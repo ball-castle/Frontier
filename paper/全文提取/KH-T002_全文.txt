@@ -1,0 +1,196 @@
+KH-T002 | Improved Baselines with Momentum Contrastive Learning
+来源：https://arxiv.org/abs/2003.04297
+本地PDF：专题文献/何恺明/KH-T002_Improved_Baselines_with_Momentum_Contrastive_Learning_arXiv2020.pdf
+SHA-256：12279a05ec386febacea77313d12fdb63eb8fde8250cd6d6fb39d88ae6ae80d9
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+              Improved Baselines with Momentum Contrastive Learning
+
+
+                             Xinlei Chen   Haoqi Fan   Ross Girshick  Kaiming He
+                                     Facebook AI Research (FAIR)
+
+
+                        Abstract                                                                            loss
+
+                                                                                                                                                                                                       loss
+            Contrastive unsupervised learning has recently shown                            affinity
+         encouraging progress, e.g., in Momentum Contrast (MoCo)                                                                                   affinity                      ...
+        and SimCLR. In this note, we verify the effectiveness of two
+          of SimCLR’s design improvements by implementing them in2020   the MoCo framework. With simple modiﬁcations to MoCo—
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    concat.             ...         namely, using an MLP projection head and more data
+        augmentation—we establish stronger baselines that outper-                                                                              queueMar   form SimCLR and do not require large training batches. We                                                             momentum                                                                                                                          encoder            encoder            encoder
+9   hope this will make state-of-the-art unsupervised learning                                                                           encoder
+         research more accessible. Code will be made public.
+
+
+         1. Introduction                                                                     (a) end-to-end          (b) Momentum Contrast
+           Recent studies on unsupervised representation learning      Figure 1. A batching perspective of two optimization mechanisms
+                                                                                     for contrastive learning. Images are encoded into a representation[cs.CV]   from images [16, 13, 8, 17, 1, 9, 15, 6, 12, 2] are converging
+                                                                                 space, in which pairwise afﬁnities are computed.        on a central concept known as contrastive learning [5]. The
+           results are promising:  e.g., Momentum Contrast (MoCo)
+          [6] shows that unsupervised pre-training can surpass its
+                                                                              fective contrastive loss function, called InfoNCE [13], is:
+         ImageNet-supervised counterpart in multiple detection and
+         segmentation tasks, and SimCLR [2] further reduces the gap
+                                                                                               exp(q·k+/τ)
+          in linear classiﬁer performance between unsupervised and        Lq,k+,{k−} = −log                                                  .   (1)
+                                                                                      exp(q·k+/τ) + X exp(q·k−/τ)         supervised pre-training representations.
+            This note establishes stronger and more feasible base-                                    k−
+          lines built in the MoCo framework. We report that two de-
+                                                              Here q is a query representation, k+ is a representation of         sign improvements used in SimCLR, namely, an MLP pro-
+                                                                         the positive (similar) key sample, and {k−} are representa-          jection head and stronger data augmentation, are orthogo-
+                                                                             tions of the negative (dissimilar) key samples. τ is a temper-          nal to the frameworks of MoCo and SimCLR, and when
+                                                                           ature hyper-parameter. In the instance discrimination pre-         used with MoCo they lead to better image classiﬁcation
+                                                                                 text task [16] (used by MoCo and SimCLR), a query and a        and object detection transfer learning results. Moreover, thearXiv:2003.04297v1                                                          key form a positive pair if they are data-augmented versions      MoCo framework can process a large set of negative sam-
+                                                                        of the same image, and otherwise form a negative pair.          ples without requiring large training batches (Fig. 1).  In
+          contrast to SimCLR’s large 4k∼8k batches, which require       The contrastive loss (1) can be minimized by various
+      TPU support, our “MoCo v2” baselines can run on a typical     mechanisms that differ in how the keys are maintained [6].
+       8-GPU machine and achieve better results than SimCLR.     In an end-to-end mechanism (Fig. 1a) [13, 8, 17, 1, 9, 2],
+      We hope these improved baselines will provide a reference      the negative keys are from the same batch and updated end-
+          for future research in unsupervised learning.                   to-end by back-propagation. SimCLR [2] is based on this
+                                                           mechanism and requires a large batch to provide a large set
+         2. Background                                            of negatives. In the MoCo mechanism (Fig. 1b) [6], the neg-
+                                                                               ative keys are maintained in a queue, and only the queries
+         Contrastive learning. Contrastive learning [5] is a frame-     and positive keys are encoded in each training batch. A mo-
+        work that learns similar/dissimilar representations from    mentum encoder is adopted to improve the representation
+         data that are organized into similar/dissimilar pairs. This     consistency between the current and earlier keys. MoCo
+        can be formulated as a dictionary look-up problem. An ef-     decouples the batch size from the number of negatives.
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+                      unsup. pre-train       ImageNet   VOC detection                                              unsup. pre-train                ImageNet
+     case   MLP aug+  cos  epochs    acc.   AP50  AP  AP75          case       MLP   aug+   cos   epochs   batch      acc.
+  supervised                             76.5    81.3  53.5  58.8       MoCo v1 [6]                         200    256     60.6
+  MoCo v1                   200     60.6    81.5  55.9  62.6        SimCLR [2]   ✓   ✓   ✓      200    256     61.9
+       (a)    ✓              200     66.2    82.0  56.4  62.6        SimCLR [2]   ✓   ✓   ✓      200   8192     66.6
+      (b)       ✓        200     63.4    82.2  56.8  63.2       MoCo v2    ✓   ✓   ✓      200    256     67.5
+       (c)    ✓  ✓        200     67.3    82.5  57.2  63.9            results of longer unsupervised training follow:
+      (d)    ✓  ✓  ✓   200     67.5    82.4  57.0  63.6        SimCLR [2]   ✓   ✓   ✓     1000   4096     69.3
+       (e)    ✓  ✓  ✓   800     71.1    82.5  57.4  64.0       MoCo v2    ✓   ✓   ✓      800    256     71.1
+
+Table 1. Ablation of MoCo baselines, evaluated by ResNet-50 for      Table 2. MoCo vs. SimCLR: ImageNet linear classiﬁer accuracy
+(i) ImageNet linear classiﬁcation, and (ii) ﬁne-tuning VOC object      (ResNet-50, 1-crop 224×224), trained on features from unsuper-
+detection (mean of 5 trials). “MLP”: with an MLP head; “aug+”:      vised pre-training. “aug+” in SimCLR includes blur and stronger
+with extra blur augmentation; “cos”: cosine learning rate schedule.      color distortion. SimCLR ablations are from Fig. 9 in [2] (we
+                                                                 thank the authors for providing the numerical results).
+Improved designs. SimCLR [2] improves the end-to-end
+variant of instance discrimination in three aspects: (i) a sub-            mechanism   batch   memory / GPU   time / 200-ep.
+stantially larger batch (4k or 8k) that can provide more neg-           MoCo      256        5.0G          53 hrs
+                                                                                   end-to-end    256        7.4G          65 hrs
+ative samples; (ii) replacing the output fc projection head                                                                                   end-to-end   4096       93.0G†             n/a
+[16] with an MLP head; (iii) stronger data augmentation.
+                                                                  Table 3. Memory and time cost in 8 V100 16G GPUs, imple-
+   In the MoCo framework, a large number of negative
+                                                           mented in PyTorch. †: based on our estimation.
+samples are readily available; the MLP head and data aug-
+mentation are orthogonal to how contrastive learning is in-
+                                                               stronger color distortion in [2] has diminishing gains in ourstantiated. Next we study these improvements in MoCo.
+                                                             higher baselines). The extra augmentation alone (i.e., no
+3. Experiments                               MLP) improves the MoCo baseline on ImageNet by 2.8%
+                                                                   to 63.4%, Table 1(b). Interestingly, its detection accuracy is
+Settings. Unsupervised learning is conducted on the 1.28M     higher than that of using the MLP alone, Table 1(b) vs. (a),
+ImageNet [3] training set. We follow two common proto-      despite much lower linear classiﬁcation accuracy (63.4%
+cols for evaluation. (i) ImageNet linear classiﬁcation: fea-      vs. 66.2%). This indicates that linear classiﬁcation accu-
+tures are frozen and a supervised linear classiﬁer is trained;     racy is not monotonically related to transfer performance
+we report 1-crop (224×224), top-1 validation accuracy. (ii)      in detection. With the MLP, the extra augmentation boosts
+Transferring to VOC object detection [4]: a Faster R-CNN     ImageNet accuracy to 67.3%, Table 1(c).
+detector [14] (C4-backbone) is ﬁne-tuned end-to-end on the
+                                                 Comparison with SimCLR. Table 2 compares SimCLR
+VOC 07+12 trainval set1 and evaluated on the VOC 07
+                                                                   [2] with our results, referred to as MoCo v2. For fair com-
+test set using the COCO suite of metrics [10]. We use the
+                                                                 parisons, we also study a cosine (half-period) learning rate
+same hyper-parameters (except when noted) and codebase
+                                                           schedule [11] which SimCLR adopts. See Table 1(d, e). Us-
+as MoCo [6]. All results use a standard-size ResNet-50 [7].
+                                                             ing pre-training with 200 epochs and a batch size of 256,
+MLP head. Following [2], we replace the fc head in MoCo    MoCo v2 achieves 67.5% accuracy on ImageNet:  this is
+with a 2-layer MLP head (hidden layer 2048-d, with ReLU).    5.6% higher than SimCLR under the same epochs and batch
+Note this only inﬂuences the unsupervised training stage;      size, and better than SimCLR’s large-batch result 66.6%.
+the linear classiﬁcation or transferring stage does not use     With 800-epoch pre-training, MoCo v2 achieves 71.1%,
+this MLP head. Also, following [2], we search for an opti-     outperforming SimCLR’s 69.3% with 1000 epochs.
+mal τ w.r.t. ImageNet linear classiﬁcation accuracy:
+                                                    Computational cost. In Table 3 we report the memory and
+       τ         0.07     0.1      0.2      0.3      0.4      0.5         time cost of our implementation. The end-to-end case re-
+   w/o MLP     60.6     60.7     59.0     58.2     57.2     56.4         ﬂects the SimCLR cost in GPUs (instead of TPUs in [2]).
+    w/ MLP     62.9     64.9     66.2     65.7     65.0     64.3
+                                                  The 4k batch size is intractable even in a high-end 8-GPU
+Using the default τ = 0.07 [16, 6], pre-training with the     machine. Also, under the same batch size of 256, the end-
+MLP head improves from 60.6% to 62.9%; switching to     to-end variant is still more costly in memory and time, be-
+the optimal value for MLP (0.2), the accuracy increases to     cause it back-propagates to both q and k encoders, while
+66.2%. Table 1(a) shows its detection results: in contrast to    MoCo back-propagates to the q encoder only.
+the big leap on ImageNet, the detection gains are smaller.
+                                                              Table 2 and 3 suggest that large batches are not necessary
+Augmentation. We extend the original augmentation in                                                                   for good accuracy, and state-of-the-art results can be made
+[6] by including the blur augmentation in [2] (we ﬁnd the                                                   more accessible. The improvements we investigate require
+   1For all entries (including the supervised and MoCo v1 baselines), we     only a few lines of code changes to MoCo v1, and we will
+ﬁne-tune for 24k iterations on VOC, up from 18k in [6].               make the code public to facilitate future research.
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+References
+
+ [1] Philip Bachman, R Devon Hjelm, and William Buchwalter.
+     Learning representations by maximizing mutual information
+     across views. arXiv:1906.00910, 2019.
+ [2] Ting Chen, Simon Kornblith, Mohammad Norouzi, and Ge-
+      offrey Hinton. A simple framework for contrastive learning
+     of visual representations. arXiv:2002.05709, 2020.
+ [3]  Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li,
+     and Li Fei-Fei. ImageNet: A large-scale hierarchical image
+     database. In CVPR, 2009.
+ [4] Mark Everingham, Luc Van Gool, Christopher KI Williams,
+     John Winn, and Andrew Zisserman. The PASCAL Visual
+     Object Classes (VOC) Challenge. IJCV, 2010.
+ [5] Raia Hadsell, Sumit Chopra, and Yann LeCun. Dimension-
+      ality reduction by learning an invariant mapping. In CVPR,
+     2006.
+ [6] Kaiming He, Haoqi Fan, Yuxin Wu, Saining Xie, and Ross
+     Girshick. Momentum contrast for unsupervised visual rep-
+      resentation learning. arXiv:1911.05722, 2019.
+ [7] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+    Deep residual learning for image recognition.  In CVPR,
+     2016.
+ [8] R Devon Hjelm, Alex Fedorov, Samuel Lavoie-Marchildon,
+     Karan Grewal, Adam Trischler, and Yoshua Bengio. Learn-
+     ing deep representations by mutual information estimation
+     and maximization. In ICLR, 2019.
+ [9] Olivier J. Hnaff, Aravind Srinivas, Jeffrey De Fauw, Ali
+     Razavi, Carl Doersch, S. M. Ali Eslami, and Aaron van den
+     Oord. Data-efﬁcient image recognition with contrastive pre-
+      dictive coding. arXiv:1905.09272v2, 2019.
+[10] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays,
+      Pietro Perona, Deva Ramanan, Piotr Doll´ar, and C Lawrence
+      Zitnick. Microsoft COCO: Common objects in context. In
+    ECCV. 2014.
+[11] Ilya Loshchilov and Frank Hutter. SGDR: Stochastic gradi-
+     ent descent with warm restarts. In ICLR, 2017.
+[12] Ishan  Misra  and  Laurens  van  der  Maaten.      Self-
+     supervised  learning  of  pretext-invariant  representations.
+     arXiv:1912.01991, 2019.
+[13] Aaron van den Oord, Yazhe Li, and Oriol Vinyals.  Rep-
+      resentation  learning  with  contrastive  predictive  coding.
+     arXiv:1807.03748, 2018.
+[14] Shaoqing Ren, Kaiming He, Ross Girshick, and Jian Sun.
+     Faster R-CNN: Towards real-time object detection with re-
+     gion proposal networks. In NeurIPS, 2015.
+[15] Yonglong Tian, Dilip Krishnan, and Phillip Isola.  Con-
+      trastive multiview coding. arXiv:1906.05849, 2019.
+[16] Zhirong Wu, Yuanjun Xiong, Stella Yu, and Dahua Lin. Un-
+     supervised feature learning via non-parametric instance dis-
+     crimination. In CVPR, 2018.
+[17] Mang Ye, Xu Zhang, Pong C Yuen, and Shih-Fu Chang. Un-
+     supervised embedding learning via invariant and spreading
+     instance feature. In CVPR, 2019.
+
+
+
+
+
+                                                 3

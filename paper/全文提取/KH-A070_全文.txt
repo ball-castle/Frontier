@@ -1,0 +1,839 @@
+KH-A070 | One-step Latent-free Image Generation with Pixel Mean Flows
+来源：https://arxiv.org/abs/2601.22158
+本地PDF：专题文献/何恺明/KH-A070_One_step_Latent_free_Image_Generation_with_Pixel_Mean_Flows_ICML2026.pdf
+SHA-256：eeb12d58cad222029d10c2549e68cb68de890dae84dcf1b1692c4368e47004a0
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+              One-step Latent-free Image Generation with Pixel Mean Flows
+
+
+
+                 Yiyang Lu * 1 Susie Lu * 1 Qiao Sun * 1 Hanhong Zhao * 1 Zhicheng Jiang 1 Xianbang Wang 1
+                                    Tianhong Li 1 Zhengyang Geng 2 Kaiming He 1
+
+
+
+                                                                                     zt          r = 1.0    r = 0.8    r = 0.5    r = 0.0        r = 1.0    r = 0.8    r = 0.5    r = 0.0
+
+
+                                                                                                                         t = 1.0
+
+
+
+                                                                                                                         t = 0.82026
+                                                                                                                         t = 0.5
+
+                                                                                                 average velocity                       denoised images
+                                                                                                                         t = 0.1                u(zt, r, t)                          x(zt, r, t)May
+9
+           Figure 1. The pixel MeanFlow (pMF) formulation, driven by the manifold hypothesis. (Left): Following MeanFlow (Geng et al.,
+            2025a), pMF aims to approximate the average velocity field u(zt, r, t) induced by the underlying ODE trajectory (black). We define a new
+              field x(zt, r, t) ≜zt −t·u(zt, r, t), which behaves like denoised images. We hypothesize that x approximately lies on a low-dimensional
+            data manifold (orange curve) and can therefore be more accurately approximated by a neural network. (Right): Visualization of the
+             quantities zt, u, x obtained by tracking an ODE trajectory via simulation. The average velocity field u corresponds to noisy images and is
+             inevitably higher-dimensional; the induced field x corresponds to approximately clean or blurred images, which can be easier to model by
+           a neural network.[cs.CV]
+
+                         Abstract                         1. Introduction
+
+            Modern diffusion/flow-based models for image                                                        Modern diffusion/flow-based models for image generation
+               generation typically exhibit two core character-                                                                        are largely characterized by two core aspects:  (i) using
+                   istics: (i) using multi-step sampling, and (ii) op-                                                                         multi-step sampling (Sohl-Dickstein et al., 2015), and (ii)
+                erating in a latent space. Recent advances have                                                                      operating in a latent space (Rombach et al., 2022). Both
+            made encouraging progress on each aspect in-                                                                        aspects concern decomposing a highly complex generation
+                 dividually, paving the way toward one-step dif-                                                                problem into more tractable subproblems. While these have
+                fusion/flow without latents.  In this work, we                                                              been the commonly used solutions,  it is valuable, from
+               take a further step towards this goal and propose                                                                  both scientific and efficiency perspectives, to investigate
+                “pixel MeanFlow” (pMF). Our core guideline is                                                                              alternatives that do not rely on these components.
+                to formulate the network output space and the
+                loss space separately. The network target is de-       The community has made encouraging progress on each
+               signed to be on a presumed low-dimensional im-         of the two aspects individually. On one hand, ConsistencyarXiv:2601.22158v3
+              age manifold (i.e., x-prediction), while the loss       Models (Song et al., 2023) and subsequent developments,
+                   is defined via MeanFlow in the velocity space.           e.g., MeanFlow (MF) (Geng et al., 2025a), have substan-
+          We introduce a simple transformation between           tially advanced few-/one-step sampling. On the other hand,
+                the image manifold and the average velocity field.         there have been promising advances in image generation in
+               In experiments, pMF achieves strong results for         the raw pixel space, e.g., using “Just image Transformers”
+               one-step latent-free generation on ImageNet at          (JiT) (Li & He, 2025). Taken together, it appears that the
+            256×256 resolution (2.22 FID) and 512×512 res-       community is now equipped with the key ingredients for
+                olution (2.48 FID), filling a key missing piece in         one-step latent-free generation.
+                  this regime. We hope that our study will further                                                             However, merging these two separate directions poses a
+              advance the boundaries of diffusion/flow-based                                                          more demanding task for the neural network, which should
+                generative models.                                                                       not be assumed to have infinite capacity in practice. On one
+                                                                  hand, in few-step modeling, a single network is responsi-
+             *Equal contribution. 1MIT 2CMU.
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+                             One-step Latent-free Image Generation with Pixel Mean Flows
+
+ble for modeling trajectories across different start and end    space, while enabling a focus on high-level semantics (via
+points; on the other hand, in the pixel space, the model must    the perceptual loss (Zhang et al., 2018)) and forgiving low-
+explicitly or implicitly perform compression and abstraction     level nuance (via the adversarial loss (Goodfellow et al.,
+(i.e., manifold learning) in the absence of pre-trained latent    2014)). Latent-based methods have become the standard
+tokenizers. Given the challenges posed by each individ-    choice for high-resolution image generation (Rombach et al.,
+ual issue, it is nontrivial to design a unified network that    2022; Peebles & Xie, 2023; Ma et al., 2024).
+simultaneously satisfies properties of both aspects.
+                                                            Pixel-space Diffusion and Flows. Before the prevalence of
+In this work, we propose pixel MeanFlow (pMF) for one-                                                            using latents, diffusion models were originally developed in
+step latent-free image generation. pMF follows the im-                                                               the pixel-space (Ho et al., 2020; Song et al., 2021b; Nichol &
+proved MeanFlow (iMF) (Geng et al., 2025b) that learns                                                           Dhariwal, 2021; Dhariwal & Nichol, 2021). These methods
+the average velocity field (namely, u) using a loss defined                                                               are in general based on a U-net structure (Ronneberger et al.,
+in the space of instantaneous velocity (namely, v). On the                                                          2015), which, unlike Vision Transformers (ViT) (Dosovit-
+other hand, following JiT (Li & He, 2025), pMF directly                                                              skiy et al., 2021), does not rely on aggressive patchification.
+parameterizes a denoised-image-like quantity (namely, x-
+prediction), which is expected to lie on a low-dimensional    There has been a recent trend in investigating pixel-space
+manifold. To accommodate both formulations, we intro-   Transformer models for diffusion and flows (Chen et al.,
+duce a conversion that relates the fields v, u, and x. We    2025a; Wang et al., 2025; Lei et al., 2026; Li & He, 2025;
+empirically show that this formulation better aligns with   Yu et al., 2025b; Ma et al., 2025; Chen et al., 2025b). To ad-
+the manifold hypothesis (Chapelle et al., 2006) and yields a    dress the high dimensionality of the patch space, a series of
+more learnable target (see Fig .1).                       work focuses on designing a “refiner head” that covers the
+                                                                    details lost in patch-based Transformers. Another solution,
+Generally speaking, pMF learns a network that directly                                                       proposed in JiT (Li & He, 2025), predicts the denoised im-
+maps noisy inputs to image pixels. It enables a “what-you-                                                        age (i.e., x) that is hypothesized to lie on a low-dimensional
+see-is-what-you-get” property, which is not the case for                                                        manifold (Chapelle et al., 2006).
+multi-step or latent-based methods. This property makes the
+usage of the perceptual loss (Zhang et al., 2018) a natural    One-step Diffusion and Flows. It is of both practical and
+component for pMF, further enhancing generation quality.     theoretical interest to study reducing steps in diffusion/flow-
+                                                       based models. Early explorations (Salimans & Ho, 2022;Experimental results show that pMF performs strongly
+                                           Meng et al., 2023) along this direction rely on distillingfor one-step latent-free generation, reaching 2.22 FID at
+                                                               pretrained multi-step models into few-step variants. Consis-256×256 and 2.48 FID at 512×512 on ImageNet (Deng
+                                                          tency Models (CM) (Song et al., 2023) demonstrate that itet al., 2009). We further demonstrate that a proper prediction
+                                                                           is possible to train one-step models from scratch. CM andtarget (Chapelle et al., 2006) is critical: directly predicting
+                                                                               its improvements (Song et al., 2024; Geng et al., 2024; Lua velocity field in pixel space leads to catastrophic perfor-
+                                & Song, 2025) aim to learn a network that maps any pointmance. Our study reveals that one-step latent-free genera-
+                                                         along the ODE trajectory to its end point.tion is becoming both feasible and competitive, marking a
+solid step toward direct generative modeling formulated as  A series of one-step models (Kim et al., 2024; Boffiet al.,
+a single, end-to-end neural network.                       2025; Frans et al., 2025; Zhou et al., 2025; Geng et al.,
+                                                        2025a;b) have been developed to characterize SDE/ODE
+2. Related Work                                               trajectories. Conceptually, these methods predict a quantity
+                                                                  that depends on two time steps along a trajectory. The
+Diffusion and Flow Matching. Diffusion models (Sohl-    designs of these different methods typically differ in what
+Dickstein et al., 2015; Ho et al., 2020; Song et al., 2021a)    quantity is to be predicted, as well as in how the quantity
+and Flow Matching (Lipman et al., 2023; Liu et al., 2023; Al-    of interest is characterized by a loss function. Our method
+bergo & Vanden-Eijnden, 2023) have become cornerstones    addresses these issues too. We provide detailed discussions
+of modern generative modeling. These approaches can be     in context later (Sec. 4.5).
+formulated as learning probability flows that transform one
+distribution into another. During inference, samples are    3. Background
+generated by solving differential equations (SDEs/ODEs),
+often through a numerical solver with multiple function   Our pMF is built on top of Flow Matching (Lipman et al.,
+evaluations.                                            2023; Liu et al., 2023; Albergo & Vanden-Eijnden, 2023),
+                                               MeanFlow (Geng et al., 2025a;b), and JiT (Li & He, 2025).
+In today’s practice, diffusion/flow-based methods often op-                                       We briefly introduce the background as follows.
+erate in a latent space (Rombach et al., 2022). The latent
+tokenizer substantially reduces the dimensionality of the
+
+
+                                                2
+
+======================== PDF 第 3 页 ========================
+                             One-step Latent-free Image Generation with Pixel Mean Flows
+
+Table 1. Prediction space and loss space. Here, all methods   Mean Flows. The MeanFlow (MF) framework (Geng et al.,
+are Transformer-based. The notations include noise ϵ, data x,
+                                                       2025a) learns an average velocity field u for few-/one-step
+instantaneous velocity v, and average velocity u. Prediction space
+is that of the direct output of the network; loss space is that of     generation. With FM’s v viewed as the instantaneous veloc-
+the regression target. When the prediction and loss spaces do      ity, MF defines the average velocity u as:
+not match, a space conversion is introduced. Here, the compared
+methods are: DiT (Peebles & Xie, 2023), SiT (Ma et al., 2024),                         1  Z t
+MeanFlow (MF) (Geng et al., 2025a), improved MF (iMF) (Geng               u(zt, r, t) ≜         v(zτ, τ)dτ,         (5)
+                                                                                                  t −r  ret al., 2025b), and JiT (Li & He, 2025).
+                                                    where r and t are two time steps: 0 ≤r ≤t ≤1. This defi-                    pred. space    conversion    loss space
+                                                                 nition leads to a MeanFlow Identity (Geng et al., 2025a;b):         DiT       ϵ                 -           ϵ
+          SiT      v                 -        v
+                                                                          d
+               u       MF                                                 -        u
+                                                                 v(zt, t) = u(zt, r, t) + (t −r) dtu(zt, r, t),    (6)               u      u →v                                  v        iMF
+           JiT      x       x →v      v
+                                                         This identity provides a way for defining a prediction func-
+       pMF     x     x →u →v     v
+                                                                 tion with a network uθ (Geng et al., 2025b):
+
+                                                  Vθ ≜uθ + (t −r) · JVPsg.             (7)
+Flow Matching. Flow Matching (FM) learns a velocity field
+v that maps a prior distribution pprior to the data distribution                                                         Here, the capital Vθ corresponds to the left-hand side
+pdata. We consider the standard linear interpolation schedule:                                                            of Eq. (6), and on the right-hand side, JVP denotes the
+                                                            Jacobian-vector product for computing dtuθ,d    with “sg” de-                   zt = (1 −t)x + tϵ                 (1)
+                                                          noting stop-gradient. We follow the JVP computation and
+with data x ∼pdata and noise ϵ ∼pprior (e.g., Gaussian),    implementation of iMF (Geng et al., 2025b), which is not
+and time t ∈[0, 1]. At t = 0, there is: z0 ∼pdata. The    the focus of our paper. With the definition in Eq. (7), iMF
+interpolation yields a conditional velocity v ≜z′t:           minimizes the v-loss like Eq. (3), i.e., ∥Vθ −v∥2. This
+                                                            formulation can be viewed as u-prediction with v-loss (see
+                v = ϵ −x                      (2)    also Tab. 1).
+
+FM optimizes a network vθ, parameterized by θ, by mini-
+                                                        4. Pixel MeanFlowmizing a loss function in the v-space (namely, “v-loss”):
+
+                                                To facilitate one-step, latent-free generation, we introduce          LFM = Et,x,ϵ∥vθ(zt, t) −v∥2.           (3)
+                                                                 pixel MeanFlow (pMF). The core design of pMF is to estab-
+It is shown (Lipman et al., 2023) that the underlying target     lish a connection between the different fields of u, v, and
+of vθ is the marginal velocity v(zt, t) ≜E[v|zt, t].           x. We want the network to directly output x, like JiT (Li &
+                                                      He, 2025), whereas one-step modeling is performed on the
+At inference time, samples are generated by solving the                                                         space of u and v as in MeanFlow (Geng et al., 2025a;b).
+ODE: dzt/dt = vθ(zt, t), from t = 1 to t = 0, with
+z1 = ϵ ∼pprior. This can be done by numerical methods                                                                    4.1. The Denoised Image Field
+such as Euler or Heun-based solvers.
+                                             As discussed in Sec. 3, both iMF (Geng et al., 2025b)
+Flow Matching with x-prediction. The quantity v in    and JiT (Li & He, 2025) can be viewed as minimizing the
+Eq. (2) is a noisy image. To facilitate the usage of Trans-    v-loss, while iMF performs u-prediction and JiT performs
+formers operated on pixels, JiT (Li & He, 2025) opts to    x-prediction. Accordingly, we introduce a connection be-
+parameterize the data x by the neural network and convert    tween u and a generalized form of x.
+it to velocity v by:1
+                                                         Consider the average velocity field u defined in Eq. (5): this
+                      1                                       field represents an underlying ground-truth quantity that
+             vθ(zt, t) :=   (zt −xθ(zt, t)),           (4)
+                              t                              depends on pdata, pprior, and the time schedule, but not on
+                                                              the network (and thus has no dependence on parameters θ).where xθ = netθ is the direct output of a Vision Trans-
+                                       We induce a new field x(zt, r, t) defined as:former (ViT) (Dosovitskiy et al., 2021). This formulation is
+referred to as x-prediction, whereas the v-loss in Eq. (2) is
+used for training. Tab. 1 lists the relation.                                 x(zt, r, t) ≜zt −t · u(zt, r, t).           (8)
+
+    1In JiT (Li & He, 2025), t = 0 corresponds to the noise side,
+in contrast to our convention of t = 1. Their convention leads to a   As detailed below, this field x serves a role similar to de-
+coefficient of 1−t,1   rather than 1t here.                          noised images. Unlike other quantities that are sometimes
+
+                                                3
+
+======================== PDF 第 4 页 ========================
+                             One-step Latent-free Image Generation with Pixel Mean Flows
+
+referred to as “x” in prior works, our field x(zt, r, t) is in-   Algorithm 1 pixel MeanFlow: training.
+dexed by two time steps, r and t: for any given zt, our x      Note: in PyTorch and JAX, jvp returns the function output and JVP.
+is a 2D field indexed by (r, t), rather than a 1D trajectory
+                                               # net: x-prediction network
+indexed only by t.                                               # x: training batch in pixels
+
+4.2. The Generalized Manifold Hypothesis              t, r = sample t r()
+                                               e = randn like(x)
+Fig. 1 visualizes the field of u and the field of x by simu-
+lating one ODE trajectory obtained from a pretrained FM    z = (1 - t) * x + t * e
+model. As illustrated, u consists of noisy images, because,
+                                               # average velocity u from x-prediction
+as a velocity field, u contains both noise and data compo-                                               def u_fn(z, r, t):
+nents. In contrast, the field x has the appearance of denoised       return (z - net(z, r, t)) / t
+images: they are nearly clean images, or overly denoised im-
+ages that appear blurry. Next, we discuss how the manifold    # instantaneous velocity v at time t
+                                               v = u_fn(z, t, t)hypothesis can be generalized to this quantity x.
+
+Note that the time step r in MF satisfies: 0 ≤r ≤t. We    # predict u and dudt
+first show that the boundary cases at r = t and r = 0    u, dudt = jvp(u_fn, (z, r, t), (v, 0, 1))
+can approximately satisfy the manifold hypothesis; we then                                               # compound function V
+discuss the case 0 < r < t.                           V = u + (t - r) * stopgrad(dudt)
+
+Boundary case I: r = t. When r = t, the average ve-   loss = metric(V, e - x)
+locity u degenerates to the instantaneous velocity v, i.e.,
+u(zt, t, t) = v(zt, t). In this case, Eq. (8) gives us:
+
+              x(zt, t, t) = zt −t · v(zt, t).            (9)    u. Our experiments in Sec. 5 and Sec. 6 show that, for
+                                                        our pixel-space model, x-prediction performs effectively,
+This is essentially the x-prediction target used in JiT (Li &    whereas u-prediction degrades severely.
+He, 2025): see Eq. (4). Intuitively, this x is the denoised
+image to be predicted by JiT. This denoised image can be     4.3. Algorithm
+blurry if the noise level is high (as it should be the expecta-
+tion of different image samples that can produce the same   The induced field x in Eq. (8) provides a re-parameterization
+noisy data zt). As widely observed in classical image de-    of the MeanFlow network. Specifically, we let the network
+noising research, these denoised images can be assumed as   netθ directly output x, and compute the corresponding
+approximately on a low-dimensional (or lower-dimensional)    velocity field u via Eq. (8) as
+manifold (Vincent et al., 2008). See the images correspond-                                                                        1
+ing to r = t in Fig. 1(right).                                           uθ(zt, r, t) =    zt −xθ(zt, r, t)  .       (11)
+                                                                                                    t
+
+                  r =Boundary case II:                           0. The definition                                         of u in Eq. (5)                                                         Here, xθ(zt, r, t) := netθ(zt, r, t) is the direct output of                                t                     1                                        1
+gives: u(zt, 0, t) = t R 0 v(zτ, τ)dτ = t (zt −z0). Substi-    the network, following JiT. This formulation is a natural
+tuting it into Eq. (8) gives:                                   extension of Eq. (4).
+
+                    x(zt, 0, t) = z0,                (10)   We incorporate uθ in (11) into the iMF formulation (Geng
+                                                                     et al., 2025b), i.e., using Eq. (7) with v-loss. Specifically,
+i.e., it is the endpoint of the ODE trajectory. For a ground-                                                         our optimization objective is:
+truth ODE trajectory, there is: z0 ∼pdata, that is, it should
+follow the image distribution. Therefore, we can assume               LpMF = Et,r,x,ϵ∥Vθ −v∥2,           (12)
+that x(zt, 0, t) is approximately on the image manifold.                                                             where  Vθ ≜uθ + (t −r) · JVPsg.
+General case: r ∈(0, t). Unlike the boundary cases, the
+                                                          Conceptually, this is v-loss with x-prediction, while x is
+quantity x(zt, r, t) is not guaranteed to correspond to an
+                                                            converted to the v-space by the relation of x →u →V for
+(possibly blurry) image sample from the data manifold. Nev-
+                                                              regressing v. Tab. 1 summarizes the relation.
+ertheless, empirically, our simulations (Fig. 1, right) suggest
+that x appears like a denoised image.  It stands in sharp   The corresponding pseudo-code is in Alg. 1. Following
+contrast to velocity-space quantities (u in Fig. 1), which   iMF (Geng et al., 2025b), this algorithm can be extended to
+are significantly noisier. This comparison suggests that x    support CFG (Ho & Salimans, 2021), which we omit here
+may be easier to model by a neural network than the noisier     for brevity and we elaborate on in the appendix.
+
+                                                4
+
+======================== PDF 第 5 页 ========================
+                             One-step Latent-free Image Generation with Pixel Mean Flows
+
+4.4. Pixel MeanFlow with Perceptual Loss
+
+The network xθ(zt, r, t) directly maps a noisy input zt to
+a denoised image. This enables a “what-you-see-is-what-
+you-get” behavior at training time. Accordingly, in addition
+to the ℓ2 loss, we can further incorporate the perceptual
+loss (Zhang et al., 2018). Latent-based methods (Rombach
+et al., 2022) benefit from perceptual losses during tokenizer
+reconstruction training, whereas pixel-based methods have
+not readily leveraged this benefit.
+
+Formally, as xθ is a denoised image in pixels, we directly
+apply the perceptual loss (e.g., LPIPS (Zhang et al., 2018))
+                                                               Figure 2. Toy Experiment. A 2D toy dataset is linearly pro-
+on it. Our overall training objective is L = LpMF + λLperc,                                                                      jected into a D-dimensional observation space using a fixed,
+where Lperc denotes the perceptual loss between xθ and   D×2 column-orthonormal projection matrix. We train Mean-
+the ground-truth clean image x, and λ is a weight hyper-    Flow models with either the original u-prediction or the proposed
+parameter. In practice, the perceptual loss can be applied     x-prediction, for D ∈{2, 8, 16, 512}. We visualize 1-NFE gen-
+only when the added noise is below a certain threshold (i.e.,     eration results. The models use the same 7-layer ReLU MLP
+                                                          backbone with 256 hidden units. The x-prediction formulation
+t ≤tthr), such that the denoised image is not too blurry.                                                             produces reasonably good results, whereas u-prediction fails in
+We investigate the standard LPIPS loss based on the VGG     the case of high-dimensional observation spaces.
+classifier (Simonyan & Zisserman, 2015) and a variant based
+on ConvNeXt-V2 (Woo et al., 2023) (see Appendix A).
+                                                                   further re-parameterization may be desired in the demanding
+                                                             scenario considered in this paper.4.5. Relation to Prior Works
+
+Our pMF is closely related to several prior few-/one-step
+                                                        5. Toy Experiments
+methods, which we discuss next. The relations and differ-
+ences involve the prediction target and training formulation.  We demonstrate with a 2D toy experiment (Fig. 2) that x-
+                                                              prediction is preferable in MeanFlow when the underlyingConsistency Models (CM) (Song et al., 2023; 2024; Geng
+                                                            data lie on a low-dimensional manifold. The experimentalet al., 2024; Lu & Song, 2025) learn a mapping from a noisy
+                                                                   setting follows the one in Li & He (2025).sample zt directly to a generated image. In our notation,
+this corresponds to fixing the endpoint to r = 0. In our    Formally, we consider an underlying data distribution (here,
+(r, t)-coordinate plane, this amounts to sampling along the    Swiss roll) defined on a 2D space. The data is projected into
+line of r = 0 for any t.                                    a D-dimensional observation space using a D×2 column-
+                                                         orthogonal matrix. We train MeanFlow models on the D-In addition, while consistency models aim to predict an
+                                                dim observation space, for D ∈{2, 8, 16, 512}. We com-image, they often employ a pre-conditioner (Karras et al.,
+                                                          pare the u-prediction in Geng et al. (2025b) with our x-2022) that modifies the underlying prediction target. In our
+                                                                prediction. The network is a 7-layer ReLU MLP with 256notation, their xθ has a form of xθ := cskip · zt + cout ·
+                                                        hidden units.netθ. Unless cskip is zero, the network does not perform
+x-prediction. We provide ablation study in experiments.       Fig. 2 shows that x-prediction performs reasonably well,
+                                                     whereas u-prediction degrades rapidly when D increases.Consistency Trajectory Models (CTM) (Kim et al., 2024)
+                                        We observe that this performance gap is reflected by the dif-formulate a two-time quantity and enable flexible (r, t)-
+                                                             ferences in the training loss (noting that both minimize theplane modeling. Unlike MeanFlow, which is based on a
+                                                same v-loss): x-prediction yields lower training loss thanderivative formulation, CTM relies on integrating the ODE
+                                                              the u-prediction counterpart. This suggests that predictingduring training. Besides, CTM adopts a pre-conditioner,
+                                          x is easier for a network with limited capacity.similar to CM, and therefore does not directly output the
+image through the network.
+                                                        6. ImageNet Experiments
+Flow Map Matching (FMM) (Boffi et al., 2025) is also
+based on a two-time quantity (referred to as a Flow Map),  We conduct ablation on ImageNet (Deng et al., 2009) at
+for which several training objectives have been developed.    resolution 256×256 by default. We report Fr´echet Inception
+In our notation, the Flow Map plays a role like displacement,    Distance (FID; Heusel et al. (2017)) on 50,000 generated
+i.e., zt −zr. This quantity generally does not lie on a low-    samples. All of our models generate raw pixel images with
+dimensional manifold (e.g., z1 −z0 is a noisy image), and a    a single function evaluation (1-NFE).
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+                             One-step Latent-free Image Generation with Pixel Mean Flows
+
+Table 2.  x-prediction is crucial for high-dimensional pixel-        80
+                                                                                                                     Adamspace generation. We compare x- and u-prediction on ImageNet
+                                                                                                                            Muon
+using a fixed sequence length of 162.  (a): At 64×64 resolu-        60
+tion, the patch dimension is 48 (4×4×3). Both prediction targets     FID
+work well. (b): At 256×256 resolution, the patch dimension is         40
+768 (16×16×3). u-prediction fails catastrophically, whereas x-                                                                                                    1-NFE
+prediction performs reasonably well. This baseline (with 9.56         20                                                           18.88
+FID) is our ablation setting. For fair comparison, no bottleneck                                                                                                                                                         9.56
+embedding (Li & He, 2025) is adopted in our ablation. (Settings:         0
+Muon optimizer, MSE loss, 160 epochs).                                  0          40          80         120         160
+                                                                                 Epochs
+       img    model  patch   seq   patch     1-NFE FID          (a) Muon vs. Adam. Muon converges faster and achieves bet-
+         size      arch    size    len   dim    x-pred   u-pred        ter FID. At 320 epochs, Adam reaches 11.86 FID, while Muon
+                                                                  achieves 8.71 FID. (Settings: pMF-B/16, MSE loss) (a)  64×64    B/4    42    162    48       3.80       3.82
+ (b) 256×256   B/16   162   162    768      9.56     164.89
+                                                                       20
+                                                                                                             MSE
+                                                                                            + LPIPS
+                                                                       15                               + LPIPS + ConvNeXtWe adopt the iMF architecture (Geng et al., 2025b), which     FID
+is a variant of the DiT design (Peebles & Xie, 2023). Un-        10                                                              9.56
+less specified, we set the patch size to 16×16 (denoted as        1-NFE                                                                5.62                                                                        5pMF/16). Ablation models are trained from scratch for 160                                                                                                                                                         3.53
+epochs. More details are in Appendix A.
+                                                                        0                                                                         0          40          80         120         160
+6.1. Prediction Targets of the Network                                             Epochs
+                                                                       (b) Perceptual loss. Using standard VGG-based LPIPS as well
+Our method is based on the manifold hypothesis, which     as a ConvNeXt-based variant leads to improved FID. (Settings:
+assumes that x is in a low-dimensional manifold and easier    pMF-B/16, Muon optimizer)
+to predict. We verify this assumption in Tab. 2.                                                               Figure 3. Training curves of pMF on ImageNet 256×256 with
+                                                                       pixel-space, 1-NFE generation.First, we consider the case of 64×64 resolution as a simpler
+setting. With a patch size of 4×4, the patch dimension is 48
+(4×4×3). This dimensionality is substantially lower than    suggests that the benefit of faster convergence is more pro-
+the network capacity (hidden dimension 768). As a result,   nounced in our single-step setting. In MeanFlow, the stop-
+pMF performs well under both x- and u-prediction.           gradient target (e.g., Eq. (12)) depends on the network eval-
+                                                               uation, and a better network in early epochs (enabled by
+Next, we consider the case of 256×256 resolution. With a
+                                                Muon) can provide a more accurate target. Accordingly, the
+patch size of 16×16, as common practice, the patch dimen-
+                                                                 benefit of faster convergence is further amplified.
+sion is 768 (16×16×3). This leads to a high-dimensional
+observation space that is more difficult for a neural net-    Perceptual loss. Thus far, our ablation studies are con-
+work to model. In this case, only x-prediction performs    ducted using a simple ℓ2 loss. In Fig. 3b, we further incorpo-
+well, suggesting that x is on a lower-dimensional manifold     rate perceptual loss. Using the standard VGG-based LPIPS
+and is therefore more amenable to learning. In contrast,   (Zhang et al., 2018) improves FID from 9.56 to 5.62; incor-
+u-prediction fails catastrophically: as a noisy quantity, u    porating a ConvNeXt-V2 variant (Woo et al., 2023) further
+has full support in the high-dimensional space and is much    improves FID to 3.53. Overall, incorporating perceptual
+harder to model. These observations are consistent with     loss leads to an improvement of about 6 FID points.
+those in Li & He (2025).
+                                                            In standard latent-based methods (Rombach et al., 2022),
+6.2. Ablations Studies                                      perceptual loss plays a key role in training the VAE tok-
+                                                               enizer (often in conjunction with an adversarial loss, which
+We further ablate other important factors, discussed next.
+                                           we do not investigate). We note that the VAE decoder di-
+                                                                   rectly outputs a reconstructed image (i.e., x) in pixel space,Optimizer. We find that the choice of optimizer plays an
+                                                   making the use of perceptual loss amenable. As our genera-important role in pMF. In Fig. 3a, we compare the standard
+                                                                      tor likewise outputs x in pixel space in one step, it naturallyAdam optimizer (Kingma & Ba, 2015) with the recently
+                                                                 benefits from the same property.proposed Muon (Jordan et al., 2024). Muon exhibits faster
+convergence and substantially improved FID.
+                                                          Alternative:  pre-conditioner.   Pre-conditioners (Kar-
+In our preliminary experiments, we compared Adam with     ras et  al., 2022) have been a common strategy for re-
+Muon on multi-step diffusion: while Muon exhibits faster    parameterizing the predict target. Using our notation, a
+convergence, we did not observe a final improvement. This    pre-conditioner performs: xθ =  cskip · zt + cout · netθ.
+
+                                                6
+
+======================== PDF 第 7 页 ========================
+                             One-step Latent-free Image Generation with Pixel Mean Flows
+
+Table 3. Alternative designs of pMF, evaluated on ImageNet    Table 4.  High-resolution generation on ImageNet. We fix
+256×256 with pixel-space, 1-NFE generation. (Settings: pMF-    sequence length (162) by increasing patch size, pMF performs
+B/16, Muon optimizer, w/ perceptual loss, 160 epochs)               strongly despite the extremely high per-patch dimensionality. (Set-
+                                                                            tings: Muon optimizer, w/ perceptual loss, 160 epochs)                    pre-conditioned x-pred            x-pred
+                   linear    EDM-style   sCM-style   (no pre-cond)           img     model   patch    seq    patch   hidden   1-NFE
+ 1-NFE FID    34.61       14.43       13.81         3.53                   size       arch     size     len    dim     dim     FID
+                                                            256×256   B/16    162    162     768     768      3.53
+(a) Comparison with pre-conditioners. A pre-conditioner trans-
+                                                            512×512   B/32    322    162    3072     768      4.06
+forms the direct network output into x, and may therefore cause it
+                                                            1024×1024  B/64    642    162    12288    768      4.58to deviate from a low-dimensional manifold.
+                                                                  Table 5. Scalability. Increasing the model size and training epochs              time sampler           1-NFE FID
+                                                             improves results. (Settings: Muon optimizer, w/ perceptual loss)
+              only r = t                 194.53
+              only r = 0                 389.28                                                        1-NFE FID
+              only r = t and r = 0        106.59                                   depth  width  # params  Gflops   160-ep   320-ep
+            0 ≤r ≤t (ours)             3.53                          B/16    16    768    119      34       3.53      3.12
+                                                                       L/16    32    1024    411     117      2.85      2.52
+(b) Comparison on time samplers. Our method, following Mean-        H/16    48    1280    956     271      2.57      2.29
+Flow, performs time sampling in the (r, t)-coordinate plane. Our
+sampler covers the full region in 0 ≤r ≤t. Restricting to a single                                                             derlying dimensionality does not grow proportionally. This
+line (r = t, or r = 0) or to both lines leads to failure.
+                                                            enables a highly FLOP-efficient solution for high-resolution
+                                                              generation, e.g., as will be shown in Tab. 7 at 512×512.
+We compare three variants of pre-conditioners: (i) linear
+(cskip = 1 −t, cout = t); (ii) the EDM style (Karras et al.,    Scalability. In Tab. 5, we report results of increasing the
+2022); and (iii) the sCM style (Lu & Song, 2025).                                                   model size and training epochs. As expected, pMF benefits
+Tab. 3a compares the pre-conditioners used in place of    from scaling along both axes.  Qualitative examples are
+pMF’s x-prediction. Both the EDM- and sCM-style pre-    provided in Fig. 4 and Appendix B.
+conditioners outperform a naive linear variant, suggesting
+                                                                    6.3. System-level Comparisons
+that performance depends strongly on the choice of param-
+eterization. However, in the very high-dimensional input   We compare with previous methods in Tab. 6 (256×256)
+regime considered here, our simple x-prediction is prefer-   and Tab. 7 (512×512). Given that few existing methods are
+able and achieves better performance. This is because, un-    both one-step and latent-free, we include multi-step and/or
+less cskip = 0, the network prediction deviates from the    latent-based methods for reference. We consider methods
+x-space and may lie on a higher-dimensional manifold.        that are trained from scratch, without distillation.
+
+Alternative: time samplers. Our method performs time    ImageNet 256×256. Tab. 6 shows that our method achieves
+sampling in the (r, t)-coordinate plane. We study alternative    2.22 (at 360 epochs). To our knowledge, the only other
+designs that restrict time sampling to specific cases: (i) only    method in this category (one-step, latent-free diffusion/flow)
+r = t, which amounts to Flow Matching; (ii) only r = 0,     is the recently proposed EPG (Lei et al., 2026), which
+which conceptually analogize the CM (Song et al., 2023)    reaches 8.82 FID with self-supervised pre-training.
+regime; and (iii) a combination of both.
+                                       GANs (Goodfellow et al., 2014) are another category of
+Tab. 3b shows the results of these restricted time samplers.   methods that are competitive for one-step, latent-free gener-
+None of these alternatives is sufficient to address the chal-    ation. In comparison with the leading GAN results, our pMF
+lenging scenario considered here. This comparison suggests    achieves comparable FID with substantially lower compute,
+that MeanFlow methods leverage the relations across (r, t)    as well as better scalability. In contrast to the GAN methods
+points to learn the field, and restricting time sampling to one     in Tab. 6, which are ConvNet-based, our pMF adopts large-
+or two lines may undermine this formulation.                 patch Vision Transformers, which are more FLOPs-efficient.
+                                                        For example, StyleGAN-XL (Sauer et al., 2022) costs 1574
+High-resolution generation. In Tab. 4, we investigate pMF    Gflops per forward, 5.8× more than our pMF-H/16.
+at resolution 256, 512, and 1024. We keep the sequence
+                                                 Compared to multi-step and/or latent-based methods, pMFlength unchanged (162), thereby roughly maintaining the
+                                                        remains competitive and substantially narrows the gap.computational cost across different resolutions. Doing so
+leads to an aggressively large patch size (e.g., 642) and patch
+                                                 ImageNet 512×512. Tab. 7 shows that pMF achieves 2.48
+dimensionality (e.g., 12288).
+                                              FID at 512×512. Notably, it produces these results with a
+Tab. 4 shows that pMF can effectively handle this highly    computational cost (in terms of both parameter count and
+challenging case. Even though the observation space is    Gflops) comparable to its 256×256 counterpart. In fact, the
+high-dimensional, our model always predicts x, whose un-    only overhead comes from the patch embedding and pre-
+
+                                                7
+
+======================== PDF 第 8 页 ========================
+                             One-step Latent-free Image Generation with Pixel Mean Flows
+
+Table 6. System-level comparison on ImageNet 256×256 gen-    Table 7. System-level comparison on ImageNet 512×512 gen-
+eration. FID and IS (Salimans et al., 2016) are evaluated on 50k     eration. pMF employs an aggressive patch size of 32, resulting
+samples, reported with CFG if applicable. ×2 in NFEs indicates     in low computational cost similar to 256×256, while achieving
+that CFG doubles NFEs at inference time. All parameters and     strong performance. Notations are similar to Tab. 6. [1] Peebles & Xie
+Gflops are reported as “generator (decoder)” for latent-space mod-      2023, [2] Ma et al. 2024, [3] Yu et al. 2025a, [4] Zheng et al. 2026, [5] Dhariwal & Nichol 2021,
+els. Gflops are for a single forward pass. The properties of 1-NFE        [6] Hoogeboom et al. 2023, [7] Kingma & Gao 2023, [8] Hoogeboom et al. 2025, [9] Li & He 2025,
+or pixel-space are highlighted by blue.  [1] Peebles & Xie 2023, [2] Ma et al.       [10] Lu & Song 2025, [11] Hu et al. 2025, [12] Brock et al. 2019, [13] Sauer et al. 2022.
+2024, [3] Yu et al. 2025a, [4] Zheng et al. 2026, [5] Dhariwal & Nichol 2021, [6] Hoogeboom     ImgNet 512×512      NFE  space    params      Gflops   FID ↓  IS ↑
+et al. 2023, [7] Kingma & Gao 2023, [8] Hoogeboom et al. 2025, [9] Li & He 2025, [10] Yu et al.       Multi-step Latent-space Diffusion/Flow
+2025b, [11] Song et al. 2024, [12] Frans et al. 2025, [13] Geng et al. 2025a, [14] Geng et al. 2025b,      DiT-XL/2 [1]        250×2 latent 675M (49M) 525 (1230)  3.04  240.8
+[15] Brock et al. 2019, [16] Sauer et al. 2022, [17] Kang et al. 2023, [18] Lei et al. 2026.             SiT-XL/2 [2]         250×2 latent 675M (49M) 525 (1230)  2.62  252.2
+                                                                             SiT-XL/2 + REPA [3]   250×2 latent 675M (49M) 525 (1230)  2.08  274.6
+ ImgNet 256×256      NFE  space    params      Gflops  FID ↓  IS ↑                                                       RAE + DiTDH-XL/2 [4] 50×2  latent 831M (415M) 642 (408)   1.13  259.6
+ Multi-step Latent-space Diffusion/Flow                                                 Multi-step Pixel-space Diffusion/Flow
+  DiT-XL/2 [1]        250×2  latent 675M (49M)  119 (310)  2.27  278.2     ADM-G [5]         250×2  pixel    559M       1983     7.72  172.7
+  SiT-XL/2 [2]         250×2  latent 675M (49M)  119 (310)  2.06  277.5        SiD, UViT [6]         1000×2  pixel     2.5B        555     3.02  248.7
+  SiT-XL/2 + REPA [3]   250×2  latent 675M (49M)  119 (310)  1.42  305.7     VDM++ [7]         256×2  pixel     2.5B        555     2.65  278.1
+ RAE + DiTDH-XL/2 [4] 50×2  latent 839M (415M) 146 (106)  1.13  262.6        SiD2, Flop Heavy [8]   512×2  pixel          -         653     1.48      -
+ Multi-step Pixel-space Diffusion/Flow                                               JiT-G/32 [9]         100×2  pixel     2B        384     1.78  306.8
+ ADM-G [5]         250×2  pixel    554M      1120    4.59  186.7      1-NFE Latent-space Diffusion/Flow
+  SiD, UViT [6]         1000×2  pixel     2.5B       555     2.44  256.3      sCT-XXL [10]           1     latent  1.5B (49M)  552 (1230)  4.29      -
+ VDM++ [7]         256×2  pixel     2.5B       555     2.12  267.7      MeanFlow-RAE [11]      1     latent 841M (415M) 643 (408)   3.23      -
+  SiD2, Flop Heavy [8]   512×2  pixel          -         653     1.38      -        1-NFE Pixel-space GAN
+  JiT-G/16 [9]         100×2  pixel     2B        383     1.82  292.6       BigGAN-deep [12]       1     pixel    56M        76      7.50  152.8
+  PixelDiT-XL/16 [10]   100×2  pixel    797M       311     1.61  292.7      StyleGAN-XL [13]       1     pixel    168M       2061     2.41  267.8
+ 1-NFE Latent-space Diffusion/Flow                                        1-NFE Pixel-space Diffusion/Flow
+  iCT-XL/2 [11]           1     latent 675M (49M)  119 (310) 34.24     -        pMF-B/32 (ours)        1     pixel    120M        34      3.70  271.9
+  Shortcut-XL/2 [12]       1     latent 676M (49M)  119 (310) 10.60 102.7      pMF-L/32 (ours)        1     pixel    413M       117     2.75  276.8
+ MeanFlow-XL/2 [13]      1     latent 676M (49M)  119 (310)  3.43  247.5      pMF-H/32 (ours)        1     pixel    959M       272     2.48  284.9
+ iMF-XL/2 [14]           1     latent 610M (49M)  175 (310)  1.72  282.0
+ 1-NFE Pixel-space GAN
+ BigGAN-deep [15]       1     pixel    56M        59     6.95  171.4
+ StyleGAN-XL [16]       1     pixel    166M      1574    2.30  260.1
+ GigaGAN [17]           1     pixel    569M            -      3.45  225.5
+ 1-NFE Pixel-space Diffusion/Flow
+ EPG-L/16 [18]           1     pixel    540M       113     8.82      -
+ pMF-B/16 (ours)         1     pixel    118M       33     3.12  254.6
+ pMF-L/16 (ours)         1     pixel    410M       117     2.52  262.6
+ pMF-H/16 (ours)        1     pixel    956M       271     2.22  268.8                        class 12: house finch, linnet, Carpodacus mexicanus
+
+
+diction layers, which have more channels; all Transformer
+blocks maintain the same computational cost.
+
+Overhead of latent decoders. We note that, with the
+progress of one-step methods, the overhead of the latent de-                                         class 309: bee
+coder is no longer negligible. This overhead has frequently
+been overlooked in prior studies. For example, the standard
+SD-VAE decoder (Rombach et al., 2022) takes 310G and
+1230G flops at resolution 256 and 512, which alone exceeds
+the computational cost of our entire generator.
+                                                                                                                               class 698: palace
+7. Conclusion
+
+In essence, an image generation model is a mapping from
+noise to image pixels. Due to the inherent challenges of
+generative modeling, the problem is commonly decomposed
+into more tractable subproblems, involving multiple steps                                       class 825: stone wall
+and stages. While effective, these designs deviate from the
+end-to-end spirit of deep learning.
+
+Our study on pMF suggests that neural networks are highly
+expressive mappings and, when appropriately designed, are
+capable of learning complex end-to-end mappings, e.g., di-
+                                                                                                                              class 973: coral reef
+rectly from noise to pixels. Beyond its practical potential,
+                                                               Figure 4. Qualitative results of 1-NFE pixel-space generation
+we hope that our work will encourage future exploration of                                                      on ImageNet 256×256. We show uncurated results of pMF-H/16
+direct, end-to-end generative modeling.                     on the five classes listed here; more are in Appendix B.
+
+                                                8
+
+======================== PDF 第 9 页 ========================
+                             One-step Latent-free Image Generation with Pixel Mean Flows
+
+Acknowledgements                               Geng, Z., Lu, Y., Wu, Z., Shechtman, E., Kolter, J. Z.,
+                                                      and He, K.   Improved mean flows: On the chal-
+We greatly thank Google TPU Research Cloud (TRC) for                                                             lenges of fastforward generative models. arXiv preprint
+granting us access to TPUs. S. Lu, Q. Sun, H. Zhao, Z.                                                           arXiv:2512.02012, 2025b.
+Jiang and X. Wang are supported by the MIT Undergraduate
+Research Opportunities Program (UROP). We thank our    Goodfellow, I. J., Pouget-Abadie, J., Mirza, M., Xu, B.,
+group members for helpful discussions and feedback.           Warde-Farley, D., Ozair, S., Courville, A., and Bengio, Y.
+                                                             Generative adversarial nets. In NeurIPS, 2014.
+References                                                        Goyal,   P.,  Doll´ar,  P.,  Girshick,  R.,  Noordhuis,   P.,
+Albergo, M. S. and Vanden-Eijnden, E. Building normaliz-     Wesolowski, L., Kyrola, A., Tulloch, A., Jia, Y., and
+  ing flows with stochastic interpolants. In ICLR, 2023.        He, K. Accurate, large minibatch sgd: Training imagenet
+                                                                    in 1 hour. arXiv preprint arXiv:1706.02677, 2017.
+Boffi, N. M., Albergo, M. S., and Vanden-Eijnden, E. Flow
+  map matching with stochastic interpolants: A mathemati-    Heusel, M., Ramsauer, H., Unterthiner, T., Nessler, B., and
+   cal framework for consistency models. TMLR, 2025.          Hochreiter, S. Gans trained by a two time-scale update
+                                                                  rule converge to a local nash equilibrium. In NeurIPS,
+Brock, A., Donahue, J., and Simonyan, K. Large scale gan      2017.
+   training for high fidelity natural image synthesis. In ICLR,
+                                                   Ho, J. and Salimans, T. Classifier-free diffusion guidance.
+  2019.
+                                                               In NeurIPS Workshop, 2021.
+
+Chapelle, Olivier, Sch¨olkopf, Bernhard, Zien, and Alexan-                                                   Ho, J., Jain, A., and Abbeel, P. Denoising diffusion proba-
+   der. Semi-Supervised Learning. MIT Press, Cambridge,                                                                             bilistic models. In NeurIPS, 2020.
+  MA, USA, 2006.
+                                                  Hoogeboom, E., Heek, J., and Salimans, T. Simple diffusion:
+Chen, S., Ge, C., Zhang, S., Sun, P., and Luo, P. Pixelflow:      End-to-end diffusion for high resolution images. In ICML,
+  Pixel-space generative models with flow. arXiv preprint      2023.
+  arXiv:2504.07963, 2025a.
+                                                 Hoogeboom, E., Mensink, T., Heek, J., Lamerigts, K., Gao,
+Chen, Z., Zhu, J., Chen, X., Zhang, J., Hu, X., Zhao, H.,       R., and Salimans, T. Simpler diffusion (sid2): 1.5 fid on
+  Wang, C., Yang, J., and Tai, Y. Dip: Taming diffusion      imagenet512 with pixel-space diffusion. In CVPR, 2025.
+  models in pixel space. arXiv preprint arXiv:2511.18822,
+  2025b.                                           Hu, Z., Lai, C.-H., Wu, G., Mitsufuji, Y., and Ermon, S.
+                                                     Meanflow transformers with representation autoencoders.
+Deng, Jia, Dong, Wei, Socher, Richard, Li, Li-Jia, Li, Kai,      arXiv preprint arXiv:2511.13019, 2025.
+   Fei-Fei, and Li.  Imagenet: A large-scale hierarchical
+                                                            Jordan, Keller, Jin, Yuchen, Boza, Vlado, Jiacheng, You,  image database. In CVPR, 2009.
+                                                                  Cecista, Franz, Newhouse, Laker, Bernstein, and Jeremy.
+                                                  Muon: An optimizer for hidden layers in neural networks,Dhariwal, P. and Nichol, A. Diffusion models beat gans on
+                                                         2024.  URL https://kellerjordan.github.  image synthesis. In NeurIPS, 2021.
+                                              io/posts/muon.
+Dosovitskiy, A., Beyer, L., Kolesnikov, A., Weissenborn,
+                                                   Kang, M., Zhu, J.-Y., Zhang, R., Park, J., Shechtman, E.,
+   D., Zhai, X., Unterthiner, T., Dehghani, M., Minderer,
+                                                                      Paris, S., and Park, T. Scaling up gans for text-to-image
+  M., Heigold, G., Gelly, S., Uszkoreit, J., and Houlsby, N.
+                                                                   synthesis. In CVPR, 2023.
+  An image is worth 16x16 words: Transformers for image
+   recognition at scale. In ICLR, 2021.                       Karras, T., Aittala, M., Aila, T., and Laine, S. Elucidating
+                                                                  the design space of diffusion-based generative models. In
+Frans, K., Hafner, D., Levine, S., and Abbeel, P. One step                                                         NeurIPS, 2022.
+   diffusion via shortcut models. In ICLR, 2025.
+                                                 Kim, D., Lai, C.-H., Liao, W.-H., Murata, N., Takida, Y.,
+Geng, Z., Pokle, A., Luo, W., Lin, J., and Kolter, J. Z.      Uesaka, T., He, Y., Mitsufuji, Y., and Ermon, S. Consis-
+  Consistency models made easy. In ICLR, 2024.              tency trajectory models: Learning probability flow ode
+                                                                     trajectory of diffusion. In ICLR, 2024.
+Geng, Z., Deng, M., Bai, X., Kolter, J. Z., and He, K. Mean
+  flows for one-step generative modeling.  In NeurIPS,   Kingma, D. P. and Ba, J. Adam: A method for stochastic
+  2025a.                                                       optimization. In ICLR, 2015.
+
+                                                9
+
+======================== PDF 第 10 页 ========================
+                             One-step Latent-free Image Generation with Pixel Mean Flows
+
+Kingma, D. P. and Gao, R. Understanding diffusion ob-    Sauer, A., Schwarz, K., and Geiger, A. Stylegan-xl: Scaling
+   jectives as the elbo with simple data augmentation. In       stylegan to large diverse datasets. In SIGGRAPH, 2022.
+  NeurIPS, 2023.
+                                                    Simonyan, K. and Zisserman, A. Very deep convolutional
+Lei, J., Liu, K., Berner, J., Yu, H., Zheng, H., Wu, J., and      networks for large-scale image recognition.  In ICLR,
+  Chu, X. There is no vae: End-to-end pixel-space genera-      2015.
+   tive modeling via self-supervised pre-training. In ICLR,
+                                                              Sohl-Dickstein, J., Weiss, E. A., Maheswaranathan, N., and  2026.
+                                                            Ganguli, S. Deep unsupervised learning using nonequi-
+Li, T. and He, K. Back to basics: Let denoising generative       librium thermodynamics. In ICML, 2015.
+  models denoise. arXiv preprint arXiv:2511.13720, 2025.
+                                                      Song, Yang, Dhariwal, and Prafulla. Improved techniques
+Lipman, Y., Chen, R. T. Q., Ben-Hamu, H., Nickel, M., and       for training consistency models. In ICLR, 2024.
+  Le, M. Flow matching for generative modeling. In ICLR,
+  2023.                                               Song, J., Meng, C., and Ermon, S. Denoising diffusion
+                                                                    implicit models. In ICLR, 2021a.
+Liu, X., Gong, C., and Liu, Q.  Flow straight and fast:
+  Learning to generate and transfer data with rectified flow.    Song, Y., Sohl-Dickstein, J., Kingma, D. P., Kumar, A., Er-
+  In ICLR, 2023.                                      mon, S., and Poole, B. Score-based generative modeling
+                                                            through stochastic differential equations. In ICLR, 2021b.
+Lu, C. and Song, Y. Simplifying, stabilizing and scaling
+  continuous-time consistency models. In ICLR, 2025.       Song, Y., Dhariwal, P., Chen, M., and Sutskever, I. Consis-
+                                                             tency models. In ICML, 2023.
+Lu, Y., Sun, Q., Wang, X., Jiang, Z., Zhao, H., and He, K.
+  Bidirectional normalizing flow: From data to noise and    Vincent, Pascal, Larochelle, Hugo, Bengio, Yoshua, Man-
+  back. arXiv preprint arXiv:2512.10953, 2025.                 zagol, and Pierre-Antoine.  Extracting and composing
+                                                              robust features with denoising autoencoders. In ICML,
+Ma, N., Goldstein, M., Albergo, M. S., Boffi, N. M., Vanden-                                                          2008.
+  Eijnden, E., and Xie, S. Sit: Exploring flow and diffusion-
+  based generative models with scalable interpolant trans-   Wang, S., Gao, Z., Zhu, C., Huang, W., and Wang, L.
+  formers. In ECCV, 2024.                                   Pixnerd: Pixel neural field diffusion.  arXiv preprint
+                                                           arXiv:2507.23268, 2025.
+Ma, Z., Wei, L., Wang, S., Zhang, S., and Tian, Q. Deco:
+  Frequency-decoupled pixel diffusion for end-to-end im-   Woo, S., Debnath, S., Hu, R., Chen, X., Liu, Z., Kweon,
+  age generation. arXiv preprint arXiv:2511.19365, 2025.          I. S., and Xie, S. Convnext v2: Co-designing and scaling
+                                                            convnets with masked autoencoders. In CVPR, 2023.
+Meng, C., Rombach, R., Gao, R., Kingma, D. P., Ermon,
+   S., Ho, J., and Salimans, T. On distillation of guided    Yu, S., Kwak, S., Jang, H., Jeong, J., Huang, J., Shin, J., and
+   diffusion models. In CVPR, 2023.                            Xie, S. Representation alignment for generation: Training
+                                                                  diffusion transformers is easier than you think. In ICLR,
+Nichol, A. and Dhariwal, P. Improved denoising diffusion
+                                                           2025a.
+   probabilistic models. In ICML, 2021.
+                                                       Yu, Y., Xiong, W., Nie, W., Sheng, Y., Liu, S., and Luo, J.
+Peebles, W. and Xie, S.  Scalable diffusion models with
+                                                                     Pixeldit: Pixel diffusion transformers for image genera-
+  transformers. In ICCV, 2023.
+                                                                         tion. arXiv preprint arXiv:2511.20645, 2025b.
+Rombach, R., Blattmann, A., Lorenz, D., Esser, P., and
+                                                       Zhang, R., Isola, P., Efros, A. A., Shechtman, E., and Wang,
+  Ommer, B. High-resolution image synthesis with latent
+                                                     O. The unreasonable effectiveness of deep features as a
+   diffusion models. In CVPR, 2022.
+                                                               perceptual metric. In CVPR, 2018.
+Ronneberger, O., Fischer, P., and Brox, T. U-net: Convolu-
+                                                     Zheng, B., Ma, N., Tong, S., and Xie, S. Diffusion trans-
+   tional networks for biomedical image segmentation. In
+                                                            formers with representation autoencoders. In ICLR, 2026.
+  MICCAI, 2015.
+                                                       Zhou, L., Ermon, S., and Song, J. Inductive moment match-Salimans, T. and Ho, J.  Progressive distillation for fast
+                                                                     ing. In ICML, 2025.  sampling of diffusion models. In ICLR, 2022.
+
+Salimans, T., Goodfellow, I., Zaremba, W., Cheung, V.,
+  Radford, A., and Chen, X.  Improved techniques for
+   training gans. In NeurIPS, 2016.
+
+                                                10
+
+======================== PDF 第 11 页 ========================
+                             One-step Latent-free Image Generation with Pixel Mean Flows
+
+Table 8. Configurations and hyper-parameters. †: for ablation    Algorithm 2 pixel MeanFlow: training guidance.
+studies.  [1] Li & He 2025, [2] Jordan et al. 2024, [3] Goyal et al. 2017.                                                                                 Note: in PyTorch and JAX, jvp returns the function output and JVP.
+     configs            pMF-B    pMF-L    pMF-H                                               # net: x-prediction network
+     depth                  16         32         48           # x, c: training and condition batch
+     hidden dim            768       1024       1280
+      attn heads              12         16         16           t, r, w = sample t r cfg()
+     patch size               image size / 16             e = randn like(x)
+     noise scale              image size / 256
+     aux-head depth                     8                   z = (1 - t) * x + t * e
+      class tokens                        8
+     time tokens                        4                   # average velocity u from x-prediction
+     guidance tokens                    4                   def u_fn(z, r, t, w, c):
+      interval tokens                      4                      return (z - net(z, r, t, w, c)) / t
+     bottleneck dim [1]       128        128        256
+      linear layer init         N(0, σ2), σ2 = 0.1/fan in          # cond and uncond instantaneous velocity v
+                                               v_c = u_fn(z, t, t, w, c)     epochs              160† / 320     320        360
+                                               v_u = u_fn(z, t, t, w, None)
+     batch size                        1024
+     optimizer         Muon [2], with (β1, β2) = (0.9, 0.95)
+                                               # Compute CFG target (same as iMF)
+     learning rate                      constant 1e-3
+                                               v_g = (e - x) + (1 - 1 / w) * (v_c - v_u)       lr warmup [3]                    0 epoch
+     weight decay, dropout                  0.0
+                                               # predict u and dudt
+    ema half-life (Mimgs)          {500, 1000, 2000}
+                                               u, dudt = jvp(u_fn, (z, r, t, w, c),
+      ratio of r̸=t                  50%                                      (v_c, 0, 1, 0, 0))
+      (t, r) cond                              t −r
+      t, r sampler                   logit-normal(0.8, 0.8)             # compound function V
+                                               V = u + (t - r) * stopgrad(dudt)      cls drop [3]                            0.1
+   CFG dist β              1          2          2
+                                               loss = metric(V, stopgrad(v_g))
+    LPIPS weight                          0.4
+    ConvNeXt weight                      0.1
+     threshold tthr                           0.8
+                                                Longer training. For Tabs. 6 and 7, we adopt a slightly
+                                                        modified training setup to better suit longer runs. Specif-
+                                                                        ically, we double the noise scale by using a logit-normal
+A. Implementation Details
+                                                          time sampler logit-normal(0.0, 0.8). In addition, to obtain a
+A.1. Configurations                                     smoother sampling distribution, we sample (t, r) uniformly
+                                                   from [0, 1] with 10% probability (instead of always using
+The configurations and hyper-parameters are summarized                                                               the default sampler). Finally, we reduce the threshold tthr to
+in Tab. 8. Our implementation is based on iMF (Geng et al.,                                                             0.6 to account for the increased noise scale.
+2025b), which is based on JAX and TPUs.
+
+CFG. We strictly follow iMF’s CFG implementation, with    A.2. Visualization of the generalized denoised images
+the network conditioned on CFG scale interval. The CFG                                                             In Fig. 1, we visualize the underlying average velocity field
+scale and interval sampling strategy during training remains                                        u and the induced generalized denoised images x by simu-
+the same. FID results are evaluated at optimal guidance                                                                  lating an ODE trajectory from t = 1 to t = 0. The images
+scale and interval. The pseudo-code2 is provided in Alg. 2.                                                            of u are shown as −u for better visualization. We use the
+EMA. Our EMA implementation follows EDM (Karras    pretrained JiT-H/16 to obtain the instantaneous velocity v
+et al., 2022). We maintain several EMA decay rates and    and solve the ODE trajectory {zt}1t=0 via a numerical ODE
+select the best-performing one during inference.                solver. Based on the simulated trajectory, we compute u
+                                                     and x for different (r, t) pairs via Eq. (5) and Eq. (8).
+Perceptual Loss. We use the standard LPIPS (Zhang et al.,
+2018) based on the VGG classifier and a variant based on
+ConvNeXt-V2 (Woo et al., 2023) as perceptual losses. Our   B. Visualizations
+implementation follows Lu et al. (2025). Additionally, we
+                                       We provide additional qualitative results in Fig 5 and Fig 6.
+apply random crop and resize to 224×224 on both images
+                                                     These results are uncurated samples of the classes listed as
+(generated and ground-truth) before we apply perceptual
+                                                                conditions. These results are from our pMF-H/16 model for
+loss, serving as an augmentation on segmentation signals.                                              1-NFE ImageNet 256×256 generation. Here, we set CFG
+   2For brevity, we omit the implementation of guidance interval    scale ω = 7.0 and CFG interval [0.1, 0.7]. This evaluation
+in the pseudo-code.                                                setting corresponds to an FID of 2.74 and an IS of 290.0.
+
+                                                11
+
+======================== PDF 第 12 页 ========================
+                            One-step Latent-free Image Generation with Pixel Mean Flows
+
+
+
+
+
+                         class 20: water ouzel, dipper                                                         class 39: common iguana, iguana, Iguana iguana
+
+
+
+
+
+                                class 42: agama                                                                               class 81: ptarmigan
+
+
+
+
+
+                      class 108: sea anemone, anemone                                                             class 288: leopard, Panthera pardus
+
+
+
+
+
+class 323: monarch, monarch butterfly, milkweed butterfly, Danaus plexippus                                           class 327: starfish, sea star
+
+
+
+
+
+                   class 458: brass, memorial tablet, plaque                                                              class 525: dam, dike, dyke
+
+
+
+
+
+                         class 533: dishrag, dishcloth                                                                   class 547: electric locomotive
+
+           Figure 5. Uncurated 1-NFE pixel class-conditional generation samples of pMF-H/16 on ImageNet 256×256.
+
+
+                                               12
+
+======================== PDF 第 13 页 ========================
+                     One-step Latent-free Image Generation with Pixel Mean Flows
+
+
+
+
+
+                class 611: jigsaw puzzle                                                                      class 628: liner, ocean liner
+
+
+
+
+
+                class 640: manhole cover                                                                          class 668: mosque
+
+
+
+
+
+class 685: odometer, hodometer, mileometer, milometer                                                   class 741: prayer rug, prayer mat
+
+
+
+
+
+                  class 947: mushroom                                                             class 976: promontory, headland, head, foreland
+
+
+
+
+
+                  class 979: valley, vale                                                                            class 980: volcano
+
+
+
+
+
+                     class 985: daisy                                                                             class 991: coral fungus
+
+    Figure 6. Uncurated 1-NFE pixel class-conditional generation samples of pMF-H/16 on ImageNet 256×256.
+
+
+                                         13

@@ -1,0 +1,617 @@
+WUT-A001 | Spatial-Temporal Attention Aggregator for Spiking Neural Networks
+来源：https://openaccess.thecvf.com/content/CVPR2025/papers/Zhang_STAA-SNN_Spatial-Temporal_Attention_Aggregator_for_Spiking_Neural_Networks_CVPR_2025_paper.pdf
+本地PDF：专题文献/武汉理工AI_CCF-A/WUT-A001_STAA-SNN_CVPR2025.pdf
+SHA-256：e3325b5cae8c312496deb41b57a88075b223af2eba6fc1905a442b1fd6b17f9d
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                     This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                 Except for this watermark, it is identical to the accepted version;
+                                the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+   STAA-SNN: Spatial-Temporal Attention Aggregator for Spiking Neural
+                              Networks
+
+    Tianqing Zhang1*  Kairong Yu1*  Xian Zhong3  Hongwei Wang1†  Qi Xu2†  Qiang Zhang2
+    1 Zhejiang University   2 Dalian University of Technology   3 Wuhan University of Technology
+              1{zhangtianqing,22271086}@zju.edu.cn  1hongweiwang@intl.zju.edu.cn
+                       2{xuqi,zhangq}@dlut.edu.cn  3zhongx@whut.edu.cn
+
+                 Abstract                               tion on low-power neuromorphic hardware, offering a dis-
+                                                                         tinct advantage over traditional Artiﬁcial Neural Networks
+Spiking Neural Networks (SNNs) have gained signiﬁcant at-     (ANNs)[2, 13, 19, 48, 63]. Among various spiking neu-
+tention due to their biological plausibility and energy ef-     ron models, the Leaky Integrate-and-Fire (LIF) model[1] is
+ﬁciency, making them promising alternatives to Artiﬁcial     widely used in SNNs for its linear differentiable [37, 38].
+Neural Networks (ANNs). However, the performance gap     Although previous works[17, 34, 73] have developed deep
+between SNNs and ANNs remains a substantial challenge    SNNs to accelerate model convergence, the multi-timestep
+hindering the widespread adoption of SNNs. In this paper,     computations inherent in SNNs signiﬁcantly increase both
+we propose a Spatial-Temporal Attention Aggregator SNN      training and inference times, leading to high latency. This
+(STAA-SNN) framework, which dynamically focuses on and      limitation hinders the potential for efﬁcient algorithm de-
+captures both spatial and temporal dependencies. First, we      sign.  Consequently, a performance gap  still exists be-
+introduce a spike-driven self-attention mechanism speciﬁ-     tween directly trained large-scale SNNs and ANNs in pat-
+cally designed for SNNs. Additionally, we pioneeringly in-      tern recognition tasks, underscoring the need for novel ap-
+corporate position encoding to integrate latent temporal re-     proaches that integrate insights from neuroscience with con-
+lationships into the incoming features. For spatial-temporal     ventional deep learning to improve both the efﬁciency and
+information aggregation, we employ step attention to selec-     accuracy of SNNs. Inspired by the human visual and cogni-
+tively amplify relevant features to variant steps. Finally, we      tive systems, attention mechanisms regulate neural activity
+implement a time-step random dropout strategy to avoid lo-     and connectivity, enhancing responses to focal stimuli. This
+cal optima. The framework demonstrates exceptional per-     enhancement is reﬂected in the increased ﬁring rates and
+formance across diverse datasets and exhibits strong gener-     improved synchronization of neurons in relevant brain re-
+alization capabilities. Notably, STAA-SNN achieves state-      gions. Additionally, this mechanism inﬂuences the strength
+of-the-art results on neuromorphic datasets CIFAR10-DVS     and efﬁciency of neural connections, thereby facilitating the
+of 82.10% and with performances of 97.14%, 82.05% and    ﬂow of information within and between different brain ar-
+70.40% on the static datasets CIFAR-10, CIFAR-100 and      eas. In the ﬁeld of deep learning, attention mechanisms en-
+ImageNet, respectively.  Furthermore, this model exhibits     able neural networks to selectively focus on relatively im-
+improved performance ranging from 0.33% to 2.80% with      portant input information, leading to signiﬁcant advance-
+fewer time steps.                                        ments in various domains such as natural language process-
+                                                             ing (NLP) and computer vision (CV). Compared to tradi-
+                                                                    tional architectures [5, 6, 44], these mechanisms have con-
+1. Introduction                                                 sistently demonstrated superior performance.
+                                                                 In this paper, we explore the integration of attention
+In recent years, Spiking Neural Networks (SNNs) have at-                                                     mechanisms into deep SNNs. Although SNNs are biologi-
+tracted signiﬁcant attention due to their low energy con-                                                                   cally inspired models, their current implementations exhibit
+sumption and biological interpretability[12, 17, 51, 57–59].                                                              signiﬁcant limitations due to inadequate biological ﬁdelity.
+Inspired by the behavior of biological neurons, SNNs rep-                                                         For instance, the heterogeneity among spiking neurons and
+resent information using discrete binary spikes over mul-                                                                the ability to independently transmit spatial and temporal
+tiple timesteps, making them well-suited for implementa-                                                             information are overlooked, with membrane parameters be-
+   *Equal contribution.                                           ing uniformly and permanently set across dimensions and
+   †Corresponding authors.                                           layers in neural networks. Neuroscience research [3, 53] has
+
+
+
+                                                    13959
+
+======================== PDF 第 2 页 ========================
+highlighted the critical role of synaptic homeostatic plastic-      cally plausible learning rules such as Hebbian learning[30]
+ity mechanisms in neuronal activity, as well as the regula-     and Spike-Timing-Dependent Plasticity (STDP)[7]. How-
+tory function of glial cells in information transmission be-      ever, these approaches are generally not suitable for deep
+tween neurons. Enhancing the alignment of SNN models    SNNs or large-scale datasets. On the other hand, super-
+with these biological processes has the potential to improve     vised learning integrates backpropagation with surrogate
+their overall performance. Therefore, we propose allowing      gradients[17, 38, 46, 58], making applicability increasingly
+different network layers to exhibit varying degrees of infor-      viable[60, 61]. Several methods have been proposed to en-
+mation transmission permeability.                           hance direct SNN training. For instance, MPBN[26] incor-
+  We introduce a self-attention mechanism to capture spa-     porates a batch normalization layer after membrane poten-
+tial correlations and the signiﬁcance of information, while       tial updates to stabilize training, while MPD-AL[72] intro-
+integrating positional encoding to enhance spatial informa-     duces an alternative learning paradigm that adapts synaptic
+tion and potentially learn temporal features. In traditional     modiﬁcations based on membrane potential traces. MS-
+SNNs, input features are typically aggregated through sim-     ResNet[34] reorganizes Vanilla ResNet layers to better
+ple addition, which can introduce signiﬁcant noise into the      align with SNNs, improving feature extraction and gradi-
+synthesized features. To address this, we propose a Step      ent propagation. Furthermore, IM-Loss[22] optimizes in-
+Attention mechanism that aggregates and reconstructs fea-     formation maximization loss to increase spike information
+tures at each time step, thereby improving the quality of in-      entropy. Recently, RSNN[62] introduced a Convolutional
+formation propagation. Additionally, we introduce a novel    LSTM-based approach that preserves temporal correlations,
+Time-Step Random Dropout (TSRD) strategy to prevent the     enhancing spike-based data processing in SNNs.
+network from falling into local optima, thereby enhancing
+its robustness and accelerating training. Our main contribu-     2.2. Attention Mechanism in SNNs
+tions are summarized as follows:
+                                                              Attention mechanisms dynamically assign varying levels
+• Inspired by neuroscience and attention mechanisms, we                                                              of importance to different input components, thereby fa-
+  propose a novel Spatio-Temporal Attention Aggregator                                                                         cilitating efﬁcient processing and feature extraction. Since
+  for Spiking Neural Networks (STAA-SNN) that inte-                                                                       their introduction in 2014, attention mechanisms have be-
+  grates self-attention, positional encoding, and step atten-                                                come integral to enhancing deep learning models and have
+  tion into a uniﬁed framework, enabling SNNs to efﬁ-                                                       been widely applied to traditional ANNs[32].   In deep
+  ciently extract features across temporal and spatial do-                                                                  learning, attention mechanisms are primarily used in two
+  mains while maintaining stable training.                                                        ways: as a basic paradigm for conducting meta-operator
+• We introduce a Time-Step Random Dropout (TSRD)                                                         such as self-attention [54] or as an auxiliary enhancement
+  strategy to accelerate training and enhance model gen-                                                      modules [33].  Also these two approaches can be com-
+  eralization by preventing premature convergence and en-                                                               bined.   Recently, integrating attention mechanisms into
+  abling optimal performance.                                           SNNs has gained traction as a means to enhance their per-
+• We evaluate the performance, convergence, and sparse                                                          formance. Unlike traditional ANNs, where attention typi-
+  spiking activity of STAA-SNN across multiple bench-                                                                   cally reﬁnes spatial feature representations, SNN-based at-
+  mark datasets, demonstrating that our method achieves                                                                 tention mechanisms must consider both spatial and tempo-
+  state-of-the-art or superior results with fewer timesteps,                                                                          ral information. Early work by [47] introduced a compu-
+  highlighting its efﬁciency and effectiveness.                                                                     tational model that bridges human selective attention and
+                                                           conscious awareness. Kundu⌘[36] utilize attention mech-
+2. Related Works                                     anisms to compress SNN models.  Temporal-wise atten-
+                                                                   tion was ﬁrst introduced in TA-SNN[64], laying the foun-2.1. Training of Deep SNNs                                                              dation for subsequent developments in SNN-speciﬁc at-
+Training deep SNNs generally follows two primary ap-      tention mechanisms. MA-SNN [66] proposed temporal-
+proaches: ANN-to-SNN conversion and direct SNN train-      channel-spatial attention for SNNs, surpassing models fo-
+ing. The ANN-to-SNN conversion method aims to trans-     cused on single-dimensional information. TCJA-SNN[76]
+fer knowledge from traditional ANNs to SNNs, but it of-     introduced a temporal-channel joint attention mechanism,
+ten encounters challenges such as minimizing accuracy     while SCTFA [8] applied temporal-channel-spatial atten-
+degradation while optimizing inference latency and energy      tion to SNNs with promising results. Moreover, STSC-SNN
+efﬁciency[27, 28, 55]. Moreover, this approach struggles     [71] incorporated temporal convolution and attention mech-
+to fully leverage the spatiotemporal dynamics inherent in     anisms to implement synaptic ﬁltering and gating functions,
+SNNs due to the lack of temporal encoding in ANNs. Di-     demonstrating the versatility of attention mechanisms in en-
+rect SNN training is categorized into unsupervised and su-     hancing SNN capabilities. IM-LIF [43] adopted temporal-
+pervised learning. Unsupervised methods rely on biologi-     wise attention to improve the updating of GRUs and LSTMs
+
+
+
+                                                    13960
+
+======================== PDF 第 3 页 ========================
+                             Figure 1. Overview of the STAA-SNN Architecture and the TSRD strategy.
+
+within SNNs. More recently, researchers have explored in-      sor St,n. The Heaviside step function ⇥outputs 1 if x ≥0corporating SNNs into Transformer architectures, achieving     and 0 otherwise.
+promising results on multiple benchmark datasets[41, 52].       Given the similarity between iterative LIF dynamics
+These researches reveal that attention mechanisms can sig-     and Recurrent Neural Networks (RNNs), Spatio-Temporal
+niﬁcantly improve the performance of SNN. However, there     Backpropagation (STBP) [57, 58] enables direct SNN train-
+remains a need for more specialized and high-performance     ing via Backpropagation Through Time (BPTT):
+attention modules tailored explicitly for SNN architectures.
+
+                                                                                                                       t+1,n                                                                                                                                                           t,nAddressing this gap can further enhance the efﬁciency and      @L X ✓@L   @St,n    @L    @V                                                                      ◆@V
+                                                                                                                                                                                 .                                                               n =                                                                                                                     t,n +robustness of SNNs in real-world applications.           @W                                                                                                                                               t,n  @W n                                                                              @St,n · @V                                                                          @V t+1,n · @V
+                                                                                                                t
+                                                                                                                             (4)
+                                                                                        @St,n                                                                                                               t,n , which represents the derivative3. Methodology                                      However, the term @V
+                                                              of the spike function, is non-differentiable. To address this,In this section, we will ﬁrst provide a brief overview of
+                                                                   prior works introduce Surrogate Gradients(SG), commonlythe Leaky Integrate-and-Fire (LIF) model and the train-
+                                                         approximated using a rectangular function:ing process.  Following that, we introduce the proposed
+Spatial-Temporal Attention Aggregator. Lastly, we outline
+                                                            @St   1             t        athe timestep random dropout strategy for SNN.                                           =           <              (5)                                                                                                            t                                                     @V    a · sign(|V  −Vth|   2),
+3.1. Leaky Integrate-and-Fire Model                  where a is a hypeparameter and set to 1. This approximation
+                                                             provides a gradient of 1 within the range Vth                tThe spiking neuron is a fundamental component of SNNs.                                   −0.5 V                                                                      Vth + 0.5, and otherwise 0.In this work, we adopt the Leaky Integrate-and-Fire (LIF)
+neuron due to its efﬁciency and simplicity. The discrete-
+                                                      Neuromorphic-Inspired Adaptive LIF Design.  Exam-time, iterative update rule of the LIF model is given by:
+                                                               ining Eq. (1),  it is evident that keeping Vreset and ⌧con-
+      t,n            1                                            stant results in ﬁxed weight coefﬁcients for H and I, which
+  V  = Ht−1,n + ⌧[It−1,n −(Ht−1,n −Vreset)],   (1)     remain unchanged across timestep t and layer n.  This
+   St,n = ⇥(V t,n                                       (2)     simpliﬁcation deviates from biological neural processing,                 −vth),                                t,n                            where neuronal excitability dynamically adapts to stimuli.
+   Ht,n = Vreset · St,n + V  ⊙(1 −St,n).            (3)    To bridge this gap, we propose an adaptive modiﬁcation to
+                                                                the membrane potential update rule:Here, Ht−1,n denotes the membrane potential after a spike
+trigger at the previous timestep, while It,n and V t,n rep-                      t,n                                                    V  = M      + N                   (6)resent the input and membrane potential of the n-th layer                    ⊙Ht−1,n     ⊙It−1,n.
+at timestep t, respectively. The threshold vth determines     Here, M and N are coefﬁcient matrices that dynamically
+whether a spike is emitted, producing the binary spike sen-      adjust through iterative learning, regulating activation and
+
+
+
+                                                    13961
+
+======================== PDF 第 4 页 ========================
+inhibition probabilities across layers.  This biologically     where Post,n represents the position encoding at the t-th
+inspired adaptation enhances information processing efﬁ-     time step in the n-th layer, with Post,n 2 RT,Cn.ciency and robustness in SNNs.
+                                                       Step Attention (SA) Block.  While previous modules pri-
+Global Context (GC) Block.  The Global Context (GC)     marily enhance feature processing from a spatial perspec-
+Block serves as a lightweight alternative to the self-attention       tive, SNNs uniquely process information across both spatial
+mechanism used in Transformers, enabling the integration     and temporal. Unlike other types of network, SNNs offer an
+of self-attention into conventional convolution-based deep      additional understanding of information sensitivity across
+learning architectures without the computational overhead      different timesteps. Therefore, in this paper, we introduce
+of full Transformer models. This makes it possible to en-     Step Attention to tackle the temporal challenges inherent inn
+hance feature learning in non-Transformer structures while    SNNs. As illustrated in Fig. 1(c), let U t,n 2 RCn⇥Hn⇥W
+maintaining efﬁciency and precision.  In this paper, we     denote the spatially aggregated feature input at the n-th
+simulate the self-attention operation using a GC block [9],      layer and the t-th timestep.  The speciﬁc Step Attention
+which consists of three 1     convolutional kernels corre-    mechanism is deﬁned as:              ⇥1                                  ✓   ✓   ✓sponding to key, query, and value. As depicted in Fig. 1(b),
+the spatial spiking input tensor of the n-th layer at the t-th                                               V t,n = U t,n ⊙Sigmoid Conv2 ReLU Conv1                                               n
+timestep is deﬁned as Xt,n 2 RCn⇥Hn⇥W n, where W               $           %◆◆◆                 (12)
+and Hn denote the width and height of the feature map,                AvgPool(U t,n)          ,and Cn represents the number of channels. Passing Xt,n            ↵·
+through the GC block yields three weight matrices for self-                                                     where ↵is a scaling factor that regulates the initial training
+attention, namely Wk, Wq and Wv, deﬁned as:                                                         speed for smoother convergence. In practice, ↵is typically
+                                                                      set to a default value of 2.
+      Wk = Xt,n · Sigmoid(Convk(Xt,n)),        (7)
+      Wq = Convq(Wk),                           (8)                                               LIF  with  Spatio-Temporal  Attention  Aggregator
+      Wv = Convv(ReLU(LN(Wq))).             (9)     (STAA).  The STAA seamlessly integrates with the LIF
+                                                         model,  offering  compatibility  across  various  network
+                                                                   structures without constraints.   It adeptly harnesses theBefore computing Wk, Xt,n is reshaped from C⇥H⇥W to
+                                                                   potential of spiking neurons,  effectively optimizing theC ⇥HW. The resulting matrices Wk, Wq, Wv 2 RC⇥1⇥1encode self-attention weights, which are then used to reﬁne                                                               storage of discrete spike information while minimizing
+the input feature map. Subsequently, the enhanced output is                                                                the loss of crucial data during transmission.  As shown
+computed as:                                                                   in Fig. 1(a), the neuronal update equation for the LIF model
+                 Zt,n = Xt,n ⊕Wv,               (10)     with STAA is formulated as:
+                                            U t,n = GC1(Xt,n)                        (13)where Zt,n 2 RC,H,W maintains the same dimensions                                                                       ⊕GC2(Ht−1,n),as Xt,n. The reﬁned feature map Zt,n, in comparison to                     t,n                                                    V  = SA(U t,n).                         (14)the Xt,n, improves the network’s ability to focus on self-
+relevant and task-critical information while suppressing ir-                                                 Where GC1 and GC2 represent Global Context Blocks for
+relevant signals.  This approach facilitates the seamless                                                                the input Xt,n and the previous membrane state Ht−1,n, re-
+transmission of enriched data ﬂow, enabling the retention                                                                    spectively. The remaining update equations follow the orig-
+of valuable features for subsequent stages.                                                                     inal LIF model.
+                                                               3.2. Time Step Random Dropout (TSRD) StrategyPosition Encoding (PE) Block.  Position encoding  is
+widely used in NLP and sequence modeling to incorporate    To further enhance training efﬁciency, we propose TSRD,
+positional information into input data. While SNNs share     an adaptive training strategy designed to prevent premature
+structural similarities with RNNs and inherently process      feature stabilization in deep SNNs.  In deeper timesteps,
+temporal information, their reliance on sparse binary spikes     spiking features may solidify too early during iterations,
+for information storage can lead to signiﬁcant feature loss.     hindering the network from achieving optimal convergence.
+This study introduces position encoding to enhance spatial    As illustrated in Fig. 1(d), TSRD randomly dropout the aug-
+features while enriching temporal relationships, thereby im-     mentation module at timestep t 2 (0, T) with a dropoutproving feature retention and strengthening temporal repre-      probability β, and instead choose the most basic element-
+sentations. The positional encoding is computed as follows:     wise addition aggregation method. The TSRD technique
+                                                                 accelerates training and helps the network escape local op-
+               Xt,n = It,n ⊕Post,n,              (11)      tima, thereby improving generalization performance.
+
+
+                                                    13962
+
+======================== PDF 第 5 页 ========================
+                                                                                      Accuracy (%)                              Method                Architecture     Timestep
+                                                                          CIFAR-10    CIFAR-100
+                                                          ResNet-19          2      94.44%       75.48%
+                             GLIF [70]
+                                                          ResNet-19          4      94.85%       77.05%
+                                                          ResNet-19          2      94.16%       72.87%
+                           TET [16]
+                                                          ResNet-19          4      94.44%       74.47%
+                                                          ResNet-19          2      94.41%       76.32%
+                          LSG [42]
+                                                          ResNet-19          4      95.17%       76.85%
+                                                          ResNet-19          2      95.6%        76.7%
+                            PFA [14]
+                                                          ResNet-19          4      95.71%       78.1%
+        CNN-based                                       ResNet-20          5      91.78%       64.07%
+                              Diet-SNN [50]
+                                                VGG-16           5      93.85%       69.67%
+                                    IM-loss [22]            VGG-16           5      93.85%       70.18%
+                               IM-LIF [43]              ResNet-19          3      95.29%       77.21%
+                                                          ResNet-19          1      96.06%       78.71%
+                                                          ResNet-19          2      96.47%       79.51%
+                                                          ResNet-19          4      96.52%       80.1%
+                       MPBN [26]
+                                                          ResNet-20          1      92.22%       68.41%
+                                                          ResNet-20          2      93.54%       70.79%
+                                                          ResNet-20          4      94.28%       72.3%
+                                  Spikformer[75]           Spikformer-4-25       4      93.94%       75.96%
+      Transformer-based        Spikingformer[74]        Spikingformer-4-25      4      94.77%       77.43%
+                             Spike-driven Transformer [69]   Transformer-2-512      4      95.60%       78.40%
+
+                                                                                                                                                          0.12%                                                                                                                                                                                 0.08%                                                VGG-13           2      94.70%±                                                                                         75.16%±
+                                                                                                                                                          0.09%                                                                                                                                                                                 0.11%                                                VGG-13           4      95.26%±                                                                                         76.35%±
+                                                                                                                                                          0.09%                                                                                                                                                                                 0.10%                                                          ResNet-19          1      96.75%±                                                                                         79.37%±
+                                                                                                                                                          0.11%                                                          ResNet-19          2      96.85%±                                                                                         80.57%±        CNN-based               Ours                                                                                                              0.11%
+                                                                                                                                                          0.10%                                                                                                                                                                                  0.10%                                                          ResNet-19          4      97.14%±                                                                                      82.05%±
+                                                                                                                                                          0.09%                                                                                                                                                                                 0.07%                                                          ResNet-20          1      93.08%±                                                                                         70.14%±
+                                                                                                                                                          0.08%                                                                                                                                                                                 0.12%                                                          ResNet-20          2      94.35%±                                                                                         73.20%±
+                                                                                                                                                          0.11%                                                                                                                                                                                 0.12%                                                          ResNet-20          4      95.03%±                                                                                         75.10%±
+
+                                Table 1. Comparison results with SOTA methods on CIFAR-10/100.
+
+4. Experiments                                               large-scale dataset containing 1.2 million training, 50,000
+                                                                    validation, and 100,000 test images spanning 1,000 cate-
+We ﬁrst outlined the experimental setup, including dataset                                                                   gories. For neuromorphic vision tasks, CIFAR10-DVS[39,
+details and implementation speciﬁcs. We then compare our                                                              40, 45] consists of 10,000 event streams across 10 classes,
+results with previous SOTA methods across multiple bench-                                                          with a 9:1 training-to-testing split. DVS128 Gesture[4] is an
+marks. Next, we perform ablation studies to assess the ef-                                                            event-based gesture recognition dataset with 1,176 training
+fectiveness of STAA. Finally, we visualize the model’s per-                                                      and 288 test samples, featuring 11 gesture classes recorded
+formance. Further details on datasets, hyperparameters, ad-                                                     from 29 subjects under three lighting conditions.
+ditional experiments, and computational efﬁciency analysis
+are provided in the Supplementary Material.
+                                                     Implementation Details.  In our experiments, we set the4.1. Experimental Setup                                                            ﬁring threshold vth to 1, and initialize ↵and β to 2 and 0.1,
+Datasets.  We evaluate our method on ﬁve benchmark      respectively. In the PE block, we adopt a learnable position
+datasets. CIFAR-10/100[35] are standard image classiﬁca-     encoding method, initializing all values to zero. All exper-
+tion datasets with 50,000 training and 10,000 test images     iments are implemented in PyTorch and conducted on an
+across 10 and 100 classes, respectively. ImageNet[15] is a    NVIDIA RTX 3090 GPU, except for ImageNet, which is
+
+
+
+                                                    13963
+
+======================== PDF 第 6 页 ========================
+                                          Figure 2. Position encoding locations in SNNs.
+
+
+     Method      Architecture  Timestep   Accuracy           Methods       Architecture   Timestep  Accuracy
+  STBP-tdBN [73]   ResNet34       6       63.72%                         CIFAR10-DVS
+    TET [16]       ResNet34       6       64.79%             IM-loss [22]       ResNet-19       10      72.60%
+                                                 LSG [42]        ResNet-19       10      77.90%  RecDis-SNN [23]   ResNet34       6       67.33%
+                                           MPBN [26]       ResNet-19       10      74.40%
+    GLIF [70]      ResNet34       4       67.52%        MPBN [26]       ResNet-20       10      78.70%
+                                                  TET [16]      VGGSNN       10      77.30%    IM-Loss [22]     ResNet18       6       67.43%
+                                                           IM-LIF [43]      VGG-13        10      80.50%
+                    ResNet18       4       63.68%           GLIF [70]       7B-wideNet       16      78.10%   Real Spike [24]
+                    ResNet34       4       67.69%          STSA [56]     STS-Transformer     16      79.93%
+                                            SEW [17]      SEW-ResNet      16       74.4%                    ResNet18       4       63.03%
+  RMP-Loss [25]                                                Spikeformer [41]    Spikeformer       16       80.9%                    ResNet34       4       65.17%
+
+                                                                                                                                                                                          0.20%                                                                                 ResNet-20                                                                                             16                                                                                              81.90%±                    ResNet18                                  4                                         63.14%                                                          Ours   MPBN [26]                                                                                                                                                                                          0.20%                                                                   VGG-13                                                                                             16    82.10%±                    ResNet34                                  4                                         64.71%
+                    ResNet18       4       63.18%                         DVS128 Gesture
+ SEW ResNet [17]
+                    ResNet34       4       67.04%         STBP-tdBN [73]     ResNet-17       40      96.87%
+                                                                                    0.19%       SEW [17]         7B-Net         16      97.52%                    ResNet18       4     68.27%±      Ours                                                                                    0.15%          PLIF [18]        PLIFNet        20      97.57%                    ResNet34       4     70.40%±
+                                             MA-SNN [66]    5 layers SCNN      20      98.23%
+                                                ASA-SNN [67]   5 layers SCNN      20      97.70%Table 2. Comparison of training based SNN SOTA on ImageNet.
+                                                           IM-LIF [43]       ResNet-19       40      97.33%
+                                                    LIAF+TA [65]    TA-SNN-Net      60      98.61%
+                                                                        Spike-driven-
+trained on 8 NVIDIA RTX 4090 GPUs. The total training                       Transformer-2-512    16      99.30%                                                                 Transformer [69]
+epochs are 500 for CIFAR-10, CIFAR-100, and CIFAR10-
+                                                                                                                                                                                          0.20%                                                          Ours         VGG-13        16    98.61%±DVS, while ImageNet runs for 300 epochs.
+
+4.2. Performance Comparison                              Table 3. Comparison results with SOTA methods on CIFAR10-
+                                            DVS and DVS128 Gesture.
+Static Image Classiﬁcation.  We evaluate our model on
+three static datasets:  CIFAR-10, CIFAR-100, and Ima-
+geNet.  For CIFAR-10/100, STAA-SNNs are applied to      tion capabilities of STAA-SNNs, which fully leverage the
+both ResNet-like and VGG-like networks and tested at 1,      potential performance of SNNs.  Furthermore, our model
+2, 3, and 4 timesteps. On ImageNet, the model is evalu-     achieves equivalent accuracy while requiring at least one
+ated using ResNet-18 and ResNet-34 with 4 time steps. Our     fewer timestep compared to prior methods, improving efﬁ-
+method achieves top accuracies of 97.14% on CIFAR-10,     ciency without sacriﬁcing performance.
+82.05% on CIFAR-100, and 70.40% on ImageNet, surpass-
+ing previous state-of-the-art methods across various archi-
+tectures. These improvements are attributed to the strong     Event-based Action Recognition.  To further assess the
+spatial-temporal attention mechanism and feature aggrega-      spatial-temporal processing capabilities of STAA-SNNs,
+
+
+
+                                                    13964
+
+======================== PDF 第 7 页 ========================
+                                                        Evaluation of position encoding methods.  We next eval-
+                                                              uate different encoding methods to determine the most ef-
+                                                                    fective approach. The results on CIFAR-10 indicate that
+                                                                learnable PE achieves an accuracy of 94.99%, outperform-
+                                                             ing ﬁxed PE, which attains 94.42%. This 0.57% improve-
+                                                    ment highlights the advantage of adaptive position encod-
+                                                                    ing, as it enables the network to dynamically adjust spa-
+                                                                                 tial representations, leading to better feature alignment and
+                                                                  overall performance.
+
+Figure 3. Distribution of accuracy with different dropout probabil-    Impact of dropout probability β in TSRD.  To acceler-
+ity β in TSRD on CIFAR-10.                                        ate training and enhance generalization in TSRD, it is es-
+                                                                      sential to determine an optimal dropout probability β. Ex-
+  STAA Components                                            cessive dropout may lead to network collapse by discarding
+                TSRD   Accuracy   Accuracy Gain                                                             too much information, while insufﬁcient dropout may limit  GC  PE   SA
+                                                                                  its regularization effect. As shown in Fig. 3, by incremen-
+   7    7     7      7     72.30%              -                tally increasing β from 0.1 to 1.0, the model achieves rela-
+  X   7     7      7     73.22%      +0.92%            tively high performance when β       and achieving opti-  X  X    7      7     73.79%      +1.49%                                  0.3,                                                    mal at 0.1. These results conﬁrm that excessive dropout re-
+  X  X    7    X     73.96%      +1.66%                                                  moves essential information, degrading performance, while  X  X   X      7     74.78%      +2.48%                                                          a balanced dropout probability effectively suppresses noise  X  X   X    X     75.10%      +2.80%
+                                                                   in deeper timesteps while preserving critical information in
+                                                             shallower steps. This enables the network to navigate criti-  Table 4. Combinations of sub-modules in STAA with TSRD.
+                                                                   cal learning stages more effectively, enhancing both stabil-
+                                                                          ity and robustness.
+we conduct experiments on the DVS128 Gesture and
+CIFAR10-DVS datasets. Unlike static datasets, these neu-     Combinations of sub-modules in STAA with TSRD.  To
+romorphic datasets contain temporal event streams, requir-      evaluate the contribution of each sub-module in STAA,
+ing models to efﬁciently process spiking sequences.  As     as well as the impact of TSRD, we conduct an ablation
+shown in Tab. 3, our model achieves state-of-the-art or     study by progressively integrating these components into
+superior performance with a smaller network and fewer      the SNN. The results on CIFAR-100 are presented in Tab. 4.
+timesteps. Speciﬁcally, STAA-SNNs achieve 82.10% accu-     Notably, the GC block alone improves accuracy by 0.92%,
+racy on CIFAR10-DVS and 98.61% on the DVS128 Gesture     while the SA block contributes an additional 1.14%, high-
+dataset, demonstrating their effectiveness in event-based ac-      lighting the importance of spatio-temporal attention and
+tion recognition tasks.                                           feature aggregation reconstruction in enhancing SNN per-
+                                                          formance. When all components, including TSRD, are in-
+4.3. Ablation Study                                                               corporated, the accuracy reaches 75.10%, demonstrating a
+All ablation studies with T=4 using ResNet-20 as baseline.      cumulative improvement of 2.80% over the baseline.
+
+Position encoding placement.  To optimize PE in SNNs,    Impact of Intermediate Dimension Scaling Coefﬁcients
+we evaluate its best placement within the network. Given     in GC.  The GC module incorporates multiple 1 ⇥1 con-the structural complexity of SNNs compared to CNNs,     volutions for feature transformation.  Retaining the orig-
+identifying the most effective integration point is crucial.      inal channel size C for the last two convolutions layers
+As shown in Fig. 2, we evaluate four placement strategies     would signiﬁcantly increase computational overhead. To
+(b)-(e) alongside a baseline SNN without PE (a), ensuring     maintain the module’s efﬁciency while preserving perfor-
+all other conditions remain constant. The CIFAR-10 accura-     mance, a scaling coefﬁcient r is introduced within the GC
+cies for (b) to (e) are 94.08%, 94.29%, 94.27%, and 93.96%,      to compress feature dimensions. By applying this scaling
+respectively. The highest performance occurs when PE is     mechanism, the parameter count is reduced from (C · C) to
+placed at the pre-aggregation spatial input port (c).  Al-    (2C · C/r), making the module more computationally fea-though (b) and (d) yield similar results, (d) introduces ad-      sible. We conduct experiments to assess the impact of dif-
+ditional parameters without signiﬁcant gains. Thus, placing      ferent r values, as shown in Fig. 5. The results indicate that
+PE at the pre-aggregation spatial input port achieves the best      the model achieves optimal performance when r = 4, ef-
+balance between accuracy and efﬁciency.                         fectively balancing computational efﬁciency and accuracy.
+
+
+
+                                                    13965
+
+======================== PDF 第 8 页 ========================
+                   Figure 4. Visualization on CIFAR10-DVS. Ten layers from VGG-13 in a shallow to deep manner.
+
+                                                          5. Conclusion
+
+                                                              In this paper, we introduce STAA-SNN, a spatio-temporal
+                                                                attention-based feature aggregator, together with the TSRD
+                                                                   training strategy. STAA-SNN leverages the inherent abil-
+                                                                          ity of SNNs to process spatio-temporal information, thereby
+                                                         enhancing network performance while reducing the number
+                                                              of required timesteps. Our approach achieves state-of-the-
+                                                                          art results across multiple benchmarks. STAA-SNN is de-
+                                                            signed as a plug-and-play module that seamlessly integrates
+Figure 5. Impact of different scaling coefﬁcients r for intermediate      into convolution-based SNN architectures.  It is composed
+feature dimensions in the GC module on the CIFAR-10 dataset.       of several synergistic modules that collectively enhance its
+                                                                      capabilities. The GC module simulates the brain’s ability
+                                                                   to process information across a broad spatial range, involv-
+4.4. Visualization and Analysis                           ing multiple brain regions in coordination. By focusing on
+                                                                      spatial feature relevance,  it enables the model to captureWe aggregate 4D (T, C, H, W) spiking maps  into 2D
+                                                              global structures and key stimuli in its environment. The(H, W) and apply Grad-CAM to visualize feature extrac-
+                                             PE module enhances temporal encoding by incorporatingtion at different depths. As shown in Fig. 4, the left displays
+                                                               time-step information into feature representations, mirror-a sample from the horse class in CIFAR10-DVS, while the
+                                                             ing the brain’s ability to integrate temporal and spatial cuesright compares vanilla LIF and STAA-LIF feature maps.
+                                                                   for improved understanding of time-dependent relation-STAA-LIF focuses more effectively on target-relevant fea-
+                                                                    ships. The SA module mimics the brain’s dynamic atten-tures, capturing ﬁner details like the horse’s mouth, which
+                                                                   tion mechanisms, adjusting feature importance across timethe vanilla LIF model misses. This highlights the advantage
+                                                                 steps by adaptively enhancing or suppressing information.of spatio-temporal attention in enhancing feature selectivity.
+                                                          This prioritization of critical temporal features strengthens
+4.5. Analysis of Computation Efﬁciency                 decision-making and overall network efﬁciency. Together,
+                                                               these modules form a robust spatio-temporal feature en-We evaluate the single-image inference energy cost us-
+                                                      hancement system that improves cognitive processing, ro-ing 45-nm technology. ANNs rely on multiplication-and-
+                                                                 bustness, and overall model performance.  Despite theseaccumulation (MAC) operations, which consume 4.6 pJ per
+                                                          promising results, future research should focus on reducingoperation, whereas SNNs primarily use accumulation (AC)
+                                                           computational energy consumption to further improve efﬁ-operations at a signiﬁcantly lower cost of 0.9 pJ per oper-
+                                                                 ciency, particularly for resource-constrained applications.ation, making SNNs inherently more energy-efﬁcient [31,
+49]. Following [11], we assess the efﬁciency of ResNet-20,
+which requires 0.10 billion ACs, 0.06 billion MACs, 0.87     6. Acknowledgements
+billion FLOPs, and consists of 12.69 million parameters.                                                          This work was supported in part by National Natural Sci-
+Under these conditions, inference on CIFAR-100 (with a                                                         ence Foundation of China (NSFC) (62476035, 62206037,
+32×32 resolution and T=4) results in an energy consump-     62276230, 62271361), and Natural Science Foundation of
+tion of 0.366 mJ, demonstrating the energy-efﬁcient nature     Zhejiang Province (LDT23F02023F02), and State Key Lab-
+of ResNet-20. Additional computational efﬁciency experi-     oratory (SKL) of Biobased Transportation Fuel Technology.
+ments are provided in the Supplementary Material.
+
+
+
+                                                    13966
+
+======================== PDF 第 9 页 ========================
+References                                                      [13] Mike Davies, Narayan Srinivasa, Tsung-Han Lin, Gautham
+                                                                      Chinya, Yongqiang Cao, Sri Harsha Choday, Georgios Di-
+ [1] Larry F Abbott. Lapicque’s introduction of the integrate-and-                                                             mou, Prasad Joshi, Nabil Imam, Shweta Jain, et al.  Loihi:
+     ﬁre model neuron (1907). Brain research bulletin, 50(5-6):                                           A neuromorphic manycore processor with on-chip learning.
+     303–304, 1999. 1                                                                           Ieee Micro, 38(1):82–99, 2018. 1
+ [2] Filipp Akopyan, Jun Sawada, Andrew Cassidy, Rodrigo                                                                     [14] Haoyu Deng, Ruijie Zhu, Xuerui Qiu, Yule Duan, Malu
+     Alvarez-Icaza, John Arthur, Paul Merolla, Nabil Imam, Yu-                                                                  Zhang, and Liang-Jian Deng. Tensor decomposition based
+     taka Nakamura, Pallab Datta, Gi-Joon Nam, et al. Truenorth:                                                                                attention module for spiking neural networks. Knowledge-
+     Design and tool ﬂow of a 65 mw 1 million neuron pro-                                                                Based Systems, 295:111780, 2024. 5
+    grammable neurosynaptic  chip.   IEEE transactions on                                                                     [15]  Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li,
+     computer-aided design of integrated circuits and systems, 34                                                                 and Li Fei-Fei.  ImageNet: A large-scale hierarchical im-
+     (10):1537–1557, 2015. 1                                                                   age database. In 2009 IEEE Conference on Computer Vision
+ [3] Pepe Alcam´ı and Alberto E Pereda. Beyond plasticity: the         and Pattern Recognition, pages 248–255, 2009. ISSN: 1063-
+     dynamic impact of electrical synapses on neural circuits. Na-                                                                     6919. 5
+      ture Reviews Neuroscience, 20(5):253–271, 2019. 1                                                                     [16] Shikuang Deng, Yuhang Li, Shanghang Zhang, and Shi Gu.
+ [4] Arnon Amir, Brian Taba, David Berg, Timothy Melano, Jef-          Temporal efﬁcient training of spiking neural network via gra-
+      frey McKinstry, Carmelo Di Nolfo, Tapan Nayak, Alexander            dient re-weighting. arXiv preprint arXiv:2202.11946, 2022.
+     Andreopoulos, Guillaume Garreau, Marcela Mendoza, et al.             5, 6
+   A low power, fully event-based gesture recognition system.                                                                     [17] Wei Fang, Zhaofei Yu, Yanqi Chen, Tiejun Huang, Timoth´ee
+     In Proceedings of the IEEE conference on computer vision                                                                         Masquelier, and Yonghong Tian. Deep residual learning in
+    and pattern recognition, pages 7243–7252, 2017. 5, 1                                                                          spiking neural networks.  Advances in Neural Information
+ [5] Anurag Arnab, Mostafa Dehghani, Georg Heigold, Chen           Processing Systems, 34:21056–21069, 2021. 1, 2, 6
+     Sun, Mario Lui, and Cordelia Schmid.  Vivit: A video vi-                                                                     [18] Wei Fang, Zhaofei Yu, Yanqi Chen, Timoth´ee Masquelier,
+     sion transformer. 2021. 1                                                                        Tiejun Huang, and Yonghong Tian. Incorporating learnable
+ [6] Gedas Bertasius, Heng Wang, and Lorenzo Torresani.  Is         membrane time constant to enhance learning of spiking neu-
+     space-time attention all you need for video understanding?             ral networks. In Proceedings of the IEEE/CVF international
+     2021. 1                                                           conference on computer vision, pages 2661–2671, 2021. 6
+ [7] Guo-qiang Bi and Mu-ming Poo. Synaptic modiﬁcations in      [19] Steve B Furber, Francesco Galluppi, Steve Temple, and
+     cultured hippocampal neurons: dependence on spike timing,           Luis A Plana. The spinnaker project.  Proceedings of the
+     synaptic strength, and postsynaptic cell type. Journal of neu-          IEEE, 102(5):652–665, 2014. 1
+      roscience, 18(24):10464–10472, 1998. 2                         [20] Banglei Guan and Ji Zhao.  Relative pose estimation for
+ [8] Wuque  Cai,  Hongze  Sun,  Rui  Liu,  Yan  Cui,  Jun           multi-camera systems from point correspondences with scale
+    Wang,  Yang  Xia,  Dezhong  Yao,  and  Daqing  Guo.              ratio. In Proceedings of the 30th ACM International Confer-
+   A Spatial–Channel–Temporal-Fused Attention for Spiking          ence on Multimedia, page 5036–5044, New York, NY, USA,
+     Neural Networks. IEEE Transactions on Neural Networks           2022. Association for Computing Machinery. 1
+    and Learning Systems, pages 1–15, 2023. Conference Name:      [21] Banglei Guan, Ji Zhao, Zhang Li, Fang Sun, and Friedrich
+    IEEE Transactions on Neural Networks and Learning Sys-           Fraundorfer. Minimal solutions for relative pose with a sin-
+     tems. 2                                                               gle afﬁne correspondence. In Proceedings of the IEEE/CVF
+ [9] Yue Cao, Jiarui Xu, Stephen Lin, Fangyun Wei, and Han          Conference on Computer Vision and Pattern Recognition
+     Hu. Gcnet: Non-local networks meet squeeze-excitation net-          (CVPR), 2020. 1
+     works and beyond. In Proceedings of the IEEE/CVF interna-      [22] Yufei Guo, Yuanpei Chen, Liwen Zhang, Xiaode Liu, Yin-
+      tional conference on computer vision workshops, pages 0–0,             glei Wang, Xuhui Huang, and Zhe Ma. Im-loss: information
+     2019. 4                                                        maximization loss for spiking neural networks. Advances in
+[10] Biswadeep  Chakraborty,  Xueyuan  She,  and  Saibal          Neural Information Processing Systems, 35:156–166, 2022.
+    Mukhopadhyay. A Fully Spiking Hybrid Neural Network             2, 5, 6
+      for Energy-Efﬁcient Object Detection. IEEE Transactions      [23] Yufei Guo, Xinyi Tong, Yuanpei Chen, Liwen Zhang, Xi-
+    on Image Processing, 30:9014–9029, 2021.  Conference          aode Liu, Zhe Ma, and Xuhui Huang. RecDis-SNN: Recti-
+    Name: IEEE Transactions on Image Processing. 3                     fying Membrane Potential Distribution for Directly Training
+[11] Guangyao Chen, Peixi Peng, Guoqi Li, and Yonghong Tian.           Spiking Neural Networks. In Proceedings of CVPR, pages
+     Training Full Spike Neural Networks via Auxiliary Accumu-          326–335, New Orleans, LA, USA, 2022. IEEE. 6
+      lation Pathway, 2023. arXiv:2301.11929 [cs]. 8                  [24] Yufei Guo, Liwen Zhang, Yuanpei Chen, Xinyi Tong, Xi-
+[12] Dennis V Christensen, Regina Dittmann, Bernabe Linares-          aode Liu, YingLei Wang, Xuhui Huang, and Zhe Ma. Real
+     Barranco,  Abu  Sebastian,  Manuel Le  Gallo,  Andrea            spike: Learning real-valued spikes for spiking neural net-
+      Redaelli,  Stefan Slesazeck, Thomas Mikolajick,  Sabina           works. In European Conference on Computer Vision, pages
+     Spiga, Stephan Menzel, et al. 2022 roadmap on neuromor-          52–68. Springer, 2022. 6
+     phic computing and engineering. Neuromorphic Computing      [25] Yufei Guo, Xiaode Liu, Yuanpei Chen, Liwen Zhang, Wei-
+    and Engineering, 2(2):022501, 2022. 1                           hang Peng, Yuhan Zhang, Xuhui Huang, and Zhe Ma. RMP-
+
+
+
+                                                    13967
+
+======================== PDF 第 10 页 ========================
+     Loss:  Regularizing Membrane Potential Distribution for           explosive shock waves based on an event camera.  Optics
+     Spiking Neural Networks, 2023. arXiv:2308.06787 [cs]. 6             Express, 32(9):15390–15409, 2024. 5
+[26] Yufei Guo, Yuhan Zhang, Yuanpei Chen, Weihang Peng, Xi-      [40] Hongmin Li, Hanchao Liu, Xiangyang Ji, Guoqi Li, and
+     aode Liu, Liwen Zhang, Xuhui Huang, and Zhe Ma. Mem-          Luping Shi.  Cifar10-dvs: an event-stream dataset for ob-
+     brane potential batch normalization for spiking neural net-             ject classiﬁcation. Frontiers in neuroscience, 11:309, 2017.
+     works. In Proceedings of the IEEE/CVF International Con-             5, 1
+     ference on Computer Vision, pages 19420–19430, 2023. 2,      [41] Yudong Li, Yunlin Lei, and Xu Yang. Spikeformer: A novel
+      5, 6                                                                      architecture for training high-performance low-latency spik-
+[27] Bing Han and Kaushik Roy. Deep spiking neural network:           ing neural network. arXiv preprint arXiv:2211.10686, 2022.
+     Energy efﬁciency through time based coding. In European             3, 6
+     Conference on Computer Vision, pages 388–404. Springer,      [42] Shuang Lian, Jiangrong Shen, Qianhui Liu, Ziming Wang,
+     2020. 2                                                     Rui Yan, and Huajin Tang. Learnable surrogate gradient for
+[28] Bing Han, Gopalakrishnan Srinivasan, and Kaushik Roy.            direct training spiking neural networks.  In Proceedings of
+     Rmp-snn: Residual membrane potential neuron for enabling            the Thirty-Second International Joint Conference on Artiﬁ-
+     deeper high-accuracy and low-latency spiking neural net-             cial Intelligence, IJCAI-23, pages 3002–3010, 2023. 5, 6
+     work. In Proceedings of the IEEE/CVF conference on com-      [43] Shuang Lian, Jiangrong Shen, Ziming Wang, and Huajin
+     puter vision and pattern recognition, pages 13558–13567,           Tang. IM-LIF: Improved Neuronal Dynamics With Atten-
+     2020. 2                                                                  tion Mechanism for Direct Training Deep Spiking Neural
+[29] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.          Network. IEEE Transactions on Emerging Topics in Compu-
+    Deep residual learning for image recognition.  In Proceed-            tational Intelligence, pages 1–11, 2024. Conference Name:
+     ings of the IEEE conference on computer vision and pattern         IEEE Transactions on Emerging Topics in Computational In-
+      recognition, pages 770–778, 2016. 1                                      telligence. 2, 5, 6
+                                                                     [44] Ze Liu, Yutong Lin, Yue Cao, Han Hu, Yixuan Wei,[30] Donald Olding Hebb. The organization of behavior: A neu-
+                                                             Zheng Zhang, Stephen Lin, and Baining Guo. Swin trans-     ropsychological theory. Psychology press, 2005. 2
+                                                                         former: Hierarchical vision transformer using shifted win-[31] Mark Horowitz. 1.1 Computing’s energy problem (and what
+                                                                   dows. 2021. 1    we can do about it). In 2014 IEEE International Solid-State
+                                                                     [45] Zibin Liu, Banglei Guan, Yang Shang, Qifeng Yu, and Lau-      Circuits Conference Digest of Technical Papers (ISSCC),
+                                                                                rent Kneip.  Line-based 6-dof object pose estimation and     pages 10–14, 2014. ISSN: 2376-8606. 8, 3
+                                                                            tracking with an event camera. IEEE Transactions on Im-
+[32]  Jie Hu, Li Shen, and Gang Sun. Squeeze-and-excitation net-
+                                                                 age Processing, 2024. 5
+     works. In Proceedings of the IEEE Conference on Computer
+                                                                     [46] Emre O Neftci, Hesham Mostafa, and Friedemann Zenke.     Vision and Pattern Recognition (CVPR), 2018. 2
+                                                                        Surrogate gradient learning  in spiking neural networks:
+[33]  J. Hu, L. Shen, S. Albanie, G. Sun, and E. Wu. Squeeze-and-                                                                      Bringing the power of gradient-based optimization to spik-
+      excitation networks. IEEE transactions on pattern analysis                                                                         ing neural networks. IEEE Signal Processing Magazine, 36
+    and machine intelligence, 42(8):2011–2023, 2020. 2                                                                          (6):51–63, 2019. 2
+[34] Yifan Hu, Yujie Wu, Lei Deng, and Guoqi Li. Advancing                                                                     [47] Kleanthis C Neokleous, Marios N Avraamides, Costas K
+      residual learning towards powerful deep spiking neural net-                                                                      Neocleous, and Christos N Schizas. Selective attention and
+     works. arXiv e-prints, pages arXiv–2112, 2021. 1, 2                                                                         consciousness: investigating their relation through computa-
+[35] Alex Krizhevsky, Vinod Nair, and Geoffrey Hinton. Cifar-10            tional modelling. Cognitive Computation, 3:321–331, 2011.
+     (canadian institute for advanced research). URL http://www.         2
+      cs. toronto. edu/kriz/cifar. html, 5(4):1, 2010. 5, 1                                                                     [48] Garrick Orchard, E Paxon Frady, Daniel Ben Dayan Rubin,
+[36] Souvik Kundu, Gourav Datta, Massoud Pedram, and Peter A          Sophia Sanborn, Sumit Bam Shrestha, Friedrich T Sommer,
+     Beerel. Spike-thrift: Towards energy-efﬁcient deep spiking          and Mike Davies. Efﬁcient neuromorphic signal processing
+     neural networks by limiting spiking activity via attention-           with loihi 2. In 2021 IEEE Workshop on Signal Processing
+     guided compression. In Proceedings of the IEEE/CVF Win-          Systems (SiPS), pages 254–259. IEEE, 2021. 1
+      ter Conference on Applications of Computer Vision, pages      [49] Ning Qiao, Hesham Mostafa, Federico Corradi, Marc Oss-
+     3953–3962, 2021. 2                                               wald, Fabio Stefanini, Dora Sumislawska, and Giacomo In-
+[37] Gabriele Lagani, Fabrizio Falchi, Claudio Gennaro, and             diveri. A reconﬁgurable on-line learning spiking neuromor-
+     Giuseppe Amato. Spiking neural networks and bio-inspired           phic processor comprising 256 neurons and 128K synapses.
+     supervised deep  learning:  A  survey.    arXiv  preprint            Frontiers in Neuroscience, 9, 2015. Publisher: Frontiers. 8,
+     arXiv:2307.16235, 2023. 1                                    3
+[38] Chankyu Lee, Syed Shakib Sarwar, Priyadarshini Panda,      [50] Nitin Rathi and Kaushik Roy. Diet-snn: A low-latency spik-
+     Gopalakrishnan Srinivasan, and Kaushik Roy.  Enabling           ing neural network with direct input encoding and leakage
+     spike-based backpropagation for training deep neural net-          and threshold optimization. IEEE Transactions on Neural
+    work architectures.  Frontiers in neuroscience, page 119,          Networks and Learning Systems, 2021. 5
+     2020. 1, 2                                                      [51] Kaushik Roy, Akhilesh Jaiswal, and Priyadarshini Panda.
+[39] Taihang Lei, Banglei Guan, Minzu Liang, Zibin Liu, Jianbin          Towards spike-based machine intelligence with neuromor-
+     Liu, Yang Shang, and Qifeng Yu. Motion measurements of           phic computing. Nature, 575(7784):607–617, 2019. 1
+
+
+
+                                                    13968
+
+======================== PDF 第 11 页 ========================
+[52] Chen She and Laiyun Qing. Spikeformer: Image reconstruc-      [66] Man Yao, Guangshe Zhao, Hengyu Zhang, Yifan Hu, Lei
+      tion from the sequence of spike camera based on transformer.          Deng, Yonghong Tian, Bo Xu, and Guoqi Li.  Attention
+     In Proceedings of the 2022 5th International Conference on           spiking neural networks. arXiv preprint arXiv:2209.13929,
+    Image and Graphics Processing, pages 72–78, 2022. 3               2022. 2, 6
+[53] Gina G Turrigiano and Sacha B Nelson. Homeostatic plas-      [67] Man Yao,  Jiakui Hu, Guangshe Zhao, Yaoyuan Wang,
+      ticity in the developing nervous system. Nature reviews neu-          Ziyang Zhang, Bo Xu, and Guoqi Li. Inherent Redundancy
+      roscience, 5(2):97–107, 2004. 1                                         in Spiking Neural Networks.  In Proceedings of the ICCV,
+[54] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszko-          pages 16924–16934, 2023. 6
+       reit, Llion Jones, Aidan N Gomez, Lukasz Kaiser, and Illia      [68] Man Yao, Guangshe Zhao, Hengyu Zhang, Yifan Hu, Lei
+     Polosukhin. Attention is all you need. arXiv, 2017. 2               Deng, Yonghong Tian, Bo Xu, and Guoqi Li. Attention Spik-
+[55] Bingsen Wang, Jian Cao, Jue Chen, Shuo Feng, and Yuan           ing Neural Networks. IEEE Transactions on Pattern Analysis
+    Wang. A new ann-snn conversion method with high accu-         and Machine Intelligence, 45(8):9393–9410, 2023. 3
+      racy, low latency and good robustness.  In Proceedings of      [69] Man Yao, Jiakui Hu, Zhaokun Zhou, Li Yuan, Yonghong
+     the Thirty-Second International Joint Conference on Artiﬁ-            Tian, Bo Xu, and Guoqi Li. Spike-driven transformer. Ad-
+      cial Intelligence, IJCAI-23, pages 3067–3075, 2023. 2                vances in neural information processing systems, 36, 2024.
+[56] Yuchen Wang, Kexin Shi, Chengzhuo Lu, Yuguo Liu, Malu             5, 6
+     Zhang, and Hong Qu. Spatial-Temporal Self-Attention for      [70] Xingting Yao, Fanrong Li, Zitao Mo, and Jian Cheng. Glif:
+     Asynchronous Spiking Neural Networks. In Proceedings of       A uniﬁed gated leaky integrate-and-ﬁre neuron for spiking
+     IJCAI, pages 3085–3093, Macau, SAR China, 2023. 6                 neural networks. Advances in Neural Information Process-
+[57] Yujie Wu, Lei Deng, Guoqi Li, Jun Zhu, and Luping           ing Systems, 35:32160–32171, 2022. 5, 6
+      Shi.   Spatio-temporal backpropagation for training high-      [71] Chengting Yu, Zheming Gu, Da Li, Gaoang Wang, Aili
+     performance spiking neural networks.  Frontiers in neuro-         Wang, and Erping Li. STSC-SNN: Spatio-Temporal Synap-
+      science, 12:331, 2018. 1, 3                                                      tic Connection with temporal convolution and attention for
+[58] Yujie Wu, Lei Deng, Guoqi Li, Jun Zhu, Yuan Xie, and Lup-           spiking neural networks.   Frontiers in Neuroscience, 16,
+     ing Shi. Direct training for spiking neural networks: Faster,           2022. 2
+      larger, better. In Proceedings of the AAAI conference on ar-      [72] Malu Zhang, Jibin Wu, Yansong Chua, Xiaoling Luo, Zihan
+      tiﬁcial intelligence, pages 1311–1318, 2019. 2, 3                     Pan, Dan Liu, and Haizhou Li. Mpd-al: an efﬁcient mem-
+[59] Yujie Wu, Rong Zhao, Jun Zhu, Feng Chen, Mingkun Xu,           brane potential driven aggregate-label learning algorithm for
+    Guoqi Li, Sen Song, Lei Deng, Guanrui Wang, Hao Zheng,           spiking neurons. In Proceedings of the AAAI conference on
+      et al. Brain-inspired global-local learning incorporated with            artiﬁcial intelligence, pages 1327–1334, 2019. 2
+     neuromorphic computing.  Nature Communications, 13(1):      [73] Hanle Zheng, Yujie Wu, Lei Deng, Yifan Hu, and Guoqi Li.
+     65, 2022. 1                                                Going deeper with directly-trained larger spiking neural net-
+[60] Qi Xu, Yaxin Li, Xuanye Fang, Jiangrong Shen, Jian K. Liu,           works. In Proceedings of the AAAI conference on artiﬁcial
+     Huajin Tang, and Gang Pan. Biologically inspired structure             intelligence, pages 11062–11070, 2021. 1, 6
+     learning with reverse knowledge distillation for spiking neu-      [74] Chenlin Zhou, Liutao Yu, Zhaokun Zhou, Zhengyu Ma, Han
+      ral networks, 2023. arXiv:2304.09500 [cs]. 2                       Zhang, Huihui Zhou, and Yonghong Tian.  Spikingformer:
+[61] Qi Xu, Jie Deng, Jiangrong Shen, Biwu Chen, Huajin Tang,           Spike-driven residual learning for transformer-based spiking
+     and Gang Pan.  Hybrid Spiking Vision Transformer for           neural network. arXiv preprint arXiv:2304.11954, 2023. 5
+     Event-Based Object Detection, 2024. 2                          [75] Zhaokun Zhou, Yuesheng Zhu, Chao He, Yaowei Wang,
+[62] Qi Xu, Xuanye Fang, Yaxin Li, Jiangrong Shen, De Ma, Yi          Shuicheng Yan, Yonghong Tian, and Li Yuan. Spikformer:
+     Xu, and Gang Pan.  Rsnn: Recurrent spiking neural net-        When spiking neural network meets transformer.   arXiv
+     works for dynamic spatial-temporal information processing.            preprint arXiv:2209.15425, 2022. 5
+     In Proceedings of the 32nd ACM International Conference      [76] Rui-Jie Zhu, Malu Zhang, Qihang Zhao, Haoyu Deng, Yule
+    on Multimedia, pages 10602–10610, 2024. 2                      Duan, and Liang-Jian Deng.  Tcja-snn: Temporal-channel
+                                                                                     joint attention for spiking neural networks. IEEE Transac-[63] Kashu Yamazaki, Viet-Khoa Vo-Ho, Darshan Bulsara, and
+                                                                                tions on Neural Networks and Learning Systems, 2024. 2    Ngan Le. Spiking neural networks and their applications: A
+     review. Brain Sciences, 12(7):863, 2022. 1
+[64] Man Yao, Huanhuan Gao, Guangshe Zhao, Dingheng Wang,
+     Yihan Lin, Zhaoxu Yang, and Guoqi Li. Temporal-wise at-
+      tention spiking neural networks for event streams classiﬁca-
+      tion. In Proceedings of the IEEE/CVF International Confer-
+     ence on Computer Vision, pages 10221–10230, 2021. 2
+[65] Man Yao, Huanhuan Gao, Guangshe Zhao, Dingheng Wang,
+     Yihan Lin, Zhaoxu Yang, and Guoqi Li. Temporal-Wise At-
+      tention Spiking Neural Networks for Event Streams Classiﬁ-
+      cation. In Proceedings of ICCV, pages 10221–10230, 2021.
+    6
+
+
+
+                                                    13969

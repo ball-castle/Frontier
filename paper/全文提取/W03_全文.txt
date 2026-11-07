@@ -1,0 +1,571 @@
+W03 | Skill-Evolving Grounded Reasoning for Free-Text Promptable 3D Medical Image Segmentation
+来源：https://papers.miccai.org/miccai-2026/0966-Paper3761.html
+本地PDF：W03_SEER_MICCAI2026.pdf
+SHA-256：e9d176e257f99b947844d81fcb5c8648a8f4ed88901cf06e54a7c4c87d67747d
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                 Skill-Evolving Grounded Reasoning for Free-Text
+                Promptable 3D Medical Image Segmentation
+
+
+                       Tongrui Zhang1, Chenhui Wang1, Yongming Li1, Zhihao Chen1, Xufeng Zhan2,
+                                            and Hongming Shan1
+
+                                                                   1 Fudan University
+2026                                             2 University of Science and Technology of China
+                             Abstract. Free-text promptable 3D medical image segmentation offers
+                             an intuitive and clinically flexible interaction paradigm. However, currentSep                        methods are highly sensitive to linguistic variability: minor changes in
+                                phrasing can cause substantial performance degradation despite iden-
+                                        tical clinical intent. Existing approaches attempt to improve robust-24
+                                  ness through stronger vision-language fusion or larger vocabularies, yet
+                               they lack mechanisms to consistently align ambiguous free-form expres-
+                                    sions with anatomically grounded representations. We propose Skill-
+                               Evolving groundEd Reasoning (SEER), a novel framework for free-text
+                              promptable 3D medical image segmentation that explicitly bridges lin-
+                                     guistic variability and anatomical precision through a reasoning-driven
+                                   design. First, we curate the SEER-Trace dataset, which pairs raw clinical[eess.IV]                         prompts with image-grounded, skill-tagged reasoning traces, establishing
+                              a reproducible benchmark. Second, SEER constructs an evidence-aligned
+                                   target representation via a vision-language reasoning chain that veri-
+                                           fies clinical intent against image-derived anatomical evidence, thereby
+                                  enforcing semantic consistency before voxel-level decoding. Third, we
+                                 introduce SEER-Loop, a dynamic skill-evolving strategy that distills
+                                high-reward reasoning trajectories into reusable skill artifacts and pro-
+                                    gressively integrates them into subsequent inference, enabling structured
+                                    self-refinement and improved robustness to diverse linguistic expressions.
+                                Extensive experiments demonstrate superior performance of SEER over
+                                     state-of-the-art baselines. Under linguistic perturbations, SEER reduces
+                               performance variance by 81.94% and improves worst-case Dice by 18.60%.
+                                 Project resources are available at: https://seer-medseg.github.io.
+
+                          Keywords: Free-Text Promptable Medical Image Segmentation · Vision-
+                             Language Models · Grounded ReasoningarXiv:2603.08215v3
+
+                1  Introduction
+
+
+                       Text-guided 3D medical image segmentation [23, 25–27] allows users to spec-
+                              ify targets via predefined class names, offering a more intuitive interface for
+                             clinical workflows compared to traditional point- or bounding-box-based mod-
+                              els [3,7,13,15,16]. Yet, the dominant language signal available in real-world care is
+
+======================== PDF 第 2 页 ========================
+2      T. Zhang et al.
+
+
+not a standardized label set but free-text: unstructured, free-form language orig-
+inating from imaging orders, clinical questions, or radiology reports. Free-text
+promptable segmentation broadens clinical applicability for diverse diagnostic
+scenarios and also serves as a natural interface for future AI agent integration.
+   However, directly conditioning segmentation models on free-text introduces
+severe challenges regarding linguistic variability, as clinical text frequently con-
+tains abbreviations, synonymous phrasing, and institution-specific conventions [8].
+While recent free-text promptable segmentation work attempts to alleviate this
+through larger training corpora, stronger vision-language fusion [20], or more
+complex multi-agent systems [12], they largely overlook that standard natu-
+ral language embedding spaces are not inherently aligned with complex clini-
+cal terminology. Clinically equivalent synonyms or shorthand frequently map to
+disparate embedding neighborhoods [4], resulting in drastically different condi-
+tioning signals and ultimately unstable segmentation masks. Overcoming this
+instability requires moving beyond direct text-to-feature mapping; it necessi-
+tates an intermediate step of explicit reasoning to disambiguate the raw text
+and resolve the underlying clinical intent before executing the task.
+   Yet, pure language reasoning is insufficient for medical imaging; it must be
+heavily grounded in the patient’s visual evidence [10,22,24]. A dependable text-
+guided segmentation system needs to comprehend the unstructured clinical re-
+quest and align it with the anatomical evidence [9,28,29]. Rather than relying
+on rigid text-to-text synonym normalization, this alignment is best achieved by
+decomposing the vision-language reasoning into granular, modular steps, known
+as skills. By applying skills (e.g., synonym normalization or spatial relation rea-
+soning) that cross-reference the textual prompt with visual features or volume
+renderings, the system can synthesize an explicit, evidence-aligned target repre-
+sentation. This provides the downstream segmentation backbone with a canoni-
+cal signal, substantially mitigating instability from diverse linguistic expressions.
+   To this end, we propose a skill-evolving grounded reasoning (SEER) frame-
+work, which bridges variable free-text prompts to robust 3D medical segmenta-
+tion by formulating the required vision-language reasoning as explicit, executable
+skills. When presented with a clinical request and a 3D scan, SEER leverages
+these skills to generate a task specification for the segmentation backbone. Fur-
+thermore, instead of relying on a static reasoning module, we introduce a dy-
+namic skill-evolving strategy, which continuously distills high-reward grounded
+reasoning episodes into auditable, reusable skill artifacts. By tracking skill usage
+and performance gains, SEER self-refines its reasoning capabilities, progressively
+enhancing its robustness against complex or unseen linguistic perturbations.
+   Our contributions are summarized as follows. (i) We introduce SEER, a novel
+framework that bridges variable free-text clinical prompts to 3D medical segmen-
+tation. (ii) We curate the SEER-Trace dataset, containing raw clinical prompts
+with image-grounded and skill-tagged reasoning traces, to support reproducible
+research on free-text promptable 3D medical segmentation. (iii) We formalize
+grounded visual–language reasoning as explicit skills, enabling the framework to
+map ambiguous free-text into explicit target representations. (iv) We propose a
+
+======================== PDF 第 3 页 ========================
+        SEER for Free-Text Promptable 3D Medical Image Segmentation      3
+
+
+
+     SEER-Trace Dataset             Grounded Reasoning                  SEER-Loop
+
+                                                      <evidence>                                                                                                                          Tag:                                                                                                         ABBR_DISAMBIGUATE New Skill Artifact                                                   The image shows a cardiac MRI-like view featuring a    Diverse free-text prompts                                                                                                                              Content:
+                                                                     central thick-walled muscular chamber surrounding a                       LV→left_ventricle;
+               Please provide  left  ventricle                   large blood-pool cavity and an adjacent smaller chamber.                   trig={RAW:ABBR(LV), VIS:CARDIAC_CHAMBERS, …}
+                 delineation for volumetry.                     </evidence>                                                             Audit: id=seer:<hash>; src=R<t>:topk …
+                                                             <rationale>
+               Delineate the left vuntricle.                   The evidence shows cardiac chambers, so "LV" is an
+                                                                 abbreviation for the left ventricle of the heart.  I'll expand                  Retrieval            Update
+      Plz delineate the left ventricular cavity.                     “LV” to “left ventricle” and keep the instruction minimal.
+                                                               </rationale>
+                Delineate the LV.                                                           <answer>                                                                              Distillation
+                                                                        Delineate the left ventricle.                        SEER-Bank               Operator
+                                                              </answer>
+
+                                                                                   Reward
+
+                                                                                                                      Evaluation
+                                                                                        Group Relative
+                    Slices                 Segmentation                                  Policy Optimization        Dice Reward
+                                Backbone                                                                                                 Stability Reward
+    3D Volume                    Multi-view
+                                    Slices                                                                                                    Format Reward
+                                                            3D Masks
+
+
+Fig. 1. Illustration of the proposed SEER framework. SEER makes free-text prompt-
+able 3D medical segmentation robust by grounding clinical free-text prompts in patient
+anatomy and evolving reusable reasoning skills.
+
+
+dynamic skill-evolving strategy that distills high-reward reasoning episodes into
+reusable skill artifacts, allowing the model to self-refine and adapt to complex lin-
+guistic variations over time. (v) Extensive experimental results demonstrate that
+SEER achieves superior segmentation performance over state-of-the-art baselines
+and strong transferability across segmentation backbones.
+
+
+2  Methodology
+
+Fig. 1 presents an overview of the proposed SEER framework for free-text
+promptable 3D medical segmentation. Building upon the supervisory founda-
+tion of SEER-Trace, our framework employs Grounded Reasoning to accurately
+align text with multi-view visual evidence; to overcome the limitations of static
+reasoning, we further introduce a dynamic skill-evolving strategy (SEER-Loop)
+to distill successful episodes into reusable skills stored in SEER-Bank, thereby
+establishing a synergistic system that continuously enhances robustness.
+
+
+2.1  SEER-Trace Dataset Curation
+
+SEER-Trace is built from established 3D medical segmentation benchmarks [2,6,
+17,18,21] and augments each case with clinician-like prompts and grounded, skill-
+tagged traces. It essentially aligns three core elements: (i) linguistically diverse
+prompts, (ii) evidence-aligned intermediate reasoning, and (iii) an executable
+task specification defined by the downstream segmentation system.
+   Formally, SEER-Trace consists of tuples:
+
+                             N
+            DTrace =  (Vi, qi, yi, τi) i=1,      yi = (ei, ri, ai),            (1)
+
+where Vi is a 3D volume, qi is a raw free-text request, and yi is a structured rea-
+soning response containing <evidence> ei, <rationale> ri, and an executable
+
+======================== PDF 第 4 页 ========================
+4      T. Zhang et al.
+
+
+<answer> ai. Specifically, each raw request qi is generated under one of eight
+predefined clinical styles (e.g., radiology note and consult question), producing
+diverse styles and levels of underspecification. We structure the response yi as
+this triplet to explicitly decouple the cognitive steps of intent resolution. Within
+yi, the evidence ei enforces perception by isolating observable visual cues from
+Vi, the rationale ri enforces logical reasoning by linking the ambiguous text qi to
+these visual cues, and the answer ai formulates the final target representation. To
+augment yi with modular steps, we also design the skill bank τi, which includes
+explicit skills such as spatial relation reasoning and synonym normalization.
+  We render each volume into a multi-view 2D representation Ii = R(Vi) =
+{Ii,m}Mm=1. We then use a large language model with constrained prompting to
+generate qi and a high-capacity vision-language model (VLM) conditioned on
+(Ii, qi) to synthesize yi and τi, generating intent-preserving explanations and
+skill tags that are strictly consistent with the volumes and prompts.
+   To avoid hallucinations, we constrained each request qi by target aliases,
+visual priors, and forbidden terms to preserve clinical intent and reduce trivial
+label leakage. We also checked each candidate yi for semantic equivalence with
+the intended target and compatibility with the frozen backbone. Furthermore, we
+randomly sampled 5% of tuples for expert audit to verify clinical plausibility. In
+the expert audit, only 7 out of 1,120 randomly sampled instances were flagged
+as abnormal, yielding a 0.63% abnormal rate, which supports the reliability
+of the full SEER-Trace dataset. The final SEER-Trace dataset contains 22,330
+multimodal instruction instances from 1,811 cases.
+
+
+2.2  Grounded Reasoning
+
+Building upon the supervised format of SEER-Trace, this component executes
+the core reasoning process at inference. Rather than solely leveraging a fixed
+mapping from text input to segmentation type, SEER actively decomposes com-
+plex input prompts into granular, executable cognitive operations, using explicit
+skills such as spatial relation reasoning and synonym normalization.
+  When processing a clinical request q and rendered views I = R(V ), the VLM
+πθ follows the learned structured reasoning format and generates y = (e, r, a):
+
+                     πθ(y | I, q, B) = πθ(e, r, a | I, q, B),                    (2)
+
+where B denotes optional skill artifacts retrieved from SEER-Bank, supplying
+reusable, high-reward reasoning patterns. To achieve visually grounded reason-
+ing, three components operate synergistically. First, the model extracts anatom-
+ical evidence e as a visual grounding constraint in I. Second, it formulates a
+rationale r that logically links the ambiguous free-text request q to this explicit
+visual evidence, thereby disambiguating the intended target. Finally, based on
+the visual evidence and rationale, it synthesizes an executable answer a, which
+is executed by the frozen segmentation system S, yielding a predicted mask bG.
+This structural separation prevents the model from relying on unconstrained
+latent text conditioning, forcing it to explicitly validate clinical intent against
+anatomical evidence before generating the final segmentation.
+
+======================== PDF 第 5 页 ========================
+        SEER for Free-Text Promptable 3D Medical Image Segmentation      5
+
+
+   To make our framework robust against diverse linguistic expressions of the
+same clinical intent, we explicitly optimize the model to produce stable segmen-
+tation masks. Let Ω(q) denote a set of clinically equivalent rephrasings of q,
+SEER aims to improve both expected segmentation quality and stability under
+Ω(q) by optimizing the following objective:
+
+   J (θ) = E(V,q,G) Eq′∼Ω(q) Dθ(V, q′, G) −λVarq′∼Ω(q) Dθ(V, q′, G)   ,    (3)
+
+where Dθ(V, q′, G) = Dice (S (V, aθ(V, q′)) , G), G is the ground truth segmen-
+tation mask, aθ(V, q′) is the generated <answer> for (V, q′), and λ controls the
+quality–stability trade-off.
+   To effectively maximize J (θ), the learning process proceeds in two stages.
+First, supervised fine-tuning (SFT) aligns the VLM with the structural opera-
+tions of SEER-Trace. Second, group relative policy optimization (GRPO) further
+refines the policy via a composite reward function R. By jointly rewarding the
+execution Dice score and stability across equivalent queries q′ ∈Ω(q), while us-
+ing a β-weighted KL penalty to the SFT policy to preserve format compliance,
+GRPO enforces robust, high-fidelity generation.
+
+
+2.3  Dynamic Skill-Evolving Strategy (SEER-Loop) via SEER-Bank
+
+While grounded reasoning resolves ambiguity using existing skills, the linguistic
+variability in real-world clinical settings is unbounded. Therefore, we propose
+a dynamic skill-evolving strategy (SEER-Loop) implemented via SEER-Bank.
+This memory mechanism captures recurring ambiguity patterns as explicit skill
+artifacts, retrieves relevant skills during generation, and updates the bank over
+time through experience distillation and downstream feedback; see Fig. 1 for the
+interaction–update loop.
+   At evolution round t, SEER-Bank stores a set of skill artifacts, B(t) = {sj =
+(κj, zj, ηj)}Ktj=1, where κj is a skill tag, zj is the skill content, and ηj records audit
+metadata. Given rendered views I and a request q, a retrieval operator selects
+a relevant subset B(t)(I, q) ⊂B(t) and uses it to guide the model’s interaction
+with the environment by conditioning the generation on retrieved skills:
+
+                  πθ(y | I, q, B(t)) ≈πθ y | I, q, B(t)(I, q)  .                 (4)
+
+Unlike generic text retrieval, retrieved skills are reusable reasoning strategies.
+Retrieval ranks skills using both request–metadata compatibility, such as target,
+tag, and alias overlap, and consistency between stored visual cues and the current
+multi-view evidence. The selected skills are rendered as structured <skill_bank>
+blocks and appended to the VLM input.
+    Skill evolution is driven by high-reward interaction episodes with the frozen
+environment. Each episode records the rendered views I, request q, generated
+structured response y = (e, r, a), execution result bG = S(V, a), and reward R. Let
+Ξ+ denote the set of top-reward episodes. The distillation extracts successful,
+novel reasoning patterns from Ξ+ into new skill artifacts. To prevent memory
+
+======================== PDF 第 6 页 ========================
+6      T. Zhang et al.
+
+   Table 1. Performance comparison under label and free-text prompting modes.
+
+                           Label Prompting    Free-text Prompting
+Dataset   Method
+                                     Dice ↑Dice ↑Worst Dice ↑Std. ↓
+          SAT [27]                         22.16    0.69           0.00   2.53
+            BiomedParseV2 [26]               18.66    2.53           0.00   7.27
+BrainMet-  Text3DSAM [23]                   0.10    0.41           0.00   0.93
+Share     MedSAM3 [12]                   11.33   16.62          10.56   5.17
+             VoxTell [20]                      48.19   52.15          46.71   3.35
+         SEER (Ours)                 51.70  53.83        51.44   1.67
+          SAT [27]                         96.05    0.01           0.00   0.13
+            BiomedParseV2 [26]                1.35    8.53           0.00   7.50
+          Text3DSAM [23]                  24.75    0.01           0.00   0.16
+PENGWIN
+         MedSAM3 [12]                   18.26    5.75           3.67   6.40
+             VoxTell [20]                   97.59   92.26          79.34   7.49
+         SEER (Ours)                    97.56  97.39        95.47   0.98
+
+
+
+bloat and redundancy, we apply two utility-based operations. First, Dedup(·)
+groups skills by source, skill tag, and target, merges semantically identical or
+highly overlapping skills, and keeps the one with higher empirical utility. Second,
+Prune(·) further caps the bank size by removing skills with negative or low
+empirical utility. The bank update is written as:
+
+      ∆B(t) = Distill(Ξ+),     B(t+1) = Prune Dedup B(t) ∪∆B(t)     .    (5)
+
+The empirical utility used by both Dedup(·) and Prune(·) is estimated from each
+skill’s marginal reward gain, which is defined as:
+
+              ∆(s) = E R s ∈B(I, q) −E R s /∈B(I, q) .              (6)
+
+By tracking these metrics, SEER-Bank identifies and retains only empirically
+verified reasoning skills. In effect, this continuous distillation, deduplication, and
+pruning process stabilizes generation, allowing the framework to self-refine and
+adapt to complex, unseen linguistic variations over time.
+
+
+3  Experiments
+
+3.1  Experimental Setup
+
+Datasets and prompting protocols. We evaluate SEER on two datasets
+to comprehensively assess generalization: BrainMetShare [5] (representing a do-
+main shift involving seen anatomy but unseen institutional sources) and PENG-
+WIN [14] (serving as a strictly out-of-distribution (OOD) benchmark since its
+pelvic bone targets are absent from the SEER-Trace reasoning supervision and
+target coverage). Each volume is processed into the multi-view 2D representation
+introduced in SEER-Trace, paired with diverse, clinician-like free-text prompts.
+
+======================== PDF 第 7 页 ========================
+        SEER for Free-Text Promptable 3D Medical Image Segmentation      7
+
+
+
+     Prompt         Input Image       SAT     BiomedParseV2   Text3DSAM    MedSAM3        VoxTell     SEER (ours)   Ground Truth
+
+   Typo Noise
+
+
+
+
+       sacrun
+
+
+
+ Spatial Specifier
+
+
+  I  need  the   right
+ hipbone delineated,
+  specifically the iliac
+  part.
+
+
+  Clinical Order
+
+
+ Delineate the brain
+ metastases for
+ radiotherapy
+ planning.
+
+
+  Fig. 2. Qualitative comparisons under three clinically plausible free-text prompts.
+
+
+
+To ensure a comprehensive and fair comparison, we evaluate all baselines under
+two settings: (i) their natively supported, predefined label prompting interfaces
+(label prompting mode), and (ii) the realistic, linguistically diverse free-text clin-
+ical prompts introduced in SEER-Trace (free-text prompting mode).
+Implementation details.  All experiments are implemented in PyTorch [19]
+and trained on NVIDIA A100 GPUs. We use DeepSeek-V3.2 [11] as the high-
+capacity VLM during SEER-Trace construction and initialize our vision-language
+reasoning module with Qwen3-VL-4B-Instruct [1]. During both training stages,
+the visual encoder is kept frozen while the remaining parameters are fully up-
+dated. SEER-Loop via SEER-Bank is executed in discrete evolutionary rounds.
+Following each training phase, we distill high-reward reasoning episodes into
+reusable skill artifacts, deduplicate the memory bank, and inject these updated
+skill traces back into the subsequent training stage.
+Evaluation metrics. We report Dice for 3D medical segmentation accuracy.
+Robustness analyses under sets of clinically equivalent rephrasings are also re-
+ported in terms of standard deviation (Std.) and worst-case Dice (worst Dice).
+
+
+3.2  Comparison Results, Ablation Study, and Generalization
+
+Quantitative comparison.  Table 1 reports Dice in both label prompting
+and free-text prompting modes. In label prompting mode, SEER matches the
+strongest baseline on PENGWIN and improves on BrainMetShare. In free-text
+prompting mode, several prior methods collapse to near-zero Dice, reflecting poor
+robustness to realistic clinical phrasing. Among methods that remain functional,
+SEER consistently improves mean Dice while substantially reducing variance and
+improving worst-case Dice. The consistent gains across both partially and strictly
+OOD datasets demonstrate that SEER acquires a new capability—generalizing
+beyond seen anatomical targets by using grounded reasoning and skill-evolving
+strategy to resolve ambiguities—rather than merely normalizing long free-text
+into seen label tokens.
+
+======================== PDF 第 8 页 ========================
+8      T. Zhang et al.
+
+        Table 2. Ablation study on the strictly OOD PENGWIN dataset.
+
+Configuration                           Dice ↑  Worst Dice ↑   Std. ↓
+Baseline                                          92.26            79.34      7.49
+ + Vanilla VLM                                 84.84            61.90     14.15
+ + Fine-tuned VLM w/ Grounded Reasoning     95.92            88.27      3.84
+  + SEER-Loop (our SEER)             97.39          95.47     0.98
+
+
+
+Qualitative comparison.  Fig. 2 presents representative cases under three
+clinically plausible free-text prompt variants: Typo Noise (spelling perturbation
+with preserved intent), Spatial Specifier (laterality and subregion constraints),
+and Clinical Order  (high-level clinical phrasing related to treatment plans).
+SEER produces consistent, on-target masks across all variants, reflecting evidence-
+aligned disambiguation from the image. In contrast, baseline outputs are highly
+prompt-sensitive in free-text prompting mode, frequently drifting to off-target
+regions or collapsing to degenerate predictions (e.g., empty/fragmented masks)
+under minor wording changes.
+Ablation study.  To evaluate the efficacy of our core architectural contribu-
+tions, we conducted an ablation study on the strictly OOD PENGWIN dataset.
+We progressively integrated our proposed modules into the strongest baseline [20].
+Table 2 shows that naively prepending a vanilla VLM (Qwen3-VL-4B-Instruct)
+to parse the text actually degrades performance. This validates our hypothe-
+sis that unconstrained, pure-text reasoning without strict anatomical grounding
+exacerbates instability. The fine-tuned VLM with grounded reasoning success-
+fully rectifies this, lifting mean Dice to 95.92 and halving the standard deviation
+compared to the baseline. Finally, the integration of the SEER-Loop delivers a
+substantial improvement in robustness. By continuously retrieving empirically
+verified reasoning artifacts from the SEER-Bank, this full configuration achieves
+the highest mean accuracy, raises the worst-case Dice to 95.47, and crushes the
+standard deviation to 0.98. This near-zero variance indicates that SEER effec-
+tively immunizes the segmentation backbone against linguistic perturbations.
+Cross-backbone generalization.  To evaluate the generalizability of SEER
+across different foundational architectures, we replace the downstream segmen-
+tation backbone with MedSAM3 while keeping our proposed front-end frozen.
+Specifically, on the strictly OOD PENGWIN dataset, integrating SEER substan-
+tially improves upon the standalone MedSAM3 baseline, increasing the mean
+Dice from 5.75 (std: 6.40) to 19.97 (std: 13.30) and elevating the worst-case
+minimum score from 3.67 to 3.94. This suggests that the reasoning capabilities
+of SEER are beneficial to other segmentation backbones, consistently elevating
+zero-shot generalization and worst-case robustness.
+
+
+4  Conclusion
+
+We presented SEER, a skill-evolving grounded reasoning framework that stabi-
+lizes free-text promptable 3D medical segmentation by converting linguistically
+
+======================== PDF 第 9 页 ========================
+        SEER for Free-Text Promptable 3D Medical Image Segmentation      9
+
+
+diverse clinical prompts into a single evidence-aligned, executable task specifica-
+tion for a frozen segmentation system. Across partially and strictly OOD bench-
+marks, SEER preserves strong label prompting performance while substantially
+improving free-text prompting robustness, reducing dispersion under linguis-
+tic variability and improving worst-case behavior; ablations further show that
+grounded visual reasoning and SEER-Loop contribute complementary gains. Fu-
+ture work should explore volumetric VLM encoders, expand the skill taxonomy,
+evaluate broader clinical tasks, and carefully audit failure modes to ensure reli-
+ability in agent-mediated clinical pipelines.
+
+
+References
+
+
+ 1. Bai, S., Cai, Y., Chen, R., Chen, K., Chen, X., Cheng, Z., Deng, L., Ding, W.,
+    Gao, C., Ge, C., et al.: Qwen3-VL technical report. arXiv:2511.21631 (2025)
+ 2. Baid, U., Ghodasara, S., Mohan, S., Bilello, M., Calabrese, E., Colak, E., Fara-
+    hani, K., Kalpathy-Cramer, J., Kitamura, F.C., Pati, S., et al.: The RSNA-ASNR-
+   MICCAI BraTS 2021 benchmark on brain tumor segmentation and radiogenomic
+     classification. arXiv:2107.02314 (2021)
+ 3. Chen, T., Wang, C., Shan, H.: Autoregressive medical image segmentation via
+    next-scale mask prediction. MICCAI 2025 (2025)
+ 4. Deng, L., Chen, L., Liu, M., Wang, X., Qi, Y., Shao, C., Jiang, T.: Knowledge from
+    medical ontology can significantly enhance mainstream text embedding models
+    in medical information retrieval. Information Processing & Management 63(2),
+    104435 (2026)
+ 5. Grøvik, E., Yi, D., Iv, M., Tong, E., Rubin, D., Zaharchuk, G.: Deep learning en-
+    ables automatic detection and segmentation of brain metastases on multisequence
+   MRI. Journal of Magnetic Resonance Imaging 51(1), 175–182 (2020)
+ 6. Hernandez Petzsche, M.R., De La Rosa, E., Hanning, U., Wiest, R., Valenzuela,
+   W., Reyes, M., Meyer, M., Liew, S.L., Kofler, F., Ezhov, I., et al.: ISLES 2022:
+  A multi-center magnetic resonance imaging stroke lesion segmentation dataset.
+     Scientific Data 9(1), 762 (2022)
+ 7. Kirillov, A., Mintun, E., Ravi, N., Mao, H., Rolland, C., Gustafson, L., Xiao, T.,
+    Whitehead, S., Berg, A.C., Lo, W.Y., et al.: Segment anything. In: ICCV. pp.
+    4015–4026 (2023)
+ 8. Larson, D.B., Koirala, A., Cheuy, L.Y., Paschali, M., Van Veen, D., Na, H.S., Pet-
+    terson, M.B., Fang, Z., Chaudhari, A.S.: Assessing completeness of clinical histories
+    accompanying imaging orders using adapted open-source and closed-source large
+    language models. Radiology 314(2), e241051 (2025)
+ 9. Lee, H.C., Liu, Z., Ahmed, H., Kim, S., Huver, S., Nath, V., Fayad, Z.A., Deyer,
+    T., Mei, X.: Unified supervision for vision-language modeling in 3D computed
+    tomography. In: ICCV. pp. 6725–6733 (2025)
+10. Lin, J., Zhu, C., Kneuertz, P.J., Bai, Y., Xue, Y.: When models learn to ask
+    why: Adaptive causal reasoning for trustworthy medical vision-language models.
+     In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+    Recognition. pp. 5556–5568 (2026)
+11. Liu, A., Mei, A., Lin, B., Xue, B., Wang, B., Xu, B., Wu, B., Zhang, B., Lin,
+    C., Dong, C., et al.: DeepSeek-V3.2: Pushing the frontier of open large language
+    models. arXiv:2512.02556 (2025)
+
+======================== PDF 第 10 页 ========================
+10     T. Zhang et al.
+
+
+12. Liu, A., Xue, R., Cao, X.R., Shen, Y., Lu, Y., Li, X., Chen, Q., Chen, J.: MedSAM3:
+    Delving into segment anything with medical concepts. arXiv:2511.19046 (2025)
+13. Liu, S., Bao, L., Yang, Q., Geng, W., Zheng, B., Li, C., Chen, W., Peng, H.,
+    Yuan, Y.: MedSAM-Agent: Empowering interactive medical image segmentation
+    with multi-turn agentic reinforcement learning. arXiv:2602.03320 (2026)
+14. Liu, Y., Yibulayimu, S., Zhu, G., Shi, C., Liang, C., Zhao, C., Wu, X., Sang, Y.,
+   Wang, Y.: Automatic pelvic fracture segmentation: a deep learning approach and
+   benchmark dataset. Frontiers in Medicine 12, 1511487 (2025)
+15. Ma, J., He, Y., Li, F., Han, L., You, C., Wang, B.: Segment anything in medical
+    images. Nature Communications 15(1), 654 (2024)
+16. Ma, J., Yang, Z., Kim, S., Chen, B., Baharoon, M., Fallahpour, A., Asakereh, R.,
+    Lyu, H., Wang, B.: MedSAM2: Segment anything in 3D medical images and videos.
+    arXiv:2504.03600 (2025)
+17. Ma, J., Zhang, Y., Gu, S., Ge, C., Mae, S., Young, A., Zhu, C., Yang, X., Meng,
+    K., Huang, Z., et al.: Unleashing the strengths of unlabelled data in deep learning-
+    assisted pan-cancer abdominal organ quantification: the FLARE22 challenge. The
+    Lancet Digital Health 6(11), e815–e826 (2024)
+18. Pace, D.F., Contreras, H.T., Romanowicz, J., Ghelani, S., Rahaman, I., Zhang, Y.,
+    Gao, P., Jubair, M.I., Yeh, T., Golland, P., et al.: HVSMR-2.0: A 3D cardiovascular
+  MR dataset for whole-heart segmentation in congenital heart disease. Scientific
+   Data 11(1), 721 (2024)
+19. Paszke, A., Gross, S., Massa, F., Lerer, A., Bradbury, J., Chanan, G., Killeen, T.,
+    Lin, Z., Gimelshein, N., Antiga, L., et al.: PyTorch: An imperative style, high-
+    performance deep learning library. NeurIPS 32 (2019)
+20. Rokuss, M., Langenberg, M., Kirchhoff, Y., Isensee, F., Hamm, B., Ulrich, C., Reg-
+    nery, S., Bauer, L., Katsigiannopulos, E., Norajitra, T., Maier-Hein, K.: VoxTell:
+    Free-text promptable universal 3D medical image segmentation. In: CVPR (2026)
+21. de Verdier, M.C., Saluja, R., Gagnon, L., LaBella, D., Baid, U., Tahon, N.H.,
+    Foltyn-Dumitru, M., Zhang, J., Alafif, M., Baig, S., et al.: The 2024 brain tumor
+    segmentation (BraTS) challenge: Glioma segmentation on post-treatment MRI.
+    arXiv:2405.18368 (2024)
+22. Wu, C., Zhang, X., Zhang, Y., Hui, H., Wang, Y., Xie, W.: Towards generalist foun-
+    dation model for radiology by leveraging web-scale 2D&3D medical data. Nature
+   Communications 16(1), 7866 (2025)
+23. Xin, Y., Ates, G.C., Shao, W.: Text3DSAM: Text-guided 3D medical image seg-
+    mentation using SAM-inspired architecture. In: CVPR: Foundation Models for 3D
+    Biomedical Image Segmentation (2025)
+24. Yao, Z., Wang, B., Zhang, Y., Wang, J., Xia, I., Tang, Z., Han, S., Ouyang, F.,
+    Yang, Z., Cohan, A., et al.: Medical thinking with multiple images. In: ICLR (2026)
+25. Zhao, T., Gu, Y., Yang, J., Usuyama, N., Lee, H.H., Kiblawi, S., Naumann, T.,
+    Gao, J., Crabtree, A., Abel, J., et al.: A foundation model for joint segmentation,
+    detection and recognition of biomedical objects across nine modalities. Nature
+   Methods 22(1), 166–176 (2025)
+26. Zhao, T., Kiblawi, S., Usuyama, N., Lee, H.H., Preston, S., Poon, H., Wei, M.:
+   Boltzmann attention sampling for image analysis with small objects. In: CVPR.
+    pp. 25950–25959 (2025)
+27. Zhao, Z., Zhang, Y., Wu, C., Zhang, X., Zhou, X., Zhang, Y., Wang, Y., Xie, W.:
+    Large-vocabulary segmentation for medical images with text prompts. NPJ Digital
+    Medicine 8(1), 566 (2025)
+
+======================== PDF 第 11 页 ========================
+        SEER for Free-Text Promptable 3D Medical Image Segmentation     11
+
+
+28. Zhu, C., Lin, Y., Chen, S., Wang, Y., Lin, J.: MedEyes: Learning dynamic visual
+    focus for medical progressive diagnosis. In: Proceedings of the AAAI Conference
+   on Artificial Intelligence. vol. 40, pp. 13916–13924 (2026)
+29. Zhu, C., Zeng, J., Jiang, J., Lin, J., Wang, Y.: MedSynapse-V: Bridging visual
+    perception and clinical intuition via latent memory evolution. arXiv:2604.26283
+    (2026)

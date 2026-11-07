@@ -1,0 +1,681 @@
+B07 | ReHyAt: Recurrent Hybrid Attention for Video Diffusion Transformers
+来源：https://arxiv.org/abs/2601.04342
+本地PDF：B07_ReHyAt_Recurrent_Hybrid_Attention_for_Video_Diffusion_Transformers.pdf
+SHA-256：e166ff79da4abd8ec15ae15efdd42fe6707cb1fda28f65b9017f33c60a082793
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                  This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                             Except for this watermark, it is identical to the accepted version;
+                            the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+
+   ReHyAt: Recurrent Hybrid Attention for Video Diffusion Transformers
+
+
+                      Mohsen Ghafoorian, Amirhossein Habibian
+                             Qualcomm AI Research*
+                              {mghafoor,ahabibia}@qualcomm.com
+
+
+
+
+                                                                                                                                    5                 Abstract                                                              FLOPs (1 DiT Block)                         Mobile Latency (1 DiT Block)                                                                       OOM              Wan2.1                                                                                               400      Wan2.1
+                                                                                                             ReHyAt                                                           ReHyAt                                                                                                                                    4
+Recent advances in video diffusion models have shifted to-          300                                        (s)
+                                                                                                                                    3                                                                                                                                                                                                                                                                                                                                                    latencywards transformer-based architectures, achieving state-of-                  TFLOPs200
+the-art video generation but at the cost of quadratic atten-                                                                                               100                                                                                 Mobile2
+tion complexity, which severely limits scalability for longer                                                   1
+sequences. We introduce ReHyAt, a Recurrent Hybrid At-            0                                      0
+                                                                                                        10       20       30       40        5         10         15         20
+tention mechanism that combines the fidelity of softmax                         Video duration (seconds)                        Video duration (seconds)
+attention with the efficiency of linear attention, enabling
+                                                                                                                                                     1.3B 83.1chunk-wise recurrent reformulation and constant memory
+usage. Unlike the concurrent linear-only SANA Video, Re-                                                                                                                                                                                                                               Wan2.1 VBench:HyAt’s hybrid design allows efficient distillation from ex-
+isting softmax-based models, reducing the training cost by                  83.4
+two orders of magnitude to ∼160 GPU hours, while being
+competitive in the quality. Our light-weight distillation and                                                                                                                                                                                                                                                                                                                                 20×ReHyAt  VBench:
+finetuning pipeline provides a recipe that can be applied
+to future state-of-the-art bidirectional softmax-based mod-      Figure 1. A comparison of our proposed Recurrent Hybrid Atten-
+els. Experiments on VBench and VBench-2.0, as well as a      tion model with Wan2.1 bidirectional full softmax attention. Top:
+human preference study, demonstrate that ReHyAt achieves     Compute complexity increase with video duration growth (left:
+state-of-the-art video quality while reducing attention cost     FLOPs, right: phone latency).  Bottom: comparing our hybrid
+from quadratic to linear, unlocking practical scalability for     model (20× ReHyAt blocks) with original Wan2.1 1.3B, quali-
+long-duration and on-device video generation.                      tatively and quantitatively. Prompt: “A cat drinking water.”
+
+
+1. Introduction                                             underlies recent state-of-the-art systems (e.g., Wan2.1 [35],
+                                                    CogVideoX [44], HunyuanVideo [22], PyramidalFlow [16],
+The ambition in generative video is shifting from produc-     Open-Sora Plan [26]), and has been documented by recent
+ing short, visually striking clips to creating sustained, co-     surveys as the prevailing trend in video generation [28, 39].
+herent sequences with rich dynamics and consistent sub-        This progress comes with a nontrivial systems cost:
+ject identity.  Diffusion-based models have become the      the self-attention term scales quadratically with sequence
+method of choice for this goal due to their stability and      length, O(N 2d) in time and O(N 2) in memory, where N is
+controllability; however, the choice of backbone  is de-      the number of tokens and d the hidden dimension [33, 34].
+cisive for scaling.  While early video diffusion systems     In video, N is the product of temporal length and spatial
+adapted U-Net architectures from images, they exhibited     patch count, so even moderate resolutions and durations
+limited capacity to model long temporal structure and      yield token counts in the tens of thousands.  In practice,
+struggled to scale effectively to higher resolutions and      the attention subroutine consumes the majority of compute
+durations.  This has motivated a transition to Diffusion      in DiT blocks, and memory pressure grows rapidly with
+Transformers (DiTs) [30], which process video as a se-     longer contexts.  Kernel- and IO-aware implementations
+quence of spatiotemporal patches and furnish global con-     such as FlashAttention [7] reduce constants but do not al-
+text from the first layer. The resulting architectural shift      ter the N 2 dependence, leaving training and inference con-
+   *Qualcomm AI Research is an initiative of Qualcomm Technologies,      strained when targeting higher resolutions, extended dura-
+Inc.                                                                    tions, or multi-shot compositions. As a direct consequence,
+
+
+
+                                                     40674
+
+======================== PDF 第 2 页 ========================
+producing videos beyond roughly 10 seconds remains diffi-     complexity. Furthermore, we leverage a two-stage training
+cult within typical GPU memory and latency budgets, while     pipeline—attention distillation from a bidirectional softmax
+edge devices such as mobile phones even struggle to gener-     teacher followed by lightweight fine-tuning—that achieves
+ate more than a few seconds of videos.                 SOTA results within fewer than 200 GPU-hours. We val-
+   Linear attention [20] offers a compelling alternative      idate our approach by transforming Wan2.1 into  its re-
+to  full softmax attention by reducing complexity from      current hybrid counterpart and evaluate on VBench [14],
+quadratic to linear and enabling constant memory when    VBench2.0 [51], and a human preference study, demon-
+reformulated as an RNN. This property makes it particu-      strating that ReHyAt delivers near state-of-the-art quality
+larly attractive for generating arbitrarily long videos, where     with dramatically reduced compute.  Fig 1 demonstrates
+memory growth is a critical bottleneck. Beyond efficiency,    some of the aspects discussed above.
+the recurrent formulation of linear attention allows chunk-    Our main contributions are as follows:
+wise processing, which aligns naturally with sequential      • We propose ReHyAt, a novel temporally chunked hybrid
+video generation. These advantages have motivated recent        attention mechanism that combines local softmax atten-
+efforts to explore linear and hybrid attention mechanisms in        tion with global linear attention. This design preserves
+video diffusion models [4, 11].                                      high-fidelity modeling of critical dependencies within and
+                                                                across adjacent frames while reducing overall complexity   However, linear attention introduces a significant trade-
+                                                                     to linear time.off:  its kernel-based similarity function lacks the expres-
+                                                                          • We derive a chunk-wise recurrent reformulation of Re-siveness of the exponential kernel used in softmax atten-
+                                                      HyAt, computationally enabling generation of arbitrarilytion. This gap manifests in reduced activation diversity and
+                                                            long videos with constant memory usage and efficient in-weaker modeling of fine-grained dependencies [47], often
+                                                                   ference.requiring extensive retraining to achieve acceptable qual-
+                                                                          • Through extensive empirical evaluations and ablationity [4, 11]. Hybrid approaches that combine linear and soft-
+                                                                       studies, we show that a state-of-the-art bidirectional Soft-max attention have emerged as a potential solution [11], but
+                                               max attention video diffusion model can be transformedexisting designs remain quadratic in complexity and cannot
+                                                                     into a chunk-wise recurrent model, only within a few hun-be reformulated as RNNs, leaving the scalability challenge
+                                                            dred GPU-hours, with negligible impact on the quality.unresolved. In other words, while these methods improve
+quality over purely linear attention, they fail to deliver the
+                                                          2. Related Workmemory and compute benefits necessary for long-duration
+video generation.                                                                 Efficient Attention.  Several approaches aim to reduce
+   Meanwhile, the most powerful video diffusion models      the quadratic complexity of self-attention across domains:
+today are trained with bidirectional full softmax attention      for  vision  tasks  (e.g.,  EfficientViT  [2], PADRe  [23],
+using massive compute and data resources.  Re-training     Performer [5], Linformer [38]), image generation  (e.g.,
+such models with alternative attention mechanisms from   SANA [25], LinGen [36], Grafting [3]), and language mod-
+scratch is prohibitively expensive and impractical for most      eling [29, 37, 43, 46, 48]. These works show the feasibility
+research and production settings.  This observation moti-     of sub-quadratic attention but often require heavy retrain-
+vates a different strategy: rather than building efficient mod-     ing or training from scratch (e.g., SANA [25]).  In con-
+els from the ground up, can we distill these high-quality,       trast, we focus on lightweight distillation and fine-tuning of
+compute-heavy models into a recurrent form that preserves      pre-trained softmax-based models into an efficient hybrid
+fidelity while dramatically reducing resource requirements?      attention design tailored for video diffusion under modest
+Achieving this would unlock practical scalability for video     compute budgets.  Linear recurrent models such as SSM
+diffusion, not neglecting the substantial progress made by     and RWKV [9, 10, 37, 45, 53] have emerged as alterna-
+state-of-the-art architectures.                                       tives to self-attention for long sequences. However, archi-
+   In this paper, we address this challenge by introduc-      tectural differences from transformers make distilling DiT
+ing ReHyAt, a recurrent hybrid attention mechanism tai-     weights into these models costly. Our approach preserves
+lored for video diffusion. Our key insight is that preserving      the original block structure, enabling effective distillation
+softmax attention for a small subset of tokens—those most     with minimal training. Finally, as noted in Katharopoulos
+critical for modeling local dependencies—while applying      et al. [20], causal linear attention can be reformulated as an
+linear attention globally enables modeling long-range and   RNN during inference—a property we leverage for efficient
+high fidelity local dependencies while ensuring linear ef-     long video generation.
+ficiency. We propose a temporally chunked hybrid atten-     Video Diffusion Models.   Recent  large-scale systems
+tion design with overlapping chunks to maintain tempo-     such as CogVideoX [44], Open-Sora Plan [26], Pyrami-
+ral coherence, and show that this formulation can be re-     dalFlow [16], LTX-video [12], and Wan2.1 [35] have sig-
+formulated into a chunk-wise RNN with constant memory      nificantly advanced video generation quality and scalability,
+
+
+
+                                                    40675
+
+======================== PDF 第 3 页 ========================
+but at substantial compute and memory cost. Mobile/PC-      the self-attention operator—the component responsible for
+oriented  designs  like  Mobile  Video  Diffusion  [42],     cross-token interaction. The standard attention mechanism
+MoViE [18], SnapGen-V [41], AMD-HummingBird [15],       is given by:
+On-device  Sora  [21],  MobileVDiT  [40],  and  Neo-
+                                                                          qk⊤Dragon [19] aim for lightweight deployment, yet most re-                                                                 Al(x) = y = softmax √     v,           (2)
+main non-DiT-based or still rely on full quadratic attention,                      D
+limiting scalability for long-duration videos.
+                                                     where queries, keys, and values are computed as linear pro-
+Video Diffusion Models with Efficient Attention.  Prior
+                                                                     jections:
+work has explored accelerating video generation through to-
+                                                                       q = xwq, k = xwk, v = xwv,
+ken merging [1, 8, 17], token downsampling [6, 31], atten-
+tion tiling [8, 50], and sparsity [24, 49]. Tiling and sparsity-     with learnable weights wq, wk, wv ∈RD×D .
+based approaches, in particular, gain efficiency by discard-       The softmax attention for token i can be expressed as:
+ing attention for most tokens. In contrast, our hybrid atten-
+tion design attends to the full token set, combining linear             PNj=1 sim(qi, kj) vj
+                                                                                    yi =                               .              (3)
+attention for long-range dependencies with softmax atten-              PNj=1 sim(qi, kj)
+tion for local, high-fidelity interactions. M4V [13] acceler-
+ates video DiTs by distilling them into Mamba blocks. De-       Applying the kernel trick, the similarity function can be
+                                                                                                                                          j  (recovering the orig-spite our simpler block structure and lightweight training,     generalized from sim(qi, kj) = eqik⊤
+we outperform M4V in both quality and efficiency.               inal softmax) to sim(qi, kj) = ϕ(qi)ϕ(kj)⊤, yielding:
+   Recently, Attention Surgery [11] proposed a temporally
+uniform hybrid attention method with reasonable quality                         ϕ(qi) PNj=1 ϕ(kj) v⊤j
+but retained quadratic complexity. Our approach introduces                      yi =                                 .             (4)
+                                                                                  ϕ(qi) PNj=1 ϕ(kj)a temporally non-uniform hybrid arrangement, enabling un-
+even treatment of token dependencies and a better inductive
+                                                                      Crucially, the terms PNj=1 ϕ(kj) v⊤j and PNj=1 ϕ(kj) dobias for video generation. It achieves linear complexity and
+                                                             not depend on i, enabling precomputation and caching for
+can be reformulated as a memory-efficient RNN, supporting
+                                                                 linear-time complexity.  The mapping ϕ(·) must be non-
+on-device execution and scalable long video generation.
+                                                                 negative; the original work by Katharopoulos et al. [20]
+   Finally, concurrent to our work, SANA-Video [4] intro-
+                                                          proposes ϕ(x) = 1 + elu(x). However, this substitution
+duced a video diffusion model incorporating linear atten-
+                                                              introduces a notable gap in expressiveness compared to the
+tion. In contrast, our method offers a hybrid approach com-
+                                                             exponential kernel, often requiring substantial retraining or
+bining the computational efficiency of linear attention for
+                                                                   resulting in degraded performance relative to softmax atten-
+long-range dependencies with the accuracy of softmax at-
+                                                                        tion.
+tention for modeling highly co-dependent adjacent tokens.
+Furthermore, unlike SANA-Video, our method sets up a     3.2. Hybrid Attention Formulation
+distillation process from a SOTA bidirectional full softmax
+                                                         Before introducing the formal expression, we note that theattention model, making training extremely efficient: we
+                                                            hybrid attention mechanism combines contributions fromobtain our model in ∼160 GPU-hours—two orders of mag-
+                                                          both softmax attention (for local, high-fidelity dependen-nitude more efficient than SANA-Video.  This work there-
+                                                                     cies) and linear attention (for global, efficient interactions),fore provides a low-cost recipe to transform costly Soft-
+                                                      and normalizes them jointly.max attention SOTA models into efficient RNNs, laying the
+                                                           For the latent x ∈RN×D, assume the N tokens are flat-groundwork for long video generation and on-device exe-
+                                                            tened from a latent tensor of shape (T, H, W, D), wherecution.
+                                N = THW. To overcome the limitations of purely lin-
+3. Methods: ReHyAt                                      ear attention in video diffusion models, we incorporate a
+                                                            hybrid attention mechanism that combines softmax-based
+3.1. Preliminaries: Linear Attention                   and kernelized linear attention formulations. Now con-
+Let x ∈RN×D denote a sequence of N tokens, each repre-      sider a chunk of Tc temporal slices from′    the latent, rep-                                                              resented as Xt ∈RN′×D, where N = TcHW.  Heresented by a D-dimensional feature vector. At the l-th trans-
+                                             we have introduced the chunk-indexed reshaped notation
+former layer, the block is formulated as:                                                                                        ′                ′                               X ∈RT ′×N′×D, with T = N/N  representing the num-
+                Tl(x) = fl Al(x) + x  ,               (1)     ber of chunks, to avoid confusion with single token in-
+                                                          dexing e.g.  xi.  Following the same notation, we have
+where fl(·) applies a token-wise transformation, typically    Qt ∈RN′×D, and ϕq(Qt) ∈RN ′×D′. Then for the hybrid
+a lightweight feed-forward network, and Al(·) represents      attention of tokens in chunk t, we partition the total tokens
+
+
+
+                                                     40676
+
+======================== PDF 第 4 页 ========================
+T = {1, 2..., N} to attend to, into softmax attention tokens
+TtS and linear attention tokens TtL . More specifically, the
+hybrid attention output for token chunk t, ˆyt ∈RN′×D con-
+stitutes of softmax attention and its normalizer aSt ∈RN′×D
+and nSt ∈RN ′×1 as well as linear attention and its normal-
+ization term aLt ∈RN′×D, nLt ∈RN′×1, formulated as
+below:
+                        aSt + aLt                            Y
+                                 ˆyt =              ,                    (5)          X                       nSt + nLt                                                           Tc
+                                                            T
+                 √
+          aSt = X exp(Qtk⊤j / D −ct)vj,         (6)        AttentionSoftmax
+               j∈TtS                                                   Causal Linear
+                                                                                       Attention
+          aLt = ϕq(Qt) X ϕk(kj) v⊤j    ,            (7)      Non-causal
+                                                                                       Linear
+                        j∈TtL                                             Attention
+                 √
+         nSt = X exp(Qtk⊤j / D −ct),           (8)     TokenTargeti (q)
+               j∈TtS                                                     Source
+                                                                          Tokens j (k, v)                   To  Tc
+         nLt = ϕq(Qt) X ϕk(kj)  ,                (9)       ‘
+                                                                  Figure 2. Overview of the temporally chunked hybrid attention                        j∈TtL
+                                                                arrangement without (top) and with chunk overlap (bottom).
+where ct is a stabilizing constant (typically the maximum
+exponent), and ϕq(·) and ϕk(·) denote the kernel feature
+maps for the linear component for queries and keys.              Characterization of ϕ. Similar to [11], to enhance the
+   Here, we propose the following specification for the par-     expressiveness of linear attention, we define distinct learn-
+titioning of the tokens sets:                                    able feature maps ϕq, ϕk  : RD →RD′. Each map first
+                                                                applies a lightweight per-head embedding network (imple-
+         TtS = {j | tN ′ ≤j < (t + 1)N ′},        (10)     mented as grouped 1 × 1 convs with non-linear activations)
+             L           S                                       to produce an intermediate representation, which is then         Tt = T −Tt                            (11)
+                                                                           split into P equal parts. Each part is raised to a different
+See the top graph in Fig 2. This means that the computation     polynomial degree 1 to P, and concatenated along the fea-
+of attention is effectively broken into temporal chunks of Tc      ture dimension. Formally, for an input x ∈RD, we define:
+slices, where the tokens within each slice more accurately
+attend to each other with the Softmax attention, and with      ϕ(x) = [ (ψ1(x))1, (ψ2(x))2, . . . , (ψP (x))P ]⊤∈RD′,
+linear attention to all the other tokens.
+                                                     where ψi(·) denotes the i-th learnable embedding slice pro-Overlapping  Chunks.   We  observe  that  the  non-
+                                                      duced by the shared embedding network. This polynomialoverlapping chunking mechanism defined above, together
+                                                          expansion allows ϕq(qi)ϕk(kj)⊤to approximate the largewith the lower fidelity dependency modeling of linear at-
+tention, can result into episodic incoherence in motion or     dynamic range of the exponential kernel eqik⊤j more accu-
+appearance between the frames transitioning from one la-      rately than fixed ELU-based mappings.
+tent chunk to next. To mitigate this, we propose to arrange
+                                                               3.3. Recurrent HyAt
+overlapping chunks for softmax attention, enabling a more
+accurate softmax-attention-based message passing between     Linear attention, once causal has the advantage that can be
+the chunks. More specifically, for generating attention out-     reformulated to RNNs.  In this section we show how our
+put for a chunk given chunk of Tc slices (i.e. applying this     hybrid arrangement, unlike [11], can be reformulated as an
+slicing to queries), the keys and values representing the to-    RNN. For this to be feasible, we first need to make it causal.
+kens to attend to, are sliced by Tc + To temporal slices in-    To achieve this, it is sufficient to reformulate TtL as follows:
+stead, where To represents the overlap size. To arrange this,          L                                    ′
+                                                                                            t = {j |j < max(tN −ToHW, 0)}            (13)one needs to reformulate TtS and TtL as:                    T
+                                                  TtS = {j | max(tN ′ −ToHW, 0) ≤j < (t + 1)N ′}     S                             ′  Tt = {j | max(tN −ToHW, 0) ≤j < (t + 1)N ′}
+  TtL = T −TtS                                    (12)     In Fig. 2, this is equivalent to the bottom graph where
+                                                                the specified non-causal linear attention is removed. Now
+The bottom subgraph in Fig 2 illustrates this.                  thanks to the temporal decoupling of TtS and TtL , we can
+
+
+
+                                                     40677
+
+======================== PDF 第 5 页 ========================
+define a chunk-wise RNN, where the model generates the      the set of denoising steps, y(l,ϵ,p,i) the output of the bidirec-
+latents chunk-by-chunk for Tc temporal slices at a time. Let      tional softmax teacher on block l, for prompt p, sampling
+st ∈RD′×D and zt ∈RD′×1 represent the state variables     noise ϵ, and denoising step i, and ˆy(l,ϵ,p,i) the same trajec-
+for the linear attention and its normalizer in t-th chunk.      tory point for the ReHyAt student model.
+Then we have:
+                                                                     3.4.2. Lightweight Fine-tuning
+                s0 = 0                             (14)
+                                                              After the pretraining distillation stage making the block at-
+                z0 = 0                             (15)      tentions recurrent hybrid, we have obtained the ϕqs and ϕks
+                     aSt + ϕq(Qt) st                        per block. However, while the pretraining distillation helps
+                  yt =                               (16)
+                   nSt + ϕq(Qt) zt                         preserve the general structure of the scenes, the details will
+                                                       be far from perfect, specifically on the transition smooth-
+              st+1 = st + X ϕk(kj) v⊤j            (17)     ness between chunks, as the blocks are pretrained in isola-
+                         j∈TtS                                   tion. Now fine-tuning the whole DiT model on a modest
+              zt+1 = zt + X ϕk(kj)              (18)      set of prompt/video pairs, for a small number of iterations
+                                                                         (e.g. 1k) recovers the lost generation quality. This is done
+                         j∈TtS
+                                                    by optimizing the normal flow-matching objective [27].
+Three points to note:  (1) Softmax attention within each
+chunk need not be causal because sampling proceeds                                                          4. Experimental Setup
+chunk-by-chunk, i.e. our method generates the latents for
+a full chunk at once. (2) The model training doesn’t have     4.1. Evaluation of generation quality
+to be done in the RNN form as introduced above. One can
+                                        We evaluate ReHyAt by distilling and fine-tuning Wan2.1
+train the model in the causal non-recurrent form and then
+                                                      1.3B model [35], a widely used efficient SOTA model. For
+rearrange the trained model to RNN at the sampling time.
+                                          SOTA comparisons, we generate videos at the original Wan
+(3) The computational complexity remains O(N) with the
+                                                                 resolution and length (81 × 480 × 832) using the full set of
+length of the generated video, while the memory complex-
+                                                          extended prompts from VBench [14] and VBench-2.0 [51].
+ity remains constant irrespective of the video duration.
+                                                                 In addition to quantitative evaluation, we conduct a
+3.4. Two-stage Training                                   blinded human preference study to assess visual qualities
+                                                      and prompt alignment. We randomly select 50 promptsGiven the enormous compute/data requirements for obtain-
+                                                     from VBench and present participants with paired videos,ing SOTA video diffusion models, our proposed method is
+                                                            asking them to choose their preferred video or indicate noinstead centered around efficiently distilling existing bidi-
+                                                                     significant difference. The order of paired videos randomlyrectional full softmax attention, e.g. Wan2.1, into our pro-
+                                                       change per prompt to avoid any potential biases. In total,posed RNN formulation. To achieve this, we propose a two-
+                                             we collect 500 paired comparisons.stage process: attention distillation and lightweight finetun-
+                                                     To enable large-scale ablation studies, we train and eval-ing that we expand in the following. Thanks to this specific
+                                                              uate our model variants at a lower spatial resolution ofmethod design, we obtain a recurrent video diffusion model
+                                                    320 × 480 per frame. For all evaluations, we use the modelwith competitive quality, within less than 200 GPU-hours.
+                                                           snapshot at the 1000th fine-tuning iteration.
+3.4.1. Attention Distillation
+We first distill a bidirectional full softmax teacher model     4.2. Assessment of compute complexity
+into a causal hybrid attention student model. During this                                          FLOPs Analysis. We analyze the number of floating point
+stage, each block is trained independently and the only                                                              operations in the proposed ReHyAt method and compare it
+learnable parameters are ϕq and ϕk per block, so as to let ϕ                                                                against flash attention, and other alternatives on the original
+parameters to enable linear attention to approximate the cor-                                                          5-second Wan video generation setup, as well as analyzing
+responding softmax dependencies.  This distillation setup                                                                the DiT blocks’ compute growth as we increase the length
+doesn’t require any prompt/video pairs for the training; the                                                              of generated videos. For this, we use the DeepSpeed library
+student model is trained to match the teacher activations for                                                                   to measure the complexities.
+different prompts, noise samples and denoising iterations.
+                                                   On-mobile Measurements. A valuable advantage of the
+The following equation formalizes this:
+                                                         proposed recurrent hybrid attention method is that it com-
+                         !                                                                 putationally enables the generation of longer videos on edge
+   ϕl = ϕl −η ∇ϕl  Eϵ∈N  y(l,ϵ,p,i) −ˆy(l,ϵ,p,i)    ,   (19)                   p∈P                                   devices such as mobile phones, thanks to lower compute
+                       i∈S                                  burden, and most importantly, due to significant reduction
+where ϕl is (ϕq, ϕk) for the l-th block, N the noise sam-      in peak memory consumption. We port the transformed
+pling distribution, P the distribution of textual prompts, S      original WAN model with flash attention blocks as well as
+
+
+
+                                                     40678
+
+======================== PDF 第 6 页 ========================
+ Models with 2B–5B parameters            Total↑  Quality↑  Semantic↑                                                  VBench-2.0
+                                                                             Model
+ Open-Sora Plan V1.3 [26]                  77.23    80.14      65.62                                                                                                    Total↑Hum.Fid.↑Creativity↑Control.↑Com.sense↑Physics↑
+ CogVideoX 5B [44]                       81.91    83.05      77.33
+ CogVideoX1.5 5B [44]                     82.01    82.72      79.17           Wan2.1 1.3B          56.0     80.7       48.7       34.0       63.4       53.8
+                                                                                  CogVideoX-1.5 5B    53.4     72.1       43.7       29.6       63.2       48.2
+ Models up to 2B parameters                                                                Attn. Surgery 15×R2  55.1     78.9       47.5       33.4       63.1       52.8
+ Open-Sora V1.2 [52]                       79.76    81.35      73.39          ReHyAt 15×Tc=3     56.1     81.9       55.1       30.8       62.7       50.0
+ LTX-Video [12]                           80.00    82.30      70.79          ReHyAt 15×Tc=5     56.3     79.8       55.7       31.9       64.2       49.7
+ SnapGenV [41]                           81.14    83.47      71.84
+                                                                    Table 2. Quantitative comparison on VBench-2.0 benchmark
+ Hummingbird 16frame [15]                 81.35    83.73      71.84
+ Mobile Video DiT - Mobile [40]            81.45    83.12      74.76
+ Mobile Video DiT - Server [40]             83.09    84.65      76.86                                Human Preference %
+ CogVideoX 2B [44]                       81.55    82.48      77.81               Prompt Dimension
+ PyramidalFlow [16]                        81.72    84.74      69.62                                   Ours  No preference   Wan2.1
+ Neodragon [19]                           81.61    83.68      73.36                                                                              Color                 43.3        46.7         10.0
+ Wan2.1 1.3B [35]                          83.31    85.23      75.65
+                                                            Human Action         21.7        41.7         36.7
+ Wan2.1 1.3B* [35]                        83.10    85.10      75.12
+                                                                                Object Class           25.0        45.0         30.0
+   Linear/Hybrid Models                                                           Overall Consistency    27.1        47.1         25.9
+                                                                          Scene                 40.0        60.0          0.0
+ Efficient VDiT [8]                        76.14        -              -
+                                                                                         Spatial Relationship    20.0        70.0         10.0
+ M4V [13]                                81.91    83.36      76.10
+                                                                                   Subject Consistency    21.7        28.3         50.0
+ STA [50]                                 83.00    85.37      73.52
+                                                                          Temporal Flickering    24.0        54.0         22.0 VSA [49]                                 82.77    83.60      79.47
+                                                                          Temporal Style        43.3        30.0         26.7 SANA-Video [4]                          83.71    84.35      81.35
+ Attention Surgery (15×R2) [11]             83.21    85.19      75.25                  Total                  27.6        43.5         29.0
+ Wan2.1 1.3B* + ReHyAt (15×Tc=3,To=1)   83.79    84.57      80.70
+                                                                  Table 3. Results of the method-blinded human visual preference
+Table 1. Comparisons with SOTA efficient video diffusion models.      study over 500 paired video comparisons. Rows correspond to
+‘Wan2.1*’ is our best reproduction using our evaluation pipeline.       subsets filtered by different VBench prompt dimensions receiving
+                                                       10+ prompt comparisons.
+
+the transformed ReHyAt modules to Qualcomm AI Run-
+time (QNN) and profile run-time metrics such as latency,     video diffusion models up to 5B parameters. We observe
+memory read, and memory write on a Snapdragon8-Gen4      that our method performs very competitively, while form-
+SoC. For the on-device measurements we report the metrics     ing a chunk-wise RNN that enables running it on mobile.
+on 320×480 frame resolution with the original 5 seconds     Note that the compute burden to obtain our model is ∼160
+WAN video length, as well as longer video durations.        H100 GPU hours, i.e.  less than 1% of SANA-Video (12
+                                                         days of 64 H100) and less than 0.01% of MovieGen [32].
+4.3. Training specification                             VBench-2.0. Table 2 presents the evaluation and compar-
+                                                              ison of SOTA methods on VBench-2.0 benchmark. WhileDatasets. For fine-tuning low-resolution models, we use a
+                                             we observe a small drop, ReHyAt still remain competitive350K subset of the video dataset from Open-Sora Plan [26].
+                                                                   to larger models such as CogVideoX1.5 5B.For high-resolution fine-tuning, we use 22K synthetic video
+                                        Human Preference Evaluation.  Table 3 shows the re-samples generated by Wan2.1 14B, with prompts drawn
+                                                                       sults for the human visual preference study comparing ourfrom the same source as used for the low-resolution dataset.
+                                               15×Tc=3 model against the original Wan2.1 1.3B, from aModel Hyperparameters. We experiment with converting
+                                                                         total of 500 paired video comparisons. As can be observed,different numbers of transformer blocks to recurrent hybrid
+                                                                 there is no significant difference between our recurrent hy-attention: 15, 20, and 25 out of the 30 blocks in Wan2.1
+                                                                brid model and the original Wan2.1 in human preference.1.3B. For the hybrid blocks, we explore hybridization with
+                                                              Figure 3 shows two qualitative samples and how ReHyAtvarious chunk sizes (Tc ∈{1, 2, 3, 5, 7}) as well as different
+                                                      compares to Wan2.1 1.3B. More extensive set of qualitativeoptions for overlap size (To ∈{0, 1, 2, 3}). Empirical anal-
+                                                        samples are provided in the supplementary materials.ysis of the impact of ϕk and ϕq transformation complexity
+on generation quality shows that a lightweight 2-layer MLP                                                               5.2. Sampling Compute Burden
+with degree-2 polynomial features is sufficient. This config-
+uration adds approximately 2.4M parameters per converted     In Fig. 4 we measure how chunk size Tc and chunk overlap
+block. Additional details are provided in the appendix.           size To impact the number of floating point operations, also
+                                              how it compares to flash attention and uniform hybrid atten-
+5. Results                                                      tion [11] with various rates R ∈{2, 4, 8}, as measured on
+                                                          5s videos at 480×832 resolution, corresponding to a latent
+5.1. Generation Quality
+                                                                   size 21×30×52. As can be observed, ReHyAt offers up to
+VBench SOTA. Table 1 compares ReHyAt model dis-    4× operation saving as compared to flash attention used by
+tilled from Wan2.1 1.3B against the state-of-the-art efficient     Wan2.1. On the other hand, our Tc=3, To=1 model variant
+
+
+
+                                                    40679
+
+======================== PDF 第 7 页 ========================
+Figure 3. Qualitative comparison of Wan2.1 1.3B (Top) to ReHyAt 15×Tc=3 (bottom) for two sample VBench prompts, “A cat and a dog.”
+and “A dog drinking water.”
+
+
+                                                            miliseconds for various types of attention mechanism, flash
+       7                ReHyAt To=0                                                                     attention, HedgeHog linear attention with learnable ϕ, uni-                       ReHyAt To=1
+                                                     form hybrid attention R=7 and our ReHyAt hybrid method       6                ReHyAt To=2
+                         Hybrid Uniform R8                    with To=3, for various video durations from 5s (81 frames)
+       5                  Hybrid Uniform R4                       to 10s (161 frames). As can be observed, our recurrent hy-
+                         Hybrid Uniform R2                      brid method is the only one that can easily extend to more
+       4                 Softmax                             than 10s without out-of-memory errors. Within the feasible    TFLOPs
+                                                                extent for flash attention (e.g. on 121 frames), our method
+       3                                                                     is ∼16× faster than flash attention used in Wan2.1 1.3B.
+                                                              Table 5 shows the memory read/write load that corre-
+       2
+                                                                       lates with power consumption and latency. As we observe,
+                                                      due to its more memory-efficient design, our recurrent hy-
+            1        2        3        4        5        6        7            brid attention model is significantly more memory-efficient,
+                 Chunk Size (Tc)                                                                        e.g. ∼11×more efficient in total memory read/write than
+Figure  4.   Comparison  of  attention compute (FLOPs) on                                                                     flash attention at 121 frames (∼7.5s duration). Please note
+21×30×52 latent size (5 seconds)
+                                                                     that while the total memory/read write is expected to grow
+                                                                    linearly with video duration for ReHyAt, the peak-memory
+                       Number of frames (320×480) resolution      usage remains constant.
+Attention Block
+                         81    101    121    141     161
+Softmax Flash Attention      281   2964   4809  OOM   OOM      5.3. Ablations Studies
+HedgeHog Linear Attention   360    455    469    542   OOM
+Uniform Hybrid - R8        464    625    818    1215   OOM    Number of ReHyAt Blocks and Chunk-size Tc. Fig. 5
+ReHyAt - Tc=3 (ours)        192    247    302    329      384      shows scatter plots comparing the computational cost of dif-
+Table 4. On mobile (Snapdragon8-Gen4) latency (ms) vs. number      ferent variations of ReHyAt, with various number of con-
+of frames at 320×480 resolution                                  verted blocks and chunk-sizes Tc as well as the original
+                                                   Wan2.1 1.3B model, at both 320×480 and 480×832 res-
+                                                                   olutions.  Table 6 shows the Vbench full set evaluation
+remains ∼2× more efficient as compared to the better qual-      for various Tc’s. As expected, increasing Tc generally im-
+ity preserving R = 2 uniform hybrid attention variation.        proves model quality; however, the increase from 1 to 2
+   Fig. 1 top demonstrates how the compute burden grows      yields a more significant improvement compared to further
+with increased video duration, comparing the scaling be-      increases to 3 and 4. This is perhaps due to the first exten-
+havior for the Wan2.1 1.3B (flash attention) versus our pro-     sion of the softmax from spatial to spatiotemporal.
+posed method (ReHyAt).  Here we see that compared to     Overlap size To. Table 7 demonstrates how different chunk
+flash attention, our recurrent hybrid attention has a signifi-     overlap size To values (ranging from 0 to 3) impacts the
+cantly better scaling behavior.                                 generation quality. As anticipated, enabling overlap (i.e.,
+   Table 4 presents the on-mobile, DiT block latencies in     going from To = 0 to To = 1) results in a notable jump in
+
+
+
+                                                    40680
+
+======================== PDF 第 8 页 ========================
+                                                  Number of frames - Memory Read/Write (GB)
+
+                                             81          101          121           141            161
+                   Attention Block
+                      W   R   W    R   W    R   W     R   W     R
+
+                 Softmax Flash Attention       5.1    6.0    12.9   16.4   22.7   53.6  OOM  OOM  OOM  OOM
+               HedgeHog Linear Attention    5.7    8.1     7.0    10.1    6.9    11.3     8.0     13.2  OOM  OOM
+                 Uniform Hybrid - R8          6.3   10.1    5.2    10.9    6.4    13.2     7.8     35.2  OOM  OOM
+               ReHyAt - Tc=3 (ours)         1.7    2.8     2.2     3.6     2.7     4.4     3.0      4.8      3.5      5.6
+
+   Table 5. Comparison of total memory read/write for Wan2.1 DiT Blocks with various attention mechanisms on Snapdragon8-Gen4
+
+
+                   Vbench Score vs Compute (320x480)                      Chunk-                   VBench
+         82.5                                                                    overlap To    Total ↑   Quality ↑   Semantic ↑    Subj. Cons.↑
+
+                                                                       0        81.56      83.23        74.90         90.90
+         82.0                                                             1        82.17      83.72        75.96         92.05
+         Score                                                                2        82.17      83.84        75.50         92.13
+         81.5                                                             3        82.19      83.86        75.51         92.24
+                          15x ReHyAt blocks, Tc=2        20x ReHyAt blocks, Tc=5
+                          15x ReHyAt blocks, Tc=3        25x ReHyAt blocks, Tc=1            Table 7. Impact of To on ReHyAt model quality as measured on           VBench                          15x ReHyAt blocks, Tc=5        25x ReHyAt blocks, Tc=2
+         81.0           20x ReHyAt blocks, Tc=1        25x ReHyAt blocks, Tc=3           VBench. All models have 25 converted ReHyAt blocks with Tc=3.
+                          20x ReHyAt blocks, Tc=2        25x ReHyAt blocks, Tc=5
+                          20x ReHyAt blocks, Tc=3        Wan2.1 Original
+         80.5            70      75      80      85      90      95     100
+                                 Total Model FLOPs %                                           Block             VBench
+                                                                              Causal
+                                                                      TFLOPs↓
+                                                                                                               Total ↑   Quality ↑   Semantic ↑
+                  Vbench Score vs Compute (480x832)
+         84.0                                      ×        4.17      82.27      83.84        75.99
+                                           ✓        4.04      82.35      83.97        75.87
+         83.5
+                                                                  Table 8. Impact of causality on ReHyAt hybrid model quality as
+        Score83.0                                                   measured on VBench on 15×Tc=3,To=0 configuration
+
+         82.5                                       15x ReHyAt blocks, Tc=3
+                                                     15x ReHyAt blocks, Tc=5          VBench                                                     20x ReHyAt blocks, Tc=1
+         82.0                                       20x ReHyAt blocks, Tc=2           Causality. Table 8 shows the compute and quality metrics
+                                                     20x                                                         ReHyAt                                                                              blocks, Tc=3             for two equal hybrid attention formation, with causality be-                                                    Wan2.1                                                                            Original
+         81.5            60    65    70    75    80    85    90    95   100           ing the only difference. We observe that the additional pro-
+                                 Total Model FLOPs %                         cess to remove the non-causal attention dependency does
+                                                             not deteriorate the quality of the model, at least as mea-
+Figure 5. The total DiT FLOPs percentages versus VBench score     sured by VBench. On the other hand, the saving in com-
+of original Wan2.1 1.3B model compared to various hybrid con-                                                            pute by just removing the forward-looking linear attention
+figurations or 320×480 (top) and 480×832 (bottom) resolutions.
+                                                                              is not substantial. The major advantage of causal attention
+                                                                           lies in enabling RNN reformulation, in turn enabling lower
+    Chunk-size     Block             VBench                  and constant peak memory and thus on-device generation
+       Tc      TFLOPs↓                                       of longer videos.                                 Total ↑    Quality ↑   Semantic ↑
+
+        1           3.87      80.97      82.37        75.39
+        2           4.04      82.08      83.86        74.99
+        3           4.30      82.17      83.72        75.96           6. Conclusion and Future Work
+        5           4.82      82.48      84.12        75.93
+                                                              In this paper, we introduced ReHyAt, a recurrent hybrid
+Table 6. Impact of Tc on ReHyAt hybrid model quality. All the      attention mechanism  for  video  diffusion  transformers
+models have 25× converted ReHyAt blocks with To=1.                that  enables  scalable,  long-duration  video  generation
+                                                          with  constant memory  and  linear  compute  require-
+                                                           ments.   Our  lightweight  distillation  pipeline  achieves
+                                                            near  state-of-the-art  quality with  dramatically reduced
+model quality; however, the total score appears to saturate                                                                   training cost.   While ReHyAt performs strongly over-
+after that. The mild gradual improvement is still noticeable       all,  a  small  fraction  of  videos—especially  with  the
+in the subject consistency dimension.  This underlies the     most  efficient  variants—still show some  temporal  in-
+importance of overlap mechanism in decreasing temporal     coherence, highlighting an area for future improvement.
+incoherencies.
+
+
+
+                                                     40681
+
+======================== PDF 第 9 页 ========================
+References                                                      [13] Jiancheng Huang, Gengwei Zhang, Zequn Jie, Siyu Jiao,
+                                                                    Yinlong Qian, Ling Chen, Yunchao Wei, and Lin Ma. M4v:
+ [1] Daniel Bolya and Judy Hoffman. Token merging for fast sta-                                                                    Multi-modal mamba for text-to-video generation.   arXiv
+     ble diffusion. In Proceedings of the IEEE/CVF conference on                                                                             preprint arXiv:2506.10915, 2025. 3, 6
+     computer vision and pattern recognition, pages 4599–4603,                                                                     [14] Ziqi Huang, Yinan He, Jiashuo Yu, Fan Zhang, Chenyang Si,
+     2023. 3                                                           Yuming Jiang, Yuanhan Zhang, Tianxing Wu, Qingyang Jin,
+ [2] Han Cai, Junyan Li, Muyan Hu, Chuang Gan, and Song           Nattapol Chanpaisit, Yaohui Wang, Xinyuan Chen, Limin
+     Han. Efficientvit: Lightweight multi-scale attention for high-         Wang, Dahua Lin, Yu Qiao, and Ziwei Liu. VBench: Com-
+      resolution dense prediction. In Proceedings of the IEEE/CVF           prehensive benchmark suite for video generative models. In
+     International Conference on Computer Vision, 2023. 2               Proceedings of the IEEE/CVF Conference on Computer Vi-
+ [3] Keshigeyan Chandrasegaran, Michael Poli, Daniel Y. Fu,           sion and Pattern Recognition, 2024. 2, 5
+    Dongjun Kim, Lea M. Hadzic, Manling Li, Agrim Gupta,      [15] Takashi Isobe, He Cui, Dong Zhou, Mengmeng Ge, Dong Li,
+     Stefano Massaroli, Azalia Mirhoseini, Juan Carlos Niebles,          and Emad Barsoum. Amd-hummingbird: Towards an effi-
+     Stefano Ermon, and Fei-Fei Li.  Exploring diffusion trans-            cient text-to-video model. arXiv preprint arXiv:2503.18559,
+     former designs via grafting. In NeurIPS, 2025. 2                     2025. 3, 6
+ [4] Junsong Chen, Yuyang Zhao, Jincheng Yu, Ruihang Chu,      [16] Yang Jin, Zhicheng Sun, Ningyuan Li, Kun Xu, Kun Xu,
+     Junyu Chen, Shuai Yang, Xianbang Wang, Yicheng Pan,         Hao Jiang, Nan Zhuang, Quzhe Huang, Yang Song, Yadong
+    Daquan Zhou, Huan Ling, et al. Sana-video: Efficient video        MU, and Zhouchen Lin. Pyramidal flow matching for effi-
+     generation with block linear diffusion transformer.  arXiv            cient video generative modeling. In The Thirteenth Interna-
+     preprint arXiv:2509.24695, 2025. 2, 3, 6                                tional Conference on Learning Representations, 2025. 1, 2,
+ [5] Krzysztof Choromanski, Valerii Likhosherstov, David Do-         6
+     han, Xingyou Song, Andreea Gane, Tamas Sarlos, Peter      [17] Kumara Kahatapitiya, Adil Karjauv, Davide Abati, Fatih
+     Hawkins, Jared Quincy Davis, Afroz Mohiuddin, Lukasz             Porikli, Yuki M Asano, and Amirhossein Habibian. Object-
+      Kaiser, David Belanger, Lucy Colwell, and Adrian Weller.            centric diffusion for efficient video editing.  In European
+     Rethinking attention with performers.  In Proceedings of          Conference on Computer Vision, pages 91–108. Springer,
+     the International Conference on Learning Representations,           2024. 3
+     2021. 2                                                        [18] Adil Karjauv, Noor Fathima, Ioannis Lelekas, Fatih Porikli,
+ [6] Katherine Crowson, Stefan Andreas Baumann, Alex Birch,         Amir  Ghodrati,  and  Amirhossein  Habibian.    Movie:
+     Tanishq Mathew Abraham, Daniel Z Kaplan, and Enrico          Mobile  diffusion  for  video  editing.    arXiv  preprint
+     Shippole.  Scalable high-resolution pixel-space image syn-           arXiv:2412.06578, 2024. 3
+      thesis with hourglass diffusion transformers.  In Forty-first      [19] Animesh Karnewar, Denis Korzhenkov, Ioannis Lelekas,
+     International Conference on Machine Learning, 2024. 3            Noor Fathima, Adil Karjauv, Vancheeswaran Vaidyanathan
+                                                        Hanwen Xiong, Will Zeng, Rafael Esteves, Tushar Singhal, [7] Tri Dao, Daniel Y. Fu, Stefano Ermon, Atri Rudra, and
+                                                                            Fatih Porikli, Mohsen Ghafoorian, and Amirhossein Habib-     Christopher Re.  Flashattention: Fast and memory-efficient
+                                                                                    ian.  Neodragon: Mobile video generation using diffusion     exact attention with io-awareness.  In Advances in Neural
+                                                                             transformer. arXiv preprint arXiv:2511.06055, 2025. 3, 6     Information Processing Systems, 2022. 1
+                                                                     [20] Angelos Katharopoulos, Apoorv Vyas, Nikolaos Pappas, and
+ [8] Hangliang Ding, Dacheng Li, Runlong Su, Peiyuan Zhang,
+                                                                                 Franc¸ois Fleuret.  Transformers are rnns: Fast autoregres-
+      Zhijie Deng, Ion Stoica, and Hao Zhang. Efficient-vdit: Ef-
+                                                                               sive transformers with linear attention. In Proceedings of the
+      ficient video diffusion transformers with attention tile. arXiv
+                                                                      37th International Conference on Machine Learning, pages
+     preprint arXiv:2502.06155, 2025. 3, 6
+                                                                 5156–5165. PMLR, 2020. 2, 3
+ [9] Zhengcong Fei, Mingyuan Fan, Changqian Yu, Debang                                                                     [21] Bosung Kim, Kyuhwan Lee, Isu Jeong, Jungmin Cheon,
+      Li, and Junshi Huang.   Diffusion-rwkv:  Scaling rwkv-                                                                       Yeojin Lee, and Seulki Lee.  On-device sora:  Enabling
+      like architectures for diffusion models.   arXiv preprint                                                                                 training-free diffusion-based  text-to-video generation  for
+     arXiv:2404.04478, 2024. 2                                                                   mobile devices. arXiv preprint arXiv:2502.04363, 2025. 3
+[10] Zhengcong Fei, Mingyuan Fan, Changqian Yu, Debang Li,      [22] Tencent AI Lab.   Hunyuanvideo: A systematic frame-
+     Youqiang Zhang, and Junshi Huang. Dimba: Transformer-         work for large video generation model.   arXiv preprint
+    mamba diffusion models. arXiv preprint arXiv:2406.01159,           arXiv:2412.03603, 2025. 1
+     2024. 2                                                                     [23] Pierre-David  Letourneau,  Manish Kumar  Singh,  Hsin-
+[11] Mohsen Ghafoorian, Denis Korzhenkov, and Amirhossein           Pai Cheng, Shizhong Han, Yunxiao Shi, Dalton Jones,
+     Habibian.  Attention surgery: An efficient recipe to lin-         Matthew Harper Langston, Hong Cai, and Fatih Porikli.
+      earize your video diffusion transformer.   arXiv preprint           Padre: A unifying polynomial attention drop-in replacement
+     arXiv:2509.24899, 2025. 2, 3, 4, 6                                      for efficient vision transformer.  In The Thirteenth Interna-
+[12] Yoav HaCohen, Nisan Chiprut, Benny Brazowski, Daniel            tional Conference on Learning Representations, 2025. 2
+     Shalem, Dudu Moshe, Eitan Richardson, Eran Levin, Guy      [24] Qirui Li, Guangcong Zheng, Qi Zhao, Jie Li, Bin Dong,
+     Shiran, Nir Zabari, Ori Gordon, et al. Ltx-video: Realtime         Yiwu Yao, and Xi Li.  Compact attention:  Exploiting
+     video latent diffusion.  arXiv preprint arXiv:2501.00103,            structured spatio-temporal sparsity for fast video generation.
+     2024. 2, 6                                                        arXiv preprint arXiv:2508.12969, 2025. 3
+
+
+
+                                                    40682
+
+======================== PDF 第 10 页 ========================
+[25] Yifan Li et al. Sana: Efficient attention for diffusion models.           Foundations, implementations, and applications.  Transac-
+     In Proceedings of the IEEE/CVF International Conference            tions on Machine Learning Research, 2025. 1
+    on Computer Vision, 2023. 2                                    [40] Yushu Wu, Yanyu Li, Anil Kag, Ivan Skorokhodov, Willi
+[26] Bin Lin, Yunyang Ge, Xinhua Cheng, et al. Open-sora plan:          Menapace, Ke Ma, Arpit Sahni, Ju Hu, Aliaksandr Siaro-
+     Open-source large video generation model. arXiv preprint            hin, Dhritiman Sagar, et al. Taming diffusion transformer
+     arXiv:2412.00131, 2024. 1, 2, 6                                         for real-time mobile video generation.   arXiv preprint
+[27] Yaron Lipman, Ricky TQ Chen, Heli Ben-Hamu, Maximil-           arXiv:2507.13343, 2025. 3, 6
+     ian Nickel, and Matt Le. Flow matching for generative mod-      [41] Yushu Wu, Zhixing Zhang, Yanyu Li, Yanwu Xu, Anil Kag,
+      eling. arXiv preprint arXiv:2210.02747, 2022. 5                  Yang Sui, Huseyin Coskun, Ke Ma, Aleksei Lebedev, Ju Hu,
+[28] Andrew Melnik, Michal Ljubljanac, Cong Lu, Qi Yan,             et al. Snapgen-v: Generating a five-second video within five
+    Weiming Ren, and Helge Ritter. Video diffusion models: A          seconds on a mobile device. In Proceedings of the Computer
+      survey. Transactions on Machine Learning Research, 2024.           Vision and Pattern Recognition Conference, pages 2479–
+    1                                                               2490, 2025. 3, 6
+[29] Jean Mercat, Igor Vasiljevic, Sedrick Scott Keh, Kushal      [42] Haitam Ben Yahia, Denis Korzhenkov, Ioannis Lelekas,
+     Arora, Achal Dave, Adrien Gaidon, and Thomas Kollar. Lin-         Amir Ghodrati, and Amirhossein Habibian.  Mobile video
+      earizing large language models. In First Conference on Lan-            diffusion. In ICCV, 2025. 3
+     guage Modeling, 2024. 2                                        [43] Songlin Yang, Bailin Wang, Yu Zhang, Yikang Shen, and
+[30] William Peebles and Saining Xie. Scalable diffusion models         Yoon Kim.  Parallelizing linear transformers with the delta
+     with transformers. In Proceedings of the IEEE/CVF Interna-            rule over sequence length. Advances in neural information
+      tional Conference on Computer Vision, 2023. 1                       processing systems, 37:115491–115522, 2024. 2
+[31] Elia Peruzzo, Adil Karjauv, Nicu Sebe, Amir Ghodrati, and      [44] Zhuoyi Yang, Jiayan Teng, Wendi Zheng, Ming Ding, Shiyu
+    Amir Habibian. Adaptor: Adaptive token reduction for video          Huang, Jiazheng Xu, Yuanming Yang, Wenyi Hong, Xiao-
+      diffusion transformers. In Proceedings of the Computer Vi-          han Zhang, Guanyu Feng, Da Yin, Zhang Yuxuan, Weihan
+     sion and Pattern Recognition Conference, pages 6365–6371,         Wang, Yean Cheng, Bin Xu, Xiaotao Gu, Yuxiao Dong, and
+     2025. 3                                                                      Jie Tang. Cogvideox: Text-to-video diffusion models with
+[32] Adam Polyak, Amit Zohar, Andrew Brown, Andros Tjandra,          an expert transformer. In The Thirteenth International Con-
+    Animesh Sinha, Ann Lee, Apoorv Vyas, Bowen Shi, Chih-           ference on Learning Representations, 2025. 1, 2, 6
+    Yao Ma, Ching-Yao Chuang, et al. Movie gen: A cast of      [45] Yuan Yao, Yicong Hong, Difan Liu, Long Mai, Feng Liu,
+     media foundation models. arXiv preprint arXiv:2410.13720,          and Jiebo Luo.  Diffusion transformer-to-mamba distilla-
+     2024. 6                                                                  tion for high-resolution image generation.  arXiv preprint
+[33] Markus N. Rabe and Charles Staats.   Self-attention does           arXiv:2506.18999, 2025. 2
+     not need o(n2) memory. arXiv preprint arXiv:2112.05682,      [46] Michael Zhang, Kush Bhatia, Hermann Kumbong, and
+     2021. 1                                                            Christopher Re. The hedgehog & the porcupine: Expressive
+[34] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszko-            linear attentions with softmax mimicry.  In The Twelfth In-
+       reit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia            ternational Conference on Learning Representations, 2024.
+     Polosukhin. Attention is all you need. In Advances in Neural         2
+     Information Processing Systems, 2017. 1                        [47] Michael Zhang, Kush Bhatia, Hermann Kumbong, and
+[35] Team Wan et al. Wan: Open and advanced large-scale video           Christopher R´e. The hedgehog & the porcupine: Expres-
+     generative models. arXiv preprint arXiv:2503.20314, 2025.            sive linear attentions with softmax mimicry. arXiv preprint
+      1, 2, 5, 6                                                         arXiv:2402.04347, 2024. 2
+[36] Hongjie Wang, Chih-Yao Ma, Yen-Cheng Liu, Ji Hou, Tao      [48] Michael Zhang, Simran Arora, Rahul Chalamala, Ben-
+     Xu, Jialiang Wang, Felix Juefei-Xu, Yaqiao Luo, Peizhao          jamin Frederick Spector, Alan Wu, Krithik Ramesh, Aaryan
+     Zhang, Tingbo Hou, et al. Lingen: Towards high-resolution           Singhal, and Christopher Re. LoLCATs: On low-rank lin-
+     minute-length text-to-video generation with linear compu-            earizing of large language models. In The Thirteenth Inter-
+      tational complexity.  In Proceedings of the Computer Vi-           national Conference on Learning Representations, 2025. 2
+     sion and Pattern Recognition Conference, pages 2578–2588,      [49] Peiyuan Zhang, Yongqi Chen, Haofeng Huang, Will Lin,
+     2025. 2                                                    Zhengzhong Liu, Ion Stoica, Eric P Xing, and Hao Zhang.
+[37] Junxiong Wang, Daniele Paliotta, Avner May, Alexander            Faster video diffusion with trainable sparse attention. In The
+     Rush, and Tri Dao. The mamba in the llama: Distilling and            Thirty-ninth Annual Conference on Neural Information Pro-
+      accelerating hybrid models. Advances in Neural Information           cessing Systems, 2025. 3, 6
+     Processing Systems, 37:62432–62457, 2024. 2                   [50] Peiyuan Zhang, Yongqi Chen, Runlong Su,  Hangliang
+[38] Sinong Wang, Belinda Li, Madian Khabsa, Han Fang, and           Ding, Ion Stoica, Zhengzhong Liu, and Hao Zhang.  Fast
+    Hao Ma. Linformer: Self-attention with linear complexity.           video generation with sliding tile attention. arXiv preprint
+     In Proceedings of the International Conference on Learning           arXiv:2502.04507, 2025. 3, 6
+     Representations, 2020. 2                                        [51] Dian Zheng, Ziqi Huang, Hongbo Liu, Kai Zou, Yinan He,
+[39] Yimu Wang, Xuye Liu, Wei Pang, Li Ma, Shuai Yuan, Paul          Fan Zhang, Yuanhan Zhang, Jingwen He, Wei-Shi Zheng,
+     Debevec, and Ning Yu. Survey of video diffusion models:         Yu Qiao, et al.  Vbench-2.0: Advancing video generation
+
+
+
+                                                    40683
+
+======================== PDF 第 11 页 ========================
+     benchmark suite for intrinsic faithfulness.  arXiv preprint
+     arXiv:2503.21755, 2025. 2, 5
+[52] Zangwei Zheng, Xiangyu Peng, Tianji Yang, Chenhui Shen,
+     Shenggui Li, Hongxin Liu, Yukun Zhou, Tianyi Li, and Yang
+     You. Open-sora: Democratizing efficient video production
+      for all. arXiv preprint arXiv:2412.20404, 2024. 6
+[53] Lianghui Zhu, Zilong Huang, Hanshu Yan, Jiashi Feng,
+    Bencheng Liao, Jun Hao Liew, and Xinggang Wang. Dig:
+     Scalable and efficient diffusion models with gated linear at-
+      tention.  In Proceedings of the IEEE/CVF Conference on
+    Computer Vision and Pattern Recognition, 2025. 2
+
+
+
+
+
+                                                    40684

@@ -1,0 +1,2397 @@
+
+=== PDF PAGE 1 ===
+UniverSat: Resolution- and Modality-Agnostic
+Transformers for Earth Observation
+Yohann Perron˚,1,5
+Guillaume Astruc˚,1,2,4
+Nicolas Gonthier2,3
+Clément Mallet2
+Loic Landrieu1,2
+1LIGM, Ecole Nationale des Ponts et Chaussées, IP Paris, Univ Gustave Eiffel, CNRS
+2LASTIG, Univ Gustave Eiffel, IGN, ENSG,
+3IGN
+4CNES
+5EFEO
+Figure 1: One Model, Many Sen-
+sors.
+A single UNIVERSAT is
+trained jointly on 13 sensors from
+7 datasets, with wide variations in
+spatial resolution, channel count,
+and revisit frequency. The resulting
+model generalizes to unseen sen-
+sors within this gamut without input
+resampling.
+0.1 m
+1 m
+10 m
+30 m
+250 m
+none
+yearly
+weekly
+daily
+1
+3
+7
+10
+400
+VHR
+UHR
+Sentinel-2
+DSM, DTM
+MODIS
+Sent-1,
+ALOS-2
+Landsat
+7,8,9
+Gaofen-5
+EO-1
+NIS
+SPOT-6/7
+Spatial resolution
+Revisit time
+Number of channels
+aerial
+optical satellite
+radar
+hyperspectral
+elevation
+Abstract
+Vision Transformers (ViT) dominate computer vision. However, their reliance on rigid
+patch projectors hinders transfer to Earth Observation (EO), where input modalities, scales,
+and resolutions vary widely. We introduce UniverSat, a ViT-style backbone built around a
+Universal Patch Encoder that maps patches from arbitrary spatial, spectral, and temporal
+resolutions, and from both optical and non-optical sensors, into a shared embedding space
+with a shared set of weights. This enables training a single model on heterogeneous
+multimodal corpora via self-supervision, yielding robust, sensor-agnostic spatial features.
+We validate this approach with strong results across classification and segmentation on
+standard EO benchmarks from GeoBench, PANGEABench, and SpectralEarth. Our code
+and models are available at github.com/gastruc/UniverSat.
+1
+Introduction
+Vision Transformers (ViTs) are the de facto backbone for visual representation learning, owing to their
+versatility and compatibility with self-supervised learning (SSL) objectives: masking [1], contrastive
+learning [2], predictive methods [3], and clustering-based approaches [4, 5]. This paradigm has been
+successfully applied to Earth Observation (EO) [6, 7, 8, 9, 10]. However, EO is more than “just
+vision”: it spans heterogeneous modalities (optical, radar, LiDAR, elevation), scales (from hectares
+to tens of km2), and resolutions: spatial (cm–km), temporal (single acquisitions to dense time series),
+and spectral (1–400 bands). This diversity is a strength only with an architecture able to exploit it.
+Most EO foundation models adopt the ViT architecture with minimal adaptation, implicitly fixing
+band counts, temporal sampling, and patch size. When operating on a narrow set of widely available
+˚Equal contribution.
+arXiv:2606.23503v2  [cs.CV]  29 Oct 2026
+
+
+=== PDF PAGE 2 ===
+Table 1: Flexible Multimodal EO Foundation Models. For each model, we list the training modali-
+ties, whether unseen spatial/temporal/spectral configurations are handled without input resampling,
+and the feature-map granularity. UNIVERSAT supports the broadest modality mix, handles unseen
+configurations, and offers flexible output resolution—all with a single set of weights.
+training modalities
+supports unseen resolution
+output
+resolution
+
+Å
+spat.
+temp.
+spec.
+TerraMind [9]
+1
+1
+1
+✓
+OmniSat [12]
+2
+2
+1
+1
+✓
+EarthView [23]
+3
+1
+1
+✓
+Panopticon [13]
+5
+1
+1
+✓
+Galileo [6]
+1
+1
+1
+✓
+✓
+AnySat [7]
+2
+4
+2
+1
+✓
+✓
+DOFA [16]
+3
+1
+1
+✓
+✓
+FoMo [24]
+4
+2
+1
+1
+✓
+✓
+Ramen [17]
+1
+1
+1
+1
+✓
+✓
+✓
+UniverSat (ours)
+4
+4
+2
+2
+3
+✓
+✓
+✓
+ : optical snapshot
+Å : optical time series
+: radar
+: elevation
+: hyperspectral
+output resolutions:
+: image
+: patch
+: pixel
+: selectable
+modalities (e.g., Sentinel or aerial RGB imagery), this design is appropriate and largely sufficient.
+However, EO practitioners often combine sensors with widely varying pixel sizes, spectral and
+temporal densities, and spatial extents. Under these conditions, a rigid architecture becomes limiting
+and often requires aggressive resampling, band selection/aggregation, or modality-specific process-
+ing. While recent work improves robustness across scales [11, 12], datasets [7, 13], and spectral
+resolution [14, 15, 16, 17], most approaches remain constrained to specific modality sets and rely
+on modality-specific projectors. We argue that this rigidity, inherited from fixed ViT-style patch
+projectors, limits the generality of EO foundation models.
+We introduce UNIVERSAT, a ViT-like model tailored to EO by replacing fixed patch projectors with
+a Universal Patch Encoder (UPE). The UPE uses linear-complexity axial cross-attention to embed
+patches of arbitrary spatial, spectral, and temporal dimensions into a shared latent space. Integrated
+into a transformer operating over spatialized tokens, this design provides four key advantages:
+• Modality-Agnostic. A single set of weights processes many modalities combinations and
+arbitrary resolutions without input resampling or channel filtering.
+• Resolution-flexible. The spatial resolution of the output feature map is specified at inference
+time and decoupled from the input patch size.
+• Granular. A skip connection preserves fine spatial details beyond patch-level embeddings.
+• SSL-compatible. The architecture retains the core ViT structure, enabling training with standard
+self-supervised learning objectives.
+We train UNIVERSAT with a self-supervised objective that extends recent latent masked modeling [18,
+19] to multimodal and multitemporal EO data. A single model is trained jointly on 7 datasets
+spanning 13 sensors across four modalities (optical, hyperspectral, radar, elevation), covering 0.1–
+300 m Ground Sampling Distance (GSD), 1–150 timestamps, and 1–396 spectral channels. Despite
+its flexibility and ability to incorporate unseen sensor configurations, UNIVERSAT remains highly
+competitive on standard benchmarks, as demonstrated through linear and convolutional probing on
+GeoBench [20], PANGEABench [21], and challenging hyperspectral benchmarks [22]. Our main
+contributions are as follows:
+• A unified ViT-like architecture for EO that processes heterogeneous sensors without modality-
+specific projectors or preprocessing;
+• A multimodal self-supervised training framework tailored to heterogeneous EO data;
+• Competitive performance across a broad range of datasets and tasks, from high-resolution RGB
+imagery to challenging radar time series and hyperspectral benchmarks;
+• Demonstrated generalization to unseen sensors (EnMAP, PlanetScope) and modality combina-
+tions.
+2
+Related work
+We provide an overview of the state-of-the-art in flexible, multimodal foundation models for Earth
+Observation (EO); a synthesis is presented in Tab. 1, and an extended list in the appendix.
+Self-supervised Learning for EO.
+Early EO SSL was predominantly contrastive [25, 26, 27, 28,
+29]. Subsequent work explored generative masking in the spirit of MAE [8, 11, 30, 31], and predictive
+2
+
+
+=== PDF PAGE 3 ===
+W
+w
+C
+H
+h
+τ1
+τ2
+T
+sub-patchify ph, wq
+H ˆ W ÞÑ I ˆ S
+Learnable Fourier
+Features 1 ÞÑ D
+I ˆ S
+C
+T
+I
+C ˆ T ˆ H ˆ W
+C ˆ T ˆ I ˆ S
+C ˆ T ˆ I ˆ S ˆ D
+: scalar value
+: multi-dimensional
+embedding
+input spatio-
+temporal patch
+Figure 2: Patch Formatting. An input patch of size C ˆ T ˆ H ˆ W is converted to a tensor of size
+C ˆ T ˆ I ˆ S with S sub-patch of I “ h w pixels. We then lift all scalar values to dimension D
+with learned Fourier features.
+objectives [6, 7]. Several methods incorporate EO priors—spectral [8, 15], temporal [26, 32],
+and spatial [11, 25]–either in the loss or in the encoder. Nevertheless, many pipelines remain
+monomodal/monotemporal, which limits their generality. We also note that some SSL settings
+include semantic products as inputs, effectively moving toward semi-supervision [6, 10, 33, 34, 35].
+Multimodal SSL for EO.
+Cross-modal pretraining leverages geo-registration: different sensors
+observe the same scene in a common reference frame. Masked cross-modal reconstruction [12, 36, 37]
+and cross-sensor contrast [28, 38, 39] have both been effective. Teacher–student hybrids add stability
+at scale [10, 35, 40]. In practice, most studies focus on Sentinel-1/2 time-series and single-date
+inputs [14, 38]. Some models also apply to elevation [7, 9, 12, 24, 41] and hyperspectral data [13, 16].
+Flexible Models.
+Many EO backbones already support variable-length time series [7, 10, 36, 40].
+Spectral variability is typically handled with token-per-band strategies [14, 24], band grouping [6, 8,
+42], or continuous wavelength encodings and dynamic weights [13, 16, 15, 17]. Spatial generalization
+at inference is addressed through feature pyramids [16, 43], scale-aware positional encodings [11], or
+FlexiViT-style encoders [6, 17, 19, 44]; nevertheless, many pipelines still resample inputs, inflating
+data volume by orders of magnitude. A persistent bottleneck is the fixed patch projector: it enforces
+rigid input formats (monotemporal/fixed patch size) or modality-specific encoders [7, 6], and typically
+requires retraining for new configurations. Atomizer [45] and Ramen [17] are conceptually close to
+our work with per-pixel, per-band “atoms”, but spatially resample its inputs to accommodate varying
+resolutions. To the best of our knowledge, UNIVERSAT is the first EO foundation model to jointly
+support flexibility along the spatial, spectral, and temporal axes without input resampling, see Tab. 1.
+3
+Method
+We introduce a method to process and merge heterogeneous Earth observations into dense feature
+maps, independently of their respective resolutions. At its core is a Universal Patch Encoder (UPE)
+that projects patches of arbitrary shape into a shared embedding space (Sec. 3.1). Built on top of
+UPE, UNIVERSAT aggregates multimodal observations into dense spatial representations (Sec. 3.3),
+and is trained in a self-supervised manner on a heterogeneous multimodal corpus (Sec. 3.3). Each
+component addresses one consequence of EO heterogeneity: the UPE maps patches of any shape
+to a fixed width, with axial attention keeping this tractable; cross-modal contrast aligns the UPE
+outputs of co-registered sensors; ACA fuses modalities at the patch level; a spatial Transformer
+models interactions between patches; masked prediction on fixed random targets trains the whole
+encoder with targets of uniform size across sensors; and a sub-patch skip connection restores fine
+spatial detail for dense prediction.
+3.1
+Universal Patch Encoder
+The Universal Patch Encoder (UPE) replaces the fixed patch projector of a standard ViT. Its goal is to
+produce a fixed-width embedding from a patch acquired by any sensor or modality, regardless of its
+spatial, spectral, or temporal resolution. To achieve this, UPE represents patches as atomic tokens
+and progressively collapses their dimensions using axial cross-attention [46].
+3
+
+
+=== PDF PAGE 4 ===
+ACAα
+X
+“
+Y1
+X
+Y2
+X ˆ Y ˆ D
+poolX
+Linear
+Linear
+D ÞÑ 2αD
+D ÞÑ αD
+cross-
+attention
+Feed
+Forward
+Y1
+Y2
+Y ˆ αD
+K,V
+Q
+Figure 3: Axial Cross-Attention. Given an input of dimension XˆY tokens of dimension D (Y can
+be several axes), the ACAα
+X module collapses target dimension X and expands the feature dimension
+by α. We first pool along the target dimension X and generate queries Q for the remaining indices.
+We then compute keys K and values V of dimension αD for all tokens and perform cross-attention
+along dimension X, broadcasting along all other indices. Finally, a feed-forward network FF yields
+an array of size Y tokens of dimension αD.
+Atomic formatting. We consider a patch x P RCˆT ˆHˆW , with C channels, T timestamps, and
+spatial extent H ˆ W. Channels may encode heterogeneous measurements across modalities, includ-
+ing spectral bands (optical), polarization responses (radar), or elevation products (e.g., DSM/DTM).
+We factorize the spatial grid into S “ HW{phwq subpatches of size I “ hw pixels, and reshape x
+as C ˆ T ˆ I ˆ S. Each scalar value xc,t,i,s is then lifted to dimension D using Learnable Fourier
+Features (LFF, see Appendix for details), yielding
+e “ LFFpxq,
+dim: C ˆ T ˆ I ˆ S ˆ D .
+(1)
+We refer to these D-dimensional vectors as atomic tokens [45]. Note that each atom is already a
+scalar (one value for one pixel, channel, and timestamp): LFF expands it rather than compressing a
+vector. LFF is cheap enough to apply to every atom while being nonlinear, which lets the network
+form value-selective responses (e.g., band-pass or threshold-like filters on reflectance, backscatter, or
+elevation); a linear scalar embedding performs worse (Tab. 5).
+Axial Cross-Attention (ACA). Directly projecting e with an MLP is impractical, as C, T, I, and
+S vary widely across sensors. Applying full self-attention over all atomic tokens would also be
+prohibitively expensive, since each axis can reach the hundreds. Instead, we aggregate tokens one
+axis at a time using axial cross-attention [46] (see Fig. 3).
+Given a tensor t P RXˆY ˆD, where X is the axis to collapse and Y groups the remaining dimensions,
+the module ACAα
+X produces a representation of size Y ˆ αD by attending over X only. Concretely,
+for each index in Y , a query is formed from pooled features, while keys and values are computed from
+all elements along X. Attention is then applied along axis X, followed by a feed-forward network.
+Restricting attention to a single axis ensures linear complexity in the number of atomic tokens.
+Axis-specific metadata is injected before attention with dedicated positional encodings representing
+the nature of the modality and the characteristics of the atom: wavelength, polarization ratio, time in
+year, etc. Full details are provided in the appendix.
+Sequential dimension collapse. Starting from a patch of shape CˆT ˆIˆSˆD, we progressively
+aggregate information by collapsing one axis at a time using ACA. We follow a fixed order: pixel
+within each sub-patch (I), channel (C), time (T), and finally sub-patch within the patch (S), gradually
+reducing the tensor while increasing the feature dimension. Collapsing I first keeps the cost manage-
+able for high-resolution inputs, while keeping S until the end provides the sub-patch embeddings used
+for dense prediction. Collapsing channels before time lets temporal attention operate on spectrally
+contextualized features, which helps with atmospheric and illumination variations; the reverse order
+degrades performance on long time series (Tab. 5):
+UPEpxq “ pf, f subq
+with f sub “ ACA2
+T
+`
+ACA2
+C
+`
+ACA1
+Ipeq
+˘˘
+,
+f “ ACA2
+S
+`
+f sub˘
+.
+(2)
+The UPE produces: (i) a global patch embedding f P R8D, and (ii) sub-patch embeddings f sub P
+RSˆ4D, which are later used in a high-resolution skip connection. Both are then linearly projected to
+the width of the spatial Transformer. The expansion factors above correspond to UNIVERSAT-Tiny;
+UNIVERSAT-B also expands the pixel axis (ACA2
+I), see the appendix.
+3.2
+UNIVERSAT
+We consider a tile partitioned into non-overlapping patches P. Each patch p P P is observed by
+a subset of modalities M. In practice, M may include multiple sensors within the same modality
+4
+
+
+=== PDF PAGE 5 ===
+T
+C
+I ˆ S
+C ˆ T ˆ I ˆ S ˆ D
+ACA1
+I
+C ˆ T ˆ I ˆ S ˆ D
+C ˆ T ˆ S ˆ D
+ACA2
+C
+C ˆ T ˆ S ˆ D
+ACA2
+T
+T ˆ S ˆ D
+T ˆ S ˆ 2D
+ACA2
+S
+S ˆ D
+S ˆ 4D
+8D
+sub-patch
+skip
+connection
+Figure 4: Universal Patch Encoder. The input of this module is a patch with C channels, T
+time stamps, S sub-patch of I pixels, and a feature dimension of D. We use our proposed Axial
+Cross-Attention module (ACA) to sequentially collapse the pixel, channel, time, and sub-patch
+dimensions while simultaneously increasing the embedding dimension. This results in a single vector
+of dimension 8D and sub-patch embeddings of dimension S ˆ 4D.
+(e.g., Sentinel-2 and SPOT for optical imagery), and we use the term modality to refer to these
+inputs generically. We denote by xm
+p the observation of patch p under modality m. Our objective
+is to produce a dense multimodal feature map tzpupPP at a user-specified spatial resolution. As
+illustrated in Fig. 5, UNIVERSAT follows a ViT-like backbone but differs in four key aspects: (i)
+patches of arbitrary spatial, spectral, and temporal resolutions are embedded using a shared UPE,
+(ii) co-registered modalities are fused via axial cross-attention, (iii) fine spatial details are preserved
+through a sub-token skip connection, (iv) the output resolution is specified at inference time.
+Patch-level modality fusion. For each patch p and modality m, we compute f m
+p , f m,sub
+p
+“
+UPEpxm
+p q , where f m
+p is the patch embedding and f m,sub
+p
+are the corresponding sub-patch embeddings.
+For a fixed patch p, the modality-specific embeddings tf m
+p umPM are stacked along the modality axis
+and fused using an axial cross-attention module that collapses the modality dimension:
+fp “ ACA1
+M
+`
+tf m
+p umPM
+˘
+.
+(3)
+This yields a single multimodal embedding per patch.
+Spatial Transformer. The multimodal patch embeddings fP “ tfpupPP are then processed by B
+gated Transformer blocks [47], denoted Trans1, ¨ ¨ ¨ , TransB:
+gP “ TransB˝ ¨ ¨ ¨ ˝ Trans1`
+fP
+˘
+,
+(4)
+yielding refined patch embeddings g. We use RoPE positional encodings over patch centers, scaled
+by patch size [11], and include four register tokens [48].
+Any-Resolution Prediction. We can specify a target ground sampling distance (GSD), defining a
+new output spatial grid O. The patch embeddings are resampled to this grid via bilinear interpolation:
+gO “ Bilinear
+`
+gP, PÑO
+˘
+.
+(5)
+To recover fine spatial details lost during patch-level aggregation, each target token attends to all
+sub-patch embeddings via cross-attention CA with a residual connection:
+zO “ gO ` CA
+`
+gO, tf m,sub
+p
+upPP, mPM
+˘
+.
+(6)
+3.3
+Training
+We exploit spatial alignment across modalities to train UNIVERSAT in a self-supervised manner on
+multiple heterogeneous datasets. Our objective combines (i) cross-modal contrast at the patch level
+and (ii) latent multimodal masked modeling (LM3).
+Scale Augmentation and Masking. We train with aggressive input dropping to improve robustness
+across scales and sensor configurations. For each tile, we sample the input patch size and target
+output resolution from dataset-specific presets, then apply a compositional masking operator that
+drops modalities, timestamps, channels, and patches. This produces a visible subset of modalities
+M‹ and patches P‹, while masked patches D “ PzP‹ are used for masked prediction. Overall,
+approximately 90% of input atoms are removed, reducing computation and encouraging invariance
+across modalities, temporal sampling, spectral density, and spatial scale. Sampling details are given
+in the Appendix.
+5
+
+
+=== PDF PAGE 6 ===
+UPE
+ACA1
+M
+SA
+ˆB
+CA
+bilinear
+sampling
+user-defined
+output resolution
+target
+grid
+sub-patch tokens
+UPE
+Figure 5: UNIVERSAT. A tile is observed by multiple sensors of arbitrary modality and resolution.
+Inputs are patchified and embedded by a shared Universal Patch Encoder (UPE). The resulting tokens
+are stacked along the modality axis and collapsed to one token per patch via Axial Cross-Attention
+(ACA). We then apply B self-attention (SA) blocks and resample the resulting feature map to the
+target resolution. Finally, the token attend high-resolution sub-token embeddings via cross-attention
+(CA) to recover fine spatial details.
+Cross-modal contrast. Different modalities observing the same patch share a common latent variable:
+their content [12, 28]. We encourage modality-invariant representations by applying a batch-wise,
+multi-positive contrastive loss Lcon [7] to the UPE embeddings tf m
+p upPP‹, mPM‹ of visible patches.
+Embeddings of the same patch in different modalities are positives, embeddings of different patches in
+different modalities are negatives, and pairs from different patches in the same modality are excluded,
+as they are trivially separable.
+Linear Multimodal Masked Modeling (LM3). We extend latent masked image modeling [49] to
+multimodal and multitemporal EO data by predicting representations of masked patches at selected
+timestamps. Following [19], we define targets in a latent space using frozen random projections.
+Concretely, for each modality m, we use a randomly initialized linear projection ϕrand
+m
+that maps
+monotemporal input patches to a fixed-size target space and remains frozen during training.
+A key challenge is to balance spatial and temporal supervision. Using all timestamps may lead
+the model to exploit trivial temporal cues, while ignoring time degrades representation quality.
+We therefore sample a small set of timestamps per tile and assign each masked patch p P D a
+target time τppq. Given the visible multimodal patch embeddings tzquqPP‹, a predictor ϕpred infers
+representations for masked patches conditioned on τppq:
+!
+zτppq
+p
+)
+pPD “ ϕpred`
+tzquqPP‹˘
+.
+(7)
+Modality-specific heads ϕhead
+m
+then map these embeddings to the target space, supervised with a
+contrastive objective in which the target of the same patch, modality, and timestamp is the only
+positive, and the targets of all other masked patches are negatives:
+LLM3 “
+ÿ
+mPM
+ÿ
+pPD
+InfoNCE
+´
+ϕhead
+m
+`
+zτppq
+p
+˘
+, ϕrand
+m
+`
+xm
+p rτppqs
+˘¯
+.
+(8)
+Although the prediction heads ϕhead
+m
+are modality-specific, they all take the same multimodal patch
+representation zp as input. Solving LM3 therefore requires zp to preserve information from all
+modalities in a shared latent space. As the modality-specific heads are used only during pretraining,
+the model itself remains modality agnostic. Finally, since the targets are random projections and
+not learned, the objective avoids collapse. See Appendix for more details. Random projections give
+targets of the same size for sensors whose raw patches differ in dimension by orders of magnitude,
+and InfoNCE is less sensitive than a regression loss to the widely varying scale of these targets; both
+choices clearly outperform their alternatives (Tab. 5). The two losses are complementary: Lcon only
+supervises the UPE and aligns the content shared across modalities, whereas LLM3 trains the full
+encoder and requires zp to retain modality-specific information.
+Final Loss. The final loss writes: L“LLM3`λconLcon , where λcon is a non-negative hyperparameter.
+4
+Experiments
+We first describe the experimental setting and our multi-dataset training corpus (Sec. 4.1). We then
+report probing experiments demonstrating how the embeddings learned by UNIVERSAT transfer to
+6
+
+
+=== PDF PAGE 7 ===
+Dropping:
+modalities
+patches
+channels
+timestamps
+Univer-
+Sat
+ϕpred
+InfoNCE
+Random Frozen
+Linear Projection
+stop
+grad
+Lcon
+modality
+specific
+MLPs
+Figure 6: Training Scheme. We give a UNIVERSAT network a heavily masked version of the input
+patches. We apply a cross-modal contrastive loss to harmonize the output of its Universal Patch
+Encoders. We then give the embedded patches that were not masked to a decoder network, which tries
+to predict the values of random projections of the raw input patches. We use a batch-wise InfoNCE
+loss on each modality separately.
+diverse and challenging EO tasks (Sec. 4.2). Finally, we provide an ablation study analyzing the
+impact of key architectural and training choices (Sec. 4.3).
+4.1
+Experimental setting
+Training Set.
+We train a single UNIVERSAT model on a composite corpus of seven heterogeneous
+datasets: FLAIR-Hub [50], PASTIS-HD [51, 12], TSAI-TS [52, 12], Planted [53], S2NAIP-Urban [54,
+55], HyperGlobal [56], and the NEON subset of EarthView [23]. Note that folds 4 and 5 of PASTIS,
+used for validation and testing in our benchmarks, are excluded from the unsupervised training set,
+even though no labels from PASTIS are used during pretraining. An overview is provided in Fig. 7,
+with full details in the appendix. The sensors span a wide range of acquisition conditions: spatial
+resolutions from 0.1 to 300 m, temporal depth from 1 to 140 images per year, and spectral width
+from 1 to 396 channels, with tile extents ranging from 0.4 to 600 ha. To our knowledge, UNIVERSAT
+is the first EO foundation model jointly trained on such a broad set of 13 sensors and modalities,
+including some that are rarely incorporated into large-scale pretraining, such as very-high-resolution
+hyperspectral time series.
+4.2
+Benchmarks
+We evaluate our model on 16 datasets from GeoBench [20], PangaeaBench [21], and Spec-
+tralEarth [22]. UNIVERSAT remains competitive with less versatile approaches in standard settings,
+while also delivering strong performance on more specialized tasks such as hyperspectral analysis.
+Probing Experiments.
+In Tab. 2, we report results in a strict probing setting (kNN and linear prob-
+ing only), following the protocol of Tseng et al. [6]. Our model achieves strong performance across a
+wide range of datasets, including state-of-the-art results on BrickKiln [57] and Sen1Flood11 [58],
+despite being significantly more general than competing approaches, which are typically restricted to
+specific sensors (e.g., Sentinel-1/2 or Landsat) or single timestamps.
+On PangaeaBench (Tab. 3), unlike prior work using large decoder heads (e.g., UperNet [61]), we
+exploit UNIVERSAT’s dense embeddings and perform semantic segmentation with a simple linear
+probe. Despite using 3700–5000ˆ fewer supervised parameters, our model remains competitive
+and reaches state-of-the-art performance on PASTIS-R [51] and AI4Farms [62]. In particular, it
+outperforms RAMEN [17], which also uses a shared encoder but resamples inputs to a common
+format, on two of the four datasets. Under full end-to-end fine-tuning, UNIVERSAT trains stably and
+reaches state-of-the-art performance on Sen1Floods11 (Sec. A.4.1).
+Importantly, we separate unseen configurations of known sensor families—mono-temporal Sentinel-
+1/2, reduced band subsets, and derived products such as HLS—from genuinely unseen sensors, absent
+from pretraining in any form: PlanetScope and EnMAP. UNIVERSAT is robust in both regimes: on
+DynamicEarthNet (PlanetScope), its 9K linear probe reaches 37.1 mIoU, above a fully supervised
+ViT (36.8) and close to UperNet decoders using 4400ˆ more supervised parameters.
+7
+
+
+=== PDF PAGE 8 ===
+VHR 43%
+optical TS
+32%
+radar TS 4%
+hyper-
+spectral
+16%
+DEM 3.2%
+(a) Atoms across modalities.
+EarthView + NEON 11.4%
+S2NAIP
+54.7%
+FLAIR-Hub
+16.4%
+Hyper-
+Global
+13.8%
+4%
+TSAITS, PASTIS-HD, PLANTED
+(b) Atoms across datasets.
+S
+T
+C
+Gå
+NAIP
+1.2
+1
+4
+540
+aerial UHR
+0.2
+1
+3
+271
+SPOT6/7
+1.5
+1
+4
+20.0
+UAV UHR
+0.1
+3
+3
+44.0
+Sentinel-2
+10
+20+
+10
+3534
+Landsat-7/8/9
+30
+4-20
+3-8
+69.2
+MODIS
+250
+60
+7
+0.6
+Sentinel-1
+10
+100+
+3
+960
+ALOS2
+30
+4
+3
+0.3
+EO1
+30
+1
+175
+143
+NIS
+0.1
+3
+396
+173
+Gaofen-5
+30
+1
+150
+151
+DSM
+30
+1
+1
+71.2
+nDEM
+0.2
+1
+1
+63.0
+(c) Training modalities.
+Figure 7: Training Datasets. Distribution of atoms (å), defined as one pixel, one band, and one
+timestamp [45], across modalities (Fig. 7a) and datasets (Fig. 7b). Figure 7c summarizes the supported
+sensors, reporting their typical spatial resolution (S, in meters), temporal depth (T, in images per
+year), number of channels (C), and total number of atoms (Gå).
+Hyperspectral Data.
+We evaluate our model on the SpectralEarth benchmark [22] (Tab. 4), which
+consists of multiple tasks based on EnMAP hyperspectral imagery (up to 500 bands), following their
+probing protocol. Compared to DOFA [16], a foundation model trained on EnMAP, our approach
+achieves consistently better performance across all tasks, despite not being trained on EnMAP.
+We also compare to specialized hyperspectral models. Our method outperforms SpatSIGMA [56] and
+approaches the performance of SpectralEarth-L, a model specifically designed for EnMAP and trained
+with self-supervision on the evaluation data itself. These results highlight that, beyond its versatility,
+our model remains highly competitive in specialized regimes such as hyperspectral analysis.
+Feature Maps.
+We visualize feature maps from different models in Fig. 8 using PCA projections.
+Thanks to its controllable output resolution, UNIVERSAT produces higher-resolution embeddings
+that preserve fine spatial structures (e.g., field boundaries and roads), compared to fixed-resolution
+models. As observed by Ye et al. [63], several models exhibit patterns consistent with positional
+collapse [64], where dominant PCA components are largely driven by positional encodings.
+4.3
+Ablation Study
+We assess in Tab. 5 the impact of our main design choices in a simplified setting. For all variants,
+we train a Tiny model (width 192, D “ 48) on the full training corpus and evaluate it on one
+classification benchmark (m-Brick-Kiln) and two semantic segmentation benchmarks (Sen1Floods11
+and PASTIS).
+classification
+semantic segmentation
+unseen config
+unseen sensor
+m-brick-
+kiln
+m-
+pv4ger
+m-forest
+net
+PASTIS
+-R
+Sen1
+Floods11
+m-chesa
+peake
+m-Neon
+Tree
+Modality
+S2}
+S2}
+L8}
+S1+S2
+S1}
+aerial
+RGB aerial
+Metric
+Acc.
+Acc.
+Acc.
+mIoU
+mIoU
+mIoU
+mIoU
+SSL
+DINOv2 [5]
+-
+-
+-
+-
+-
+64.0
+59.1
+DINOv3 7B [59]
+91.3
+-
+48.0
+-
+-
+-
+-
+CROMA-L [38]
+91.7
+94.5
+-
+44.4
+78.8
+-
+-
+CopernicusFM [60]
+85.9
+-
+-
+-
+77.6
+32.2
+-
+AnySat [7]
+84.5
+90.3
+34.0
+46.2
+77.8
+61.7
+49.9
+DOFA [16]
+-
+95.8
+-
+13.4
+77.4
+59.2
+55.4
+Panopticon [13]
+92.9
+96.7
+52.3
+-
+-
+60.8
+50.4
+Satlas [54]
+83.0
+-
+36.9
+28.0
+72.9
+-
+-
+UniverSat-B (ours)
+94.5
+92.7
+41.7
+47.9
+80.1
+64.7
+51.0
+SSup
+Galileo-B [6]
+91.1
+93.1
+-
+39.2
+79.4
+-
+-
+TerraMind [9]
+91.9
+-
+-
+-
+78.7
+-
+-
+OlmoEarth-L [19]
+93.4
+-
+41.6
+51.8
+79.8
+-
+-
+Table 2: Probing Experiment. We evaluate our model on several classification and segmentation
+datasets using kNN for classification and linear probing for segmentation. SSL designates methods
+trained with only sensor observation, and SSup models that use labels as supervision or training
+modalities. Results of competing methods are taken from the literature [6, 13, 19]. When values
+conflict, we take the highest. Top 3 performance are highlighted. }: single time stamp.
+8
+
+
+=== PDF PAGE 9 ===
+Table 3: Probing with Decoders.
+We evaluate our model on datasets
+from the Pangaea Benchmark us-
+ing a linear probe, whereas other
+models use a heavyweight Uper-
+Net decoder. ViT-B sup. is a fully
+supervised baseline trained end-to-
+end [21].
+}: single time stamp.
+unseen config., unseen sensor.
+Probe
+param
+PASTIS-R
+BurnScar
+DynEN
+AI4Farms
+Modality
+S1+S2
+HLS}
+PlanetScope
+S2}RGBNiR
+ViT-B sup. [21]
+125M
+38.5
+81.6
+36.8
+38.4
+Satlas [54]
+33M
+17.5
+80.0
+36.3
+25.1
+CROMA [38]
+47M
+32.3
+82.4
+38.3
+25.7
+DOFA + [16]
+47M
+40.3
+86.5
+41.1
+29.9
+Ramen [17]
+40M
+42.3
+85.0
+39.9
+38.8
+TerraMind [9]
+47M
+43.1
+82.9
+37.9
+27.5
+UniverSat-B
+9K
+47.9
+81.5
+37.1
+41.1
+A UPE. We replace the UPE with |M| modality-specific MLP projectors (UPEÞÑMLPs), as in a
+standard ViT. This ties the model to sensors seen during training, prevents arbitrary patch sizes,
+and reduces the number of tokens processed by each encoder. It leads to a marked performance
+drop, while increasing the parameter count by 58% and removing the ability to handle unseen
+sensors. However, this variant is more efficient, with a 2ˆ reduction in training time. Replacing
+the LFF atom embedding with a linear scalar embedding (LFFÞÑLinear) degrades performance,
+supporting a nonlinear embedding of atoms. Reversing the aggregation order to collapse time
+before channels (Time before channels) mostly affects PASTIS, which has long time series.
+Finally, training only on the Sentinel-2 part of the corpus (S2 only training) performs worse,
+even on the Sentinel-2-only Brick-Kiln: multimodal training causes no negative transfer and
+instead provides complementary supervision.
+B UniverSat architecture. We remove the skip connection that enables cross-attention to sub-
+patch embeddings (No skip connection). This degrades performance on all three benchmarks,
+most strongly on Brick-Kiln (´3.9), showing that the skip connection helps preserve the fine-
+grained spatial features lost during patch-level aggregation.
+We then disable resolution control by keeping the same patch size throughout the network (Fixed
+Output Res.). This degrades performance on all three benchmarks, most notably on PASTIS
+(´3.7) and Brick-Kiln (´2.3), showing that decoupling the output resolution from the input
+patch size benefits both segmentation and classification. Finally, we replace ACA-based modality
+fusion with either late fusion (Late fusion), where each modality is processed independently
+and the resulting embeddings are averaged, or mid-fusion (Average Pooling), where ACAM is
+replaced by average pooling over modalities right after the UPE. Both cause a small performance
+drop, showing that ACA is an effective fusion mechanism. It adds little cost, as it operates on
+patch embeddings rather than atoms, whereas late fusion requires one pass per modality.
+C Training objective. We remove the cross-modal contrastive loss applied to patch embeddings
+directly after the UPE (λcon “ 0). This substantially decreases performance, especially for
+multimodal segmentation. We hypothesize that this auxiliary supervision stabilizes UPE training
+and encourages stronger alignment of sub-patch representations across modalities. We also
+evaluate variants of our LM3. Replacing the contrastive InfoNCE loss with a simple L2 loss
+in the frozen projection space results in a significant decrease in performance. Replacing LM3
+with a traditional MAE objective in pixel space also incurs a significant, but lesser, loss of
+performance. LM3 is thus both easier to implement for massively multimodal training and
+unseen sensor
+all datasets use
+EnMAP
+Segmentation (mIoU)
+Class. (F1)
+Free
+param.
+Trained w.
+EnMAP
+Cdl
+Nlcd
+Euro
+crops
+Tree
+map
+BD
+Foret
+BnetD
+Corine
+SpectralEarth-L [22]
+1.2M
+✓
+72.7
+42.7
+62.1
+42.6
+71.1
+44.0
+74.0
+SpatSIGMA-B [56]
+900K
+63.5
+36.0
+50.7
+37.0
+58.2
+38.6
+68.2
+DOFA-L [16]
+1.2M
+✓
+60.6
+33.4
+46.1
+34.7
+51.3
+37.4
+67.5
+UniverSat SSL
+900K
+64.7
+39.0
+55.3
+38.2
+63.3
+43.9
+73.6
+UniverSat SSL w. linear
+9K
+61.4
+34.6
+52.8
+35.3
+57.5
+40.3
+71.5
+Table 4: Hyperspectral performance. We evaluate UNIVERSAT on the SpectralEarth benchmark,
+composed of multiple tasks using EnMAP hyperspectral data. We compare against specialized
+hyperspectral models (top) and general foundation models supporting hyperspectral inputs (bottom).
+Despite no training on EnMAP, UNIVERSAT surpasses the state-of-the-art DOFA foundation model,
+and remains competitive even when using only a linear probe instead of a convolutional decoder.
+9
+
+
+=== PDF PAGE 10 ===
+Table 5: Ablation Study. We evaluate
+the impact of our key design choices in
+a simplified setting.
+classification
+segmentation
+m-Brick-Kiln
+Sen1flood11
+Pastis
+Best Configuration
+92.4
+78.4
+36.4
+A
+UPEÞÑ MLPs
+91.9
+77.6
+21.5
+A
+LFFÞÑ Linear atom emb.
+88.8
+77.8
+34.9
+A
+Time before channels
+91.2
+76.8
+25.2
+A
+S2 only training
+87.0
+-
+29.3
+B
+No skip connection
+88.5
+76.9
+34.0
+B
+Fixed Output Res.
+90.1
+77.5
+32.7
+B
+Late modality fusion
+-
+-
+32.6
+B
+Mid-fusion: Average Pooling
+92.1
+76.8
+32.7
+C
+No cross-modal contrast
+91.3
+76.8
+27.9
+C
+InfoNCEÞÑ L2
+69.8
+69.7
+10.7
+C
+Pixel MAE
+77.5
+74.4
+12.7
+Spot6 (1.5m)
+UNIVERSAT (2m)
+OlmoEarth (10m)
+AlphaEarth (10m)
+S1 T.S (10m)
+S2 T.S. (10m)
+Time Series (T.S.)
+Galileo (80m)
+TerraMind (160m)
+Tessera (10m)
+(a) Input
+(b) Multimodal Models
+(c) Embedding Fields
+Figure 8: Embedding Visualization. Embeddings of a PASTIS multimodal test tile (1.6 km2) are
+projected using PCA, with the top three components mapped to RGB; colors are lightly harmonized
+across images for visualization.
+more effective. Removing LLM3 is not a meaningful ablation, as only the UPE would then be
+supervised.
+Limitations and Impact.
+UNIVERSAT trades specialization for generality: in standard settings
+(e.g., VHR RGB or mono-temporal Sentinel-2), modality-specific models may be more accurate
+or efficient. Its computational overhead is moderate, and it is even faster on long time series, but
+memory use is typically higher (Sec. A.5.1): this is the cost of supporting heterogeneous inputs
+with one architecture. Our evidence for unseen sensors covers EnMAP and PlanetScope, whose
+characteristics lie within the pretraining gamut (roughly 0.2–250 m GSD, up to 140 observations per
+year, and 1–500 channels); we do not claim generalization to arbitrary sensors far outside it, such as
+UAV imagery or very dense temporal streams. Axial aggregation assumes co-registered inputs: under
+strong misalignment across timestamps or modalities, the UPE may blur fine details, which standard
+co-registration can mitigate. It is also less seamless for non-optical sensors, which require learning a
+small modality encoding vector alongside the probe. Beyond technical aspects, and as with any EO
+model, UNIVERSAT may also enable large-scale monitoring capabilities, raising concerns around
+surveillance or misuse.
+5
+Conclusion
+We introduced UNIVERSAT, a transformer architecture for multimodal Earth Observation that
+replaces fixed patch projectors with a Universal Patch Encoder, enabling a single model to process
+multimodal inputs of any resolutions. Through self-supervised training across 13 sensors and 7
+heterogeneous datasets, UNIVERSAT learns modality- and resolution-agnostic representations that
+transfer effectively to a wide range of downstream EO tasks. Our results demonstrate that a single,
+shared backbone remains competitive with modality-specific foundation models, and surpasses them
+in several settings, while offering far greater input flexibility.
+10
+
+
+=== PDF PAGE 11 ===
+Acknowledgments and Disclosure of Funding
+This work was supported by Hi! PARIS (ANR-23-IACL-0005), the ANR project SHARP (ANR-23-
+PEIA-0008) in the context of the PEPR IA, the French Space Agency PhD program (CNES), and
+the French National Institute of Geographic and Forest Information (IGN). This work was granted
+access to the HPC resources of IDRIS under the allocations AD011014719R2, AD011014781R2,
+and A0200116178 made by GENCI. We thank Jordi Inglada for inspiring discussions and valuable
+feedback.
+References
+[1] Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li, Piotr Dollár, and Ross Girshick. Masked
+autoencoders are scalable vision learners. In CVPR, 2022. 1
+[2] Kaiming He, Haoqi Fan, Yuxin Wu, Saining Xie, and Ross Girshick. Momentum contrast for
+unsupervised visual representation learning. In CVPR, 2020. 1
+[3] Mahmoud Assran, Quentin Duval, Ishan Misra, Piotr Bojanowski, Pascal Vincent, Michael
+Rabbat, Yann LeCun, and Nicolas Ballas. Self-supervised learning from images with a joint-
+embedding predictive architecture. In CVPR, 2023. 1
+[4] Mathilde Caron, Hugo Touvron, Ishan Misra, Hervé Jégou, Julien Mairal, Piotr Bojanowski,
+and Armand Joulin. Emerging properties in self-supervised vision transformers. In ICCV, 2021.
+1
+[5] Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov,
+Pierre Fernandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al. Dinov2: Learning
+robust visual features without supervision. TMLR, 2024. 1, 8
+[6] Gabriel Tseng, Anthony Fuller, Marlena Reil, Henry Herzog, Patrick Beukema, Favyen Bastani,
+James R Green, Evan Shelhamer, Hannah Kerner, and David Rolnick. Galileo: Learning global
+& local features of many remote sensing modalities. In ICML, 2025. 1, 2, 3, 7, 8, 19, 21
+[7] Guillaume Astruc, Nicolas Gonthier, Clement Mallet, and Loic Landrieu. AnySat: One earth
+observation model for many resolutions, scales, and modalities. In CVPR, 2025. 1, 2, 3, 6, 8,
+19, 21
+[8] Yezhen Cong, Samar Khanna, Chenlin Meng, Patrick Liu, Erik Rozi, Yutong He, Marshall
+Burke, David Lobell, and Stefano Ermon. SatMAE: Pre-training transformers for temporal and
+multi-spectral satellite imagery. In NeurIPS, 2022. 1, 2, 3, 21
+[9] Johannes Jakubik, Felix Yang, Benedikt Blumenstiel, Erik Scheurer, Rocco Sedona, Stefano
+Maurogiovanni, Jente Bosmans, Nikolaos Dionelis, Valerio Marsocci, Niklas Kopp, et al.
+Terramind: Large-scale generative multimodality for Earth observation. arXiv:2504.11171,
+2025. 1, 2, 3, 8, 9, 19, 21
+[10] Christopher F Brown, Michal R Kazmierski, Valerie J Pasquarella, William J Rucklidge,
+Masha Samsikova, Chenhui Zhang, Evan Shelhamer, Estefania Lahera, Olivia Wiles, Simon
+Ilyushchenko, et al. AlphaEarth Foundations: An embedding field model for accurate and
+efficient global mapping from sparse label data. arXiv:2507.22291, 2025. 1, 3, 21
+[11] Colorado J Reed, Ritwik Gupta, Shufan Li, Sarah Brockman, Christopher Funk, Brian Clipp,
+Kurt Keutzer, Salvatore Candido, Matt Uyttendaele, and Trevor Darrell. Scale-MAE: A scale-
+aware masked autoencoder for multiscale geospatial representation learning. In ICCV, 2023. 2,
+3, 5, 16, 21
+[12] Guillaume Astruc, Nicolas Gonthier, Clement Mallet, and Loic Landrieu. OmniSat: Self-
+supervised modality fusion for Earth observation. In ECCV, 2024. 2, 3, 6, 7, 21
+[13] Leonard Waldmann, Ando Shah, Yi Wang, Nils Lehmann, Adam J Stewart, Zhitong Xiong,
+Xiao Xiang Zhu, Stefan Bauer, and John Chuang. Panopticon: Advancing any-sensor foundation
+models for earth observation. arXiv:2503.10845, 2025. 2, 3, 8, 19, 21
+[14] Jonathan Prexl and Michael Schmitt. SenPa-MAE: Sensor parameter aware masked autoencoder
+for multi-satellite self-supervised pretraining. arXiv:2408.11000, 2024. 2, 3
+[15] Gencer Sumbul, Chang Xu, Emanuele Dalsasso, and Devis Tuia. SMARTIES: Spectrum-aware
+multi-sensor auto-encoder for remote sensing images. In ICCV, 2025. 2, 3, 21
+11
+
+
+=== PDF PAGE 12 ===
+[16] Zhitong Xiong, Yi Wang, Fahong Zhang, Adam J Stewart, Joëlle Hanna, Damian Borth, Ioannis
+Papoutsis, Bertrand Le Saux, Gustau Camps-Valls, and Xiao Xiang Zhu. Neural plasticity-
+inspired multimodal foundation model for Earth observation. arXiv:2403.15356, 2024. 2, 3, 8,
+9, 21
+[17] Nicolas Houdré, Diego Marcos, Hugo Riffaud de Turckheim, Dino Ienco, Laurent Wendling,
+Camille Kurtz, and Sylvain Lobry. RAMEN: Resolution-adjustable multimodal encoder for
+Earth observation. arXiv:2512.05025, 2025. 2, 3, 7, 9, 21
+[18] Kun Yi, Yixiao Ge, Xiaotong Li, Shusheng Yang, Dian Li, Jianping Wu, Ying Shan, and Xiaohu
+Qie. Masked image modeling with denoising contrast. In ICLR, 2023. 2
+[19] Henry Herzog, Favyen Bastani, Yawen Zhang, Gabriel Tseng, Joseph Redmon, Hadrien Sablon,
+Ryan Park, Jacob Morrison, Alexandra Buraczynski, Karen Farley, et al. OlmoEarth: Stable
+latent image modeling for multimodal Earth observation. In CVPR, 2026. 2, 3, 6, 8, 17, 19
+[20] Alexandre Lacoste, Nils Lehmann, Pau Rodriguez, Evan Sherwin, Hannah Kerner, Björn
+Lütjens, Jeremy Irvin, David Dao, Hamed Alemohammad, Alexandre Drouin, et al. Geo-bench:
+Toward foundation models for earth monitoring. In NeurIPS, 2023. 2, 7
+[21] Valerio Marsocci, Yuru Jia, Georges Le Bellier, David Kerekes, Liang Zeng, Sebastian Hafner,
+Sebastian Gerard, Eric Brune, Ritu Yadav, Ali Shibli, et al. PANGAEA: A global and inclusive
+benchmark for geospatial foundation models. arXiv:2412.04204, 2024. 2, 7, 9
+[22] Nassim Ait Ali Braham, Conrad M Albrecht, Julien Mairal, Jocelyn Chanussot, Yi Wang, and
+Xiao Xiang Zhu. SpectralEarth: Training hyperspectral foundation models at scale. IEEE
+Journal of Selected Topics in Applied Earth Observations and Remote Sensing, 18:16780–16797,
+2025. 2, 7, 8, 9
+[23] Diego Velazquez, Pau Rodriguez, Sergio Alonso, Josep M Gonfaus, Jordi Gonzalez, Gerardo
+Richarte, Javier Marin, Yoshua Bengio, and Alexandre Lacoste. EarthView: A large scale
+remote sensing dataset for self-supervision. In WACV Workshops, 2025. 2, 7, 21
+[24] Nikolaos Ioannis Bountos, Arthur Ouaknine, Ioannis Papoutsis, and David Rolnick. FoMo:
+Multi-modal, multi-scale and multi-task remote sensing foundation models for forest monitoring.
+In AAAI, 2025. 2, 3, 21
+[25] Kumar Ayush, Burak Uzkent, Chenlin Meng, Kumar Tanmay, Marshall Burke, David Lobell,
+and Stefano Ermon. Geography-aware self-supervised learning. In ICCV, 2021. 2, 3
+[26] Oscar Manas, Alexandre Lacoste, Xavier Giró-i Nieto, David Vazquez, and Pau Rodriguez.
+Seasonal contrast: Unsupervised pre-training from uncurated remote sensing data. In ICCV,
+2021. 2, 3
+[27] Utkarsh Mall, Bharath Hariharan, and Kavita Bala. Change-aware sampling and contrastive
+learning for satellite images. In CVPR, 2023. 2
+[28] Wei-Hsin Tseng, Hoàng-Ân Lê, Alexandre Boulch, Sébastien Lefèvre, and Dirk Tiede. CROCO:
+Cross-modal contrastive learning for localization of Earth observation data. ISPRS Annals of
+the Photogrammetry, Remote Sensing and Spatial Information Sciences, 2022. 2, 3, 6
+[29] Zhengpeng Feng, Clement Atzberger, Sadiq Jaffer, Jovana Knezevic, Silja Sormunen, Robin
+Young, Madeline C Lisaius, Markus Immitzer, Toby Jackson, James Ball, et al. Tessera: Tem-
+poral embeddings of surface spectra for earth representation and analysis. arXiv:2506.20380,
+2025. 2
+[30] Boran Han, Shuai Zhang, Xingjian Shi, and Markus Reichstein. Bridging remote sensors with
+multisensor geospatial foundation models. In CVPR, 2024. 2
+[31] Matías Mendieta, Boran Han, Xingjian Shi, Yi Zhu, and Chen Chen. Towards geospatial
+foundation models via continual pretraining. In ICCV, 2023. 2
+[32] Iris Dumeur, Silvia Valero, and Jordi Inglada. Self-supervised spatio-temporal representation
+learning of satellite image time series. IEEE Journal of Selected Topics in Applied Earth
+Observations and Remote Sensing, 2024. 3
+[33] Gabriel Tseng, Ivan Zvonkov, Mirali Purohit, David Rolnick, and Hannah Kerner. Lightweight,
+pre-trained transformers for remote sensing timeseries. arXiv:2304.14065, 2023. 3, 21
+12
+
+
+=== PDF PAGE 13 ===
+[34] Muhammad Sohail Danish, Muhammad Akhtar Munir, Syed Roshaan Ali Shah, Muham-
+mad Haris Khan, Rao Muhammad Anwer, Jorma Laaksonen, Fahad Shahbaz Khan, and
+Salman Khan. TerraFM: A scalable foundation model for unified multisensor earth obser-
+vation. arXiv:2506.06281, 2025. 3, 21
+[35] Qi Zhu, Jiangwei Lao, Deyi Ji, Junwei Luo, Kang Wu, Yingying Zhang, Lixiang Ru, Jian
+Wang, Jingdong Chen, Ming Yang, et al. Skysense-o: Towards open-world remote sensing
+interpretation with vision-centric visual-language modeling. In CVPR, 2025. 3
+[36] Antoine Labatie, Michael Vaccaro, Nina Lardiere, Anatol Garioud, and Nicolas Gonthier.
+MAESTRO: Masked autoencoders for multimodal, multitemporal, and multispectral earth
+observation data. In WACV, 2026. 3, 21
+[37] Yi Wang, Conrad Albrecht, Nassim Ait Ali Braham, Lichao Mou, and Xiaoxiang Zhu. Self-
+supervised learning in remote sensing: A review. IEEE Geoscience and Remote Sensing
+Magazine, 2022. 3
+[38] Anthony Fuller, Koreen Millard, and James R Green. CROMA: Remote sensing representations
+with contrastive radar-optical masked autoencoders. In NeurIPS, 2023. 3, 8, 9, 19, 21
+[39] Guillaume Astruc, Eduard Trulls, Jan Hosang, Loic Landrieu, and Paul-Edouard Sarlin. Uni-
+GeoCLIP: Unified geospatial contrastive learning. In CVPR Workshop EarthVision, 2026.
+3
+[40] Yingying Zhang, Lixiang Ru, Kang Wu, Lei Yu, Lei Liang, Yansheng Li, and Jingdong Chen.
+SkySense V2: A unified foundation model for multi-modal remote sensing. In ICCV, 2025. 3,
+21
+[41] Ibrahim Fayad, Max Zimmer, Martin Schwartz, Fabian Gieseke, Philippe Ciais, Gabriel Be-
+louze, Sarah Brood, Aurélien de Truchis, and Alexandre d’Aspremont. DUNIA: Pixel-sized
+embeddings via cross-modal alignment for earth observation applications. In ICML, 2025. 3, 21
+[42] Jeremy Irvin, Lucas Tao, Joanne Zhou, Yuntao Ma, Langston Nashold, Benjamin Liu, and
+Andrew Y Ng. USat: A unified self-supervised encoder for multi-sensor satellite imagery.
+arXiv:2312.02199, 2023. 3
+[43] Manuel Weber and Carly Beneke. PyViT-FUSE: A foundation model for multi-sensor earth
+observation data. arXiv:2504.18770, 2025. 3
+[44] Lucas Beyer, Pavel Izmailov, Alexander Kolesnikov, Mathilde Caron, Simon Kornblith, Xiaohua
+Zhai, Matthias Minderer, Michael Tschannen, Ibrahim Alabdulmohsin, and Filip Pavetic.
+FlexiViT: One model for all patch sizes. In CVPR, 2023. 3, 17
+[45] Hugo Riffaud de Turckheim, Sylvain Lobry, Roberto Interdonato, and Diego Marcos. Atomizer:
+Generalizing to new modalities by breaking satellite images down to a set of scalars. In BMVC,
+2025. 3, 4, 8, 21
+[46] Jonathan Ho, Nal Kalchbrenner, Dirk Weissenborn, and Tim Salimans. Axial attention in
+multidimensional transformers. arXiv:1912.12180, 2019. 3, 4, 16
+[47] Zihan Qiu, Zekun Wang, Bo Zheng, Zeyu Huang, Kaiyue Wen, Songlin Yang, Rui Men, Le Yu,
+Fei Huang, Suozhi Huang, et al. Gated attention for large language models: Non-linearity,
+sparsity, and attention-sink-free. In NeurIPS, 2025. 5
+[48] Timothée Darcet, Maxime Oquab, Julien Mairal, and Piotr Bojanowski. Vision transformers
+need registers. In ICLR, 2024. 5
+[49] Yibing Wei, Abhinav Gupta, and Pedro Morgado. Towards latent masked image modeling for
+self-supervised visual representation learning. In ECCV, 2024. 6, 17
+[50] Anatol Garioud, Sébastien Giordano, Nicolas David, and Nicolas Gonthier. FLAIR-HUB :
+Large-scale multimodal dataset for land cover and crop mapping. ISPRS Journal of Photogram-
+metry and Remote Sensing, 2026. 7
+[51] Vivien Sainte Fare Garnot and Loic Landrieu. Panoptic segmentation of satellite image time
+series with convolutional temporal attention networks. In ICCV, 2021. 7
+[52] Steve Ahlswede, Christian Schulz, Christiano Gava, Patrick Helber, Benjamin Bischke, Michael
+Förster, Florencia Arias, Jörn Hees, Begüm Demir, and Birgit Kleinschmit. TreeSatAI Bench-
+mark Archive: A multi-sensor, multi-label dataset for tree species classification in remote
+sensing. Earth System Science Data, 15:681–695, 2023. 7
+13
+
+
+=== PDF PAGE 14 ===
+[53] Luis Miguel Pazos-Outón, Cristina Nader Vasconcelos, Anton Raichuk, Anurag Arnab, Dan
+Morris, and Maxim Neumann. Planted: A dataset for planted forest identification from multi-
+satellite time series. In IGARSS, 2024. 7
+[54] Favyen Bastani, Piper Wolters, Ritwik Gupta, Joe Ferdinando, and Aniruddha Kembhavi.
+SatlasPretrain: A large-scale dataset for remote sensing image understanding. In ICCV, 2023.
+7, 8, 9
+[55] Piper Wolters, Favyen Bastani, and Aniruddha Kembhavi.
+Zooming out on zooming in:
+Advancing super-resolution for remote sensing. arXiv:2311.18082, 2023. 7
+[56] Di Wang, Meiqi Hu, Yao Jin, Yuchun Miao, Jiaqi Yang, Yichu Xu, Xiaolei Qin, Jiaqi Ma,
+Lingyu Sun, Chenxing Li, Chuan Fu, Hongruixuan Chen, Chengxi Han, Naoto Yokoya, Jing
+Zhang, Minqiang Xu, Lin Liu, Lefei Zhang, Chen Wu, Bo Du, Dacheng Tao, and Liangpei
+Zhang. HyperSIGMA: Hyperspectral intelligence comprehension foundation model. TPAMI,
+47(8):6427–6444, 2025. 7, 8, 9
+[57] Jihyeon Lee, Nina R Brooks, Fahim Tajwar, Marshall Burke, Stefano Ermon, David B Lobell,
+Debashish Biswas, and Stephen P Luby. Scalable deep learning to identify brick kilns and aid
+regulatory capacity. Proceedings of the National Academy of Sciences, 2021. 7
+[58] Derrick Bonafilia, Beth Tellman, Tyler Anderson, and Erica Issenberg. Sen1Floods11: A
+georeferenced dataset to train and test deep learning flood algorithms for Sentinel-1. In CVPR
+Workshop EarthVision, 2020. 7
+[59] Oriane Siméoni, Huy V Vo, Maximilian Seitzer, Federico Baldassarre, Maxime Oquab, Cijo
+Jose, Vasil Khalidov, Marc Szafraniec, Seungeun Yi, Michaël Ramamonjisoa, et al. Dinov3.
+arXiv:2508.10104, 2025. 8, 21
+[60] Yi Wang, Zhitong Xiong, Chenying Liu, Adam J. Stewart, Thomas Dujardin, Nikolaos Ioannis
+Bountos, Angelos Zavras, Franziska Gerken, Ioannis Papoutsis, Laura Leal-Taixé, and Xiao Xi-
+ang Zhu. Towards a unified copernicus foundation model for Earth vision. arXiv:2503.11849,
+2025. 8
+[61] Tete Xiao, Yingcheng Liu, Bolei Zhou, Yuning Jiang, and Jian Sun. Unified perceptual parsing
+for scene understanding. In ECCV, 2018. 7
+[62] Claudio Persello, Jeroen Grift, Xinyan Fan, Claudia Paris, Ronny Hänsch, Mila Koeva, and
+Andrew Nelson. AI4SmallFarms: A dataset for crop field delineation in southeast asian
+smallholder farms. IEEE Geoscience and Remote Sensing Letters, 2023. 7
+[63] Dingqi Ye, Daniel Kiv, Wei Hu, Jimeng Shi, and Shaowen Wang. Any model, any place, any
+time: Get remote sensing foundation model embeddings on demand. arXiv:2602.23678, 2026.
+8
+[64] Timothée Darcet, Federico Baldassarre, Maxime Oquab, Julien Mairal, and Piotr Bojanowski.
+Cluster and predict latent patches for improved masked image modeling. arXiv:2502.08769,
+2025. 8
+[65] Yang Li, Si Si, Gang Li, Cho-Jui Hsieh, and Samy Bengio. Learnable Fourier features for
+multi-dimensional spatial positional encoding. NeurIPS, 2021. 15
+[66] Tero Karras, Miika Aittala, Jaakko Lehtinen, Janne Hellsten, Timo Aila, and Samuli Laine.
+Analyzing and improving the training dynamics of diffusion models. In CVPR, 2024. 15
+[67] Byeongho Heo, Song Park, Dongyoon Han, and Sangdoo Yun. Rotary position embedding for
+vision transformer. In ECCV, 2024. 15, 16
+[68] Johannes Jakubik, S Roy, CE Phillips, P Fraccaro, D Godwin, B Zadrozny, D Szwarcman,
+C Gomes, G Nyirjesy, B Edwards, et al. Foundation models for generalist geospatial artificial
+intelligence. arxiv:2310.18660. 19
+[69] Daniela Szwarcman, Sujit Roy, Paolo Fraccaro, Thorsteinn Elí Gíslason, Benedikt Blumenstiel,
+Rinki Ghosal, Pedro Henrique de Oliveira, Joao Lucas de Sousa Almeida, Rocco Sedona,
+Yanghui Kang, et al. Prithvi-EO-2.0: A versatile multi-temporal foundation model for earth
+observation applications. arXiv:2412.02732, 2024. 19, 21
+14
+
+
+=== PDF PAGE 15 ===
+UniverSat: Resolution- and Modality-Agnostic
+Transformers for Earth Observation
+In this appendix, we provide details on compute cost and licensing (Sec. A.1), additional methodolog-
+ical insights into the Universal Patch Encoder (UPE) (Sec. A.2), and reproducibility details (Sec. A.3).
+We then report additional fine-tuning experiments (Sec. A.4), discuss computational cost (Sec. A.5.1)
+and information compression (Sec. A.5.2), and provide an exhaustive description of the training
+datasets with an extended comparison to competing methods (Sec. A.6).
+A.1
+Compute Cost and License
+License
+Code is released under the MIT License at https://github.com/gastruc/UniverSat,
+allowing unrestricted use, modification, and distribution. Pretrained weights are available on the
+Hugging Face Hub at https://huggingface.co/g-astruc/UniverSat. All datasets used in
+this work are publicly available; we adhere to their respective licenses and cite them appropriately in
+the paper and supplementary material.
+Compute Resources
+All experiments were conducted on H100 GPUs. Training UNIVERSAT
+in the self-supervised setting requires approximately 240 GPU-h. Linear probing experiments are
+lightweight, ranging from 1 to 10 GPU-h per dataset, for a total of 60 GPU-h. The full project,
+including ablations and preliminary experiments, required approximately 30K GPU-h. Using standard
+estimates of carbon intensity computed with CodeCarbon1, this corresponds to an approximate carbon
+footprint of 31 tons CO2.
+A.2
+Additional Methodological Details
+We provide exact derivations of the Learnable Fourier Features, Metadata Encoding, and Axial
+Cross-Attention modules.
+A.2.1
+Learnable Fourier Features (LFF)
+We use Fourier features followed by a learned projection, in the spirit of Learnable Fourier Features
+(LFF) [65], to lift scalar values (e.g., radiance or wavelength) to a D-dimensional embedding
+LFF : R Ñ RD. For a scalar u P R,
+LFFpuq “ W
+”?
+2 cospωku ` ϕkq
+ıD{4
+k“1,
+(9)
+where the frequencies ωk „ Np0, p2πβq2q and phases ϕk „ Up0, 2πq are sampled at initialization
+and kept frozen, and W P RDˆD{4 is a learned linear projection. Following EDM2 [66], the
+?
+2
+factor yields unit-variance features. We use a bandwidth β “ 2.5 for atom values and β “ 1 for
+wavelengths. When applied to a tensor, LFF modules are applied element-wise.
+A.2.2
+Metadata Encoding
+We consider a tensor t P RXˆY ˆD, where X is the axis to collapse, D the feature dimension, and Y
+aggregates all remaining dimensions. Patch x is associated with its ground sampling distance (GSD)
+ρ, its acquisition times τ “ tτtuT
+t“1, and per-channel descriptors b “ tbcuC
+c“1: wavelength for optical
+data, categorical identifier otherwise. We add to t some axis-specific metadata encodings, depending
+on the dimension X being collapsed:
+• Channel (C): optical channels receive a dedicated LFF embedding of their wavelength (in µm).
+Non-optical channels (e.g., radar polarizations or elevation products) cannot be described by a
+single scalar and are instead mapped to learned lookup embeddings.
+• Time (T): we apply 1D RoPE [67] to the day of the year of each acquisition. For multi-year
+series, the position is the day of the year plus 365 times the number of years elapsed since the
+start of the sequence, which emphasizes seasonality while still distinguishing years.
+1 https://codecarbon.io/
+15
+
+
+=== PDF PAGE 16 ===
+• Space (I and S): we apply 2D RoPE relative positional encodings [67] at both spatial aggrega-
+tion stages (pixels within sub-patches, then sub-patches within patches), with positions scaled
+by the GSD ρ following Scale-MAE [11].
+Additive metadata embeddings are added to t before computing keys and values, while RoPE is
+applied as a rotary transformation to the projected query and key vectors. This makes the ACA
+module both modality-aware and geometry-aware.
+A.2.3
+Axial Cross-Attention (ACA)
+Directly projecting e with an MLP is impractical as C ˆT ˆI ˆSˆD varies significantly across
+sensors. Using self-attention would be too expensive as the channel, pixel, and temporal dimensions
+can each reach the hundreds. Instead, we collapse one axis at a time with axial cross-attention [46],
+see Fig. 3.
+We consider an Axial Cross-Attention module ACAα
+X where X is the dimension to collapse, and α is
+the feature expansion factor. Let t be a tensor of dimension XˆY ˆD with X the target dimension,
+D the feature dimension, and Y representing all remaining dimensions. For example, to collapse
+dimension I of a tensor of dimension CˆT ˆIˆ S ˆD, we would have X “ I and Y “ CˆT ˆS.
+We first compute keys, queries, and values with RMSNorm (N) as follows:
+K, V “ ψkpNptqq, ψvpNptqq
+dim: X ˆ Y ˆ αD
+(10)
+Q “ ψq
+`“
+meanXpNptqq, maxXpNptqq
+‰˘
+dim: Y ˆ αD ,
+(11)
+where ψk, ψv are linear layers mapping D to the expanded feature axis αD, meanX and maxX pool
+along the X axis, r¨, ¨s denotes concatenation, and ψq : 2D ÞÑ αD. Queries and keys are further
+normalized per head (QK-norm). We perform gated cross-attention along axis X only, then apply a
+residual feed-forward network FF with RMSNorm:
+ACAα
+Xptq “ FF
+ˆ
+poolα
+Xptq ` γCA softmaxX
+ˆQ bD K
+?
+αD
+˙
+bX V
+˙
+,
+(12)
+where softmaxX is on axis X, poolα
+X is a max pooling along X for α “ 1 and the concatenation
+of mean and max pooling for α “ 2, and γCA is a LayerScale parameter initialized at 10´6 (the
+residual branch of FF uses the same scheme). We denote by bD the vector product in axis D with
+broadcasting on dimension XˆY , and bX the product in axis X with broadcasting on dimension
+Y ˆD:
+rQ bD Ksx,y “
+ÿ
+d
+Qy,dKx,y,d
+rA bX V sy,d “
+ÿ
+x
+Ax,yVx,y,d .
+(13)
+Since each query attends only along axis X, the cost is linear in the number of atomic tokens in each
+patch.
+A.2.4
+Scale Augmentation and Masking
+We consider a multimodal tile x “ txm
+p upPP, mPM composed of patches P observed in modalities M.
+We randomly sample both the input patch size and the target output resolution from dataset-specific
+presets, encouraging robustness to spatial scale. We then apply a compositional masking operator:
+• Modality dropping. Randomly drop modalities for the entire tile with probability 30%, ensuring
+that at least one remains. The retained modalities are denoted M‹.
+• Time dropping. For time-series modalities, randomly drop 50% of timestamps and, with
+probability 10%, retain a single timestamp to emulate mono-date observations.
+• Channel dropping. For each retained modality with N channels, drop a fraction ψpNq “
+1{p1 `
+a
+5{Nq, so that spectrally dense sensors are thinned more aggressively. Dropping is
+applied in two contiguous channel blocks.
+• Patch dropping. Drop a random subset D Ă P of 75% of the patches, and denote the visible
+patches by P‹ “ PzD.
+Overall, approximately 90% of input atoms are removed.
+16
+
+
+=== PDF PAGE 17 ===
+A.2.5
+Linear Multimodal Masked Modeling (LM3)
+We adapt the LMIM-Lite objective [49, 19] to a multimodal and multitemporal setting. The goal
+is to predict representations of masked patches in a fixed latent space defined by frozen random
+projections.
+Random Projection Targets
+For each modality m, we define a frozen linear projection applied to
+single-time-step slices:
+ϕrand
+m
+: RCˆHˆW Ñ RD.
+(14)
+For optical modalities, varying patch sizes are handled via kernel interpolation, following Flex-
+iViT [44]. For SAR data, where spatial resampling is less straightforward, we use separate projections
+for each patch size. The projections ϕrand
+m
+are randomly initialized at the beginning of training and
+kept frozen thereafter.
+Temporal Sampling
+A key challenge is to balance spatial and temporal training signals. Using all
+timestamps may lead the model to exploit trivial temporal cues (e.g., acquisition dates) instead of
+spatial content, while ignoring temporal variation degrades representation quality. To address this,
+we select a small set of K “ 4 timestamps per tile, sampled at random among those with a cloud
+density below 30% when cloud masks are available. Each masked patch p P D is assigned a target
+timestamp τppq from this set.
+Prediction
+We define a predictor network ϕpred, composed of a stack of self-attention blocks. It
+takes as input the visible patch embeddings tzquqPP‹ together with learned mask tokens for masked
+patches p P D. We apply spatial RoPE positional encodings to all tokens, and inject absolute temporal
+encodings into masked tokens to represent their assigned timestamps τppq. The predictor produces
+representations for masked patches at their target times:
+tzτppq
+p
+upPD “ ϕpred`
+tzquqPP‹˘
+.
+(15)
+Modality-specific linear heads tϕhead
+m umPM map these embeddings to the target space:
+hm,τppq
+p
+“ ϕhead
+m
+`
+zτppq
+p
+˘
+.
+(16)
+Loss
+We define a contrastive loss between predicted embeddings and random projection targets of
+the masked inputs at the corresponding timestamps, using temperature τLM3:
+LLM3 “ ´
+ÿ
+mPM
+ÿ
+pPD
+log
+exp
+´
+1
+τLM3
+A
+hm,τppq
+p
+, ϕrand
+m
+`
+xm
+p rτppqs
+˘E¯
+ř
+qPD exp
+´
+1
+τLM3
+A
+hm,τppq
+p
+, ϕrand
+m
+`
+xm
+q rτpqqs
+˘E¯.
+(17)
+This objective combines masked prediction in latent space with a contrastive training signal. It avoids
+collapse without requiring momentum teachers, while coupling information across modalities and
+time.
+A.3
+Reproducibility Details
+We summarize the implementation and evaluation details required to reproduce the experiments.
+A.3.1
+Model Configurations
+17
+
+
+=== PDF PAGE 18 ===
+Table A.1: Model configuration details required for reproducing UNIVERSAT-Tiny and UNIVERSAT-
+B.
+Item
+UNIVERSAT-Tiny
+UNIVERSAT-B
+Usage
+Ablation study in Tab. 5
+Main benchmark tables
+Atomic embedding size D
+48
+96
+UPE patch embedding
+192
+768
+UPE expansion α (I, C, T,
+S)
+1, 2, 2, 2
+2, 2, 2, 2
+UPE sequence
+Pixel, Channel, Time, Sub-patch
+Spatial Transformer blocks
+SAˆ6
+SAˆ12
+Attention heads: UPE + en-
+coder
+8
+12
+Attention heads: predictor
+8
+12
+FFN expansion ratio
+4
+Normalization
+Pre-norm RMSNorm, QK-norm
+Gating (MLP and Attention)
+True
+QKV bias (ACA, CA and
+SA)
+False
+Dropout
+dropout 0.0; attention dropout 0.0
+Stochastic depth
+stochastic depth 0.0
+Register tokens
+4
+UPE register tokens
+2 (time axis), 4 (sub-patch axis)
+Predictor depth
+depth 8
+Predictor time subset size
+4
+Predictor register
+4
+Predictor dimensions
+192
+768
+Random targets
+Frozen linear projection; FlexiViT kernel at 32 ˆ 32 or lower (SAR: one per patch size)
+Prediction heads ϕhead
+m
+Linear, one per modality
+A.3.2
+Self-Supervised Pretraining
+Table A.2: Self-supervised pretraining hyperparameters and optimization details.
+Item
+Value / description
+Supervision
+Self-supervised only; no labels are used during pretraining.
+Time
+Full pretraining requires approximately 240 GPU-h.
+GPUs
+2 nodes ˆ 4 GPUs per node = 8 GPUs
+GPU memory
+H100 80GB
+Precision
+bf16 mixed precision
+Optimizer type
+AdamW
+Optimizer LR
+5 ˆ 10´4
+Optimizer weight decay
+10´3
+Optimizer epsilon and betas
+ϵ “ 10´5, betas use PyTorch AdamW defaults
+LR schedule
+10 warmup epochs, then cosine annealing to 10´6
+Gradient accumulation
+2
+Training length
+100k steps
+Final loss
+LLM3 ` λconLcon.
+Loss weights
+λcon “ 1.0
+LM3 temperature τLM3
+0.1
+Cross-modal contrast tempera-
+ture
+0.2
+18
+
+
+=== PDF PAGE 19 ===
+Table A.3: Modality-level preprocessing configuration: native resolution, number of input bands or
+descriptors, sub-patch factor, and datasets using each modality.
+Modality
+Resolution (m)
+Bands
+Sub-patch size (px)
+Datasets
+spotRGBN
+1.6
+4
+2
+FLAIR-Hub.
+aerialflair
+0.2
+4
+8
+FLAIR-Hub.
+s2flair
+12.8
+10
+1
+FLAIR-Hub.
+s1flair
+12.8
+3
+1
+FLAIR-Hub.
+dem
+0.2
+2
+10
+FLAIR-Hub.
+spot
+1
+3
+10
+PASTIS-HD.
+s2
+10
+10
+1
+PASTIS-HD, Planted, TSAI-TS, S2NAIP-Urban.
+s1
+10
+3
+1
+PASTIS-HD, Planted, TSAI-TS, S2NAIP-Urban.
+l7
+30
+6
+1
+Planted.
+alos
+30
+3
+1
+Planted.
+modis
+250
+7
+1
+Planted.
+aerial
+0.2
+4
+10
+TSAI-TS.
+naip
+1.25
+4
+10
+S2NAIP-Urban.
+l8
+10
+11
+1
+S2NAIP-Urban.
+EO1
+30
+175
+1
+HyperGlobal.
+GF5
+30
+150
+1
+HyperGlobal.
+enmap
+30
+202
+1
+SpectralEarth (evaluation only).
+rgbneon
+0.1
+3
+20
+EarthView.
+ndemneon
+1
+1
+2
+EarthView.
+neon
+1
+369
+2
+EarthView.
+Table A.4: Dataset-level spatial configuration: image size from the config, input and target output
+scales, and modalities used for each dataset.
+Dataset
+Image
+size
+(ˆ10 m)
+Input
+scales
+(ˆ10 m)
+Output
+scales
+(ˆ10 m)
+Dataset
+weight
+Modalities
+FLAIR-Hub
+10.24
+1.28, 2.56
+0.64, 1.28
+2
+spotRGBN, aerialflair,
+s2flair, s1flair, dem.
+PASTIS-HD
+128
+4, 8, 16
+2, 4
+2
+spot, s2, s1.
+Planted
+12
+3
+3
+1
+s2, s1, l7, alos, modis.
+TSAI-TS
+6
+2, 1
+1
+1
+aerial, s2, s1.
+S2NAIP-
+Urban
+64
+16, 4, 8
+2, 4
+4
+naip, l8, s2, s1.
+HyperGlobal
+192
+12, 6
+6, 3
+2
+EO1, GF5.
+EarthView
+6.4
+0.8, 1.6
+0.4, 0.8
+4
+rgbneon,
+ndemneon,
+neon.
+A.4
+Additional Experiments
+A.4.1
+End-to-End Fine-Tuning
+Our main protocol uses frozen-backbone probing, following Galileo [6] and OlmoEarth [19]. To
+verify that the UPE does not cause optimization instability, we also fine-tune UNIVERSAT-B end-to-
+end on Sen1Floods11 and BurnScars. The model trains stably and reaches strong performance, setting
+a new state of the art on Sen1Floods11 and approaching the best models on BurnScars (Tab. A.5).
+Table A.5: End-to-end fine-tuning. mIoU of fully fine-tuned models.
+Model
+Sen1Floods11
+BurnScars
+AnySat [7]
+77.4
+90.6
+RemoteCLIP
+–
+65.1
+Prithvi [68]
+–
+86.9
+Prithvi v2 [69]
+–
+90.5
+Panopticon [13]
+79.1
+–
+CROMA [38]
+79.4
+–
+TerraMind [9]
+79.5
+–
+OlmoEarth [19]
+79.8
+–
+UNIVERSAT-B, linear probing
+80.1
+81.5
+UNIVERSAT-B, fine-tuning
+80.2
+89.6
+19
+
+
+=== PDF PAGE 20 ===
+Data
+Timesteps
+Model
+Inference
+Training
+Memory
+(samples/s)
+(samples/s)
+(GB VRAM)
+S2
+40
+MultiMLP baseline
+2.1
+-
+6.9
+-
+4.6
+-
+UniverSat
+2.0
+ˆ0.95
+2.7
+ˆ0.39
+12.2
+ˆ2.7
+S1
+140
+MultiMLP baseline
+0.21
+-
+1.8
+-
+11.8
+-
+UniverSat
+1.7
+ˆ8.1
+1.8
+ˆ1.0
+12.7
+ˆ1.1
+Aerial 20cm
+-
+MultiMLP baseline
+130
+-
+26
+-
+1.8
+-
+UniverSat
+79
+ˆ0.61
+14
+ˆ0.54
+3.7
+ˆ2.1
+Table A.6: Computational cost. Throughput and memory of UNIVERSAT and of a ViT-style baseline
+with one linear projector per modality and patch size (MultiMLP), measured on an A100 GPU. Ratios
+are relative to the baseline.
+A.5
+Limitations
+A.5.1
+Computational Efficiency
+To quantify UniverSat’s overhead, we compare it to a minimal ViT-style baseline in which the UPE is
+replaced by independent linear projectors for each modality, patch size, and resolution, resulting in a
+token for each patch, modality, and timestep. This baseline is particularly computationally efficient
+but also highly impractical: it requires a separate projector for every input modality and patch size
+(42 projectors), cannot be applied to unseen configurations, and performs substantially worse, e.g., by
+approximately 15 points on PASTIS (UPEÞÑMLPs in Tab. 5). This suggests that the cheaper interface
+fails to learn shared geospatial representations across heterogeneous inputs.
+We now report throughput and memory for representative input types on A100, using images of
+128×128 for S1/S2 time series with patch size 4 and images of 512×512 with patch size 64 for aerial
+photography.
+UniverSat is slower and more memory-intensive for short time series and high-resolution aerial
+imagery, but its overhead remains moderate relative to the added flexibility. Memory usage is
+generally higher, but can be controlled through the input patch size and target output resolution.
+These results clarify the intended trade-off. UniverSat is not designed to be cheaper than a specialized
+encoder optimized for one fixed input format. Instead, it provides a single native-resolution interface
+that avoids resampling, supports unseen configurations, and yields stronger representations across
+heterogeneous EO inputs at a measurable computational cost.
+A.5.2
+UPE Compression of Information
+Due to its flexibility, the UPE maps heterogeneous patches to fixed-width representations which can
+lead to discarding some raw information. It is a representation encoder, not an invertible reconstruction
+model. However, it does not collapse the complete patch into a single vector: it outputs both a global
+patch embedding and a set of sub-patch embeddings used by the high-resolution skip connection.
+The effective compression rate depends on the physical patch extent and on the spatial, spectral, and
+temporal density of the sensor. Across our input configurations, it ranges from an expansion of 0.02×
+for sparse ALOS inputs to a compression of 369× for the dense NEON hyperspectral time series,
+with a geometric average of 1.56× when removing NEON. Importantly, the patch extent is selected at
+runtime rather than fixed by the architecture, allowing the user to control this trade-off.
+Such compression is not unique to UPE: a standard ViT also maps each input patch to a fixed-width
+token. The main difference is that UPE supports heterogeneous input shapes with shared weights
+and preserves sub-patch embeddings, which mitigate spatial information loss and retain fine-scale
+features for dense prediction.
+The largest compression rates occur for very-high-resolution and hyperspectral inputs, where adjacent
+pixels or spectral bands are often strongly redundant. Our strong frozen-feature performance on
+hyperspectral benchmarks suggests that the UPE preserves substantial task-relevant information even
+in this regime, although we do not claim that it retains every raw measurement.
+20
+
+
+=== PDF PAGE 21 ===
+A.6
+Data and Models
+We provide here an extended comparison with recent models (Tab. A.7) and the datasets used to train
+UNIVERSAT (Tab. A.8).
+training modalities
+supports unseen resolution
+feature
+resolution
+
+Å
+{
+spat.
+temp.
+spec.
+DINOv3 [59]
+1
+SatMAE [8]
+1
+CROMA [38]
+1
+1
+DOFA [16]
+3
+1
+1
+✓
+✓
+Atomizer [45]
+1
+✓
+Prithvi v2 [69]
+1
+DUNIA [41]
+1
+1
+✓
+MAESTRO [36]
+1
+1
+1
+✓
+SkySense v2 [40]
+1
+1
+1
+✓
+PRESTO [33]
+1
+1
+1
+6
+✓
+EarthView [23]
+3
+1
+1
+✓
+Galileo [6]
+1
+1
+1
+6
+✓
+✓
+Smarties [15]
+1
+1
+✓
+TerraMind [9]
+1
+1
+1
+1
+✓
+Scale-MAE [11]
+1
+✓
+TerraFM [34]
+1
+1
+2
+Panopticon [13]
+5
+1
+1
+✓
+AlphaEarth [10]
+3
+1
+2
+5
+✓
+OmniSat [12]
+2
+2
+1
+1
+✓
+FoMo [24]
+4
+2
+1
+1
+✓
+✓
+Ramen [17]
+1
+1
+1
+1
+✓
+✓
+✓
+AnySat [7]
+2
+4
+2
+1
+✓
+✓
+UniverSat
+4
+4
+2
+2
+3
+✓
+✓
+✓
+/Å : optical snapshot/ time series
+: radar
+: elevation
+: hyperspectral
+{ : labels
+: image
+: patch
+: pixel
+: any resolutions
+Table A.7: Multimodal EO Foundation Models. For each model, we list the training modalities,
+whether unseen spatial/temporal/spectral configurations are handled without input resampling, and
+the feature-map granularity. UNIVERSAT supports the broadest modality mix, handles unseen
+configurations, and offers flexible output resolution—all with a single set of weights.
+21
+
+
+=== PDF PAGE 22 ===
+Dataset
+Labels
+Extent
+Modalities
+Resolution
+# atoms
+Spat.
+Temp.
+Spect.
+m
+img/yr
+chan.
+Gå
+TSAI-TS
+Tree species
+classification
+multilabel
+50K
+60ˆ60 m
+Aerial VHR
+0.20
+1
+4
+18
+S1
+10
+10-70
+3
+0.2
+S2
+10
+10-70
+10
+0.7
+PASTIS-HD
+Crop type
+segmentation
+dense
+2433
+1280ˆ1280 m
+SPOT6/7
+1m:
+1
+4
+16
+S1
+10
+140
+3
+17
+S2
+10
+38-61
+10
+18
+FLAIR-Hub
+Land cover
+segmentation
+241K
+102.4ˆ102.4 m
+Aerial VHR
+0.2
+1
+4
+253
+DSM+nDSM
+0.2
+1
+1
+63
+SPOT6
+1.5
+1
+4
+3.9
+S1
+10
+0-122
+2
+9.1
+S2
+10
+20-146
+10
+21
+Planted
+Tree species
+classification
+1.3M
+120ˆ120 m
+S2
+10
+8
+10
+15
+S1
+10
+8
+3
+4.5
+Landsat 7
+30
+20
+3
+1.2
+ALOS-2
+30
+4
+3
+0.3
+MODIS
+250
+60
+7
+0.6
+Land cover
+segmentation
+dense
+515K
+640ˆ640 m
+NAIP
+1.25
+1
+4
+540
+S2NAIP-
+S2
+10
+16-32
+10
+506
+Urban
+S1
+10
+2-8
+3
+38
+Landsat 8/9
+10m:
+4
+8
+68
+HyperGlobal
+450K
+Gaofen-5
+30
+1
+150
+151
+1920ˆ1920 m
+EO 1
+30
+1
+175
+143
+EarthView
+35K
+64 ˆ64 m
+UHR aerial RGB
+0.1
+1
+3
+44
+NIS
+1
+3
+396
+173
+LiDAR
+1
+3
+1
+0.4
+Table A.8: Pretraining Datasets Overview. Summary of the seven heterogeneous datasets used to
+train UNIVERSAT. The table details the semantic labels, spatial extent, and sensor modalities for
+each dataset, along with their respective spatial (m), temporal (images/year), and spectral (channels)
+resolutions, and the total volume of atomic tokens (Gå).
+22

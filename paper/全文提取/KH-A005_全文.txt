@@ -1,0 +1,511 @@
+KH-A005 | Constant Time Weighted Median Filtering for Stereo Matching and Beyond
+来源：https://openaccess.thecvf.com/content_iccv_2013/html/Ma_Constant_Time_Weighted_2013_ICCV_paper.html
+本地PDF：专题文献/何恺明/KH-A005_Constant_Time_Weighted_Median_Filtering_for_Stereo_Matching_and_Beyond_ICCV2013.pdf
+SHA-256：d10f047a05a5bc61fbee7e614931b6a231710fd6e7a0dbcc2923f8e9c59d5855
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+  Constant Time Weighted Median Filtering for Stereo Matching and Beyond
+
+
+         Ziyang Ma1∗    Kaiming He2     Yichen Wei2      Jian Sun2    Enhua Wu1
+                  1University of Chinese Academy of Sciences &
+                                                                   2Microsoft Research Asia
+        State Key Laboratory of Computer Science, Institute of Software, CAS
+
+
+                 Abstract                           proving the accuracy, local methods have focused on robust
+                                                                cost computation (step 1) [2, 13, 8] and edge-aware cost ag-
+   Despite the continuous advances in local stereo match-     gregation (step 2) [33, 34, 22, 17, 30].
+ing for years, most efforts are on developing robust cost       But the impact of disparity reﬁnement (step 4) has at-
+computation and aggregation methods. Little attention has      tracted far less attention in the literature. Traditional prac-
+been seriously paid to the disparity reﬁnement.                    tices involve left-right consistency check (e.g., [4]), hole
+   In this work, we study weighted median ﬁltering for dis-      ﬁlling (e.g., [2]), and (unweighted) median ﬁltering (e.g.,
+parity reﬁnement. We discover that with this reﬁnement,      [18]). Recently, Rhemann et al. [22] adopt weighted me-
+even the simple box ﬁlter aggregation achieves comparable     dian ﬁltering with bilateral weights [26] to reﬁne local ag-
+accuracy with various sophisticated aggregation methods     gregation results. But the high complexity of this ﬁlter be-
+(with the same reﬁnement). This is due to the nice weighted    comes the timing bottleneck and sacriﬁces the speed of fast
+median ﬁltering properties of removing outlier error while      local aggregation1. Yang [30] reﬁnes the non-local aggre-
+respecting edges/structures. This reveals that the previously     gation results by another non-local cost aggregation. In the
+overlooked reﬁnement can be at least as crucial as aggre-      related ﬁeld of optical ﬂow, Sun et al. [25] discover that
+gation. We also develop the ﬁrst constant time algorithm for      the weighted median ﬁltering is a crucial post-processing in
+the previously time-consuming weighted median ﬁlter. This     each iteration of optimizing the ﬂows.
+makes the simple combination “box aggregation + weight-        In this paper, we present a constant time weighted me-
+ed median” an attractive solution in practice for both speed     dian ﬁlter for local stereo reﬁnement. Our method provides
+and accuracy.                                     new insights for both research and practices of local stere-
+  As a byproduct, the fast weighted median ﬁltering un-    o methods. In terms of research, we discover that with our
+leashes its potential in other applications that were ham-     technique, the reﬁned results of simple box ﬁlter cost aggre-
+pered by high complexities. We show its superiority in var-     gation [24] can be comparable with the reﬁned results of
+ious applications such as depth upsampling, clip-art JPEG     various sophisticated cost aggregation (e.g., [34, 22, 30]).
+artifact removal, and image stylization.                    The comparability presents on error statistics (detailed in
+                                                                  Fig. 4) and also on the superiority of the reﬁned box-ﬁlter
+                                                            aggregation results in a fair number of individual cases (de-
+1. Introduction                                                 tailed in Fig. 5). This is because of the nice weighted medi-
+                                                       an ﬁltering properties of removing outliers while respecting
+   Since the proposition of a stereo framework in a semi-      edges/structures. Our discovery indicates that the largely
+nal paper [24] a decade ago, most stereo matching methods     overlooked disparity reﬁnement (step 4) can be at least as
+are following the four-step pipeline: 1) matching cost com-      crucial as the other three steps.
+putation; 2) cost aggregation; 3) disparity optimization; 4)                                                                 In practice, this discovery leads to a fast and high-quality
+disparity reﬁnement.                                                                 stereo solution - simple box aggregation followed by our
+  Most previous studies are on the ﬁrst three steps of this                                                              constant time weighted median reﬁnement.  Fig. 1 shows
+framework. Global stereo methods optimize all disparities      this solution on the benchmark pair “Tsukuba” [24].  In
+of all pixels simultaneously, and mostly focus on optimiza-      this example, with our reﬁnement, the box aggregation and
+tion techniques (step 3). They generates good results but                                                               the more complex guided aggregation [10, 22] are compa-
+are often time-consuming. By contrast, local stereo meth-     rably accurate (1.66 vs. 1.62), but the former is much faster
+ods estimate the disparity of a pixel using simple “Winner-
+Take-All” in step 3. To harness this simplicity while im-          1Actually, in [22] the weighted median ﬁlter is only performed near
+                                                                               detected depth edges. Even so, its CPU implementation is very slow and
+   ∗This work was done when Ziyang Ma was an intern at MSRA.            dominates the time of the whole algorithm. In [22] it is based on GPU.
+
+
+                                                 1
+
+======================== PDF 第 2 页 ========================
+                                                             speed. (2) We present the ﬁrst constant time algorithm for
+                                                         weighted median ﬁltering. It provides a practically fast so-
+                                                                   lution to stereo matching and various other applications.
+                                          We publish the Matlab code of the constant time weight-
+                                                       ed median ﬁlter on our website2.
+
+                                                          2. Constant Time Weighted Median Filtering
+ (a) box agg. + LR check + hole-filling     (b) guided agg. + LR check + hole-filling
+          46ms, Err. 4.68                       246ms, Err. 2.08           We  ﬁrst introduce our constant time algorithm  for
+                                                        weighted median ﬁltering. Then we demonstrate its effect
+                                                                  for stereo reﬁnement (Sec. 3) and other applications (Sec. 4)
+
+                                                               2.1. Median Filtering
+
+                                                    The (unweighted) median ﬁlter [14] has been long con-
+                                                               sidered as a way of removing “outliers” like salt-and-pepper
+                                                                  noise.  This ﬁlter replaces the value of a pixel with the
+   (c) weighted median filtering of (a)         (d) weighted median filtering of (b)       median of its neighbors. For discrete signals (e.g., dispar-
+          134ms, Err. 1.66                      334ms, Err. 1.62
+                                                                          ity/intensities), this median can be computed from a his-
+Figure 1. With our weighted median ﬁltering reﬁnement, simple                                                       togram h(x, ·) that calculates the population around the po-
+box-ﬁlter aggregation [24] can be comparably good as sophisti-                                                                      sition x = (x, y):
+cated aggregation [22] using guided ﬁlters [10]. (a) Box-ﬁlter ag-
+gregation followed by left-right check [4] and hole-ﬁlling [2]. (b)                 h(x, i) =       δ(V (x′) −i).           (1)
+Guided-ﬁlter aggregation followed by left-right check and hole-
+ﬁlling. (c) Our weighted median ﬁltering reﬁnement on (a). (d)                          x′∈N(x)
+Our weighted median ﬁltering reﬁnement on (c). The error is e-                                                           Here, N(x) is a local window (usually a box) near x, V  is
+valuated on bad pixel percentage. The running time is reported on
+                                                               the pixel value, i is the discrete bin index, and δ(·) is thea single-core CPU with C++ implementation.
+                                                       Kronecker delta function: δ(·) is 1 when the argument is 0,
+                                                      and is 0 otherwise. It is straightforward to pick the median
+(134ms vs. 334ms).                                          value through accumulating this histogram.
+  The above discussion is made possible by our fast con-                                                               2.2. Weighted Median Filtering
+stant time algorithm for weighted median ﬁltering.  This
+algorithm is driven by the recent progress on fast median       The unweighted median ﬁlter treats each neighbor equal-
+ﬁltering [20, 3, 15], fast algorithms [7, 19, 21, 31] for bilat-       ly, and may lead to morphological artifacts like rounding
+eral ﬁltering [26], and other fast edge-aware ﬁltering [10, 9].     sharp corners and removing thin structures (e.g., Fig. 2(c)).
+We show that (in Sec. 2) the above fast median/bilateral ﬁl-    To address this problem, the weighted median ﬁlter [25, 22]
+tering algorithms can be uniﬁed in a framework of high-     has been introduced. The pixels are weighted in the local
+dimensional ﬁltering. This framework reveals that the (un-     histograms:
+weighted) median ﬁlter can be implemented as a box ﬁl-
+ter in a high-dimensional space. Thus we can replace this             h(x, i) =       w(x, x′)δ(V (x′) −i).      (2)
+box ﬁlter with constant time edge-aware ﬁlters [10, 9] for                      x′∈N(x)
+weighted median ﬁltering. Our algorithm is simple and easy
+                                                     Here the weight w(x, x′) depends on an image I that can be
+to implement.                                                                    different from V , e.g., the left image in stereo. In [25, 22]
+  As a byproduct, our fast algorithm for weighted median                                    w is the bilateral weight [26] that suppresses the pixels with
+ﬁltering allows us to treat it as a general image ﬁlter and
+                                                                    different color from the center pixel. As in the unweight-
+study its behaviors in various applications. In this paper, we
+                                                       ed case, the median value is obtained by accumulating this
+show its high-quality results in depth upsampling, clip-art
+                                                             histogram.
+JPEG artifact removal, and image stylization. We believe
+our algorithm is potential for many other applications due     2.3. A Constant Time Algorithm
+to its simplicity and nice properties.
+                                      A brute-force implementation of Eqn.(2) can be time-
+   In sum, our paper makes these main contributions: (1)
+                                                       consuming: its complexity is O(r2) per pixel with the sup-
+We discover that the disparity reﬁnement (step 4) can be
+                                                                port radius r. This high complexity largely limits the appli-
+at least as important as the other steps in stereo matching.
+                                                                cations and studies of this ﬁlter. Next we provide a constant
+The combination of simple box aggregation and our weight-
+ed median reﬁnement achieves good accuracy and very fast       2research.microsoft.com/en-us/um/people/kahe/
+
+======================== PDF 第 3 页 ========================
+                                                                                                                                          (a)       weights
+
+
+
+
+                                                                                                                                     (b)         (d)
+
+
+
+
+
+            (a) left image            (b) box agg.+LR check+hole-filling      (c) median filtering of (b)     (d) weighted median filtering of (b)         (e) zoom-in
+
+Figure 2. Unweighted and weighted median ﬁltering. (a) The left image of a stereo pair. (b) The result of box aggregation + left-right check
++ hole-ﬁlling. (c) The unweighted median ﬁltering result of (b). (d) The weighted median ﬁltering result of (b). On the right we show a
+zoom-in region and a ﬁltering kernel.
+
+                                                    i                                               i
+
+
+
+
+                                                       y                             y
+
+
+                                 x                             x
+
+          (a) noisy input                    (b) f(x, i) in 3d space            (c) weighted histogram h(x, i)        (d) weighted median result
+
+Figure 3. Constant time weighted median ﬁltering.  (a): the map to be ﬁltered (V in Eqn.(2)).  (b): the 3-dimensional signal f(x, i) in
+Eqn.(3). (c): A guided ﬁlter is performed on f(x, i) for each ﬁxed i. (d) The median value is taken from the histogram of each pixel and
+gives the ﬁnal result.
+
+
+time algorithm (i.e., O(1) per pixel) for weighted median    Choosing Filter Weights  Our constant time weighted
+ﬁltering.                                              median ﬁlter is compatible with various weights - it only
+  We ﬁrst discuss the unweighted case Eqn.(1). We con-      requires the corresponding edge-aware ﬁlter to be constant
+sider the argument (x, i) as 3D coordinates where x repre-      time. In this paper, we consider the following O(1) time
+sents the 2D spatial coordinates and i represents a 1D range     edge-aware ﬁlters: the O(1) time solutions [21, 31] to the
+coordinate (disparity/intensity). Deﬁne a signal f(x, i) in      bilateral ﬁlter [26], the guided ﬁlter [10], and the domain
+this 3-dimensional space:                                    transform ﬁlter [9].  The O(1) bilateral ﬁlter [21, 31] is
+                                               much slower than the other two, unless the range is aggres-               f(x, i) ≜δ(V (x) −i).               (3)
+                                                                  sively quantized. But the quantization impacts the quali-
+Then the computation of the unweighted histogram Eqn.(1)       ty. On the contrary, both the guided ﬁlter and the domain
+is essentially a 2D box ﬁltering of f in the spatial domain:      transform ﬁlter require no quantization/coarsening. We no-
+                                                                        tice that the domain transform ﬁlter is more suitable for im-
+           h(x, i) =        b(x, x′)f(x′, i),          (4)
+                                                        age smoothing, but less so for preserving detailed structures
+                    x′∈N(x)
+                                                                    [11]. We also ﬁnd the accuracy of using the domain trans-
+  where b is a box kernel. The computation of (4) can     form weights for stereo reﬁnement is not as good as using
+be simply done by performing a 2D box ﬁlter on f(x, i)      the guided ﬁlter weights. For these reasons, throughout this
+for each ﬁxed i. Because box ﬁltering can be efﬁciently     paper we use the guided ﬁlter weights as the weights for
+performed using integral images [5, 27] or moving sums     median ﬁltering. The guided ﬁlter has edge-aware kernels
+in O(1) time, the unweighted median ﬁlter is O(1) time.      similar to the bilateral ﬁlter [10] (Fig. 2 right).
+The existing O(1) median ﬁltering algorithms [3, 20] can
+be viewed as an implementation of this formulation.
+   For weighted median ﬁltering, we can simply replace     2.4. Relations to Previous Methods
+the box ﬁlter b(x, x′) with any other edge-aware weight
+w(x, x′), e.g., the bilateral ﬁlter [26], the guided ﬁlter [10],     We show that various fast algorithms for bilateral ﬁlter-
+                                                             ing [7, 19, 21, 31] and median ﬁltering [14, 3, 20, 15] canor the domain transform ﬁlter [9]. To compute the weighted
+                                                       be uniﬁed in the same framework of high-dimensional ﬁl-histogram Eqn.(2), we only need to perform the speciﬁed
+edge-aware ﬁlter on f(x, i) for each ﬁxed i.  If the edge-      tering. This provides more insights on the relationship be-
+aware ﬁlter is O(1) time, the resulting weighted median ﬁl-     tween our method and existing ones.
+ter is O(1) time. Fig. 3 illustrates our algorithm.            We consider a more general 3-dimensional ﬁltering for-
+
+======================== PDF 第 4 页 ========================
+                      method                            spatial               range               order
+          Durand & Dorsey, SIGGRAPH ’02 [7]     FFT Gaussian            conv.          range ⇒spatial
+               Paris & Durand, ECCV ’06 [19]       FFT Gaussian      FFT Gaussian       simultaneously
+                     Porikli, CVPR ’08 [21]             O(1) box              conv.            spatial ⇒range                    Bilateral
+              Yang et al., CVPR ’09 [31]        O(1) Gaussian [6]          conv.          range ⇒spatial
+             Huang et al., TASSP ’79 [14]           O(r) box            median
+               Perreault & H´ebert, TIP ’07 [20]          O(1) box            median
+                                                                                                             spatial ⇒range             Median   Kass & Solomon, SIGGRAPH ’10 [15]    O(1) Gaussian [6]     conv. + median
+             Our weighted median          O(1) guided [10]        median
+
+Table 1. A summary of various fast bilateral/median ﬁltering algorithms. The ‘spatial/range’ columns show the spatial/range operations
+applied. The ‘order’ column shows the order of these operations, e.g., ‘range ⇒spatial’ means the range operation goes ﬁrst. In the ‘range’
+column, ‘conv.’ means arbitrary convolutions (usually Gaussian), and ‘median’ means taking the median from the histogram of each pixel.
+
+
+mulation:                                                        Fig. 1(a,b) and Fig. 2(b)). The edge-aware averaging ﬁlters
+                                                                      like [26, 10, 9] are not suitable for this noise (in plane re-
+    h(x, i) =              k(x, x′, i, i′)f(x′, i′).    (5)      gions, this is analogous to box/Gaussian ﬁlers vs. traditional
+             x′∈N(x) i′∈N(i)                             median ﬁlters).
+                                            On the other hand, the weighted median ﬁlter is edge-
+If the 3-dimensional kernel k(x, x′, i, i′) = w(x, x′)δ(i −
+                                                           aware. This is in contrast to the unweighted median ﬁlter.
+i′), Eqn.(5) becomes the computation of a histogram;  if
+                                               Due to the edge-aware weights that suppress the impact of
+k(x, x′, i, i′) = ks(x −x′)kr(i −i′) for some spatial/range                                                               the pixels in different colors (Fig. 2 (e)), the weighted medi-
+kernels ks and ks (often Gaussian), it has been shown [19]                                                       an ﬁlter is capable of capturing the strong edges, sharp cor-
+that Eqn.(5) is exactly the bilateral ﬁlter (plus some proper                                                                   ners, and thin structures from the image I (see Fig. 2(c)).
+manipulations, namely, division and slicing [19]).
+                                                  The unweighted median ﬁlter does not have this good prop-
+  The 3-dimensional ﬁltering in Eqn.(5) is linear, sepa-
+                                                                  erty and produces morphological artifacts (Fig. 2(b)). Ac-
+rable, and commutative (between spatial/range). We show                                                                         tually, the unweighted median ﬁlter is blind to the image I
+that various existing fast algorithms for bilateral/median ﬁl-                                                      and can merely access the noisy map V .
+tering can all be viewed in this formulation (though they can
+be originally derived from other ways). They mainly differ
+in the linear ﬁltering operations and the computation order-     3. Experiments on Stereo Reﬁnement
+s (due to the separability and commutativity). We roughly
+                                                       Thanks to the constant time algorithm for weighted me-
+summarize various fast algorithms for bilateral/median ﬁl-
+                                                            dian ﬁltering, it is feasible for us to study its performance
+tering in Table 13.
+                                                                   for reﬁning local stereo results.
+   Strictly speaking, the O(1) complexity in all the above
+methods involves a constant scale which is the number                                                               3.1. Experimental Settings
+of the discrete values (e.g., the disparity/intensity range).
+But in conventional median/bilateral ﬁltering literatures       For fair comparisons and for clearly understanding the
+[3, 20, 21, 31], the argument in the complexity O(·) is often     reﬁnement step, in all experiments throughout this paper
+considered as the kernel radius r. So this constant has been    we strictly follow a local stereo matching pipeline [22] de-
+ignored in the discussion.                                      scribed as below:
+                                                                           (1): cost computation. We use exactly the same cost as
+2.5. Filter Properties                                                                    [22]. It is a blending of truncated color difference and trun-
+  The weighted median ﬁlter inherits some desired prop-     cated gradient difference.
+erties from both median ﬁltering and edge-aware averaging         (2): cost aggregation. We use the cost aggregation as
+ﬁltering (the guided ﬁlter).                                        [22]. We have tested four kinds of O(1) time aggregation:
+  The weighted median ﬁlter is capable of removing “out-     the box ﬁlter, the guided ﬁlter [10] (adopted in [22]), the
+lier” noise as a median ﬁlter. This is particularly desired      variable cross ﬁlter [34], and the non-local ﬁlter [30]. For
+for reﬁning local stereo aggregation results, which may    box ﬁlters we use a 9x9 support. The parameters of all other
+generate erroneous disparity values in arbitrary ranges (see      ﬁlters are as recommended in these papers.
+                                                                           (3): disparity optimization. We simply choose the dis-   3For a clearer summarization, in Table 1 we have ignored some oper-
+ations applied for individual methods, including division, slicing, down-      parity with the minimal aggregated cost for each pixel
+sampling/quantizing/coarsening, and upsampling.                       (Winner-Take-All).
+
+======================== PDF 第 5 页 ========================
+               Before WM    After WM                        Before WM    After WM                        Before WM    After WM                        Before WM    After WM
+
+                                                                                                                                   12                                             3                                                                                          21                                                                                                                          19.04                                                                                                                                                                                                                10.7            9.27    10                                                                                                                                                                                      10.3                                                                                                         2.56                                                                                                                                                 17.82                                                                                                                                                                   17.8                                                                                                                                                                                                                        10.03                                                                  2.44                                    8.34                                                                                          18                                                 8.16                                                                                                                                   10                                                                                                                                                                                                                     9.02                                                                                                                                                                  15.43                                                                                                                                                           15.4                                                                                                                             15.51   15.9115.34                                                                                                                                                                                                                                 8.61                                                                                                                                                                                           8.79    8.76 8.51     8
+                        6.75                                                                                          15
+                                                                                                                                    8                                             2                6.19                                                                                            1.75                                         6.04 (%)                                                     5.63                               5.5     6                                                                                          12
+
+                                                                               1.08                                                                                         9  Error  4                                                                                                                              6
+                                             1         0.78                                                                                    0.76          0.9          0.78                                                                                         6                                          4
+     2                                                                                   3                                          2
+
+     0                                        0                                           0                                          0
+         Box     Guided   Non-local   Cross        Box     Guided   Non-local    Cross         Box     Guided   Non-local    Cross         Box     Guided   Non-local    Cross
+               (a) standard (4 pairs)                      (b) 2001 (6 pairs)                          (c) 2005 (6 pairs)                       (d) 2006 (15 pairs)
+
+            Figure 4. Error rates on four Middlebury datasets before and after WM, using four different aggregation ﬁlters.
+
+
+   (4-i): disparity reﬁnement (i). We do left-right check and      rates of different aggregation methods are signiﬁcant differ-
+simple hole-ﬁlling as in [22].                                       ent. Before WM, the guided ﬁlter aggregation is the most
+    (4-ii): disparity reﬁnement (ii). On the resulting dispar-     competitive in all four datasets, whereas the box ﬁlter aggre-
+ity map of (4-i), we apply the weighted median (WM) ﬁl-     gation is generally poor. But we discover that after WM the
+ter. The parameters of the guided ﬁlter used in this WM      error rates of different aggregation methods are very com-
+are ﬁxed as ϵ = 0.012, r = max(wid, hei)/40. A 3x3     parable (especially in the 2001, 2005, and 2006 sets). Typ-
+unweighted median ﬁlter is ﬁnally applied to remove a few       ically, the box ﬁlter aggregation with WM can be almost as
+spikes.                                              good as the other sophisticated aggregation methods with
+   This pipeline follows the public Matlab code4 provided   WM. The comparability not only presents on the statistics
+by [22]. The main modiﬁcations are that we apply our WM      (Fig. 4), but also on the fact that the simple “box aggrega-
+ﬁlter for reﬁnement, and we investigate four ﬁlters in cost      tion + WM” is more accurate than the sophisticated “guided
+aggregation. The purpose of using this pipeline is for a bet-     aggregation + WM” in a number of cases (12 out of all 31
+ter understanding of the roles of aggregation vs. reﬁnement.      pairs). Fig. 5 shows some examples. This discovery reveals
+It is possible to improve the quality by, e.g., using advanced      that the disparity reﬁnement step is at least as important as
+costs, ﬁne-tuning the ﬁlter parameters, incorporating medi-     the cost aggregation.
+an ﬁlters for intermediate-processing, or improving the sim-
+                                                         Analysis   The above discovery can be explained by theple hole-ﬁlling. But these are not our focus and not consid-
+                                                                  capability of “outlier” removal of the WM. Before WM, the
+ered in this paper.
+                                                    box ﬁlter aggregation produces more outliers than the oth-
+   All the experiments are implemented in C++ and run on
+                                                                   er sophisticated aggregation methods (see Fig. 1(a,b) and
+a PC with 8G RAM and an Intel Xeon 2.83GHz CPU us-
+                                                                 Fig. 5(b,c)). These outliers can be reliably removed by me-
+ing a single thread. In this implementation, the weighted
+                                                            dian ﬁltering in a sufﬁciently large support, if only the “in-
+median ﬁlter takes about 60ms per mega-pixel per disparity
+                                                                        liers” in this large support are dominant. But a large box(see [11] for more technical details about implementing the
+                                                            support leads to morphological artifacts (Fig. 2(c)) and of-
+guided ﬁlter).
+                                                                ten degrades the results. This issue is nicely addressed by
+  Our experiments are on the Middlebury stereo bench-
+                                                     median ﬁltering in a large edge-aware support (Fig. 2(d)).
+mark [1]. We evaluate all the pairs that have ground-truths
+                                                                                    It can remove more outliers by a large support without in-
+available: the standard 4 pairs, the 2001 set (6 pairs), the
+                                                             troducing morphological artifacts. So even though the box
+2005 set (6 pairs), and the 2006 set (21 pairs) [23, 12]. We
+                                                                     ﬁlter aggregation produces more outliers, they can still be
+consider the error metric as the percentage of bad pixels
+                                                    removed (unless in the support the outliers are dominant).
+with error threshold 1.
+  We notice that local methods are less suitable for texture-
+                                                               3.3. A Fast Practical Solution
+less images. The error of these images would dominate the
+error statistics. To remove this bias, we ﬁrst run the method       The above discovery suggests a very fast solution in
+of [22] on all image pairs and ignore those with error rate      practice - combining the box ﬁlter aggregation with WM re-
+> 20% (6 pairs in 2006) in the remaining experiments. This     ﬁnement. This solution harnesses the fast speed of box ﬁlter
+leaves us in total 31 pairs for evaluation.                        aggregation, and almost does not sacriﬁce accuracy due to
+                                                               the WM. Fig. 6 shows the error rates vs. the CPU running
+3.2. Results
+                                                                time. It is clear that the “box aggregation + WM” is a com-
+   Fig. 4 shows the error rates before and after weighted      pelling choice, considering both speed and accuracy.
+median ﬁltering. In each dataset we test four different ﬁl-
+                                     GPU implementation  The box aggregation and the WM
+ters for cost aggregation. We ﬁnd that before WM, the error
+                                                        can both be easily implemented on GPU. Because our WM
+  4www.ims.tuwien.ac.at/research/costFilter/           uses guided ﬁltering weights and the algorithm of the guid-
+
+======================== PDF 第 6 页 ========================
+                   Venus                  2.88                   0.62              0.32 (213ms)          0.34 (641ms)
+
+
+
+
+
+                    Sawtooth                2.44                   1.50              1.00 (320ms)          1.04 (1010ms)
+
+
+
+
+
+                        Dolls                 12.75                 12.13             11.43 (820ms)         11.83 (2760ms)
+
+
+
+
+
+                     Reindeer                10.27                  9.21               6.21 (830ms)          8.45 (2650ms)
+                                                     (b) box agg.+                (c) guided agg.+
+                           (a) left image                                                                 (d) weighted median of (b)  (e) weighted median of (c)
+                             LR check+hole-filling     LR check+hole-filling
+Figure 5. Several benchmark examples where the simple “box aggregation + WM” outperforms the complex “guided aggregation + WM”.
+For each image we show the error rate and the running time.
+
+
+   10                                                    Ours and previous work   Avg. error  GPU time
+                                     Box agg. only
+   9.5                                     Box agg. + WM                  NonLocalFilter [30]        5.48†         n/a
+    9                                        Cross agg. + WM               Guided agg. + WM        5.50      54ms(%)                                            Non-local agg. + WM
+   8.5                                          Guided agg. + WM                    CostFilter [22]          5.55†      65ms†
+Error  8                                                           Cross agg. + WM         5.63          n/a
+   7.5                                                          Non-local agg. + WM       6.04          n/a
+    7                                                 Box agg. + WM         6.19      22ms
+      0         0.5        1         1.5        2         2.5        3           VariableCross [34]        7.60†         n/a
+                  CPU running time (seconds)
+
+Figure 6. Error rates and CPU running time of four different ag-                                                                  Table 2. The error rates and GPU running time on the standard four
+gregation methods. The results are averaged on all 31 pairs of all                                                                          pairs in Middlebury benchmark. (†These numbers are reported by
+four datasets.                                                                           original papers. Their pipelines can be different from ours, so the
+                                                                           error can be different even using the same cost aggregation.)
+
+ed ﬁlter is a series of box ﬁlters (see [10]), our WM is nat-
+urally GPU-friendly. We have implemented “box aggrega-   PU implementation is in [22]. It takes on average 65ms in
+tion + WM” and “guided aggregation + WM” on a GeForce     the standard four pairs (reported on GeForce GTX480, 480
+GTX580 GPU (512 CUDA cores, 1.5GB VRAM). Table 2   CUDA cores, 1.5GB VRAM). Table 2 shows that our GPU
+shows the GPU time and error rates in the standard four     implementation of “box aggregation + WM” takes 22ms,
+pairs. We are not aware of any GPU implementation of the     about 3x faster than [22]. Considering the error rates in Ta-
+non-local aggregation [30] and cross aggregation [34], so      ble 2 and Fig. 4 & 6, we believe the “box aggregation +
+their performance on GPU remains unknown.          WM” is a very fast practical solution (in both CPU and G-
+  To the best of our knowledge, the previous fastest G-    PU) that slightly trades off accuracy.
+
+======================== PDF 第 7 页 ========================
+    (a) Joint Bilateral, Err. 14.43           (b) Depth SR, Err. 10.19                 (c) Ours, Err. 8.58                    (d) Ground truth
+
+Figure 7. A visual example of depth upsampling (8×), displayed using colormaps. (a) Joint bilateral ﬁlter [16]. (b) Depth super-resolution
+(SR) [32]. (c) Ours. (d) Ground-truth.
+
+
+4. More Applications                                           (a,b). Such artifacts are not Gaussian-alike noise. Even
+                                                           worse, they are near strong edges that are challenging for
+  The weighted median ﬁlter is not only applicable for                                                     most edge-aware ﬁlters. A recent state-of-the-art solution
+stereo reﬁnement.  It is a general purpose ﬁlter that is po-                                                              [28] optimizes a complex L0-regularized energy to address
+tential in various applications. In this section we demon-                                                                        this problem.
+strate its power on depth upsampling, clip-art JPEG artifact
+                                          We compare our WM with the method of [28] (Fig. 8).
+removal, and image stylization.
+                                                           Despite the simplicity, the WM better recovers the piece-
+4.1. Depth Upsampling                                 wise constant colors and the strong step edges, with almost
+                                                    no smoothing near edges. We observed such improvements
+  The problem is to upsample a low resolution depth im-    on all test images on the website of [28] (see supplementary
+age with the guidance of a registered high resolution col-      materials).
+or image [16, 32].  This is a practical problem for stereo
+matching in high resolution images. The method in [16] us-     4.3. Image Stylization
+es a joint bilateral ﬁlter, which is an edge-aware averaging
+                                                    The capability of removing outliers while preserving
+ﬁlter. The method in [32] uses robust truncated costs and
+                                                                edges/structures is suitable for removing textures and gen-
+a post quadratic interpolation. We compare both methods
+                                                                 erating piecewise constant images. This is particularly fa-
+with ours WM. In our method, we simply upscale the low
+                                                         vored in applications like image stylization or image ab-
+resolution depth image to the high resolution using bilinear
+                                                                      straction.  In Fig. 9 we show a comparison with a recent
+interpolation, and apply the WM.
+                                                                sophisticated method in [29]. We ﬁnd the simple WM can
+  We evaluate on the 2×, 4× and 8× downsampled images
+                                                        produce compelling results.
+of the four standard Middlebury pairs [1] with ground-truth
+high resolution depth available. Table 3 shows the quantita-
+                                                          5. Conclusiontive results. It is clear that our simple method outperforms
+the two competitors in all cases. Fig. 7 shows a visual ex-     We have proposed the ﬁrst constant time weighted medi-
+ample. We see that the WM avoids “halos” near depth edges     an ﬁltering algorithm for stereo reﬁnement and other appli-
+and better preserves the edge proﬁles.                            cations. For stereo, we discover that the reﬁnement can be
+                                                              as important as other steps. We expect this work can attract
+      Algorithm      Tsukuba   Venus   Teddy   Cones       more attention on stereo reﬁnement, in company with the
+        Bilinear          6.40      3.22     13.55    16.63                                                               recent intensive efforts on aggregation [33, 34, 22, 30]. For
+         [16]           5.15      2.54     14.43    16.23                                                             general image ﬁltering, we believe the simple weighted me-
+         [32]           4.53      1.25     10.19    11.53
+                                                            dian ﬁltering is very potential in various applications. We
+     Our method        4.35      1.09     8.58     9.34
+                                                                   will develop more applications in the future.
+
+Table 3. Bad pixel percentage with error threshold 1 for 8× depth
+upsampling on the standard four Middlebury pairs [1].            References
+
+                                                                            [1] http://vision.middlebury.edu/stereo.
+4.2. Clip-Art JPEG Artifact Removal                          [2] S. Birchﬁeld and C. Tomasi. A pixel dissimilarity measure
+                                                                                   that is insensitive to image sampling. TPAMI, pages 401–
+  The JPEG compression may lead to artifacts near step           406, 1998.
+edges due to the frequency quantization. This is an annoy-        [3] D. Cline, K. B. White, and P. K. Egbert. Fast 8-bit median
+ing problem typically for clip-art cartoon images as in Fig. 8            ﬁltering based on separability. In ICIP, 2007.
+
+======================== PDF 第 8 页 ========================
+                                                                      [10] K. He, J. Sun, and X. Tang. Guided image ﬁltering. In ECCV,
+                                                                      2010.
+                                                                      [11] K. He, J. Sun, and X. Tang. Guided image ﬁltering. TPAMI,
+                                                                      2013.
+                                                                      [12] H. Hirschmuller and D. Scharstein. Evaluation of cost func-
+                                        (a) input                                           tions for stereo matching. In CVPR, 2007.
+                                                                      [13] H. Hirschmuller and D. Scharstein.  Evaluation of stereo
+                                                                   matching costs on images with radiometric differences.  T-
+                                                             PAMI, pages 1582–1599, 2009.
+                                                                      [14] T. Huang, G. Yang, and G. Tang. A fast two-dimensional
+                                                                median ﬁltering algorithm. IEEE Transactions on Acoustics,
+                                                                   Speech and Signal Processing, pages 13–18, 1979.
+                                                                      [15] M. Kass and J. Solomon. Smoothed local histogram ﬁlters.
+                                                                          In SIGGRAPH, page 100, 2010.
+                                                                      [16]  J. Kopf, M. Cohen, D. Lischinski, and M. Uyttendaele. Joint
+                                                                                     bilateral upsampling. In SIGGRAPH, page 96, 2007.
+                                                                      [17] D. Min, J. Lu, and M. Do. A revisit to cost aggregation in
+                                                                              stereo matching: How far can we reduce its computational
+         (b) zoom-in of input     (c) L0 regularized           (d) ours                    redundancy? In ICCV, 2011.
+Figure 8. Clip-art JPEG compression artifact removal result. (a)      [18] K. M¨uhlmann, D. Maier, J. Hesser, and R. M¨anner.  Cal-
+Input. (b) Zoom-in of the JPEG artifacts. (c) The L0 regularized            culating dense disparity maps from color stereo images, an
+method [28]. (d) Ours.                                                      efﬁcient implementation. IJCV, pages 79–88, 2002.
+                                                                      [19] S. Paris and F. Durand. A fast approximation of the bilateral
+                                                                                  ﬁlter using a signal processing approach. In ECCV, 2006.
+                                                                      [20] S. Perreault and P. H´ebert. Median ﬁltering in constant time.
+                                                                       TIP, pages 2389–2394, 2007.
+                                                                      [21]  F. Porikli. Constant time o (1) bilateral ﬁltering. In CVPR,
+                                                                      2008.
+                                                                      [22] C. Rhemann,  A.  Hosni, M.  Bleyer,  C.  Rother,  and
+                                            (a) input                             M. Gelautz. Fast cost-volume ﬁltering for visual correspon-
+                                                                   dence and beyond. In CVPR, 2011.
+                                                                      [23] D. Scharstein and C. Pal. Learning conditional random ﬁelds
+                                                                                for stereo. In CVPR, 2007.
+                                                                      [24] D. Scharstein and R. Szeliski. A taxonomy and evaluation of
+                                                                    dense two-frame stereo correspondence algorithms.  IJCV,
+                                                                     pages 7–42, 2002.
+                  (b) result of RTV                           (c) ours                      [25] D. Sun, S. Roth, and M. Black. Secrets of optical ﬂow esti-
+                                                                   mation and their principles. In CVPR, 2010.Figure 9. Image stylization. (a) Input. (b) Results of Relative Total
+                                                                      [26] C. Tomasi and R. Manduchi. Bilateral ﬁltering for gray andVariation [29]. (c) Ours. The edges are imposed as in [28].
+                                                                            color images. In ICCV, 1998.
+                                                                      [27]  P. Viola and M. Jones. Rapid object detection using a boosted
+                                                                      cascade of simple features. In CVPR, 2001.
+ [4] S. D. Cochran and G. Medioni. 3-d surface description from
+                                                                      [28] L. Xu, C. Lu, Y. Xu, and J. Jia. Image smoothing via L0
+     binocular stereo. TPAMI, pages 981–994, 1992.
+                                                                            gradient minimization. In SIGGRAPH Asia, page 174, 2011.
+ [5]  F. C. Crow. Summed-area tables for texture mapping.  In                                                                      [29] L. Xu, Q. Yan, Y. Xia, and J. Jia. Structure extraction from
+    SIGGRAPH, pages 207–212, 1984.                                                                               texture via relative total variation. In SIGGRAPH Asia, page
+ [6] R. Deriche. Recursively implementing the gaussian and its           139, 2012.
+      derivatives, 1993.                                               [30] Q. Yang. A non-local cost aggregation method for stereo
+ [7]  F. Durand and J. Dorsey. Fast bilateral ﬁltering for the dis-           matching. In CVPR, 2012.
+     play of high-dynamic-range images. In SIGGRAPH, pages      [31] Q. Yang, K.-H. Tan, and N. Ahuja. Real-time o (1) bilateral
+     257–266, 2002.                                                            ﬁltering. In CVPR, 2009.
+ [8] N. Einecke and J. Eggert. A two-stage correlation method for      [32] Q. Yang, R. Yang, J. Davis, and D. Nist´er.  Spatial-depth
+     stereoscopic depth estimation. In International Conference           super resolution for range images. In CVPR, 2007.
+    on Digital Image Computing: Techniques and Applications,      [33] K. Yoon and I. Kweon. Adaptive support-weight approach
+     pages 227–234, 2010.                                                    for correspondence search. TPAMI, pages 650–656, 2006.
+                                                                     [34] K. Zhang, J. Lu, and G. Lafruit.  Cross-based local stereo [9] E. S. Gastal and M. M. Oliveira. Domain transform for edge-
+                                                                   matching using orthogonal integral images. TCSVT, pages     aware image and video processing. In SIGGRAPH, page 69,
+                                                                  1073–1079, 2009.     2011.

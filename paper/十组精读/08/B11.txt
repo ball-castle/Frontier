@@ -1,0 +1,1013 @@
+===== PDF PAGE 1 =====
+            How Far Can Coding Agents Go in Visual Generation?
+
+
+                           Hengguang Zhou1* Yuanhao Ban1*   Jiaqi Feng2
+                              Xiaohuan Pei1   Justin Cui1  Cho-Jui Hsieh1
+                         1University of California, Los Angeles    2Tsinghua University
+
+2026
+Oct                      Dh           Canvas 2D         Shapes          Pixel harness         GUI
+13                                      Harness h
+
+
+
+              Internal imagery z
+             Independent pixel probes[cs.CV]                                                                            Stroke              Oil brush           Blender
+
+         Figure 1. A conceptual view of shared internal imagery across drawing harnesses. Left: the Mona Lisa assembled from 65,536 independent
+          fresh-session pixel queries on a 256 × 256 grid, used as a behavioral probe of hypothesized internal imagery z. Right: one-shot 256 × 256
+        whole-image outputs through seven drawing harnesses, generated without visual feedback. The mapping Ih = Dh(z) illustrates the
+         hypothesis; the arrow denotes a conceptual relation rather than an experimental image-to-image pipeline.
+
+                       Abstract                            question answering task and find reconstructed visual code
+                                                                           retains substantial information for question answering and,
+      Modern image generation largely relies on specialized gen-     in some domains, supports higher accuracy than the original
+         erative models that leave the process of image construc-     image. These abilities raise a further question: do agents
+         tion implicit in learned parameters. We explore an alterna-    draw on a shared internal representation of scene content be-
+         tive: general-purpose coding agents that construct images     yond a particular drawing program? We explore an internal
+        through executable programs. Our study of zero-shot draw-     visual language-of-thought hypothesis, in which a shared,
+        ing on AgentDrawBench, a 200-prompt benchmark, reveals     compositionally structured representation supports visual
+                                                                     operations across drawing languages. Cross-harness draw-arXiv:2610.19025v1   a distinctive capability profile. Agents excel at preserving
+         structure and satisfying precise visual constraints, achieving     ings and images assembled from independent single-pixel
+        competitive results in domains where compositional accu-     queries exhibit related layouts and tones. Agents also main-
+        racy matters more than photorealistic appearance, while      tain self-generated room arrangements across viewpoints
+       remaining limited in perceptual richness. Their visual ex-     after visible drawings are removed. These results demon-
+        pressiveness varies with the drawing interface, and a quali-      strate that the coding agent would maintain a consistent and
+         tative study on reconstruction shows how procedural skills     coherent world inside its imagine even before the harness
+         extracted from human demonstrations support different artis-     gets involved and the generation starts.
+          tic media. We then examine code as an external visual lan-
+       guage of thought: a structured, executable representation
+         that agents can construct and inspect. We test it in visual
+
+
+            *These authors contributed equally to this work.
+
+
+                                                        1
+
+===== PDF PAGE 2 =====
+1. Introduction                                       With code serving as an external visual language of
+                                                              thought, we next ask whether capabilities that emerge in
+In recent years, text-to-image generation has largely relied                                                                   large language models translate to drawing with code. Specif-
+on end-to-end generative models, including latent diffusion                                                                          ically, we examine whether code-based drawing benefits
+models, rectified-flow transformers, and autoregressive mod-                                                       from test-time scaling and in-context learning using procedu-
+els [9, 26, 27, 37]. Despite their considerable success, these                                                                          ral drawing guidance from human demonstrations. We find
+approaches encode the generation process in learned neural                                                                      that extending refinement to a fourfold budget yields a mod-
+networks, leaving the details of image construction largely                                                                        est structural improvement and only a 50.5% holistic win rate
+implicit in model parameters. In contrast, modern agents                                                                  against the standard run. Analysis of the outputs points to the
+offer a programmatic alternative: they can write and exe-                                                           importance of the drawing interface. For in-context learning,
+cute programs, coordinate tools, and iteratively refine their                                             we provide procedures distilled from human drawing demon-
+actions over multiple turns [18, 35]. These developments mo-                                                                      strations, including stroke operations, construction order,
+tivate our central question: How far can general-purpose                                                             value grouping, and edge control, enhancing the drawing in-
+coding agents go in visual generation?                                                                       terfaces. Guided by these procedures, the agent reconstructs
+  We first assess these agents as zero-shot drawers using                                                              reference images in Chinese ink, charcoal, watercolor, and
+harnesses ranging from individual pixels and geometric prim-                                                                         oil painting, producing expressive, medium-specific visual
+itives to Canvas 2D programs, SVG documents, and a graph-                                                                        effects. These experiments highlight the role of drawing in-
+ical painting application. To evaluate these coding agents,                                                                   terfaces in perceptual quality. They also illustrate how code
+we introduce AgentDrawBench, a 200-prompt benchmark                                                         can serve as a working representation for visual thinking, en-
+spanning multiple domains. We will publicly release the                                                               abling agents to apply medium-specific drawing procedures
+benchmark to support further research on agent-based vi-                                                             supplied in context.
+sual generation. Our results show that these agents are
+                                                          Across these external expressions, a recurring pattern
+strong in structural fidelity but fall short in perceptual re-
+                                                         emerges: independent drawings of the same prompt can
+alism compared with native image generators.  In partic-
+                                                             share coarse layouts and color choices across different har-
+ular, GPT-6-Astra with Canvas 2D achieves 85.8% struc-
+                                                             nesses (Fig. 6). Could these recurring visual choices reflect
+tural fidelity, compared with 68.8% for gpt-image-1
+                                                            a shared internal representation of scene content? We formu-
+and 90.7% for gpt-image-2. On design and symbolic
+                                                                          late this possibility as an internal visual language-of-thought
+tasks, where precise control matters more than photoreal-
+                                                                 hypothesis: agents may use a compositionally structured rep-
+istic appearance, GPT-6-Astra with Canvas 2D achieves a
+                                                                 resentation of entities, attributes, and relations to construct,
+92.0% holistic win rate against gpt-image-1, judged by
+                                                                         interpret, and transform scenes through different external ex-
+gemini-3.5-flash. This task-dependent profile reveals
+                                                                pressions [23, 24]. The hypothesis motivates two behavioral
+the potential of coding agents for visual generation without
+                                                                    properties: consistency, the recurrence of scene-level choices
+a dedicated image generator. These results raise a further
+                                                               across forms of expression, and coherence, the coordination
+question: can agents also use visual programs to organize
+                                                              of entities and relations under visual transformations.
+and reason about the scenes they depict?
+                                         We investigate these properties through complementary  The language-of-thought hypothesis proposes that think-
+                                                             probes. We quantify cross-harness consistency and test in-ing operates over structured mental representations whose
+                                                        dependent single-pixel queries, each made without accessmeanings depend on their components and how they are com-
+                                                                   to any other query’s answer. The assembled images recoverbined [24]. Drawing on this perspective, we frame visual
+                                                             regions and tones similar to whole-image drawings. Tocode as an external visual language of thought: a structured,
+                                                      examine spatial coherence, agents choose furniture arrange-executable medium for organizing, manipulating, and rea-
+                                                     ments and revisit them from different viewpoints. Scenesoning about visual content. We examine whether code can
+                                                             organization remains largely consistent after earlier SVGsserve this role in both visual generation and understanding.
+                                                               are removed, including a condition that also removes theFor generation, the agent achieves 83.0% structural fidelity
+                                                                  furniture list. Fresh calls given only the furniture list andusing code alone, close to the 85.6% achieved when it can
+                                                               turn history show lower agreement across revisits and be-inspect intermediate images. For understanding, we sample
+                                                     tween views and floor plans. Together, the results provide200 visual question answering tasks from WorldBench [36]
+                                                     complementary behavioral support for the internal visualcovering a broad taxonomy of real-world visual concepts
+                                                             language-of-thought hypothesis.and reconstruct the question images as SVG code. We find
+that answering from source code achieves 69.0% accuracy,      Our contributions are:
+compared with 65.0% from the render and 74.0% from the      • We characterize agents as zero-shot drawers, identifying
+original image. In the academics and digital-world domains,       strong structural fidelity and precise control alongside lim-
+the agent answers questions more accurately using code than          its in perceptual realism, and examine how feedback, re-
+using the original images.                                        finement, and drawing interfaces affect their performance
+
+
+                                                 2
+
+===== PDF PAGE 3 =====
+  (Secs. 4 and 5).                                          3. Experimental Setup
+• We study code as an external visual language of thought,
+                                                             In this section, we describe various drawing harnesses,  showing how reconstructed SVG programs support ques-
+                                                     AgentDrawBench, and the structural, perceptual, and holistic
+  tion answering about scene content (Sec. 5).
+                                                                 metrics.• We formulate an internal visual language-of-thought hy-
+  pothesis and investigate complementary evidence for     3.1. Harness Design
+  reusable scene content through cross-harness consistency,
+                                       We design several harnesses for programmable drawing,
+  independent pixel queries, and spatial coherence in self-
+                                                          ranging from direct pixel assignments and shape-based
+  generated rooms (Sec. 6).
+                                                    marks to executable Canvas 2D programs and SVG docu-
+                                                            ments. To evaluate whether agents can draw in a human-like
+2. Related Work                                       manner, we also assess their ability to imitate human drawing
+                                                                strokes and draw through graphical user interfaces (GUIs).
+Text-to-image generative models.  Diffusion models have      • pixel: The model directly assigns the location and color of
+achieved substantial success in text-to-image synthesis in       each pixel on a persistent canvas autoregressively. Previ-
+recent years [3, 12, 21, 28, 29]. [26] propose to diffuse the       ously painted pixels can be overwritten in later turns. No
+latent instead of the image pixels [26]. Imagen combines       geometric primitives or procedural drawing operations are
+language representations with cascaded diffusion [27]. Esser        available. This provides the least abstract output represen-
+et al. [9] transform random noise into data along nearly        tation, but its generation cost grows with the number of
+straight paths, making generation simpler and faster. Ho and        pixels.
+Salimans [13] use the difference between conditional and      • shapes: The model constructs an image as a sequence of
+unconditional noise predictions to guide generation toward       elementary geometric marks: filled rectangles, ellipses,
+alignment with the input prompt. Transfusion Zhou et al.       polygons, lines, and individual pixels.  It predicts each
+[39] unified image tokens and language tokens in one shared       mark’s position, extent, color, and stroke width. Marks
+transformer and provides better control.                           are rasterized in generation order, allowing later shapes to
+                                                            cover earlier ones and progressively build a composition
+                                                       from background to foreground.
+                                                                          • canvas2d: The model generates executable JavaScript pro-
+Code generation  for  visual  content.  Graphics  pro-
+                                                      grams that draw onto a persistent canvas. Each program
+grams represent images through executable descriptions [8].
+                                                         can combine paths, curves, text, gradients, transforma-
+StarVector [25], OmniSVG [33], and InternSVG [31] learn
+                                                                          tions, and compositing operations, while loops and helper
+models for structured vector generation. Stroke-based recon-
+                                                                 routines express repeated objects or procedural textures.
+struction is also studied through learned painting policies
+                                     A persistent state object can retain reusable drawing rou-
+with neural renderers [15] and feed-forward prediction of
+                                                                         tines and intermediate data across turns, enabling complex,
+stroke sets [19]. SketchAgent uses an off-the-shelf multi-
+                                                                 high-resolution compositions without enumerating every
+modal language model and an in-context sketching language
+                                                          drawing operation separately.
+to construct and revise drawings stroke by stroke [30].
+                                                                          • svg: The model represents the entire image as a structured
+                                                                  vector document, specifying shapes, paths, text, gradients,
+                                                                 transformations, and their ordering declaratively. After
+Agentic image-generation systems.  Agents organize im-        that, a renderer converts this document into the output
+age creation through tool selection, external knowledge gath-       image.
+ering, and iterative refinement. Early systems coordinate      • GUI: The model operates JS Paint, a graphical painting
+visual foundation models [32], select suitable diffusion gen-       application, through mouse clicks, drags, keyboard input,
+erators [22], and revise generation prompts using visual feed-      and color selection. It selects drawing tools in the interface
+back [34]. Recent work extends these capabilities. VisionDi-      and constructs the image on the application’s persistent
+rector decomposes long instructions into structured goals       canvas. After each action batch, a screenshot of the full
+and verifies staged edits with rollback [6]. For knowledge-     window provides feedback for correcting tool selection,
+intensive requests, Gen-Searcher performs search to gather       geometry, and placement. The agent executes no drawing
+textual knowledge and reference images [10]. RS-Gen uses a      code and cannot paste or import images. Interface and
+training-free questioning-and-solving loop for reasoning and        rollout settings are in Sec. A.1.
+search-augmented generation [2]. As a related concurrent      • Blender Cycles: The model constructs a three-dimensional
+work, MaLiang-Harness studies programmable image and       scene through Python, specifying geometry, materials,
+video generation, addressing the gap between executable         lights, and a camera. Cycles computes projection, shading,
+programs and their visual outcomes [38].                      and light transport [4]. The agent inspects preview renders
+
+
+                                                 3
+
+===== PDF PAGE 4 =====
+  and revises its scene across turns; each script rebuilds the         Harness                 Canvas 2D       Shapes SVG Blender          Native
+  scene in a fresh process. External models, images, and        Agent             Astra Kimi K3 DeepSeek  Astra  Astra  Astra  GPT-image-2 GPT-image-1
+  material libraries are excluded. The model therefore spec-        ScenesPeople / organic    76.581.1   52.854.7     58.869.4     68.171.4  71.979.1   62.073.2       85.493.6         76.880.1
+   ifies the scene assets while the renderer computes their         Objects / 3D        82.0   60.5     70.3     63.3  77.8   71.5       87.0         67.1
+                                                                                                          Stylized illustration 88.5   49.3     73.6     82.3  85.8   71.9       92.4         74.7
+  appearance. Detailed settings are in Sec. A.1.                         Design / symbolic   94.6   84.7     89.5     75.2  93.9   92.3       94.4         58.1
+• Stroke workflows: Medium-specific drawing procedures         Overall            85.8   64.6     74.7     71.5  83.2   76.8       90.7         68.8
+  guide reference-based reconstruction on a persistent can-
+  vas.  The protocol and four variants are described in      Table 1. Structural fidelity (%) by pass rate. Astra denotes GPT-6-
+                                                                       Astra; Deepseek denotes Deepseek V4.1 Flash.
+  Sec. 5.2.2.
+   Figure 2 compares Canvas 2D and GUI drawings against
+native image generation on the same prompts. The pri-     position bias, each comparison is performed twice with im-
+mary generator is gpt-6-astra. Prompts, tool execution,     age positions swapped; a win requires agreement across both
+stopping rules, and budget controls are detailed in Secs. A      orderings, while disagreements are reported as ties.
+and A.2.
+
+3.2. AgentDrawBench                                      Holistic quality. We adopt the MMRB2 pairwise judge
+                                                     prompt [14] to assess holistic quality. Each pair is judged
+Benchmark Construction We  construct AgentDraw-                                                           twice with positions swapped. We report preference win
+Bench,  a 200-prompt benchmark  across seven  fami-                                                                      rates as (W + 0.5T)/(W + T + L), assigning half credit to
+lies: photographic scene, human/organic, product/material,                                                                           ties and disagreements between the two image orderings. A
+spatial/3D,  stylized  illustration,  designed  visual,  dia-                                                    win requires agreement across both image orderings; failed
+gram/symbolic. We select prompts from four published                                                               or incomplete judgments are excluded and their coverage is
+benchmarks:  110 from Arena-T2I-Hard  [1], 40 from                                                                 disclosed.
+HPDv3 [20], 35 from BizGenEval [17] and 15 from Graph-
+icWeaver [16]. We evaluate structural fidelity, perceptual                                                          4. Coding Agents Are Zero-Shot Drawers
+realization, and holistic quality on AgentDrawBench. We
+will publicly release AgentDrawBench.               We first evaluate coding agents as zero-shot drawers: how
+                                                                     faithfully can they depict requested content, how convinc-
+Structural fidelity. We assess prompt adherence using     ingly can they realize it, and how often are their outputs
+question checklists about the generated image. We retain     preferred to a native image generator? Agents receive tool
+the source benchmarks’ question sets where available: DSG-     documentation and a text prompt, without task-specific fine-
+style questions [5] from Arena-T2I-Hard [1], 20-question     tuning or example drawings; multiple turns and feedback
+checklists from BizGenEval [17], and binary VQA questions     from their own renders remain available. We report struc-
+from GraphicWeaver [16]. For HPDv3 [20], we generate      tural fidelity, perceptual realization, and holistic preference
+DSG-style atomic questions from each prompt and manu-     across agents, task categories, and drawing harnesses. These
+ally audit the resulting checklists. These questions cover     comparisons characterize zero-shot drawing capability be-
+requested objects, attributes, counts, spatial relationships,     fore we examine how agents construct and understand visual
+text, and layout. For each image, a VLM answers every     content through code in Sec. 5.
+question with yes, no, or unclear, accompanied by visual
+evidence. We score questions independently and report the     Structural Fidelity  Table 1 reports checklist pass rates
+proportion answered yes, treating both no and unclear as    on AgentDrawBench, both overall and across content cat-
+failures. For Arena, the structural comparison retains only      egories. Agent systems achieve strong structural fidelity:
+the source questions labeled faithfulness.                    GPT-6-Astra attains an overall pass rate of 85.8%, outper-
+                                                         forming gpt-image-1 by 17 percentage points. Performance
+Perceptual quality.  An image can satisfy the requested       is particularly strong in the design and symbolic categories,
+content yet appear visually unconvincing. We therefore as-    where zero-shot DeepSeek V4.1 Flash achieves a pass rate
+sess perceptual quality through relative comparisons on the     of 89.5%, exceeding gpt-image-1 by 31.4 percentage points.
+same prompt, asking which aspects of an agent’s output fall     In the design and symbolic categories, Astra also slightly
+short of a native image-generation baseline. The percep-     exceeds the structural pass rate of gpt-image-2, the higher-
+tual rubric contains ten dimensions: artifacts, object form,     scoring native baseline overall.
+anatomy, typography, perspective, light transport, material,
+scene physics, medium realization and semantic coherence.    Perceptual Realization  Table 2 reports perceptual win
+For each dimension applicable to a prompt, a VLM compares      rates against GPT-image-1 across ten dimensions, judged by
+the two outputs and selects the better image. To eliminate    gemini-3.5-flash. Strong prompt adherence does not
+
+
+                                                 4
+
+===== PDF PAGE 5 =====
+Figure 2. The computer-use harness. Three matched AgentDrawBench prompts drawn through Canvas 2D with visual feedback, the JS Paint
+GUI, and GPT-image-1: workplace-safety design, student furniture, and a tiger approaching through a brick opening.
+
+
+guarantee convincing appearance. With Astra, Canvas 2D       Harness                  Canvas 2D         Shapes SVG  Blender
+and SVG achieve typography win rates of 77.6% and 74.8%,      Agent              Astra Kimi K3 DeepSeek  Astra  Astra   Astra
+respectively, but all reported configurations remain below         artifacts             45.2    32.3      29.0     28.7   48.9    39.7
+50% on anatomy, perspective, light transport, material, and        object form         46.1    24.3      25.3     30.2   39.0    32.6
+scene physics. The agents can produce legible design ele-      anatomy            15.4     9.9        8.2      10.4   18.9    13.6
+ments while struggling with naturalistic form and appear-       typography          77.6    57.6      61.2     38.1   74.8    58.6
+                                                                                  perspective          28.0    14.8      15.1     11.6   23.2    25.8
+ance.                                                                                     light transport       18.0    13.1      15.3      6.2    19.6    24.0
+                                                                                  material            13.1     7.9       10.5      3.5    12.6    15.2
+                                                                            scene physics       28.0    14.1      13.8     17.0   23.2    24.2
+Holistic Performance We compare each agent configu-      medium realization  35.3    29.0      28.0     21.0   38.0    29.8
+                                                                            semantic coherence  51.5    28.8      31.1     35.6   45.2    39.4
+ration directly against GPT-image-1 using the MMRBv2
+rubric with Gemini 3.5 Flash. Table 3 shows the win rate
+                                                                Table 2. Perceptual win rates (%) against GPT-image-1. Astra
+over GPT-image-1 across different categories. Astra with                                                                  denotes GPT-6-Astra; Deepseek denotes Deepseek V4.1 Flash.
+Canvas 2D achieves a 92.0% win rate on design and sym-
+bolic prompts, but only 13.0% on scenes and 6.0% on people
+and organic subjects. Its overall win rate is 47.7%, counting     5. Code as an External Visual Language of
+ties as half a win. These results establish a pronounced task      Thought
+profile: agents are competitive on briefs emphasizing ex-
+plicit structure and legible design, while the native baseline      In this section, we first test whether agents can construct and
+is preferred for naturalistic scenes and people.                  understand visual content through code. Based on the results,
+
+
+                                                 5
+
+===== PDF PAGE 6 =====
+ Harness                  Canvas 2D         Shapes SVG  Blender                  Question-answering accuracy
+ Agent              Astra Kimi K3 DeepSeek  Astra  Astra   Astra                                Overall
+ Scenes              13.0     0.0        1.9       0.0     1.9     0.0
+ People / organic      6.0     0.0        4.0       0.0     0.0     0.0                                         90%
+                                                                      Scenes                    Academics
+ Objects / 3D        24.4    14.0      13.1      9.5    24.4    21.2
+                                                                                           80%
+ Stylized illustration  35.2     7.4       11.1     18.5   24.1    11.8
+ Design / symbolic   92.0    64.0      77.3     62.0   87.3    76.5                                     70%
+
+ Overall             47.7    28.4      34.7     28.3   42.1    39.1
+                                                                                        60%
+
+Table 3. Holistic win rates (%) against GPT-image-1 using the          Objects                 50%              Agents
+MMRBv2 rubric. Astra denotes GPT-6-Astra; Deepseek denotes
+Deepseek V4.1 Flash.
+
+
+we frame code as an external visual language of thought:                   Living                             Digital
+a medium through which agents reason about scenes and                 Things                        World
+apply capabilities such as iterative refinement and in-context                        Documents, charts
+learning.                                                         & tables
+
+5.1. Constructing and Understanding through Vi-                       Original image    SVG code    SVG render
+     sual Code
+
+We test two uses of visual code: constructing an image
+without rendered-image feedback, and extracting visual in-     Figure 3. WorldBench question-answering accuracy across seven
+formation from SVG source code.                            domains and overall, using the original image, SVG source code,
+                                                                     or rendered SVG reconstruction.
+5.1.1. Generation without Visual Feedback
+
+We first ask how well the agent can draw through code
+                                                         pared with 74.0% with the original image. The model an-
+and execution feedback alone without visual feedback. We
+                                                          swers more questions correctly when given its own program
+evaluate the GPT-6-Astra agent with Canvas 2D harness on
+                                                           than when given the corresponding rendered image. In the
+AgentDrawBench. In the blind setting, the agent receives
+                                                       academics and digital-world domains, accuracy from code
+execution results, but never sees the RGB canvas. In the
+                                                               also exceeds accuracy from the original image. Figure 4
+visual feedback setting, it also receives the current rendered
+                                                                         illustrates two patterns of successful code-based answering.
+canvas after each drawing turn.
+                                                Code can reduce visual distractions by exposing question-
+                                                                  relevant properties separately from surrounding appearance.
+Results.  On AgentDrawBench, blind drawing achieves an     In the button-counting example, the model correctly identi-
+83.0% structural-fidelity pass rate, compared with 85.6%      fies four buttons from code despite answering three from the
+with visual feedback. These results support the view that      original photograph, as explicit marks are easier to isolate
+code can serve as a working representation for image con-    from clothing texture and nearby details. Together, these
+struction, with rendered-image feedback providing a modest      results support reconstructed code as a usable representation
+additional structural gain.                                         for visual question answering: explicit text, coordinates, and
+                                                               object properties can make question-relevant information
+5.1.2. Understanding Images through Reconstructed
+                                                                   easier to access. Details are in Sec. B.
+     Code
+We next ask whether agents can interpret visual code to     5.2. Agentic Capabilities in Drawing
+recover information about an image. To this end, we sample                                                     Having shown that agents can construct and understand vi-
+200 WorldBench image–question pairs proportionally across                                                                sual content through code, we next ask whether techniques
+seven domains [36]. The agent reconstructs the original                                                        used in language and code tasks, such as test-time scaling
+image as SVG before receiving the question. The agent                                                       and in-context learning, can also improve drawing with code.
+then answers the same question in a fresh context for each
+condition, using the original image, the SVG source alone,      5.2.1. Test-Time Scaling
+or the rendered reconstruction. The code-only condition     Experimental Settings  We test whether additional itera-
+receives no rendered image.                                         tive refinement improves drawing. We run GPT-6-Astra with
+  As shown in Fig. 3, question-answering accuracy is 69.0%    Canvas 2D under standard and extended budgets on Agent-
+with the reconstruction code and 65.0% with its render, com-    DrawBench. For each prompt, the extended run targets a
+
+
+                                                 6
+
+===== PDF PAGE 7 =====
+         Figure 4. Selected WorldBench items where SVG source supports a correct answer while an image-based answer fails.
+
+
+budget of 4B, where B = I + 5O is the measured budget of     Stroke-workflow protocol.  The agent analyzes sampled
+the standard visual-feedback run, and I and O denote cumu-     frames and stroke sequences from drawing demonstrations,
+lative provider-reported input and output tokens, respectively.     identifying how marks are made and how they accumulate to
+Extended runs allow up to 48 model responses, compared     form shapes. These observations are translated into reusable
+with 12 in the standard setting. If the model replies DONE      stroke operations and procedural skills specifying construc-
+before reaching 4B, the harness asks it to continue refining      tion order, value grouping, edge control, and local correc-
+the same persistent canvas.                                         tions. We develop four workflows: Chinese ink combines
+                                                               tapered lines, broken dry strokes, dilute washes, and reserved
+                                                   empty space; charcoal builds tonal masses through broad
+                                                                 deposits and directional hatching, then models form through
+Results.  On AgentDrawBench, structural fidelity increases
+                                                                  local smudging and lifting; watercolor layers transparent
+from 85.6% under the standard budget to 86.8% under the
+                                                         washes, preserves paper lights, and finishes with selective
+4× extended budget. We compare holistic quality directly
+                                                           dry-brush accents; and oil painting progresses from broad
+between the standard and extended runs using the MMRB2
+                                                               color masses to loaded strokes, glazing, scumbling, and se-
+rubric [14]. Extended refinement achieves a holistic win rate
+                                                                      lective impasto. Video sources and extracted procedures are
+of 50.5% against standard generation. Additional refinement
+                                                                 detailed in Sec. A.1. For each reconstruction, GPT-6-Astra
+within the fixed Canvas 2D harness therefore brings a modest
+                                                               receives a reference image and the written procedures for
+structural gain without a clear holistic preference advantage.
+                                                                 the selected medium. It starts with a blank persistent canvas
+This limited return motivates examining the drawing inter-
+                                                       and refines the drawing using rendered-image feedback. The
+faces and procedures available to the agent.
+                                                             agent may inspect the reference, but its drawing code cannot
+                                                           sample, trace, blit, or filter the reference pixels.
+5.2.2. In-Context Learning for Visual Reconstruction
+
+We next examine in-context procedural guidance as a way
+to extend the drawing interface. Procedures distilled from     Qualitative reconstruction results.  The rollouts in Fig. 5
+human demonstrations specify both the marks available to     preserve the reference images’ recognizable compositions
+the agent and how they should be organized during reference-     while producing medium-specific marks: sparse ink contours
+guided reconstruction.                                           in the floating chapel, grainy charcoal tones in the cottage,
+
+
+                                                 7
+
+===== PDF PAGE 8 =====
+transparent watercolor washes in the village, and layered oil     prompt without access to another harness’s program or im-
+marks in the park. Intermediate frames show construction     age. We measure coarse luminance layout, dominant hues,
+from broad forms to local detail. These qualitative recon-    and perceptual similarity. A separate ten-prompt pilot tests
+structions illustrate how procedures supplied in context guide     cross-harness agreement without visual feedback; Fig. 6
+the agent’s construction and revision of visual programs to      illustrates selected outputs.
+produce expressive, medium-specific effects.
+                                                Luminance layout fingerprints.  We convert each output
+6. The Internal Visual Language-of-Thought      to grayscale using L = 0.299R + 0.587G + 0.114B, down-
+   Hypothesis                                      sample it to 16 × 16 with Lanczos filtering, and flatten the
+                                                                     result into a 256-dimensional vector.  This coarse repre-
+Visual programs allow agents to construct scenes and rea-
+                                                                sentation suppresses fine textures and stroke details while
+son about their contents through an external representation.
+                                                                 retaining the spatial arrangement of large light and dark re-
+When comparing their drawings across interfaces, we ob-
+                                                               gions. For two drawings of the same prompt, we compute
+serve a recurring pattern: independent runs given the same
+                                                                the Pearson correlation between their vectors:
+prompt can produce similar overall compositions and visual
+elements (Fig. 6). Could these recurring visual choices re-           Pi(xi −¯x)(yi −¯y)                                                                     r(x, y) =                                            .       (1)
+flect a shared internal representation of scene content? We          pPi(xi −¯x)2 Pi(yi −¯y)2
+explore this possibility as the internal visual language-of-
+thought hypothesis.                                        This measures the agreement in coarse tonal layout, rather
+  We hypothesize that agents generate drawings according     than the identity of the object or exact geometric agreement.
+to the following process:
+
+                                                         Saturation-weighted hue palettes.  We convert each full-
+                    Ih = Dh(z),
+                                                                 resolution RGB image to HSV and construct an 18-bin hue
+where z denotes the hypothesized internal representation     histogram. Each pixel contributes its saturation to the corre-
+of scene entities, attributes, and relations, and Dh denotes     sponding hue bin, giving greater weight to saturated colors
+the process of expressing and rendering that representation     than to nearly gray regions. For hue Hp and saturation Sp
+through harness h to produce image Ih. This effective de-      at pixel p, the histogram is hb = Pp Sp 1[Hp ∈Bb], where
+coder encompasses the agent’s use of drawing programs,    Bb is one of 18 equal hue intervals. We compare histograms
+GUI actions, or individual pixel responses and their render-     using cosine similarity, c(h, g) = h⊤g/(∥h∥2∥g∥2). This
+ing into an image.                                              representation discards spatial position and measures color
+  Under this hypothesis, drawings produced through dif-     usage.
+ferent harnesses are different realizations of shared internal
+imagery. Consistency refers to the agreement in visual con-    DreamSim [11]  We also report the DreamSim distance be-
+tent across these realizations. Coherence is the extent to     tween independent drawings of the same prompt. DreamSim
+which underlying order or structure is preserved through       is a learned perceptual metric trained to align with human
+change.                                                            similarity judgments, capturing differences in semantic con-
+  We study consistency through independent drawings      tent, object appearance, color, and spatial layout. Lower
+across harnesses and by independently asking the agent for     values indicate greater perceptual similarity.
+the color of each pixel on a 128 × 128 canvas. We ex-
+amine the coherence of spatial structure in agent-arranged                                                         Results and controls.  Figure 7 summarizes the prompt-
+rooms: the scene arrangement should persist as its appear-                                                     matched similarities on AgentDrawBench. Three compar-
+ance changes with viewpoint. We compare room views with                                                              isons highlight the main findings.  First, drawings of the
+floor plans and test the recovery of earlier views after visible                                                    same prompt using two different 2D drawing harnesses (Can-
+drawing programs are removed.                                                          vas 2D, SVG, Shapes) agree at a mean layout correlation
+                                                             of 0.60, palette cosine 0.81, and DreamSim 0.19, against6.1. Consistency
+                                                                0.66, 0.84, and 0.14 for two independent SVG runs. Thus,
+6.1.1. Cross-Harness Consistency                                                               cross-harness agreement remains close to the same-harness
+We ask whether drawings share visual content when the     reference on all three metrics. Second, the computer-use
+agent expresses the same prompt through different drawing     harness, which shares no drawing API with the others and
+interfaces. We compare independent drawings on Agent-    draws by mouse, sits inside this cluster (0.56, 0.79, 0.22).
+DrawBench through Canvas 2D, SVG, Shapes, the mouse-     Third, Blender, which constructs and renders a 3D scene, is
+driven GUI, and Blender, with a second independent SVG      further from every 2D drawing harness (0.34, 0.69, 0.29),
+run as a same-harness reference. Each run starts from the     while still showing substantially greater similarity than the
+
+
+                                                 8
+
+===== PDF PAGE 9 =====
+Figure 5. Reference-guided image reconstruction using four learned stroke workflows. Each row shows the reference image, intermediate
+renders at turns 1, 4, 8, 16, and 32, and the final saved image.
+
+
+
+
+
+Figure 6. Independent GPT-6-Astra drawings for two prompts across six drawing harnesses, including two independent SVG runs. Top:
+drawings generated with intermediate visual feedback. Bottom: blind drawings of a desert prompt, generated without intermediate visual
+feedback; blind GUI runs receive only the initial blank window. Pixel provides an additional qualitative comparison. Each run starts from its
+text prompt without access to another run’s code or image. The rows use different prompts and illustrate cross-harness similarities within
+each setting. Aggregate consistency measurements are reported in Fig. 7.
+
+
+
+                                                 9
+
+===== PDF PAGE 10 =====
+               (a) Layout correlation r (higher = closer)               (b) Palette cosine (higher = closer)                 (c) DreamSim distance (lower = closer)
+
+   Canvas 2D        0.63  0.57  0.57  0.32  0.59                     0.81  0.81  0.75  0.72  0.82                     0.17  0.21  0.24  0.27  0.17
+
+        SVG  0.63        0.61  0.54  0.34  0.66               0.81        0.81  0.77  0.69  0.84               0.17        0.19  0.22  0.28  0.14
+
+      Shapes  0.57  0.61        0.57  0.36  0.59               0.81  0.81        0.84  0.68  0.80               0.21  0.19        0.19  0.30  0.19
+
+  GUI (mouse)  0.57  0.54  0.57        0.33  0.54               0.75  0.77  0.84        0.66  0.77               0.24  0.22  0.19        0.31  0.22
+
+       Blender  0.32  0.34  0.36  0.33        0.36               0.72  0.69  0.68  0.66        0.71               0.27  0.28  0.30  0.31        0.27
+
+ SVG, 2nd run  0.59  0.66  0.59  0.54  0.36                     0.82  0.84  0.80  0.77  0.71                     0.17  0.14  0.19  0.22  0.27
+        2D SVGShapes(mouse)Blender2ndrun        2D SVGShapes(mouse)Blender2ndrun        2D SVGShapes(mouse)Blender2ndrun       Canvas       GUI      SVG,              Canvas       GUI      SVG,              Canvas       GUI      SVG,
+                       (d) Layout r by pair type                           (e) Palette cosine by pair type                                (f) DreamSim by pair type
+             Same harness (SVG resampled)                       Same harness (SVG resampled)                       Same harness (SVG resampled)
+                                         0.66                                                       0.84                     0.14
+               Pen ↔ pen (Canvas, SVG, Shapes)                         Pen ↔ pen (Canvas, SVG, Shapes)                         Pen ↔ pen (Canvas, SVG, Shapes)
+                                       0.60                                                        0.81                        0.19
+               Pen ↔ GUI (mouse, no code)                             Pen ↔ GUI (mouse, no code)                             Pen ↔ GUI (mouse, no code)
+                                     0.56                                                         0.79                          0.22
+               Pen ↔ Blender (renderer)                                Pen ↔ Blender (renderer)                                Pen ↔ Blender (renderer)
+                            0.34                                                             0.69                                 0.29
+                   Different prompt (null)                                           Different prompt (null)                                           Different prompt (null)
+                0.01                                                            0.31                                                                  0.77
+
+             0.0     0.2     0.4     0.6     0.8     1.0          0.0     0.2     0.4     0.6     0.8     1.0          0.0     0.2     0.4     0.6     0.8     1.0
+
+
+Figure 7. Cross-harness consistency on AgentDrawBench. (a–c) Prompt-matched layout correlation, palette cosine similarity, and DreamSim
+distance between independent drawings of the same prompt using five harnesses and a second SVG run. (d–f) The same three metrics
+summarized by pair type. Drawings produced with Canvas 2D, SVG, and Shapes show cross-harness similarity close to that of two
+independent SVG runs. Mouse-driven GUI drawings show comparable similarity to these outputs. Blender drawings are less similar to the
+2D outputs, but remain substantially more similar than drawings of different prompts.
+
+
+different-prompt null (0.01, 0.31, 0.77). The same ordering      (Fig. 8). These regions occupy compatible positions within
+holds across the three metrics. A ten-prompt pilot without     a recognizable whole, even though each query has no access
+visual feedback gave the same ordering (layout correlations      to any other answer. Facial features remain unresolved and
+of 0.42–0.49 compared with a null of 0.03–0.08). These     boundaries are noisy; the agreement lies in the broad spatial
+independent runs show that coarse layout and appearance     organization of the portrait.
+choices recur across different ways of constructing an image,      The agreement occurs at the level of regions and tones
+including mouse-driven drawing. Their agreement supports      across answers generated without a shared drawing program
+the hypothesis that drawings produced through different in-     or access to one another’s outputs. The consistency is there-
+terfaces reflect shared internal imagery.                          fore among independently generated parts of the assembled
+                                                         image, supporting the hypothesis that local responses can
+6.1.2. Independent Queries, Consistent Images                                                             express shared internal imagery.
+Whole-image generation allows the agent to coordinate scene
+                                                               6.2. Coherenceelements within a drawing program. We next ask whether
+consistent visual structure also emerges when the agent is     Consistency across expressions motivates a further test: can
+asked for the color of each pixel independently. We ask the     the agent preserve a scene’s spatial structure through suc-
+agent to “draw” a subject on a 128×128 canvas but to report      cessive viewpoint changes and revisits? We examine spatial
+only the color of one pixel (x, y). Every pixel is requested in     coherence in self-generated rooms. Given a predefined fur-
+a separate, fresh context, without access to any other query’s      niture list, the agent chooses where to place the furniture,
+answer; the 16,384 answers are then assembled. Figure 8     then draws the room from different headings and returns
+shows four images assembled this way.                          to earlier views. The room’s arrangement should remain
+  The independently queried pixels assemble into the coarse      stable while visibility and image-relative ordering change
+composition of the Mona Lisa: a light oval face framed by     with viewpoint, and revisits should recover the earlier views.
+dark hair, a dark torso, and a lighter patch in the hand region    By removing earlier SVGs from the visible conversation, we
+
+
+                                                 10
+
+===== PDF PAGE 11 =====
+Figure 8. Pictures assembled from independent sessions: the Mona Lisa, a sunset over the sea, a red apple, and a peace sign, each pixel
+answered in a separate context with no access to any other answer. The system message shown is identical in every session; the user message
+names the subject and one coordinate. Layout and palette recur across sessions; detail and exact pixel values do not.
+
+
+test whether the agent can continue to express its own scene                            Same            Plan
+choices without rereading those drawings.                         Context after the first view   pieces  Relations  wall  Order
+                                              Own drawings kept          0.97     1.00    0.99  0.92
+                                              Own drawings removed      0.99     0.96    0.99  0.79
+Test setting.  The agent receives the type and rough shape
+                                                              Drawings and list removed   0.88     0.79    0.99  0.80
+of one of 30 rooms from the ProcTHOR-10K validation                                                                    Fresh call per view          0.71     0.61    0.24  0.63
+split [7] and a list of its 7–14 furniture pieces with size
+words but no positions. It is told to decide an arrangement       Chance                   –       –     0.31  0.50
+and keep it fixed, to stand at the centre, and to draw what it
+sees as SVG with one group per piece. It draws the facing      Table 4. Self-furnished rooms: revisit consistency (piece-set Jac-
+                                                                  card and relation agreement between a revisited heading and itswall, then follows a random sequence of six quarter- and
+                                                                                            first view) and agreement between each wall view and the agent’s
+half-turns that visits every wall, revisits headings, and ends
+                                                  own floor plan (piece on exactly its plan wall; left-to-right order).
+facing north, and finally draws a top-down floor plan (Fig. 9).                                                          30 rooms.
+   Four conditions vary the retained context: (1) the agent’s
+own drawings (SVG) are kept; (2) they are replaced by
+one-line stubs; (3) both drawings and the furniture list are      against exactly 1.00 when the drawings are kept. When the
+replaced by stubs; or (4) every view is a fresh call given only      furniture list is deleted as well, removing that explicit record
+the list and the turn history. Every condition covers all 30     of the room contents, the agent retains most furniture pieces
+rooms.                                               and their wall assignments (Jaccard 0.88, plan agreement
+   With no externally specified target arrangement, we score      0.99), including every one of the 13 pieces in the illustrated
+agreement among the agent’s own outputs geometrically    room (Fig. 9, bottom).
+from the SVG: whether a revisited heading shows the same
+pieces and relations as its first view (piece-set Jaccard, rela-
+                                                            Interpretation.  The room experiment shows that later
+tion agreement), and whether each wall view shows exactly
+                                                        drawings remain compatible with the agent’s earlier scene
+the pieces the agent’s own plan places on that wall, in the
+                                                             choices as the requested viewpoint changes. Furniture posi-
+same left-to-right order. Chance is obtained by permuting
+                                                                  tions were never supplied in the prompt, and earlier SVGs
+the plan’s wall assignment. All conditions use GPT-6-Astra
+                                                               are unavailable in the removal conditions, so compatible
+with SVG output; protocol details are in Sec. D.1.
+                                                                         revisits and floor plans suggest the continued availability of
+                                                                the agent’s chosen arrangement. This preservation of scene
+Results.  Table 4 gives the results across four conditions.     structure is the spatial coherence expected under the inter-
+With its earlier drawings deleted after every turn, the agent      nal visual language-of-thought hypothesis. Across the three
+still redraws the same room on each revisit (Jaccard 0.99,     probes, visual structure recurs under changes of interface, in-
+relation agreement 0.96) and its wall views agree with its     dependent queries for pixel colors, and changes of viewpoint.
+own plan on 99% of pieces (chance 0.31); box IoU is 0.71,     Together, these behaviors support the hypothesis of reusable
+
+
+                                                 11
+
+===== PDF PAGE 12 =====
+Figure 9. Self-furnished rooms, two conversations. The agent is given only a furniture list, arranges the room itself, draws the facing wall,
+turns six times, and ends with a floor plan; the frames are shown in the order drawn, revisited headings marked. Top: its own drawings are
+deleted from the context after every turn. Bottom: the furniture list is deleted too; the same pieces return on the same walls and the plan lists
+all of them.
+
+
+scene content underlying external visual expressions.        References
+
+                                                                            [1] Yuanhao Ban, Tong Xie, Sohyun An, Yunqi Hong, Evan
+7. Conclusion                                                          Frick, I Hsu, Wei-Lin Chiang, Ion Stoica, Cho-Jui Hsieh,
+                                                                                    et al. Arena-t2i hard: Benchmarking and improving faith-
+General-purpose coding agents can draw zero-shot, with par-                                                                           fulness with dependency-aware checklist.  arXiv preprint
+ticular strengths in structural accuracy and compositional           arXiv:2606.31711, 2026.
+constraints and persistent limitations in perceptual richness.                                                                            [2] Feifei Bian, Zhimin Zheng, Wei Deng, Daiguo Zhou, and
+Drawing harnesses shape how these capabilities appear in           Jian Luan.  Rs-gen: A multi-stage agentic framework for
+the resulting images. Visual programs also serve as an ex-          reasoning and search-augmented image generation. arXiv
+ternal visual language of thought: agents can construct them            preprint arXiv:2606.23221, 2026.
+and interpret the scene information they express. Beyond        [3] Black Forest Labs. FLUX.2: Frontier visual intelligence,
+these observable operations, cross-harness consistency, in-          2025.
+dependent pixel queries, and coherence in self-furnished        [4] Blender Foundation. Cycles: Open source production ren-
+rooms provide complementary behavioral evidence for an            dering, 2026. Project documentation, accessed October 9,
+internal visual language-of-thought hypothesis. Together,          2026.
+these results connect agents’ use of executable visual repre-       [5] Jaemin Cho, Yushi Hu, Jason Baldridge, Roopal Garg, Peter
+sentations to a possible shared organization of scene content          Anderson, Ranjay Krishna, Mohit Bansal, Jordi Pont-Tuset,
+across external expressions.                                        and Su Wang. Davidsonian scene graph: Improving reliability
+                                                                              in fine-grained evaluation for text-to-image generation. In
+                                                                            International conference on learning representations, pages
+Limitations.  Most ablation experiments use only one pri-         15625–15645, 2024.
+mary agent, and evaluations largely rely on automated judg-       [6] Meng Chu, Senqiao Yang, Haoxuan Che, Suiyun Zhang, Xi-
+ments with limited human verification. The in-context learn-          chen Zhang, Shaozuo Yu, Haokun Gui, Zhefan Rao, Dandan
+ing experiments are evaluated qualitatively. We study fron-          Tu, Rui Liu, et al. Visiondirector: Vision-language guided
+                                                                           closed-loop refinement for generative image synthesis. In Pro-tier agents through the interfaces available to us, without
+                                                                      ceedings of the IEEE/CVF Conference on Computer Vision
+access to model weights or the providers’ internal agent
+                                                              and Pattern Recognition, pages 9203–9212, 2026.
+interfaces and implementations. Our investigation of the
+                                                                            [7] Matt Deitke, Eli VanderBilt, Alvaro Herrasti, Luca Weihs,
+internal visual language-of-thought hypothesis is therefore
+                                                                Kiana Ehsani, Jordi Salvador, Winson Han, Eric Kolve,
+exploratory and behavioral: consistency and coherence pro-
+                                                                Aniruddha Kembhavi, and Roozbeh Mottaghi. ProcTHOR:
+vide supporting evidence. The pixel-query probe covers five                                                                        Large-scale embodied AI using procedural generation. Ad-
+subjects, and the self-furnished-room experiment concerns          vances in neural information processing systems, 35:5982–
+an agent with retained, opaque reasoning history. The exper-          5994, 2022.
+iments cover selected drawing harnesses and spatial transfor-       [8] Kevin Ellis, Daniel Ritchie, Armando Solar-Lezama, and Josh
+mations; broader evaluation across models, interfaces, and          Tenenbaum. Learning to infer graphics programs from hand-
+transformation types would provide a more comprehensive         drawn images. Advances in neural information processing
+account of these capabilities.                                            systems, 31, 2018.
+
+
+                                                 12
+
+===== PDF PAGE 13 =====
+ [9] Patrick Esser, Sumith Kulal, Andreas Blattmann, Rahim En-      [23] Jake Quilty-Dunn, Nicolas Porot, and Eric Mandelbaum. The
+      tezari, Jonas Müller, Harry Saini, Yam Levi, Dominik Lorenz,           best game in town: The reemergence of the language-of-
+     Axel Sauer, Frederic Boesel, et al. Scaling rectified flow trans-          thought hypothesis across the cognitive sciences. 2023.
+     formers for high-resolution image synthesis. In Forty-first      [24] Michael Rescorla. The language of thought hypothesis. In The
+      international conference on machine learning, 2024.                  Stanford Encyclopedia of Philosophy. Metaphysics Research
+[10] Kaituo Feng, Manyuan Zhang, Shuang Chen, Yunlong          Lab, Stanford University, summer 2024 edition, 2024.
+     Lin, Kaixuan Fan, Yilei Jiang, Hongyu Li, Dian Zheng,      [25] Juan A Rodriguez, Abhay Puri, Shubham Agarwal,  Is-
+    Chenyang Wang, and Xiangyu Yue.  Gen-searcher: Rein-         sam H Laradji, Pau Rodriguez, Sai Rajeswar, David Vazquez,
+     forcing agentic search for image generation. arXiv preprint           Christopher Pal, and Marco Pedersoli. Starvector: Generat-
+     arXiv:2603.28767, 2026.                                           ing scalable vector graphics code from images and text. In
+[11] Stephanie Fu, Netanel Tamir, Shobhita Sundaram, Lucy Chai,         2025 IEEE/CVF Conference on Computer Vision and Pattern
+     Richard Zhang, Tali Dekel, and Phillip Isola. Dreamsim:          Recognition (CVPR), pages 16175–16186. IEEE, 2025.
+     Learning new dimensions of human visual similarity using      [26] Robin Rombach, Andreas Blattmann, Dominik Lorenz,
+      synthetic data. arXiv preprint arXiv:2306.09344, 2023.                 Patrick Esser, and Björn Ommer. High-resolution image syn-
+[12] Google. Nano Banana: Image editing in Google Gemini gets            thesis with latent diffusion models. In 2022 IEEE/CVF con-
+     a major upgrade, 2025.                                               ference on computer vision and pattern recognition (CVPR),
+                                                                    pages 10674–10685. ieee, 2022.[13] Jonathan Ho and Tim Salimans.  Classifier-free diffusion
+                                                                     [27] Chitwan Saharia, William Chan, Saurabh Saxena, Lala Li,     guidance. arXiv preprint arXiv:2207.12598, 2022.
+                                                                       Jay Whang, Emily L Denton, Kamyar Ghasemipour, Raphael[14] Yushi Hu, Reyhane Askari-Hemmat, Melissa Hall, Emily
+                                                                         Gontijo Lopes, Burcu Karagol Ayan, Tim Salimans, et al. Pho-     Dinan, Luke Zettlemoyer, and Marjan Ghazvininejad. Mul-
+                                                                                        torealistic text-to-image diffusion models with deep language     timodal rewardbench 2: Evaluating omni reward models for
+                                                                        understanding. Advances in neural information processing      interleaved text and image. In Proceedings of the IEEE/CVF
+                                                                           systems, 35:36479–36494, 2022.     Conference on Computer Vision and Pattern Recognition,
+                                                                     [28] Team Seedream, Yunpeng Chen, Yu Gao, Lixue Gong,     pages 36904–36915, 2026.
+                                                     Meng Guo, Qiushan Guo, Zhiyao Guo, Xiaoxia Hou, Weilin
+[15] Zhewei Huang, Wen Heng, and Shuchang Zhou. Learning
+                                                               Huang, Yixuan Huang, et al. Seedream 4.0: Toward next-
+      to paint with model-based deep reinforcement learning. In
+                                                                        generation multimodal image generation.  arXiv preprint
+     Proceedings of the IEEE/CVF international conference on
+                                                                      arXiv:2509.20427, 2025.
+     computer vision, pages 8709–8718, 2019.
+                                                                     [29] Stability AI. Introducing Stable Diffusion 3.5, 2024.
+[16] Dayeon Ki, Tianyi Zhou, Marine Carpuat, Gang Wu, Puneet
+                                                                     [30] Yael Vinker, Tamar Rott Shaham, Kristine Zheng, Alex
+     Mathur, and Viswanathan Swaminathan.  Graphicweaver:
+                                                                  Zhao, Judith E Fan, and Antonio Torralba.  Sketchagent:
+     Benchmarking agentic planning for graphic design generation.
+                                                                   Language-driven sequential sketch generation. In Proceed-
+     In Proceedings of the 4th Workshop on Advances in Language
+                                                                         ings of the IEEE/CVF Conference on Computer Vision and
+    and Vision Research (ALVR), pages 57–84, 2026.
+                                                                          Pattern Recognition, pages 23355–23368, 2025.
+[17] Yan Li, Zezi Zeng, Ziwei Zhou, Xin Gao, Muzhao Tian, Yifan                                                                     [31] Haomin Wang, Jinhui Yin, Qi Wei, Wenguang Zeng, Lixin
+     Yang, Mingxi Cheng, Qi Dai, Yuqing Yang, Lili Qiu, et al.                                                              Gu, Shenglong Ye, Zhangwei Gao, Yaohui Wang, Yanting
+     Bizgeneval: A systematic benchmark for commercial visual                                                                    Zhang, Yuanqi Li, et al. Internsvg: Towards unified svg tasks
+     content generation. arXiv preprint arXiv:2603.25732, 2026.                                                                       with multimodal large language models. In International Con-
+[18] Jacky Liang, Wenlong Huang, Fei Xia, Peng Xu, Karol Haus-                                                                         ference on Learning Representations, pages 38649–38705,
+    man, Brian Ichter, Pete Florence, and Andy Zeng. Code                                                                     2026.
+     as policies: Language model programs for embodied con-                                                                     [32] Chenfei Wu, Shengming Yin, Weizhen Qi, Xiaodong Wang,
+       trol. In 2023 IEEE International conference on robotics and                                                                Zecheng Tang, and Nan Duan. Visual chatgpt: Talking, draw-
+     automation (ICRA), pages 9493–9500. IEEE, 2023.                                                                        ing and editing with visual foundation models. arxiv 2023.
+[19] Songhua Liu, Tianwei Lin, Dongliang He, Fu Li, Ruifeng           arXiv preprint arXiv:2303.04671, 10, 2023.
+     Deng, Xin Li, Errui Ding, and Hao Wang. Paint transformer:      [33] Yiying Yang, Wei Cheng, Sijin Chen, Xianfang Zeng, Fukun
+     Feed forward neural painting with stroke prediction. In 2021           Yin, Jiaxu Zhang, Liao Wang, Gang Yu, Xingjun Ma, and
+    IEEE/CVF International Conference on Computer Vision         Yu-Gang Jiang. Omnisvg: A unified scalable vector graphics
+     (ICCV), pages 6578–6587. IEEE, 2021.                               generation model. Advances in Neural Information Process-
+[20] Yuhang Ma, Xiaoshi Wu, Keqiang Sun, and Hongsheng Li.           ing Systems, 38:113670–113696, 2026.
+     Hpsv3: Towards wide-spectrum human preference score. In      [34] Zhengyuan Yang, Jianfeng Wang, Linjie Li, Kevin Lin,
+    2025 IEEE/CVF International Conference on Computer Vi-         Chung-Ching Lin, Zicheng Liu, and Lijuan Wang. Idea2img:
+     sion (ICCV), pages 15086–15095. IEEE, 2025.                            Iterative self-refinement with gpt-4v for automatic image de-
+[21] OpenAI. Introducing our latest image generation model in           sign and generation. In European conference on computer
+     the API, 2025.                                                             vision, pages 167–184. Springer, 2024.
+[22]  Jie Qin, Jie Wu, Weifeng Chen, Yuxi Ren, Huixia Li, Hefeng      [35] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran,
+    Wu, Xuefeng Xiao, Rui Wang, and Shilei Wen. Diffusiongpt:          Karthik Narasimhan, and Yuan Cao.  React: Synergizing
+     Llm-driven text-to-image generation system. arXiv preprint           reasoning and acting in language models.  arXiv preprint
+     arXiv:2401.10061, 2024.                                          arXiv:2210.03629, 2022.
+
+
+                                                 13
+
+===== PDF PAGE 14 =====
+[36] Yida Yin, Harish Krishnakumar, Chung Peng Lee, Boya Zeng,
+    Wenhao Chai, Shengbang Tong, Wenhu Chen, Hu Xu, Xingyu
+     Fu, Gabriel Sarch, et al. Worldbench: A challenging and
+     visually diverse multimodal reasoning benchmark.  arXiv
+     preprint arXiv:2606.06538, 2026.
+[37] Jiahui Yu, Yuanzhong Xu, Jing Yu Koh, Thang Luong, Gun-
+      jan Baid, Zirui Wang, Vijay Vasudevan, Alexander Ku, Yinfei
+     Yang, Burcu Karagol Ayan, et al. Scaling autoregressive mod-
+      els for content-rich text-to-image generation. arXiv preprint
+     arXiv:2206.10789, 2(3):5, 2022.
+[38] Haoyu Zhao, Zihao Zhang, Xudong Wang, Jiaxi Gu, Zuxuan
+    Wu, Yu-Gang Jiang, and Shuicheng Yan. Maliang-harness:
+   A programmable path to image and video generation. arXiv
+     preprint arXiv:2609.34309, 2026.
+[39] Chunting Zhou, Lili Yu, Arun Babu, Kushal Tirumala, Michi-
+     hiro Yasunaga, Leonid Shamis, Jacob Kahn, Xuezhe Ma,
+    Luke Zettlemoyer, and Omer Levy. Transfusion: Predict the
+     next token and diffuse images with one multi-modal model.
+     In International Conference on Learning Representations,
+     pages 6446–6469, 2025.
+
+
+
+
+
+                                                 14
+
+===== PDF PAGE 15 =====
+        How Far Can Coding Agents Go in Visual Generation?
+
+                           Supplementary Material
+
+A. Harness and Run Infrastructure                      at each revision. An incremental control variant instead al-
+                                                        lows new elements to be appended and existing elements to
+A.1. The harnesses                                                       be replaced by identifier.
+
+  Harness           Renderer              Representation / interaction     GUI.  The GUI  harness  runs JS  Paint  in  headless
+  Pixel             PIL                    Individual  pixel  assign-     Chromium through Playwright. The model sends ordered
+                                       ments                     batches of clicks, double-clicks, mouse-drag paths, typed
+  Shapes           PIL                 Ordered geometric marks
+ Canvas 2D       Node + Canvas 2D     JavaScript on a persistent        text, key presses, and color selections in window coordinates.
+                                          canvas            A color-selection shortcut opens and operates the applica-
+ SVG               resvg                Complete vector-document        tion’s Edit Colors dialog. Available application tools include
+                                          replacement                   pencil, brush, airbrush, eraser, fill, lines, curves, rectangles,
+ GUI              JS Paint / Chromium  Mouse and keyboard ac-
+                                                tions with screenshots            ellipses, polygons, and text. Tool choice, shape options,
+  Blender Cycles     Cycles                Procedural 3D scenes with      and canvas dimensions are set through the interface; undo
+                                            render feedback                  is available through keyboard input. After each batch the
+  Stroke workflows   Canvas 2D            Medium-specific   marks      agent might receive a screenshot containing both the canvas
+                                      and  construction  proce-
+                                           dures                    and application controls. Code execution, image import, and
+ SVG patch         resvg                 Incremental append and       paste are unavailable as agent actions.
+                                              replace-by-id control
+
+                                                     Blender Cycles.  CPU rendering uses adaptive sampling,
+Table 5. Drawing harnesses, renderers, and interaction mechanisms.
+                                         OIDN denoising, and the AgX view transform. PreviewTheir protocols are not uniformly matched in compute or feedback.
+                                                     and final timeouts are 60 and 180 seconds, respectively,
+                                                             within a cumulative rendering budget of 360 seconds. Each
+                                                                     script rebuilds the scene; external assets are excluded. Of
+pixel. A single tool, draw_pixel(drawing_index,    200 AgentDrawBench prompts, 199 have successful final
+color), over a PIL RGB canvas. The address is a flat     renders; one exhausts the render-time budget.  Structural
+row-major index (0 = top-left); colors are CSS names     evaluation reuses cached judgments of these exact images.
+or #RRGGBB; out-of-range indices and unparseable colors     Perceptual and holistic comparisons against GPT-image-1
+come back as tool errors.                                   use the same applicable dimensions and MMRBv2 rubric
+                                                             as the other harnesses, with Gemini 3.5 Flash through the
+                                                      Arena gateway and both image orderings. Perceptual judging
+Shapes.  The model draws a sequence of elementary ge-                                                              requests all applicable dimensions in one JSON response
+ometric marks: filled rectangles, ellipses, polygons, lines                                                            per ordering. Different response limits and rendering costs
+with adjustable width, and individual pixels.  It specifies                                                 make this a comparison of harness configurations rather than
+each mark’s geometry and color; coordinates are rounded                                                           a controlled estimate of the renderer’s causal effect.
+to integer pixel positions. Marks accumulate on the same
+raster canvas in the order generated, so later marks can cover
+                                                        Stroke workflows.  We inspect sampled video frames andearlier ones.
+                                                                short stroke sequences and encode the observed ordering,
+                                                   mark families, and correction procedures as instructions and
+Canvas 2D.  The model writes executable JavaScript pro-     medium-specific Canvas 2D helpers. This is in-context pro-
+grams that draw onto a persistent canvas. Programs can     cedural guidance. Reference-guided studies begin on a blank
+combine paths, curves, text, gradients, transformations, and     canvas; the model may inspect the supplied reference and
+compositing, while loops and reusable routines express re-       its current render, but its drawing code cannot sample, trace,
+peated elements and procedural textures.                               blit, or filter reference pixels. Intermediate renders and exe-
+                                                             cuted programs are retained. These qualitative studies do not
+                                                                   establish a controlled improvement on AgentDrawBench.SVG and incremental SVG editing.  The model con-
+structs a vector document describing the image’s shapes,
+paths, text, colors, gradients, transformations, and layering.        Oil.  The source is the oil-painting timelapse shared by
+The standard SVG harness replaces the complete document     blueemi99, https://x.com/blueemi99/status/
+
+
+                                              S1
+
+===== PDF PAGE 16 =====
+2106755903223664708. We analyze a recording of this     as stopped. Turn caps are 12 for the code harnesses and
+demonstration. The visible timelapse proceeds from a toned    40 for shapes.
+ground and composition scaffold to broad light/color masses,      The core programmable harnesses receive instructions
+structural forms, material-directed strokes, and sparse focal     describing the output device, visibility, canvas dimensions,
+accents. We adapt this ordering with loaded and dry strokes,     available drawing operations, construction strategy, and stop-
+glazing, scumbling, local blending, and selective impasto.      ping rule. Dimensions, background color, and the visibility
+                                                             clause are instantiated for each run. Below we reproduce
+                                                               the construction and stopping instructions from the system   Watercolor.  Sources  are  Javid  Tabatabaei’s  land-
+                                                           prompts; the operation declarations are described in the pre-scape demonstration, https://www.youtube.com/
+                                                           ceding harness specifications.watch?v=wnG6vg3TRlE;  misulbu’s portrait demon-
+stration, watercolor painting–When overlapping, https:
+//www.youtube.com/watch?v=jCJsnpH9IC4;     Pixel system-prompt excerpt.
+and Tabatabaei’s Watercolor painting tutorial–a Rainy
+Night, https://www.youtube.com/watch?v=           Plan the picture first (briefly), then paint it. Fill in every
+GjVGfTPqaoA. The workflow plans light reserves and            pixel that should differ from the background. When the
+                                                                             picture is complete, reply with the single word DONEbroad color relationships, then layers transparent masses,
+                                                                 and no tool calls.
+strengthens connected shadows, and adds selective dry-brush
+and focal accents. Portrait studies prioritize face/hand pro-
+portions before fine details; rainy-street studies align broken     Shapes system-prompt excerpts.
+pavement reflections with their light sources. Rendering
+controls approximate wetness, grain, and edge softness.               Later calls paint over earlier ones, so work back to front:
+                                                                   sky and ground first, then distant objects, then fore-
+                                                                 ground detail. Tool calls within one turn are executed
+   Charcoal.  The source is Kisoo Chai’s Real-time Char-             strictly in the order you list them, so issue many calls
+coal Drawing, #157, https://www.youtube.com/           per turn (dozens is fine); one call per turn is far too slow.
+watch?v=K-Ane8Bq7gY. The observed sequence es-                                                                     Plan the composition briefly, then paint it. When the
+tablishes placement and feature axes, groups dark masses,                                                                             picture is complete, reply with the single word DONE
+models turning planes, then alternates local smudging, lift-         and no tool calls.
+ing, and selective accents. Our implementation uses broad
+granular deposits, directional hatch bundles, local pigment
+                                                  Canvas 2D system-prompt excerpt.redistribution, and partial removal. Fine features follow con-
+nected midtone coverage; repeated contour reinforcement is
+                                                       Work back to front in a few substantial scripts: back-
+replaced by lifting and rebuilding the faulty plane.                                                                 ground and sky, terrain and large masses, mid-ground,
+                                                                     foreground detail, atmosphere. Use gradients, paths,
+   Chinese ink.  The source is the Chinese ink demon-          transforms and loops to get real richness at this res-
+                                                                              olution; avoid a few flat rectangles. Plan briefly first.stration on Bilibili, https://www.bilibili.com/
+                                                     When the picture is complete, reply with the single word
+video/BV1sg411Q7av/. We analyze a recording of this
+                                             DONE and no tool calls.
+demonstration. The sampled demonstration establishes pavil-
+ion contours, branching pines and grouped needles, broken
+foreground/shore marks, pale mountain washes, and selec-   SVG system-prompt excerpt.
+tive dark ridge accents while leaving substantial sky and
+water as untouched paper. We adapt its tapered pressure           Plan briefly, then write a rich, well-layered SVG (back-
+                                                                     ground, large masses, mid-ground, detail). When thelines, form-following dry texture, dilute washes, and dense-
+                                                                             picture is complete, reply with the single word DONE
+versus-empty balance. Chinese ink specifies the medium,
+                                                                 and no tool calls.
+while the reference image determines the subject matter.
+
+                                                          Small wording choices in this skeleton carry measurable
+A.2. System-prompt skeleton and turn mechanics
+                                                              weight. An early shapes prompt lacked the sentence promis-
+Generator, turns, and stopping. A turn is one API call;     ing that tool calls within one turn are executed strictly in the
+the model may attach any number of tool calls, which the     order listed; without it, the generator issued one primitive
+harness executes in listed order, returning all results in one     per turn, and 3 of 9 pilot runs hit the turn cap with unfinished
+message. A reply of DONE with no tool calls ends the run. A     images. With the sentence, the same model issued 20–64
+stop without DONE is answered with a nudge to continue or      calls per turn and no run hit the cap. The added sentence
+finish explicitly, twice by default, before the run is recorded    makes the harness’s execution order explicit.
+
+
+                                              S2
+
+===== PDF PAGE 17 =====
+A  representative  rollout.  AgentDrawBench  prompt    Academics  1678, 1688, 1700, 1703, 1707, 1717, 1718,
+arena_132 (a social-media post mock-up with exact head-    1730, 1752, 1762, 1770, 1788, 1805, 1819, 1824, 1832,
+line text) under arm C: turn 1 plans in prose, then lays the     1845, 1855, 1859, 1866, 1875, 1882, 1888.
+background and card geometry in one script; turn 2, be-
+fore committing the headline, measures it — the rendered                                                     Agents  1342, 1385, 1388, 1390, 1395, 1399, 1401, 1403,
+width of the headline over two candidate font stacks (583.8                                                          1404, 1416, 1423, 1433, 1436, 1451, 1458, 1476, 1480.
+vs. 581.2 px against the intended column) — and only then
+draws; turns 3–5 add body text, avatar, and interaction row,
+                                                              Digital World  14, 27, 31, 46, 48, 93, 98, 100, 109, 116,each checking the returned render; the run ends with DONE
+                                                          125, 127, 129, 1903, 1913, 1916, 1925, 1930, 1938, 1961,after 5 turns at $0.58. This measure-then-commit pattern
+                                                          1964, 1980, 1993, 1995, 1997.recurs throughout the canvas2d traces and illustrates how
+executable code supports measurement during image con-
+struction.                                           Documents, Charts, & Tables  1506, 1515, 1536, 1559,
+                                                         1563, 1565, 1571, 1575, 1615, 1616, 1618, 1624, 1627,
+A.3. Imposed-budget mode                                                          1637, 1647, 1651, 1900.
+The   dollar-matched   arms   of   Sec.   5.2.1   use
+-min-spend/-max-spend.    Below  the  floor,  a     Living Things  1099, 1106, 1109, 1116, 1124, 1137, 1139,
+DONE is not accepted: the harness replies with a nudge     1140, 1141, 1170, 1173, 1183, 1201, 1203, 1208, 1213,
+of the form “You still have about X% of your drawing     1223, 1235, 1257, 1258, 1286, 1288, 1302, 1331.
+budget left. Keep refining the same canvas...” and the
+run continues. The ceiling is checked before each turn;
+                                                        Objects  608, 612, 619, 651, 658, 677, 679, 682, 684, 696,
+crossing it stops the run . Spend is the gateway-reported
+                                                           699, 700, 703, 719, 742, 764, 769, 774, 776, 811, 813, 823,
+dollar cost accumulated so far, so matched arms are matched
+                                                           824, 839, 845, 848, 858, 862, 863, 864, 866, 890, 908, 921,
+in dollars, not in tokens or turns. The -feedback text
+                                                          929, 933, 937, 950, 973, 976, 990, 994, 1000, 1009, 1021,
+mode (a character grid downsampled from the render)
+                                                          1040, 1067, 1068, 1073, 1243.
+is image-derived, and is therefore excluded from every
+no-inspection arm.
+                                                       Scenes  159, 169, 173, 202, 222, 227, 228, 230, 233, 242,
+A.4. Run records, resumability, and cost accounting                                                           244, 256, 261, 263, 264, 279, 293, 316, 356, 357, 384, 393,
+Each run preserves the final image, vector source where     396, 424, 427, 428, 434, 437, 448, 458, 459, 467, 474, 475,
+applicable, intermediate frames, a timelapse, the complete     490, 499, 505, 510, 537, 544, 555, 567, 574, 575.
+interaction trace, the instantiated system prompt, the task,
+and judge outputs. Records include response counts, stop-     Conditions and analysis.  The reconstruction is generated
+ping reason, elapsed time, provider-reported token usage and     from the source image before the quiz; the reconstruction
+cost, and drawing-operation counts. Batch generation and     request does not contain the MCQ. Separate fresh-context
+judging skip completed records when resumed. Costs are      calls answer the same benchmark question from the orig-
+accumulated from provider-reported usage.                       inal image, rendered reconstruction, or SVG source. The
+                                                             question-answering evaluation uses gpt-6-astra; this is
+B. WorldBench Selection and Paired Answer                                                          a single-model analysis. SVG input is truncated at 60,000
+    Analysis                                                 characters by the runner. The matching experiment has 145
+                                                                items, as collection stopped at the budget limit; it supplies
+The frozen set contains 200 image–question items from the
+                                                               the SVG plus its own render or a randomly selected other
+zlab-princeton/WorldBench train split. The doc-
+                                                                 item’s render. It is separate from the 200-item MCQ analysis.
+umented sampling procedure is random and stratified pro-
+                                         We compare exact-match correctness against the bench-
+portionally by domain with seed 20261001. The selection
+                                                  mark answer key. For domain d, the original-to-render loss
+script itself is not tracked, so the frozen manifest defines
+                                                                      rate is
+the exact selection. Its entries retain the source row index,                                Pi∈d 1[Oi = 1, Ri = 0]
+domain, category, question, four answer options, and bench-                  ℓd =                                      ,
+                                  Pi∈d 1[Oi = 1]mark answer key. This analysis uses the frozen sample and
+recorded model responses. Domain allocations are Objects    where Oi and Ri denote correctness from the original
+50, Scenes 44, Digital World 25, Living Things 24, Aca-    and render. This conditional rate separates reconstruction-
+demics 23, Agents 17, and Documents/Charts/Tables 17.     associated answer changes from errors already present with
+The following source row indices identify every selected      the original. There are 32 losses and 14 reverse gains, yield-
+item, grouped by domain.                                      ing a net decrease of 18 correct answers (9 percentage points).
+
+
+                                              S3
+
+===== PDF PAGE 18 =====
+    120              107                                                  Scoring measures self-consistency because the agent
+    100                                                      chooses the layout. Piece-set Jaccard and geometric relation
+     80
+                                                       agreement compare a revisited heading with its first view.
+  Items 60
+                                                         Object-box IoU measures the stability of placement on re-     40                                                                         30
+                                           21                                                                              visits. Wall–plan agreement checks whether a piece appears     20                 11        9                                                    12        8                                                                        2      0                                               on the wall assigned by the agent’s own plan; order agree-                    ×     ×      ××    ×      × ×    ××     ×××
+                                          Correctness: original / code / render                   ment compares left-to-right order within a wall. Permuting
+                                                               the plan’s wall assignments provides the chance reference.
+Figure 10. Complete correctness census for the 200 WorldBench     These comparisons assess persistence and coordination of
+items. Each label gives original/code/render correctness in that     the agent’s chosen scene, rather than accuracy against an
+order. There are 107 all-correct, 30 all-wrong, and 63 mixed items.                                                                 externally supplied arrangement.
+
+
+The analogous original-to-code comparison has 30 losses
+and 20 gains; code-to-render has 19 losses and 11 gains.
+These are paired response transitions, not proof that the un-
+derlying visual fact is absent from an artifact. MCQ guessing,
+visual reasoning, and code reasoning can all affect correct-
+ness. Domain sample sizes are small; the displayed ranking
+is descriptive, with no claim of statistical significance.
+  The paired analysis produces the correctness-census plot
+and a complete per-item record of answer correctness.
+
+C. Independent Pixel Queries: Additional Diag-
+    nostics
+
+The following diagnostics supplement the qualitative analy-
+sis in Sec. 6.1.2. Across five subjects, the assembled pictures
+have high spatial autocorrelation (Moran’s I of luminance
+0.85–0.96, against 0.01 when the same colors are shuffled)
+and share coarse composition with whole-image Canvas 2D
+drawings of the same subjects (luminance correlation 0.51–
+0.88). Re-asking the same coordinate returns the identical
+color only 2–38% of the time, though the difference is small
+(about 10 of 255 per channel), and fine structure such as
+facial features or the leaves of a branch does not survive.
+
+D. Self-Furnished Room Protocol
+
+D.1. Self-Furnished Rooms
+
+The experiment in Sec. 6.2 uses 30 rooms from the
+ProcTHOR-10K validation split. The agent receives a room
+type, rough shape, and a list of 7–14 furniture pieces de-
+scribed with size words, without furniture positions.   It
+chooses an arrangement, draws an initial wall view as SVG
+with one group per piece, and follows six quarter- and half-
+turns. The turn sequence visits every wall, revisits headings,
+and ends facing north. A final top-down plan provides a
+second expression of the agent’s chosen arrangement.
+  The four conditions retain earlier SVGs, replace them
+with one-line stubs, replace both the SVGs and the furniture
+list with stubs, or use a fresh call for each view with only the
+furniture list and turn history. Every condition covers all 30
+rooms.
+
+
+                                              S4

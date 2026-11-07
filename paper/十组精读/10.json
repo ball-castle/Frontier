@@ -1,0 +1,107 @@
+[
+  {
+    "id": "B19",
+    "title": "Meta Expert: Cross-Layer Expert Sharing for Storage- and Retrieval-Efficient MoE",
+    "source_url": "https://arxiv.org/abs/2610.27598",
+    "screenshot_check": "已查看截图10、11、12；本条在截图11左上，英文题名与PDF一致。视频“只用70%专家”对应有条件的参数削减实验；2026年10月预印本。",
+    "problem": "传统MoE按层私有化专家，可能重复存储相似功能；直接循环整个Transformer又增加串行计算。本文研究不增加层数、固定专家粒度与每层激活数量时，跨层共享专家池能否提高参数利用率。它是架构和共享拓扑的研究，不是对现成模型直接剪去30%专家。",
+    "mechanism": "式(1)的层内top-k检索改为式(2)的共享路由器R和共享参数θ；混合设置同时保留私有专家。主要配置将75%的专家预算分配给共享池，每层激活4个共享、4个私有专家，再测试首尾两层仅私有及两个交错子池。训练梯度在共享参数相加；式(7)给出跨层一阶影响Δy≈−ηγ²J_m J_lᵀȳ_l。该切线核解释共享写入如何影响别层读取，不保证信号不消失。",
+    "evidence": [
+      {
+        "claim": "6B-A1.6B模型训练200B tokens后，MR75+Loop2的MMLU由0.4087升至0.4175，OpenBookQA由0.3500升至0.3640；但组合F2L2+Loop2的MMLU仅0.4052，说明最低训练损失配置并非逐任务最优。",
+        "page_or_table": "PDF第8页，表1；第6–7页§3.4"
+      },
+      {
+        "claim": "削减共享池而保持top-8激活，约减少20–30%专家、15–25%总参数仍可匹配基线；附录明确浅层读取的是深层训练写入的权重内容，单次前向不依赖未来层激活。",
+        "page_or_table": "PDF第6页总体比较、第19–20页表5与A.4"
+      }
+    ],
+    "compute": "作者从头训练H200模型；表3最小档5.31B tokens、7.135×10¹⁸ FLOPs，最大档34.92B、2.413×10²⁰。6B下游比较另外训练200B tokens。4–8高端GPU适合缩小机制探针，完整阶梯与多变体重训负担高，文中未提供总GPU时。",
+    "limits": "等激活预算不自动等于相同端到端延迟，路由候选池和通信仍需实测。共享专家并非首次提出；本文价值在系统拓扑比较。附录冗余谱指标是功能相似性的代理，不能独立证明因果机制；主缩放图用最后十步训练损失，不能替代泛化评价。",
+    "transfer_hypothesis": "可借鉴到ESN收尾的是区分存储容量、可访问路径和训练可达性，并保持预算可比；不能把切线核解释改名为新的接口选择器，或据此重启已冻结C2。与有限视频记忆只有方法论关联。",
+    "pilot": "建议而未执行：只做一个小MoE、三种拓扑、三种子，固定tokens、激活数和专家粒度；同时测验证损失、真实吞吐、专家负载与共享梯度冲突。若收益仅在训练损失、或被更小私有模型成本优势覆盖，则停止，不扩至6B。至少保留一人完成ESN交付。",
+    "priority": "P2：值得读透的架构对照范例；暂不作为2–4人团队新主攻。"
+  },
+  {
+    "id": "B20",
+    "title": "UniverSat: Resolution- and Modality-Agnostic Transformers for Earth Observation",
+    "source_url": "https://arxiv.org/abs/2606.23503",
+    "screenshot_check": "截图11上排第二项明确显示UniverSat、NeurIPS2026与13。原文是13种传感器/模态输入，并非严格13颗卫星；包含航空影像、雷达、高程等。",
+    "problem": "遥感输入在像素尺寸、波段数、时间长度上差异巨大，固定patch投影器迫使重采样或为每个传感器单独建模。目标是共享编码接口接收原生分辨率输入，产生可用于分类、分割的统一空间表征。",
+    "mechanism": "UPE把C×T×H×W展开为通道、时间、子块内像素、子块四轴，先给标量做傅里叶特征映射。轴向交叉注意力依次压缩像素、通道、时间、子块，并增加宽度；保留子块特征走高分辨率旁路。模态融合后接空间Transformer，输出特征可插值到目标网格。损失L=LM3+λLcon：跨模态对齐加预测冻结随机投影的InfoNCE；约90%输入原子被丢弃作自监督。训练头按模态区分，推理编码器共享。",
+    "evidence": [
+      {
+        "claim": "9K参数线性探针在PASTIS-R得47.9 mIoU，对照Ramen配40M参数解码器为42.3；未知PlanetScope上37.1，低于DOFA的41.1，但略高于端到端监督ViT的36.8。结果体现适配成本优势而非全面最高分。",
+        "page_or_table": "PDF第9页，表3"
+      },
+      {
+        "claim": "Tiny消融中，通道先于时间的最佳配置PASTIS为36.4，顺序反转降至25.2；去跨模态对比为27.9，InfoNCE改L2仅10.7，说明收益依赖聚合顺序及训练目标。",
+        "page_or_table": "PDF第10页，表5"
+      },
+      {
+        "claim": "A100上40时相S2显存12.2GB，对照4.6GB；140时相S1推理1.7样本/秒，对照0.21。效率变化明显依赖输入类型。",
+        "page_or_table": "PDF第20页，表A.6"
+      }
+    ],
+    "compute": "附录报告单次自监督约240 H100 GPU小时，8×80GB H100、100k步；线性探针每数据集1–10 GPU小时。整个项目含探索和消融约30K GPU小时，不能把240当完整研究账单。4–8卡可做冻结模型探针和小消融。",
+    "limits": "原生输入不重采样不意味着输出特征不插值，也不意味着无损；UPE是有损表示编码。未知传感器实证集中于EnMAP和PlanetScope：两者未参与预训练，但其空间/时间/光谱规格落在预训练覆盖范围内；非光学新模态仍需学习小编码向量，强时空错位会模糊细节。",
+    "transfer_hypothesis": "与当前有限记忆候选有关的是“统一接口后再研究信息保留”，以及按任务而非输入形状判断压缩是否可用。但遥感配准和长期季节变化与一般视频事件不同，不能直接把轴向聚合收益迁移为事件记忆收益。",
+    "pilot": "建议而未执行：先用公开权重和一个长时序遥感集，固定输入特征，比较相同字节预算下均匀采样、去重、事件保留；预设少量关键时相恢复是否修复错误。按区域划分并锁定标签，若完整历史也失败，或收益只由传感器配准差异产生则停止。",
+    "priority": "P2：接口与评估设计有启发；除非已有遥感数据能力，不建议另开基础模型预训练线。"
+  },
+  {
+    "id": "B21",
+    "title": "DeepInfer（官方开源推理系统项目，非已确认独立论文）",
+    "source_url": "https://github.com/deepseek-ai/DeepInfer",
+    "screenshot_check": "截图11上排第三项明确是DeepInfer开源推理框架解读。已读官方README、examples说明、eval说明和吞吐绘图源码；没有发现专属论文PDF，故本项按软件证据分析，不填写虚构页码。",
+    "problem": "该项目公开DeepSeek生产推理系统的离线核心，主要解决大型稀疏模型的计算、通信和调度开销。它提供工程组件与评测入口，不能把框架名称当成一个独立学习算法，也不能把原模型能力分数归因于框架。",
+    "mechanism": "注意力使用数据并行与均衡上下文并行，MoE使用专家并行及负载平衡；底层接FlashMLA、DeepGEMM、DeepEP等。DSpark生成草稿并按置信度调度验证，异步CPU调度与设备执行重叠；SWA有限后缀重放减少解码器预填充。批组成不变推理与固定种子采样用于数值复现，但官方确定性采样配置要求关闭可变长度推测验证，不能默认所有优化同时保持完全相同输出。",
+    "evidence": [
+      {
+        "claim": "默认草稿最大长度5；SWA保留140 tokens，要求覆盖滑窗和最大回溯长度。确定性采样需启用BATCH_INVARIANT、关闭MTP_VARLEN并固定seq_seed，且仅NVIDIA支持。",
+        "page_or_table": "官方README：Feature details and configuration；https://github.com/deepseek-ai/DeepInfer/blob/main/README.md"
+      },
+      {
+        "claim": "基准decode吞吐按avg_SPS×请求数×(1+nextn)/cp统计，采用全部草稿接受口径；绘图源码另用τ=1+nextn×draft_acceptance修正，默认接受率1.0。原始吞吐不是实测有效输出token速率。",
+        "page_or_table": "examples/README.md：Stage decoupling and metrics；examples/sweep/plot_pareto.py第58–61、131–134行"
+      },
+      {
+        "claim": "eval将生成与评分分离；AIME为30题各32样本，GPQA为198题各8样本，均报平均Pass@1；必须coverage_complete=true才视为完整。",
+        "page_or_table": "官方eval/README.md：Benchmark evaluation与§6 Outputs；https://github.com/deepseek-ai/DeepInfer/blob/main/eval/README.md"
+      }
+    ],
+    "compute": "README支持SM100 GPU和Ascend950，依赖Linux、Python3.12及相应工具链；公开性能图用4卡预填充、64卡解码，均同一scale-up域。4–8张泛称高端GPU不足以保证平台兼容或复现64卡曲线；这里未安装或运行。",
+    "limits": "发行版不包含完整服务所需KV缓存系统、VE/Prefill/Decode解耦服务及跨DP副本负载均衡。官方能力表是部署健全性参考，非框架对照消融。只计GPU内核、过滤负载平衡刷新区间或给定接受率的曲线，均需保留对应测量条件。",
+    "transfer_hypothesis": "对研究组合最有用的是让数值复现、调度成本与有效输出量同时进入实验协议：有限记忆方案应显式计入状态、读取和预处理。工程收益本身不支持重启C2，也不构成新的事件记忆算法贡献。",
+    "pilot": "建议而未执行：若硬件匹配，先用官方离线样例做同输入、不同batch的逐token一致性检查，再固定请求集对比推测解码开关，报告实际接受率、有效tokens/秒、延迟与答案一致性。硬件不匹配则只迁移测量协议，避免为复现64卡系统改造全部环境。",
+    "priority": "P3：工程基线和可复现性参考，当前不作为论文主线。"
+  },
+  {
+    "id": "B22",
+    "title": "Mixture-of-Top-k Attention: Efficient Attention via Scalable Fast Weights",
+    "source_url": "https://arxiv.org/abs/2602.01219",
+    "screenshot_check": "截图11底部与截图12为同一视频，已去重。缩略图未显示论文题名；本轮检索到B站同题解读《注意力层根本不存在？【NeurIPS 2026】》，正文自称Lau博士，并明确列出MiTA题名、作者和arXiv:2602.01219，进一步支持对应关系。未取得原视频页或字幕，不把同题文章视为逐段视频核验。论文机制与数值仍以本地PDF为依据。",
+    "problem": "全注意力可解释为宽度随上下文N增长的快权重映射；每个query单独寻找top-k仍要产生N套稀疏模式。MiTA关注能否用少量可复用模式保存精确KV访问，同时用压缩摘要补足全局上下文。",
+    "mechanism": "将Q平均池化为m个landmark；第i个landmark以I_i=Topk(Kᵀq̃_i)收集k个原始KV，构成共享稀疏专家。普通query按QᵀQ̃选择专家；另用landmark扫描全KV得到Ṽ，组成全局摘要专家。两路KV拼接后做统一softmax，实际实现用online softmax合并，实验固定s=1。主注意力项O(N(m+ks))，但建专家需扫描原始KV并承担gather和排序成本。",
+    "evidence": [
+      {
+        "claim": "ImageNet无额外组件时MiTA-DeiT-T为71.1%，低于全注意力72.2%；加入深度卷积才到73.4%。ADE20K的Tiny降FLOPs42%，但mIoU从39.1降到36.5，体现明确的精度成本权衡。",
+        "page_or_table": "PDF第7页表2、第8页表4"
+      },
+      {
+        "claim": "LRA在24GB RTX4090上平均准确率58.91，对照58.19，总训练时间2.4小时，对照10.6小时；纯路由版本为5.5小时，支持摘要与路由组合的效率价值。",
+        "page_or_table": "PDF第9页，表5与§4.3"
+      },
+      {
+        "claim": "消融中共享摘要加路由为71.1%，仅压缩70.3%，仅路由70.8%；附录明确没有评估LLM解码。",
+        "page_or_table": "PDF第14页表6、第17页附录D"
+      }
+    ],
+    "compute": "LRA小模型可单张4090运行；4–8高端GPU足以做视觉backbone微调与多种子探针。图5极长序列速度来自3层、宽128模型且每次调batch最大吞吐，不能直接当大VLM或自回归解码加速比；论文未给全项目GPU时。",
+    "limits": "“注意力等价MLP”是代数视角，式(4)的归一化V̂仍依赖query，不是普通固定权重FFN替换证明。固定m、k才得到相关线性复杂度叙述；稀疏gather可能受显存带宽限制。原算法读取完整KV，尚非严格有限总记忆的因果流式方案。",
+    "transfer_hypothesis": "可作为有限记忆方向的重要对照：全局压缩摘要加少量未压缩证据，可能比单纯相似度裁剪更保留延迟决策所需细节。但把landmark和top-k改名不具新颖性，必须查清已有混合记忆，并证明未知未来查询下的写入优势。",
+    "pilot": "建议而未执行：冻结视觉编码和问题协议，在相同总字节、读写次数下比较纯摘要、纯检索、MiTA式两路及强现成选择器；只允许每个历史块在到达时访问。先验证完整历史能答、遗忘导致错、补回少量证据能修复；两模型均有稳定残余收益才投入训练。",
+    "priority": "P1：四项中最贴近有限记忆候选的机制与碰撞文献；适合作基线，不能直接作为新贡献。",
+    "screenshot_mapping_source": "https://www.bilibili.com/read/cv53571100/"
+  }
+]

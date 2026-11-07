@@ -1,0 +1,1046 @@
+WUT-A021 | Instruct2See: Learning to Remove Any Obstructions Across Distributions
+来源：https://proceedings.mlr.press/v267/li25s.html
+本地PDF：专题文献/武汉理工AI_CCF-A/WUT-A021_Instruct2See_ICML2025.pdf
+SHA-256：3ee682106d902386e911edb185a056fe180c1c23c1e3ad04635ccddd451ab1f3
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+   Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+
+
+                     Junhang Li 1 2 * Yu Guo 2 3 * Chuhua Xian 1 Shengfeng He 2
+
+                  In-distribution                                 Out-of-distribution                   Unseen Obstruction Representation
+    RainDrop           Fence              Power Cables       Snow              Stroke
+                                                                                                                                      ''Remove the
+Input                                                                                                                      Semi-Transparent
+(a)                                                                                                                                             Obstruction''
+
+
+                                                                                          Mask       Visual      Text
+                                                                                               Decoder   Encoder   EncoderRestormer
+(b)
+                                                                                                                                              ''Stains and dirt
+                                                                                                          adhered to the
+LaMa                                                                                                                  surfacewindow.''of the car
+(c)
+
+
+
+
+                                                                                                                              Visual    TextualInstruct2See                                                                                     Mask  +          +                                                                                                         Semantic  Command
+(d)
+Figure 1: We present Instruct2See, a zero-shot framework for obstruction removal that handles arbitrary obstructions. It
+effectively tackles both soft (semi-transparent) and hard (opaque) obstructions, while demonstrating a robust effect in both
+in-distribution (seen) and out-of-distribution (unseen) scenes. The right part shows how we represent unseen obstructions.
+
+                 Abstract                             through a cross-attention unit to enhance con-
+                                                                       textual understanding and improve mode control.    Images are often obstructed by various obstacles
+                                                                  Additionally, a tunable mask adapter allows for    due to capture limitations, hindering the observa-
+                                                       dynamic soft masking, enabling real-time adjust-     tion of objects of interest. Most existing meth-
+                                                        ment of inaccurate masks. Extensive experiments    ods address occlusions from specific elements
+                                                      on both in-distribution and out-of-distribution     like fences or raindrops, but are constrained by
+                                                                  obstacles show that Instruct2See consistently     the wide range of real-world obstructions, mak-
+                                                               achieves strong performance and generalization     ing comprehensive data collection impractical.
+                                                                     in obstruction removal, regardless of whether    To overcome these challenges, we propose In-
+                                                                  the obstacles were present during the training     struct2See, a novel zero-shot framework capable
+                                                                 phase. Code and dataset are available at https:     of handling both seen and unseen obstacles. The
+                                              //jhscut.github.io/Instruct2See.     core idea of our approach is to unify obstruction
+    removal by treating it as a soft-hard mask restora-
+     tion problem, where any obstruction can be rep-                                                        1. Introduction
+     resented using multi-modal prompts, such as vi-
+     sual semantics and textual instructions, processed         Obstruction removal is a challenging task that involves re-
+                                                         covering clean scenes occluded by unwanted obstacles or
+  *Equal contribution 1School of Computer Science and Engi-
+                                                            unpredictable natural phenomena. Existing methods oftenneering, South China University of Technology 2School of Com-
+puting and Information Systems, Singapore Management Uni-    focus on specific types of obstructions (Zhang et al., 2019;
+versity 3School of Navigation, Wuhan University of Technology.   Wen et al., 2019; Du et al., 2020; Chugunov et al., 2024;
+Correspondence to: Chuhua Xian and Shengfeng He <chhx-   Quan et al., 2023a; Huang et al., 2024b; Zhou et al., 2023;
+ian@scut.edu.cn, shengfenghe@smu.edu.sg>.                                                          Li et al., 2024) by relying on predefined categories and spe-
+                    nd                                              cific training datasets. However, this reliance limits theirProceedings of the 42    International Conference on Machine
+Learning, Vancouver, Canada. PMLR 267, 2025. Copyright 2025    generalization, often resulting in poor or invalid removal
+by the author(s).                                              of occluders outside the training distribution. Therefore, it
+
+                                                1
+
+======================== PDF 第 2 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+is crucial to enable models to grasp the underlying physi-    bridge the gap between the estimated and actual masks,
+cal properties of occlusion to enhance image quality under    reweighting the predicted mask into a soft mask that dy-
+complex and varied conditions.                             namically adapts to the testing scene. In summary, the key
+                                                               contributions of our work include:
+While many advanced methods (Tsogkas et  al., 2023;
+Chugunov et al., 2024; Zhou et al., 2023; Dai et al., 2023;
+                                                                            • We introduce the first unified obstruction formulationZhang et al., 2023a; Li et al., 2024; Chang et al., 2024;
+                                                        and a novel zero-shot paradigm capable of handlingChen et al., 2023a) continue to target specific obstructions,
+                                                         any obstruction by integrating obstacle positions withthe diversity of real-world obstacles makes designing and
+                                                            multi-modal prompts, including visual semantics andtraining separate models for each type inefficient and im-
+                                                                          text instructions.practical (Guo et al., 2024). As a result, there is growing
+interest in all-in-one restoration models (Li et al., 2020;                                                                            • We develop a dynamic soft masking strategy that au-
+Chen et al., 2021; Han et al., 2022; Wang et al., 2023b; Vala-                                                                   tomatically refines inaccurate masks for occluding ob-
+narasu et al., 2022; Li et al., 2022a; ¨Ozdenizci & Legenstein,                                                                      structions using a tunable adapter.
+2023), which aim to handle multiple complex scenarios with
+a single model. However, despite these advancements, such        • Comprehensive experiments demonstrate the superior
+models remain constrained by their training datasets. As         effectiveness of our model in obstruction removal, as
+shown in Fig. 1 (b), restoration methods trained on multi-        well as its strong zero-shot generalization to unseen
+scene datasets struggle to handle unseen scenarios and lack         obstructions outside the training distribution.
+the flexibility to adapt based on user input. This limitation is
+especially problematic in dynamic real-world applications,    2. Related Work
+such as autonomous driving and intelligent robotics.                                                     Obstruction Removal. The task of obstruction removal
+An alternative approach to obstruction removal is image in-    aims to clear unwanted obstructions from a scene, improving
+painting techniques (Zeng et al., 2019; Suvorov et al., 2022),     its visibility. Many existing methods are tailored to specific
+which repair or fill in missing or occluded regions by gen-    types of degradation, such as deraining (Zhang et al., 2023b;
+erating plausible pixel values that blend with the original   Wang et al., 2023a), desnowing (Quan et al., 2023b; Chen
+scene. While inpainting can produce visually convincing re-    et al., 2023b), and raindrop removal (Qian et al., 2018; Li
+sults, these reconstructions often lack realism. For example,     et al., 2024). While these approaches are effective for in-
+as shown in Fig. 1 (c), inpainting can fill occluded areas,    dividual obstructions, they struggle with handling multiple
+but the reconstructed textures, such as the woman’s face,    degradation types simultaneously, often requiring separate
+often appear unnatural. Applying these inaccurate results to    models for each. To address this limitation, all-in-one image
+downstream tasks, like object detection, depth estimation,    restoration models have been developed. For example, Liu
+or video analysis, can lead to errors and negatively impact     et al. (2021) proposed a method that separates an image into
+practical applications.                                        obstruction and background layers using layered decompo-
+                                                                      sition, improving visibility through obstructions. Li et al.
+In this work, we revisit the problem of obstruction re-                                                          (2022a) introduced AirNet, which incorporates an additional
+moval through the lens of unified masking and introduce                                                         encoder with contrastive learning to distinguish between var-
+Instruct2See, a method that transcends traditional training-                                                            ious degradation types. Potlapalli et al. (2023) presented
+dependent solutions by generalizing beyond specific data                                                     PromptIR, a flexible plugin module that uses lightweight
+distributions (Fig. 1 (d)). Our distribution-agnostic ap-                                                     prompts to handle multiple image restoration tasks. Histo-
+proach formulates obstruction removal as a soft-hard mask                                                       former was introduced to employ histogram equalization
+restoration problem, where any obstruction can be repre-                                                          techniques within a neural framework to enhance and re-
+sented by integrating visual semantic embeddings and text                                                                store degraded images (Sun et al., 2024). Despite these
+instructions, as provided by a visual-language model (right                                                        advancements, all-in-one models still face challenges when
+part of Fig. 1). By seamlessly integrating obstruction po-                                                           dealing with degradation types beyond their training data,
+sitions, visual semantics, and textual instructions, our ap-                                                                limiting their effectiveness in real-world applications.
+proach redefines obstruction removal as an adaptable pro-
+cess that fluidly transitions between hard and soft masking,   Image Inpainting. With advancements in parallel comput-
+effectively capturing the complexity and diversity of real-    ing and deep learning, numerous image inpainting methods
+world obscured scenarios. To be specific, visual semantics    have been developed to restore missing or damaged regions
+help recover missing information caused by occlusions, lead-    in digital images with natural and coherent content. CNN-
+ing to more accurate scene reconstruction, while the text    based methods, such as PEN-Net (Zeng et al., 2019) and
+instruction serves as a prior prompt to guide various removal   LaMa (Suvorov et al., 2022), have proven efficient for gen-
+tasks. Additionally, we design a tunable mask adapter to    erating local textures, but they often struggle to capture
+                                                            global context and handle complex patterns. To address
+
+                                                2
+
+======================== PDF 第 3 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+these limitations, transformer-based and diffusion-based          Inputs       Masks        GTs         Inputs       Masks        GTs
+models have been proposed. Deng et al. (2021) introduced                       Fence                                  Fine Woolen
+the Contextual Transformer Network, which uses multi-
+scale, multi-head attention to capture long-range dependen-
+                                                                                                       RainDrop                             Snow
+cies and global context through self-attention. Similarly,
+Li et al. (2022c) developed the Mask-Aware Transformer,
+which selectively aggregates non-local information using                          Flare                                 Scratch
+a dynamic mask, ensuring high fidelity and diversity in re-                       …
+stored images. Diffusion-based methods like RePaint (Lug-
+                                                                                                           In-distribution Obstacles                 Out-of-distribution Obstacles
+mayr et al., 2022) combine denoising diffusion probabilistic
+models with conditional inpainting to iteratively generate    Figure 2: Examples of in- and out-of-distribution obstacles.
+high-quality results. More recently, Grechka et al. (2024)
+proposed GradPaint, a diffusion-based method that lever-    obstruction removal, characterized by diverse and varied
+ages gradient guidance to enhance the quality and coherence    obstructions, a ZSL approach is essential for handling a
+of inpainted regions, producing artifact-free restorations.     wide range of unseen obstacles effectively.
+
+Despite these efforts, applying image inpainting methods
+directly to obstruction removal is challenging due to limi-    3. Distribution-Agnostic Formulation
+tations in cross-domain applicability and the distinct focus
+                                                  Seen Obstructions. As illustrated in Fig. 2, we focus onof these methods. While inpainting aims to generate visu-
+                                                                 three typical but distinct types of obstructions in the trainingally plausible results, obstruction removal requires precise
+                                                                  data: fences, raindrops, and flares. These obstructions wererestoration to ensure data integrity for further analysis. Un-
+                                                       chosen for their diversity in visual characteristics and maskrealistic outcomes can lead to errors in downstream tasks.
+                                                              extraction difficulty. Fences represent obstructions with aNonetheless, rethinking obstruction removal from the per-
+                                                           sharp distinction from the background, making it relativelyspective of image inpainting presents a promising avenue
+                                                             straightforward to extract the mask. Therefore, we adopt afor future exploration.
+                                                      hard masking strategy for fences, as shown by the purple
+Vision-Language Models (VLMs). VLMs (Zhang et al.,    process in Fig. 3. In contrast, raindrops pose a challenge due
+2024) have gained significant attention for their ability to     to their blurred boundaries with the background and their
+jointly interpret visual and textual information. Pre-trained    random distribution across the image. Similarly, flares also
+VLMs, such as CLIP (Radford et al., 2021), have demon-    exhibit soft, blurred edges, but their occurrence is more pre-
+strated improved performance across a range of downstream     dictable, often appearing around point light sources. Given
+tasks by integrating visual and textual representations. CLIP     the difficulty in extracting accurate masks for raindrops and
+employs a contrastive learning approach to align image and     flares, which have indistinct boundaries, we employ a soft
+text embeddings, while distancing mismatched pairs in the    masking approach, indicated by the green process in Fig. 3.
+embedding space. This alignment enables CLIP to perform
+                                                 Unseen Obstructions. In addition to the seen obstructionszero-shot learning, recognizing unseen objects and concepts
+                                                            present in the training data, this work also targets morebased on textual descriptions, achieving remarkable results
+                                                   complex and varied unseen obstructions, including powerwithout task-specific fine-tuning. In this work, we integrate
+                                                                cables, yarn, snow, rain streaks, scratches, and others, withthe pre-trained CLIP with a prompt module to effectively
+                                                     examples depicted in Fig.  2. Depending on the degreeleverage contextual information about degradation types,
+                                                            of boundary ambiguity between the obstruction and theenhancing the performance of obstruction removal.
+                                                        background, and the difficulty in extracting an appropriate
+Zero-Shot Learning (ZSL). ZSL is an advanced machine    mask, we apply soft masking for semi-transparent occlusions
+learning paradigm that enables models to recognize and     like shadow and rain streaks, where the edges are blurred.
+understand instances they have never encountered during    For more opaque occlusions, such as power cables, yarn,
+training. Unlike traditional supervised learning, which relies    and scratches, we employ hard masking due to the clearer
+on labeled examples for each class, ZSL leverages auxiliary    boundary between the obstruction and the background.
+information such as semantic attributes, textual descrip-
+                                                        Unified Imaging Description. The overarching objectivetions, or word embeddings to generalize from seen to un-
+                                                              of this work is to remove unwanted obstructions and restoreseen classes. ZSL has shown significant potential in various
+                                                             the occluded background. This problem can be modeledapplications, including image classification (Naeem et al.,
+                                                          mathematically as follows:2024), object detection (Huang et al., 2024a), and object
+counting (Zhu et al., 2024), offering a solution for scenarios                                                            I(x) = B(x) ◦(1 −M(x)) + R(x) ◦M(x),    (1)
+with limited labeled data or dynamic class distributions. In
+                                                   where I(x) represents the input image containing obstruc-
+
+                                                3
+
+======================== PDF 第 4 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+         GPT 4                Input Images       Mask Generation                                                          Ground Truth
+
+                                                         Mask                                      Adapter
+                                                                Detector                                                                                     FFN
+
+                                                                                                                                                                                    Layer Norm      Text          Command                                                                                                                                                                Loss                                                                                       Cutout + Concat                                           Reconstruction Training         Database                                                                                                                             Outputs                       Soft Masking
+ Phase                    Switch                                                                                                                                                                                                                                                                                       Encoder                                           Decoder                                             Self-Attention                                                                                                                                                                                                                                                                                                                                                                                                                                                               Transformer                                                                   Transformer
+
+                                                                                                                       Cross-Attention                                                Layer Norm
+                                                       Input Images                                                        Obstruction Removal
+         Instructions             Obstruction
+                             Removal Model                                                                                                                        Tunable
+
+                                                                                                                                                                              Freeze
+                                                                                                                                  Semantic           Positional                                    …    Visual                      Instruct2See                                                                                                                                        EncoderVisual                                                                                                                          Tokens                                                                                                                                                                         Embedding
+                                                                                                                                                                                    Layer Norm  Inference                                                                                                                                                                     Token    Encoding               Cross-Attention
+                                                                 Q K                                                                                    V
+                                                                                                                                                                                      Masking                                                                                                                    Text                                                                                                                 Command         Hard
+                                                                                                                                                                                          Process                                                                                                                          Tokens                                                                                                                                         ''... Opaque/Semi-                                                                                                                                                            Image                                                                                                                                                                                                    Multi-modal Phase                                                             Transparent                                                                                             Obstruction...''                                                                                                                                            Text      …                                                                                                                                                                            Soft                                                                                                                                                                                     Masking                                                                                                                                                                            Feature                                                                                                                                                                                    Prompt                                                                                                                                                                                                                                              Encoder                                                                                                                                                                                          Process
+           User                  Outputs             Text Instructions                        Multi-modal Prompt Generation        Common process          Transformer Block
+
+Figure 3: Flowchart of our Instruct2See. Instruct2See accepts instructions (randomly sampled from a database of instructions
+generated by GPT-4 during the training phase or inputted by the user during the inference phase) to flexibly activate soft
+masking and control the obstruction removal model for optimal capabilities.
+
+tions, B(x) is the underlying background image to be recov-    in Eq. (1) as the model input, we first aim to mitigate the
+ered, R(x) denotes the obstruction components, and M(x)    negative impact of R on model generalization. We introduce
+is a binary mask. Here, x refers to the pixel index. This for-     ˆI as the input to the restoration network, defined as:
+mulation enables the decomposition of the input image into
+background and obstruction components using the mask                    ˆI(x) = I(x) −R(x) ◦M(x).            (2)
+M(x) to separate them.
+                                                To achieve this, we utilize a trained mask detector D(·) to
+Generalization to Unseen Obstructions. As outlined in                                                            estimate the mask M from I. This estimated mask is used
+Eq. (1), obstruction removal is inherently an ill-posed prob-                                                             as the final mask for hard masking, while a tunable adapter
+lem, as it involves estimating the background scene B(x)                                                       A(·) (see Sec. 4.1) is employed for soft masking, effectively
+from a single input image I(x) while accounting for the                                                      compensating for inaccuracies in M during the restoration
+obstructions R(x) represented by the mask M(x). Most                                                              process. The process is formulated as:
+deep learning-based methods tackle this challenge by taking
+I(x) as input and predicting B(x) as output, relying on a            (                                                                       A(D(I(x))),   if soft masking,
+network to learn the complex mapping from I(x) →B(x).    M(x) ≈ˆM(x) =                                     (3)
+                                                                          D(I(x)),        if hard masking.
+However, these approaches are heavily data-dependent and
+typically perform well only on obstructions within the train-
+                                                      Using M,ˆ we remove the obstruction R(x) from the originaling distribution, becoming less effective when encounter-
+ing out-of-distribution obstructions. This limitation arises    image I to obtain ˆI. With this pre-processing, the obstruc-
+primarily from the significant variation in the obstruction     tion removal task is simplified to:
+component R(x) across different classes.
+                                                                                    ˆI(x) = B(x) ◦(1 −ˆM(x)).             (4)
+To address this challenge, our approach focuses on improv-
+ing the model’s ability to generalize by explicitly consider-   To reconstruct the clear background scene, we develop a
+ing the variability in the obstruction component R(x). By    Transformer-based obstruction removal framework (detailed
+designing the model to handle a wide range of obstruction     in Sec. 4.3) that learns the mapping (ˆI, M,ˆ T) →B with
+types beyond the training data, we enhance its capacity   T being the text instruction. Multi-modal prompts (see Sec.
+to perform well on unseen obstructions. This enables the    4.2) are integrated using a cross-attention unit to guide the
+model to maintain robust performance even when faced with    reconstruction process. Finally, the network parameters Θ
+occlusions that deviate significantly from those encountered    are optimized by minimizing the objective function E(·):
+during training.
+                                                       N
+                                                                   1
+                                                  E(Θ) = X B −f(ˆI, M,ˆ T; Θ)  ,       (5)
+4. Proposed Method                            N                                                                    n=1
+
+Fig. 3 outlines the flowchart of the proposed method. Unlike
+                                                   where N is the number of images, and f(·) represents the
+existing obstruction removal approaches that directly use I
+                                                                 restoration operation.
+
+                                                4
+
+======================== PDF 第 5 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+4.1. Mask Generation                                        visual prompts help prevent overfitting and enhance zero-
+                                                             shot generalization, reducing dependence on specific train-
+Hard Masking and Motivation. As shown by the purple
+                                                            ing data.
+process in Fig. 3, for obstructions with clear boundaries,
+such as fences, we apply an accurate mask to explicitly    Soft Masking Switch. Based on the input instructions, we
+mark the regions requiring restoration, termed hard mask-    use the text embeddings Γt(T) to activate the soft masking
+ing. However, this approach struggles when dealing with    mode.  Specifically, let the text representations for semi-
+obstructions with ambiguous boundaries, such as raindrops,    transparent and opaque obstacles be denoted as Γt(Ts) and
+as it lacks flexibility in handling uncertain occlusion regions.    Γt(To), respectively; the similarity between these represen-
+This limitation ultimately affects restoration performance.    tations and the Γt(T) can be expressed as follows:
+To overcome this, we propose a soft masking approach, il-
+lustrated by the green process in Fig. 3, enabling the model
+to autonomously adjust the mask based on the obstruction’s                   Γt(T) · Γt(Ti)
+                                                         sim(T, Ti) =                       for i ∈{o, s}.   (7)characteristics.                                                        ∥Γt(T)∥∥Γt(Ti)∥,
+
+Tunable Adapter for Soft Masking. The tunable adapter
+                                                             After calculating the similarity index, we apply the Softmaxis designed to improve reconstruction performance by mit-
+                                                            function to normalize the vector such that the sum of itsigating the negative impact of inaccurate boundary esti-
+                                                                 probabilities equals 1. When the similarity between Γt(T)mates.  Specifically, the tunable adapter takes the initial
+                                                    and Γt(Ts) exceeds a threshold θ, we enable the adaptermask, estimated by the mask detector or manually provided,
+                                                                strategy for adaptive adjustment of the mask.as input and outputs an optimized mask. The input first
+passes through a convolutional layer with batch normaliza-
+                                                                    4.3. Obstruction Removaltion and ReLU activation. Subsequently, multiple Trans-
+former blocks, incorporating self-attention units and feed-                                       We develop a restoration network based on Restormer (Za-
+forward networks, are used to extract relevant features. A                                                      mir et al., 2022), utilizing a Transformer-based encoder-
+final convolutional layer produces the output mask. The                                                        decoder architecture for image restoration tasks.
+key role of the adapter is to dynamically adjust the mask,
+allowing the model to determine the extent and regions    Cross-attention for Multi-modal Prompts. To efficiently
+where the mask should be applied based on the image fea-    use the prompt information, we integrate cross-attention
+tures and occlusion conditions. This adaptive mechanism    mechanisms into each Transformer block. By concatenat-
+enhances flexibility, enabling selective restoration without    ing the embeddings from the text and visual prompts and
+strict reliance on the initial mask regions.                    feeding them into the Transformer blocks, we improve the
+                                                       model’s ability to leverage multi-modal cues during the
+                                                                 restoration process. The cross-attention unit is defined as:4.2. Multi-modal Prompt Generation
+Using only ˆI and Mˆ as inputs presents two key challenges:                      Q · K⊤p !
+                                                            Cross-Att(Q, Kp, Vp) = Softmax            Vp,   (8)1) the model lacks understanding of the required masking                                λ
+strategy for targeted restoration, and 2) it struggles to ex-
+tract high-level semantic information from the incomplete    where λ is a temperature factor, and Kp and Vp represent
+image, especially when encountering unseen obstructions,    the key and value obtained from the multi-modal prompt,
+leading to less accurate results. To address these issues, we    while Q represents the query derived from the degraded
+introduce a multi-modal prompting strategy that leverages    image feature.
+both text instructions and visual semantic embeddings to
+guide the image restoration process. Specifically, we input                                                        5. Experiments and Analysis
+the text instruction T and the original image I into the CLIP
+model’s text and visual encoders (Γt, Γv) to generate re-    5.1. Experiment Settings
+spective embeddings, which are concatenated to form the
+                                                   Implementation Details. Our Instruct2See framework ismulti-modal prompt P ∈RL, where L is the number of
+                                                    implemented in PyTorch 1.12.0 and trained on a systemtokens. This can be expressed as:
+                                                      equipped with 2 AMD EPYC 7543 32-Core CPUs and 8
+       P = concat[Γt(T), Γv(I(x))] ∈RL.        (6)   NVIDIA L40 GPUs. We train the model using the AdamW
+                                                             optimizer (β1 = 0.9, β2 = 0.999, weight decay of 1×10−4)
+A cross-attention mechanism is then applied to integrate    and L1 loss, over 300K iterations. The initial learning rate is
+these prompts with the image features, guiding the re-     set to 3×10−4. A progressive learning strategy is employed,
+construction process. By incorporating text prompts, the     starting with a patch size of 128 × 128 and a batch size of
+model’s ability to adapt its masking strategy improves, while     1. The patch size is progressively updated to 128 × 128,
+
+                                                5
+
+======================== PDF 第 6 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+Table 1: PSNR, SSIM, CLIP Score (CLIPS), and LPIPS comparisons of different methods on seen obstructions. The best
+and second best results are highlighted in bold and underlined.
+
+                                    Fence                              Flare                         Raindrop                       Average
+   Method     Venue
+                  PSNR↑SSIM↑CLIPS↑LPIPS↓PSNR↑SSIM↑CLIPS↑LPIPS↓PSNR↑SSIM↑CLIPS↑LPIPS↓PSNR↑SSIM↑CLIPS↑LPIPS↓
+
+ Restormer   CVPR22    29.86  0.9170  0.9045  0.0986   25.41  0.9162  0.9547  0.0772   30.07  0.9542  0.9670  0.0482   28.45  0.9291  0.9421  0.0746
+ TransWeather CVPR22    26.93  0.8492  0.8964  0.1157   25.18  0.9040  0.9323  0.0824   30.44  0.9508  0.9468  0.0787   27.52  0.9013  0.9252  0.0922
+ PromptIR    NeurIPS23  24.59  0.7423  0.8957  0.1521   25.43  0.9187  0.9604  0.0721   31.95  0.9668  0.9679  0.0471   27.32  0.8759  0.9413  0.0904
+ WGWSNet  CVPR23    23.19  0.7878  0.8561  0.2884   25.87  0.9192  0.9486  0.0710   32.89  0.9671  0.9706  0.0486   27.32  0.8914  0.9251  0.1360
+ Histoformer  ECCV24    28.05  0.9001  0.8971  0.1134   25.19  0.9195  0.9541  0.0712   31.59  0.9614  0.9584  0.0548   28.28  0.9270  0.9365  0.0798
+ XRestormer  ECCV24    27.11  0.8972  0.9037  0.1430   24.89  0.9185  0.9487  0.0743   30.55  0.9583  0.9557  0.0482   27.52  0.9247  0.9360  0.0924
+
+ Instruct2See  ICML25    30.15  0.9079  0.9093  0.0941   25.15  0.9202  0.9509  0.0694   32.64  0.9680  0.9723  0.0446   29.31  0.9320  0.9442  0.0694
+
+
+            Fence
+
+
+
+
+
+            Flare
+
+
+                   RainDrop
+
+
+
+                   (a) Inputs          (b) PromptIR        (c) WGWSNet       (d) Histoformer      (e) XRestormer       (f) Instruct2See     (g) Ground Truth
+               Figure 4: Visual comparisons of our method with other approaches on seen obstructions.
+
+160 × 160, 192 × 192, and 256 × 256 at iterations 115,000,    Additionally, 500 raindrop test image pairs are included. For
+80,000, 60,000, and 45,000, respectively. We also apply    unseen obstructions, we sourced 100 test images each from
+horizontal and vertical flips for data augmentation.            the rain streak dataset (Yang et al., 2017), snowy dataset
+                                                           (Liu et al., 2018), and stroke dataset (Lugmayr et al., 2022).
+Datasets. We utilize 3,984 images for model training. For
+                                       We also tested our method on special obstacles to verify its
+the fence obstacle, we select 897 clear images from the BSD
+                                                             zero-shot capability.
+dataset (Martin et al., 2001) and the UCID dataset (Schaefer
+& Stich, 2003), and generate paired data using the fence
+                                                                    5.2. Comparisons with the State-of-the-Artssynthesis method from (Du et al., 2018). Additionally, 987
+clear images from the Flickr24K dataset (Zhang et al., 2018)    Results on Seen Obstructions. The quantitative evalu-
+and 987 flare images from the Flare7K dataset (Dai et al.,    ation results for seen obstructions are presented in Table
+2022) are used to create flare image pairs. We also include     1. We compare the obstruction removal performance of
+2,100 training image pairs from the VRDS dataset (Wu et al.,    various methods by using detected masks. While our pro-
+2023). For testing, we apply the same synthesis strategy to    posed method is slightly outperformed by certain state-of-
+create a fence test dataset with 100 image pairs. Moreover,    the-art methods in specific tasks based on PSNR, SSIM,
+a flare test dataset with another 100 image pairs is used.
+
+
+                                                6
+
+======================== PDF 第 7 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+Table 2: PSNR, SSIM, CLIP Score (CLIPS), and LPIPS comparisons of different methods on unseen obstructions. The best
+and second best results are highlighted in bold and underlined.
+
+                                  Rain Streak                    Snow                            Stroke                         Average
+ Method      Venue
+                  PSNR↑SSIM↑CLIPS↑LPIPS↓PSNR↑SSIM↑CLIPS↑LPIPS↓PSNR↑SSIM↑CLIPS↑LPIPS↓PSNR↑SSIM↑CLIPS↑LPIPS↓
+
+ Restormer   CVPR22    26.19  0.8381  0.9133  0.2385   28.81  0.9013  0.9355  0.1508   21.14  0.8173  0.8012  0.2061   25.38  0.8522  0.8833  0.1984
+ TransWeather CVPR22    26.70  0.8341  0.8989  0.2450   29.53  0.8926  0.9455  0.1317   18.27  0.6752  0.8014  0.3598   24.83  0.8006  0.8819  0.2455
+ PromptIR    NeurIPS23  24.04  0.7197  0.8869  0.2211   26.01  0.7457  0.9370  0.1185   29.39  0.9021  0.8533  0.0970   26.48  0.7892  0.8924  0.1455
+ WGWSNet  CVPR23    29.68  0.9111  0.9422  0.1411   29.54  0.8944  0.9439  0.1273   28.25  0.8722  0.8791  0.1222   29.18  0.8927  0.9217  0.1302
+ Histoformer  ECCV24    27.99  0.8634  0.8854  0.1870   32.40  0.9203  0.9421  0.0909   28.07  0.8761  0.8379  0.1206   29.49  0.8866  0.8885  0.1328
+ XResrormer  ECCV24    28.05  0.8560  0.9138  0.2108   31.31  0.9170  0.9567  0.1040   19.00  0.7588  0.7754  0.2472   26.12  0.8439  0.8820  0.1873
+
+ Instruct2See  ICML25    29.82  0.8907  0.9296  0.1639   34.85  0.9283  0.9618  0.0639   29.45  0.9067  0.8507  0.0936   31.37  0.9086  0.9140  0.1071
+
+
+CLIPS, and LPIPS metrics, the overall results clearly high-    Table 3: PSNR and SSIM comparisons of our method with
+light the strengths and advantages of our approach. Notably,    inpainting/editing-based methods on unseen obstructions.
+our method achieves a PSNR that is 0.86 dB higher than   The best results are highlighted in bold.
+the second-best method, Restormer, demonstrating its su-                          Rain Streak     Snow         Stroke       Average
+perior ability to preserve image quality. Furthermore, as     Method    Venue                                                                          PSNR↑SSIM↑PSNR↑SSIM↑PSNR↑SSIM↑PSNR↑SSIM↑
+shown in Fig. 4, visual comparisons across the three ob-
+                                                             LaMa    WACV22 29.07 0.8858 32.32 0.9108 28.10 0.8728 29.83 0.8898
+struction removal tasks consistently emphasize the strengths      RePaint   CVPR22  28.78 0.8865 32.20 0.9064 23.78 0.8059 28.25 0.8662
+of our approach, particularly in reconstructing fine details      DiffEdit   ICLR23  23.88 0.6561 24.23 0.6732 11.65 0.6072 19.92 0.6455
+and maintaining scene coherence. For additional numeri-     Instruct2SeeICML25  29.82 0.8907 34.85 0.9283 29.45 0.9067 31.37 0.9086
+cal experiments under ideal conditions (using ground truth
+masks), please refer to the Appendix.
+                                                                in the zero-shot obstruction removal. Table 3 presents the
+Results on Unseen Obstructions. To further evaluate the
+                                                                quantitative evaluation results for these methods and ours
+zero-shot learning capability of our model, we conducted
+                                                            across three classic obstacle removal scenarios. In particu-
+experiments on images containing unseen obstructions. Ta-
+                                                                                 lar, the editing-based method (DiffEdit) has poor numerical
+ble 2 presents the PSNR, SSIM, CLIPS, and LPIPS results
+                                                         performance, while inpainting-based methods fail to accu-
+for obstruction removal on three classic obstacles not in-
+                                                                 rately reconstruct details. These stem from their design
+cluded in the training. With the exception of a slightly lower
+                                                            as image inpainting and editing tools, which strictly con-
+CLIPS compared to WGWSNet, our method consistently
+                                                                   strain changes to masked regions and lack the flexibility
+delivers the best results across the unseen obstruction. As
+                                                                to handle irregular-shaped holes. The results indicate that,
+shown in Fig. 5, visual comparisons across additional ob-
+                                                              despite using obstacle masks as inputs, existing inpainting
+structions, such as yarn, scratches, spots, and power cables,
+                                                     and editing methods still struggle to effectively address this
+further demonstrate the strong generalization ability of our
+                                                         problem. In contrast, our method, which incorporates a tun-
+proposed method. While existing methods often struggle or
+                                                              able mask adapter and multimodal feature representation of
+show limited effectiveness in addressing out-of-distribution
+                                                                obstacles, demonstrates superior performance in zero-shot
+obstructions, our approach consistently produces more ac-
+                                                              obstacle removal tasks. Fig. 6 further visualizes additional
+curate and realistic restorations. This confirms the perfor-
+                                                              obstacle removal results. It is evident that while LaMa and
+mance boost provided by our multi-modal prompt strategy
+                                                         RePaint exhibit some obstacle removal capabilities, residual
+and tunable adapter, which enable effective zero-shot learn-
+                                                             obstacles remain. Conversely, our Instruct2See effectively
+ing and allow our model to capture the nuances of unseen
+                                                          handles various situations and robustly removes obstacles.
+obstructions. These results validate the robustness and flex-
+ibility of our method, making it a promising solution for
+                                                                    5.3. Ablation Study
+real-world applications where diverse and unpredictable
+obstructions are common.                                   Effectiveness of Network Modules. Table 4 (a) presents a
+                                                      comprehensive quantitative evaluation of different moduleIn addition, the inpainting- and editing-based methods ex-
+                                                              configurations on three seen and three unseen obstructions.hibit strong zero-shot capabilities and perform well in var-
+                                                 The results clearly show that the baseline model alone pro-ious object removal or image editing tasks, making them
+                                                         duces poor results, as indicated by the low PSNR and SSIMviable solutions for the obstruction removal task. There-
+                                                                scores. Introducing a mask improves performance slightly,fore, for a comprehensive comparison, we evaluated our
+                                                            but the enhancement remains limited. This is primarily be-proposed method against two inpainting methods (LaMa
+                                                        cause the model struggles to distinguish between different(Suvorov et al., 2022) and RePaint (Lugmayr et al., 2022))
+                                                           types of obstructions and cannot effectively select the ap-and one editing method (DiffEdit (Couairon et al., 2023))
+                                                              propriate masking strategy. Additionally, without a proper
+
+                                                7
+
+======================== PDF 第 8 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+
+
+           Yarns
+
+
+                    Scratches
+
+
+           Spots
+
+             Cables
+           Power
+
+                (a) Inputs          (b) PromptIR       (c) WGWSNet      (d) Histoformer     (e) XRestormer       (f) Instruct2See
+
+              Figure 5: Visual comparisons of our method with other approaches on unseen obstructions.
+
+understanding of scene semantics, the model generates unre-    Table 4: PSNR and SSIM comparisons of integrating dif-
+alistic and anomalous restoration outcomes. In contrast, in-    ferent modules (a) and using different prompt strategies (b).
+corporating the cross-attention mechanism, which integrates    Pt and Pv represent text and visual prompts, respectively.
+textual instructions with visual semantics, significantly im-      mask  CA  Adapter  PSNR↑  SSIM↑    Pt  Pv  PSNR↑  SSIM↑
+proves performance, leading to a PSNR increase of 1.95
+                                                                                                         27.05    0.8920                 28.65    0.9063
+and an SSIM increase of 0.0113. This mechanism enables    ✓                    28.05    0.9004   ✓         29.73    0.9168
+the model to better grasp the contextual relationship be-    ✓✓  ✓✓   ✓      30.0030.93    0.91170.9250   ✓  ✓✓    30.2530.93    0.92150.9250
+tween the obstruction and the surrounding scene, producing                             (a)                                       (b)
+more coherent and realistic restoration results. Finally, the
+tunable adapter can further enhance the ability to handle   When using only the textual embedding, the model can
+obstructions with blurred boundaries, resulting in optimal    adopt the correct strategy to handle both sharp and blurred
+effects across all metrics. This verified that our model can   mask boundaries. However, due to the absence of complete
+adaptively manage different obstruction scenarios, leading    image semantics from occluded regions, the model often
+to a more refined and effective restoration process.           produces unrealistic or inconsistent results. Using only the
+                                                              visual encoder strategy can better compensate for the se-Effectiveness of Different Prompts. Table 4 (b) compares
+                                                       mantic loss caused by obstacle removal, thereby achievingperformance using different prompt strategies.  Without
+                                                                    better results than introducing only the text encoder. Finally,prior prompts, the model performs poorly, primarily due to
+                                                    by integrating both visual semantics and textual instructionsconfusion over the correct masking strategy and a lack of
+                                                          through a multi-modal prompt, the model can easily handlesemantic understanding, especially for unseen obstructions.
+                                                               obstruction removal tasks for both in-distribution and out-of-
+
+
+                                                8
+
+======================== PDF 第 9 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+
+
+                                                                                                                                                                                           Original Mask              Adapted Mask
+
+ Stroke
+
+
+                                                                                                        (a) Input         (b) w/o Adapter       (c) Full Model      (d) Ground Truth
+                                                          Figure 8: Visual comparisons of using our tunable adapter
+                                                   on a raindrop obstruction case.
+
+Spots                                                         adapter for soft masking to address inaccuracies in occlu-
+                                                            sion regions. This adapter dynamically adjusts the mask,
+                                                            enabling our model to determine the extent of mask applica-
+                                                                  tion based on the image features, rather than being confined
+                                                                to a predefined mask area. To evaluate the function and
+                                                                effectiveness of our proposed adapter, we conducted an ab-
+Snow                                                                 lation study. As shown in Fig. 8, a comparison between the
+                                                            adjusted and original masks demonstrates that the adapter
+                                                                   effectively refines the mask for uncertain obstructions, such
+                                                            as raindrops. The original mask often overly covers the
+          (a) Inputs             (b) LaMa             (c) RePaint        (d) Instruct2See      restoration area, leading to a loss of detail and suboptimal
+Figure 6: Visual comparisons of our method with inpainting                                                              reconstruction. In contrast, the adjustments made by the
+methods on unseen obstructions.                                                           tunable adapter ensure more accurate and reliable restora-
+                                                                tion by preserving crucial details in the occluded regions.
+                                                             Additionally, the ablation study reveals that the tunable
+                                                           adapter significantly improves the model’s adaptability to
+                                                            various obstructions with ambiguous boundaries, resulting
+                                                                  in a PSNR increase of 0.93 and an SSIM gain of 0.0133 com-
+       (a) Input          (b) w/o Prompt   (c) w/o Visual Prompt   (d) Full Modal      (e) Ground Truth     pared to the fixed mask approach. These findings confirm
+Figure 7: Visual comparisons of using different prompt                                                                   that the tunable adapter not only optimizes mask coverage
+strategies on a snow obstruction case.                                                             but also plays a vital role in refining the restoration process.
+
+distribution obstacles. The multi-modal prompt strategy not
+only improves the model’s interpretability but also strength-    6. Conclusion
+ens its ability to generalize to unfamiliar obstructions.
+                                                            In this work, we proposed Instruct2See, a novel zero-shot
+To further illustrate the impact of multi-modal prompts, we    obstruction removal framework designed to effectively ad-
+compared different strategies in a snow obstruction case, as    dress challenges posed by both in-distribution and out-
+shown in Fig. 7. Without any prompt, the model shows     of-distribution obstructions. By leveraging multi-modal
+only a slight reduction of the snow obstacles.  Introduc-    prompts that integrate visual semantics and textual descrip-
+ing a textual prompt (Fig. 7(c)) allows the model to focus     tions through a cross-attention mechanism, Instruct2See
+more on masking strategy, leading to better suppression of    demonstrated superior performance in accurately recon-
+the obstruction. However, using only the textual prompt     structing occluded scenes.  The inclusion of a tunable
+introduces unnatural artifacts in the reconstruction, as the    adapter for soft masking further improved adaptability, al-
+model lacks complete semantic information from the oc-    lowing the model to handle ambiguous boundaries with
+cluded regions. By incorporating the visual encoder from     greater flexibility. Extensive experiments validated the effi-
+the visual-language model, we effectively compensate for    cacy and generalization capabilities of Instruct2See, high-
+the missing semantic details during obstruction removal.    lighting its potential as a robust solution for real-world ob-
+This approach preserves the model’s robust zero-shot learn-    struction removal tasks.
+ing capability while enabling it to extract relevant details
+                                                            Limitations. Our method targets small, numerous obstacles
+and accurately represent various obstructions, even those
+                                                                           (e.g., raindrops and fences) and explores optimal strategies
+not encountered during training. Consequently, the multi-
+                                                                for removing both opaque and translucent obstacles. It is
+modal prompt strategy delivers superior visual restoration
+                                                          not intended for large obstructions, as it focuses on scene
+and enhanced obstruction suppression performance.
+                                                           recovery through contextual cues. In such cases, inpainting
+Effectiveness of Tunable Adapter. We designed a tunable    techniques may be more effective.
+
+                                                9
+
+======================== PDF 第 10 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+Acknowledgements                               Du, C., Kang, B., Xu, Z., Dai, J., and Nguyen, T. Accurate
+                                                        and efficient video de-fencing using convolutional neural
+This work is supported by the Guangdong Natural Sci-                                                        networks and temporal information. In ICME, pp. 1–6,
+ence Funds for Distinguished Young Scholars (Grant                                                           2018.
+2023B1515020097), the GuangDong Basic and Applied Ba-
+sic Research Foundation (2025A1515010124), the National    Du, Y., Han, G., Tan, Y., Xiao, C., and He, S. Blind image
+Research Foundation, Singapore under its AI Singapore Pro-      denoising via dynamic dual learning. IEEE TMM, 23:
+gramme (AISG Award No: AISG3-GV-2023-011), and the      2139–2152, 2020.
+Lee Kong Chian Fellowships.
+                                                       Grechka, A., Couairon, G., and Cord, M.  Gradpaint:
+                                                             Gradient-guided inpainting with diffusion models. CVIU,Impact Statement
+                                                          240:103928, 2024.
+This paper presents work whose goal is to advance the field
+of Machine Learning. There are many potential societal    Guo, Y., Gao, Y., Lu, Y., Zhu, H., Liu, R. W., and He,
+consequences of our work, none of which we feel must be       S. Onerestore: A universal restoration framework for
+specifically highlighted here.                                composite degradation. ECCV, 2024.
+
+                                                    Han, J., Li, W., Fang, P., Sun, C., Hong, J., Armin, M. A.,
+References                                                   Petersson, L., and Li, H. Blind image decomposition. In
+                                               ECCV, pp. 218–237, 2022.Chang, W., Chen, H., He, X., Chen, X., and Shen, L. Uav-
+  rain1k: A benchmark for raindrop removal from uav
+                                                   Huang, P., Zhang, D., Cheng, D., Han, L., Zhu, P., and
+   aerial imagery. In CVPR, pp. 15–22, 2024.
+                                                      Han, J. M-rrfs: A memory-based robust region feature
+                                                                  synthesizer for zero-shot object detection. IJCV, pp. 1–22,Chen, H., Wang, Y., Guo, T., Xu, C., Deng, Y., Liu, Z.,
+                                                           2024a.  Ma, S., Xu, C., Xu, C., and Gao, W.  Pre-trained im-
+  age processing transformer. In CVPR, pp. 12299–12310,                                                   Huang, Q., Xu, C., Li, G., Wu, Z., Liu, S., and He, S.
+  2021.                                                                     Portrait shadow removal via self-exemplar illumination
+                                                                   equalization. In ACM MM, pp. 7474–7482, 2024b.
+Chen, S., Ye, T., Bai, J., Chen, E., Shi, J., and Zhu, L. Sparse
+  sampling transformer with uncertainty-driven ranking for                                                                 Li, B., Liu, X., Hu, P., Wu, Z., Lv, J., and Peng, X. All-in-
+   unified removal of raindrops and rain streaks. In ICCV,                                                       one image restoration for unknown corruption. In CVPR,
+  pp. 13106–13117, 2023a.                                                               pp. 17452–17462, 2022a.
+
+Chen, Z., Sun, Y., Bi, X., and Yue, J. Lightweight image                                                                 Li, J., Li, D., Xiong, C., and Hoi, S. Blip: Bootstrapping
+  de-snowing: A better trade-off between network capacity                                                          language-image pre-training for unified vision-language
+  and performance. Neural Networks, 165:896–908, 2023b.                                                            understanding and generation. In ICML, 2022b.
+
+Chugunov, I., Shustin, D., Yan, R., Lei, C., and Heide,     Li, R., Tan, R. T., and Cheong, L.-F. All in one bad weather
+   F. Neural spline fields for burst image fusion and layer      removal using architectural search. In CVPR, pp. 3175–
+   separation. In CVPR, pp. 25763–25773, 2024.               3185, 2020.
+
+Couairon, G., Verbeek, J., Schwenk, H., and Diffedit, M.    Li, W., Lin, Z., Zhou, K., Qi, L., Wang, Y., and Jia, J. Mat:
+  Diffusion-based semantic image editing with mask guid-     Mask-aware transformer for large hole image inpainting.
+  ance. In ICLR, 2023.                                        In CVPR, pp. 10758–10768, 2022c.
+
+Dai, Y., Li, C., Zhou, S., Feng, R., and Loy, C. C. Flare7k:    Li, Y., Monno, Y., and Okutomi, M. Dual-pixel raindrop
+ A phenomenological nighttime flare removal dataset.      removal. IEEE TPAMI, 2024.
+  NeurIPS, 35:3926–3937, 2022.
+                                                             Liu, Y.-F., Jaw, D.-W., Huang, S.-C., and Hwang, J.-N.
+Dai, Y., Luo, Y., Zhou, S., Li, C., and Loy, C. C. Nighttime      Desnownet: Context-aware deep network for snow re-
+  smartphone reflective flare removal using optical center      moval. IEEE TIP, 27(6):3064–3073, 2018.
+  symmetry prior. In CVPR, pp. 20783–20791, 2023.
+                                                             Liu, Y.-L., Lai, W.-S., Yang, M.-H., Chuang, Y.-Y., and
+Deng, Y., Hui, S., Zhou, S., Meng, D., and Wang, J. Learn-     Huang, J.-B. Learning to see through obstructions with
+  ing contextual transformer network for image inpainting.      layered decomposition. IEEE TPAMI, 44(11):8387–8402,
+  In MM, pp. 2529–2538, 2021.                              2021.
+
+                                                10
+
+======================== PDF 第 11 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+Lugmayr, A., Danelljan, M., Romero, A., Yu, F., Timofte,    Suvorov, R., Logacheva, E., Mashikhin, A., Remizova, A.,
+   R., and Van Gool, L. Repaint: Inpainting using denoising      Ashukha, A., Silvestrov, A., Kong, N., Goka, H., Park, K.,
+  diffusion probabilistic models.  In CVPR, pp. 11461–      and Lempitsky, V. Resolution-robust large mask inpaint-
+  11471, 2022.                                               ing with fourier convolutions. In WACV, pp. 2149–2159,
+                                                          2022.
+Martin, D., Fowlkes, C., Tal, D., and Malik, J. A database
+  of human segmented natural images and its application    Tsogkas, S., Zhang, F., Jepson, A., and Levinshtein, A.
+   to evaluating segmentation algorithms and measuring       Efficient flow-guided multi-frame de-fencing. In WACV,
+  ecological statistics. In ICCV, volume 2, pp. 416–423,      pp. 1838–1847, 2023.
+  July 2001.
+                                                           Valanarasu, J. M. J., Yasarla, R., and Patel, V. M. Tran-
+Naeem, M. F., Xian, Y., Gool, L. V., and Tombari, F.      sweather: Transformer-based restoration of images de-
+  I2dformer+: Learning image to document summary at-      graded by adverse weather conditions.  In CVPR, pp.
+   tention for zero-shot image classification. IJCV, pp. 1–17,      2353–2363, 2022.
+  2024.
+                                                Wang, C., Zheng, Z., Quan, R., Sun, Y., and Yang, Y.
+¨Ozdenizci, O. and Legenstein, R. Restoring vision in ad-      Context-aware pretraining for efficient blind image de-
+  verse weather conditions with patch-based denoising dif-      composition. In CVPR, pp. 18186–18195, 2023a.
+  fusion models. IEEE TPAMI, 45(8):10346–10357, 2023.
+                                                Wang, Y., Ma, C., and Liu, J.  Smartassign: Learning a
+Potlapalli, V., Zamir, S. W., Khan, S., and Khan, F. Promptir:      smart knowledge assignment strategy for deraining and
+  Prompting for all-in-one image restoration. In NeurIPS,      desnowing. In CVPR, pp. 3677–3686, 2023b.
+  2023.
+                                                  Wen, Q., Tan, Y., Qin, J., Liu, W., Han, G., and He, S. Single
+                                                      image reflection removal beyond linearity. In CVPR, pp.Qian, R., Tan, R. T., Yang, W., Su, J., and Liu, J. Attentive
+                                                       3771–3779, 2019.  generative adversarial network for raindrop removal from
+  a single image. In CVPR, pp. 2482–2491, 2018.                                             Wu, H., Yang, Y., Chen, H., Ren, J., and Zhu, L. Mask-
+                                                         guided progressive network for joint raindrop and rainQuan, Y., Huang, H., He, S., and Xu, R.  Deep video
+                                                                  streak removal in videos. In MM, pp. 7216–7225, 2023.  demoir´eing via compact invertible dyadic decomposition.
+  In ICCV, pp. 12677–12686, 2023a.                                                     Yang, W., Tan, R. T., Feng, J., Liu, J., Guo, Z., and Yan,
+                                                                S. Deep joint rain detection and removal from a singleQuan, Y., Tan, X., Huang, Y., Xu, Y., and Ji, H. Image
+                                                           image. In CVPR, pp. 1357–1366, 2017.  desnowing via deep invertible separation. IEEE TCSVT,
+  33(7):3133–3144, 2023b.                                                        Zamir, S. W., Arora, A., Khan, S., Hayat, M., Khan, F. S.,
+                                                      and Yang, M.-H. Restormer: Efficient transformer for
+Radford, A., Kim, J. W., Hallacy, C., Ramesh, A., Goh, G.,
+                                                               high-resolution image restoration. In CVPR, pp. 5728–
+  Agarwal, S., Sastry, G., Askell, A., Mishkin, P., Clark, J.,
+                                                          5739, 2022.
+   et al. Learning transferable visual models from natural
+  language supervision. In ICML, pp. 8748–8763, 2021.     Zeng, Y., Fu, J., Chao, H., and Guo, B. Learning pyramid-
+                                                              context encoder network for high-quality image inpaint-
+Ravi, N., Gabeur, V., Hu, Y.-T., Hu, R., Ryali, C., Ma, T.,
+                                                                     ing. In CVPR, pp. 1486–1494, 2019.
+  Khedr, H., R¨adle, R., Rolland, C., Gustafson, L., et al.
+  Sam 2: Segment anything in images and videos. arXiv    Zhang, D., Ouyang, J., Liu, G., Wang, X., Kong, X., and
+  preprint arXiv:2408.00714, 2024.                                  Jin, Z. Ff-former: Swin fourier transformer for nighttime
+                                                                          flare removal. In CVPR, pp. 2824–2832, 2023a.
+Ronneberger, O., Fischer, P., and Brox, T. U-net: Convolu-
+   tional networks for biomedical image segmentation. In    Zhang, H., Xu, X., He, H., He, S., Han, G., Qin, J., and
+  MICCAI, pp. 234–241, 2015.                         Wu, D. Fast user-guided single image reflection removal
+                                                               via edge-aware cascaded networks. IEEE TMM, 22(8):
+Schaefer, G. and Stich, M. Ucid: An uncompressed color                                                       2012–2023, 2019.
+  image database. In Storage and retrieval methods and
+  applications for multimedia 2004, volume 5307, pp. 472–   Zhang, J., Huang, J., Jin, S., and Lu, S. Vision-language
+  480. SPIE, 2003.                                      models for vision tasks: A survey. IEEE TPAMI, 2024.
+
+Sun, S., Ren, W., Gao, X., Wang, R., and Cao, X. Restor-   Zhang, X., Ng, R., and Chen, Q. Single image reflection
+  ing images in adverse weather conditions via histogram       separation with perceptual losses. In CVPR, pp. 4786–
+  transformer. ECCV, 2024.                                 4794, 2018.
+
+                                                11
+
+======================== PDF 第 12 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+Zhang, Z., Wei, Y., Zhang, H., Yang, Y., Yan, S., and Wang,
+  M. Data-driven single image deraining: A comprehensive
+  review and new perspectives. PR, 143:109740, 2023b.
+
+Zhou, Y., Liang, D., Chen, S., Huang, S.-J., Yang, S., and
+   Li, C. Improving lens flare removal with general-purpose
+   pipeline and multiple light sources recovery. In ICCV, pp.
+  12969–12979, 2023.
+
+Zhu, H., Yuan, J., Yang, Z., Guo, Y., Wang, Z., Zhong,
+  X., and He, S.  Zero-shot object counting with good
+  exemplars. ECCV, 2024.
+
+
+
+
+
+                                                12
+
+======================== PDF 第 13 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+A. Implementation Details
+
+A.1. Model Inference
+
+As outlined in Algorithm 1, our model operates in two modes during inference: opaque obstruction removal using hard
+masking and semi-transparent obstruction removal using soft masking. The process begins with the image I, containing
+the obstruction, and a text instruction T. The overall obstruction removal procedure is divided into three key steps: mask
+generation, multi-modal prompt generation, and obstruction removal.
+
+
+Algorithm 1 Instruct2See Model Inference
+  1: I: input image, B clear background, M:¯  initial mask, M:ˆ  adapted mask, ˆI: input image cutout by M,ˆ T: text instruction,
+    Ts: “semi-transparent obstacle” text, D(·): mask detector, A(·): tunable adapter, R(·, ·, ·): Obstruction Eliminator,
+     Γt(·): visual language model’s text encoder, Γv(·): visual language model’s visual encoder, Pt: text prompt, Pv: visual
+    prompt, P: multi-modal prompt, concat: embedding splicing operation
+Input: I, T
+  2: M¯ ←D(I) {Initial mask generation.}
+  3: Pt ←Γt(T)
+  4: Pv ←Γv(I)
+  5:  if sim(Pt, Γt(Ts)) > θ then
+  6:  Mˆ ←A(M)¯  {Soft masking.}
+  7: else
+  8:  Mˆ = M¯ {Hard masking.}
+  9: end if
+10: P = concat[Pt, Pv] {Multi-modal prompt generation.}
+11: get ˆI by cutting out the region in Mˆ from I
+12: B ←R(ˆI, M,ˆ P) {Obstruction removal.}
+13: return B
+
+Mask Generation. We first extract the initial mask M¯ from the input image I using a mask detector (as described in
+line 2 of Algorithm 1). For obstructions like rain streaks and snow, which are more challenging to segment, we employ a
+U-Net-based model (Ronneberger et al., 2015) to generate the initial mask. For other obstructions, we use the Segment
+Anything Model 2 (SAM2) (Ravi et al., 2024). Depending on the type of obstruction, different masking strategies are
+applied: for opaque obstructions with clear boundaries, we directly use M¯ as the final mask Mˆ (lines 7–9), while for
+semi-transparent obstructions with blurred edges, we refine M¯ using a tunable adapter to improve performance (lines 5–7).
+
+Multi-Modal Prompt Generation. We process the inputs I and T using the text and image encoders of the Contrastive
+Language-Image Pre-training (CLIP) model (Radford et al., 2021) to obtain textual and visual embeddings (Pt, Pv). These
+embeddings are then concatenated to generate the multi-modal prompt P, as described in lines 3, 4, and 10 of Algorithm 1.
+Obstruction Removal. With the refined mask Mˆ and the multi-modal prompt P, we first use Mˆ to mask out the obstructions
+in I, generating ˆI. Then, ˆI and Mˆ are concatenated along the channel dimension and, along with P, input into the obstruction
+removal model R(·) (lines 11–13). A cross-attention module within R(·) fuses the image features with the multi-modal
+prompt. Specifically, features from the image map are extracted using convolution as the query, while the multi-modal
+prompt generates key and value vectors via two independent linear layers. These vectors are fused using a multi-head
+attention mechanism, guiding the network to effectively remove unknown obstructions.
+
+
+A.2. CLIP Usage
+
+In the use of CLIP1, the visual encoder is employed to extract visual features from the original image to compensate
+for the loss of visual semantics caused by obstacle cutout. Since the pre-trained CLIP visual encoder already possesses
+strong semantic representation capabilities, we do not perform additional fine-tuning on this module. The text embeddings,
+however, provide specific removal prompts to the model. Due to the relatively few specific instructions for obstacle removal
+in CLIP’s original training, the original embedding space may not be suitable for this task (i.e., the embeddings generated by
+text instructions for the same goal may exhibit significant variability). Therefore, we only fine-tune CLIP’s text encoder. The
+
+   1We utilize the CLIP ViT-B/32 model.
+
+
+                                                13
+
+======================== PDF 第 14 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+                                                                        Contrastive Text Encoder Fine-tuning
+              Text Command Database
+   Translucent object in the image.                                        ''Translucent object blocks.''
+   The picture contains a translucent barrier.                                                                                                        Text                                                                                                    ''This image contains an                                Encoder
+   Please remove the translucent object from the image.                                   opaque obstacle.''
+  An opaque object is obstructing part of the image, making                                            Share Weight                T3  T4
+    it difficult to see what lies behind it.                                                                                       ''The view in the image is
+                                                                         obstructed by a semi-transparent   The image contains an opaque object that needs to be                                                                                        object, making it difficult to see                              T1      T1·T3 T1·T4
+   addressed to improve visibility.                                        what lies behind it ''                                       Text                                                                                                                                                                                                                                                                             Encoder                                                                                                           T2      T2·T3 T2·T4
+  Remove opaque obstruction.                                                                       ''Opaque''
+ …
+
+
+                               Figure 9: Contrastive fine-tuning of CLIP text encoder.
+
+Table 5: PSNR and SSIM comparisons of different methods on seen obstructions. The scheme using the GT mask as input
+is designed to demonstrate the obstruction removal capabilities of each model under ideal conditions.
+
+                                  Fence                Flare             Raindrop            Average               Method
+                      PSNR↑   SSIM↑   PSNR↑   SSIM↑   PSNR↑   SSIM↑   PSNR↑   SSIM↑
+              Restormer       29.86    0.9170    25.41    0.9162    30.07    0.9542    28.45    0.9291
+           w GT mask    29.62    0.9166    25.38    0.9145    32.04    0.9651    29.01    0.9321
+              TransWeather    26.93    0.8492    25.18    0.9040    30.44    0.9508    27.52    0.9013
+           w GT mask    29.12    0.8727    26.05    0.9150    30.58    0.9510    28.58    0.9129
+             PromptIR        24.59    0.7423    25.43    0.9187    31.95    0.9668    27.32    0.8759
+           w GT mask    26.41    0.7842    25.63    0.9193    32.71    0.9691    28.25    0.8909
+          WGWSNet      23.19    0.7878    25.87    0.9192    32.89    0.9671    27.32    0.8914
+           w GT mask    26.88    0.8467    25.50    0.9193    32.26    0.9648    28.21    0.9103
+              Histoformer      28.05    0.9001    25.19    0.9195    31.59    0.9614    28.28    0.9270
+           w GT mask    32.29    0.9382    25.96    0.9106    32.29    0.9636    30.18    0.9375
+             XRestormer      27.11    0.8972    24.89    0.9185    30.55    0.9583    27.52    0.9247
+           w GT mask    30.57    0.8972    25.44    0.9176    31.02    0.9599    29.01    0.9249
+               Instruct2See      30.15    0.9079    25.15    0.9202    32.64    0.9680    29.31    0.9320
+           w GT mask    32.12    0.9329    25.83    0.9203    33.52    0.9706    30.49    0.9413
+
+fine-tuning strategy for the CLIP text encoder is shown in Fig. 9. We first collected the text instructions corresponding to
+each image in our training dataset to construct a text command database. This database contains two categories: instructions
+for removing opaque obstacles and instructions for removing semi-transparent obstacles. Subsequently, we fine-tuned the
+model using a contrastive pre-training strategy similar to CLIP.
+
+More specifically, in each iteration, we randomly select text instructions in the database and use the CLIP text encoder to
+generate two text embeddings for opaque obstacles (T2 and T4) and two text embeddings for semi-transparent obstacles (T1
+and T3). Subsequently, we calculate the cosine similarity between each pair and designate the values calculated between
+the same category as positive samples, while the values calculated between different categories are designated as negative
+samples. Finally, we perform contrastive training based on the clip loss (Radford et al., 2021).
+
+Additionally, the tunable adapter is only activated for semi-transparent obstacles. To selectively enable this function based
+on the input instruction, we set up two-word embeddings: “opaque” and “semi-transparent”. By calculating the cosine
+similarity between the instructions embedding and these two embeddings, we can determine whether to activate the adapter
+module. Therefore, this fine-tuning strategy allows our model to more accurately judge when to enable the adapter.
+
+B. More Experimental Results
+
+B.1. More Numerical Results
+
+To demonstrate the upper bound of seen obstacle removal under ideal conditions, we compared the restoration performance
+of various methods using both detected masks and ground-truth masks. As shown in Table 5, the results show that higher-
+quality masks benefit most methods. In our task, the mask detector is plug-and-play, and future adoption of more powerful
+
+
+                                                14
+
+======================== PDF 第 15 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+                        PSNR                       SSIM
+                                Fence                          Fence
+                                Stroke                   Flare            Stroke                   Flare
+                                                                                                            Restormer
+                                                                                                          TransWeather
+                                                                                                          PromptIR
+                                                                                WGWSNet
+                                                                                                                       Histoformer                        Snow                                                       Snow                                                          RainDrop                                                                                                        RainDrop        XRestormer
+                                 Rain Streak                        Rain Streak                 Instruct2See
+
+            Figure 10: PSNR and SSIM comparisons of different methods on seen and unseen obstructions.
+
+
+mask detectors could further enhance the obstruction removal capability. Additionally, we present a radar chart (Fig. 10)
+comparing the PSNR and SSIM results for three types of seen obstacles and three classic unseen obstacles. The results
+demonstrate that the proposed model delivers robust performance across various scenarios, validating its effectiveness and
+strong generalization ability.
+
+
+B.2. Zero-Shot Single Obstruction Removal
+
+This section presents additional examples of removing various unseen obstructions. Fig. 11 compares the results of different
+methods on three typical obstruction removal tasks. It is evident that TransWeather and XRestormer perform poorly in the
+stroke removal task, failing to handle such cases effectively. Other methods also produce distorted facial details during
+restoration. For semi-transparent obstructions, such as raindrops and snow, these methods fail to properly capture the
+relationship between the obstruction and the mask, leading to ineffective or minimal removal.
+
+In contrast, our method employs a hard-soft masking strategy, allowing smooth transitions between hard and soft masking.
+This enables it to capture the complexity and diversity of real-world occlusion scenarios more effectively. Fig. 12 showcases
+further experiments on uncommon obstructions, demonstrating the zero-shot generalization capability of our method. This
+advantage stems from our distribution-agnostic approach, which formulates obstruction removal as a soft-hard masking
+problem, representing any obstruction through the integration of visual semantic embeddings and textual instructions.
+
+
+B.3. Zero-Shot Multiple Obstruction Removal
+
+Fig. 13 displays three visualization cases on multiple obstruction removal. It is evident that our method can accurately
+represent specified obstructions through multi-modal prompts and masks, and easily eliminate them using the designed
+model. From the results, it appears that only when there are occlusions between multiple obstacles does the elimination of
+one obstacle inevitably affect another. The order of obstruction elimination does not have a significant impact on the results.
+
+                Table 6: PSNR and SSIM comparisons of using different prompt generation strategies.
+
+
+                                   Model            PSNR↑   SSIM↑
+
+                                            Instruct2See + CLIP     30.93     0.9250
+                                            Instruct2See + BLIP     31.01     0.9235
+
+
+B.4. Metric Influence of Using Different Prompt Generation Models
+
+In this section, we compared the effects of using CLIP’s and BLIP’s encoders to generate textual and visual embeddings on
+obstacle removal results. The experimental results are shown in Table 6. Clearly, whether using CLIP (Radford et al., 2021)
+or BLIP (Li et al., 2022b), our model can generate robust obstacle removal effects, proving that our model can adapt to
+commonly used pretrained encoders.
+
+C. Failure Cases using Incorrect Description
+
+Fig. 14 illustrates two examples of using incorrect descriptions. In the stroke removal case, when an instruction of a
+semi-transparent obstruction removal is used for a scene with an opaque obstruction, our model tends to treat the original
+
+                                                15
+
+======================== PDF 第 16 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+
+
+
+
+       (a) Inputs          (b) Restormer      (c) TransWeather      (d) PromptIR        (e) WGWSNet         (f) Histoformer      (g) XRestormer     (h) Instruct2See       (i) Ground Truth
+
+           Figure 11: Visual comparisons on three classic unseen obstructions (rain streak, snow, and stroke).
+
+
+opaque obstruction as part of the real information, leading to suboptimal results. Accurately describing the obstacle as an
+opaque obstacle can easily resolve this issue. Similarly, in the shadow removal case, using an opaque obstruction description
+will make the masked image content completely invisible, resulting in a restoration that does not match reality, especially in
+cases of large-area occlusions. However, correcting the instruction to remove the transparent obstacle can solve this problem.
+
+D. Complexity Analysis
+
+In this section, we present the model sizes of various methods and calculate their Floating Point Operations (FLOPs) and
+runtime on 224x224 images. As shown in Table 7, although our model has the highest number of parameters due to the
+introduction of a cross-attention module integrated with multi-modal prompts and an adjustable mask adapter, its FLOPs
+and inference speed remain at a moderate level compared to competing methods. In the future, we will consider maintaining
+the model’s strong zero-shot generalization capabilities while reducing computational costs.
+
+                         Table 7: Comparisons of parameters, FLOPs, and runtime between.
+
+
+                    Model         Venue        Parameters (M)   FLOPs (G)    Runtime (ms)
+
+                       Restormer     CVPR22          26.13          118.60      49.37±0.46
+                       TransWeather   CVPR22          38.06            3.57       19.64±0.05
+                     PromptIR       NeurIPS23        35.59          132.26      53.95±0.47
+                WGWSNet     CVPR23           4.70           96.65       88.39±0.35
+                        Histoformer    ECCV24          16.62           86.79       83.13±0.82
+                     XRestromer    ECCV24          22.34          155.49      100.67±0.44
+
+                         Instruct2See    ICML25          56.69          146.23      84.28±0.61
+
+
+
+
+
+                                                16
+
+======================== PDF 第 17 页 ========================
+                          Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+
+
+
+
+Shadow
+
+
+Watermarks
+
+
+
+
+
+         Inputs         Histoformer      Instruct2See         Inputs         Histoformer      Instruct2See
+
+                          Figure 12: Visual comparisons on more uncommon obstructions.
+
+
+
+
+
+                                                17
+
+======================== PDF 第 18 页 ========================
+                         Instruct2See: Learning to Remove Any Obstructions Across Distributions
+
+
+
+
+
+         Input             Spots removal       Scratches removal    Remove scratches,   Remove spots, then     Ground Truth
+                                                                        then spots             scratches
+
+
+
+
+
+       Input           Fence removal      Scratches removal   Remove scratches,   Remove fence, then     Ground Truth
+                                                                then fence            scratches
+
+
+
+
+
+       Input           Fence removal    Watermark removal  Remove watermark,  Remove fence, then     Ground Truth
+                                                                then fence          watermark
+
+                            Figure 13: Visual results on multiple obstruction removal.
+
+
+
+
+
+    Input (Stroke)           Output_S            Output_O                Input (Shadow)                  Input_O                      Input_S
+
+
+
+
+
+Opaque obstruction         Text: Please remove the      Text: opaque.              Semi-transparent obstruction        Text: Opaque barriers block my       Text: Translucent shadows affect
+                          semi-transparent                                                                              view.                  my observation.
+                             obstacles on the human’s
+                               face.
+
+                         Figure 14: Visual comparisons of using different text descriptions.
+
+
+
+
+
+                                               18

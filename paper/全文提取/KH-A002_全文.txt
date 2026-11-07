@@ -1,0 +1,478 @@
+KH-A002 | Fast Matting using Large Kernel Matting Laplacian Matrices
+来源：https://people.csail.mit.edu/kaiming/publications.html
+本地PDF：专题文献/何恺明/KH-A002_Fast_Matting_using_Large_Kernel_Matting_Laplacian_Matrices_CVPR2010.pdf
+SHA-256：feae1bdb2094f0c8d44300365ee452a366893365fff27f813f546eb3e362f21d
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+         Fast Matting Using Large Kernel Matting Laplacian Matrices
+
+
+          Kaiming He1                   Jian Sun2                Xiaoou Tang1,3
+     1Department of Information Engineering       2Microsoft Research Asia      3Shenzhen Institute of Advanced Technology
+
+     The Chinese University of Hong Kong                                           Chinese Academy of Sciences
+
+
+
+Abstract  Image matting is of great importance in both
+computer vision and graphics applications.  Most exist-
+ing state-of-the-art techniques rely on large sparse matri-
+ces such as the matting Laplacian [12]. However, solving
+these linear systems is often time-consuming, which is un-
+favored for the user interaction. In this paper, we propose a
+                                                                                         (a)                                   (b)
+fast method for high quality matting. We ﬁrst derive an efﬁ-
+cient algorithm to solve a large kernel matting Laplacian. A
+large kernel propagates information more quickly and may
+improve the matte quality. To further reduce running time,
+we also use adaptive kernel sizes by a KD-tree trimap seg-
+mentation technique. A variety of experiments show that
+our algorithm provides high quality results and is 5 to 20
+                                                                                         (c)                                   (d)
+times faster than previous methods.
+                                                                  Figure 1. (a) Image (800×563 pixels). (b) Trimap (180k unknown
+1. Introduction                                                       pixels). (c) Result of closed-form matting [12]. The running time
+                                                                                      is 28 seconds using a coarse-to-ﬁne solver in [12]. (d) Our result.
+  Image matting refers to the problem of softly extracting     The running time is 2.5 seconds. Notice the gap between the toys.
+the foreground object from a single input image. Denot-
+ing a pixel’s foreground color, background color, and fore-
+ground opacity (alpha matte) as F, B, and 훼respectively,     with different data weights or priors [24, 14, 15]. New ap-
+the pixel’s color I is a convex combination of F and B:         pearance models [18] and a learning based technique [25]
+                                                               are proposed to generalize the color line assumption. Cur-
+                 I = F훼+ B(1 −훼).                (1)      rently, matting-Laplacian-based methods produce the best
+                                                                 quality results [16, 23].
+Image matting has a number of important applications, such       However, efﬁciency is also very important for image
+as image/video segmentation, layer extraction, new view     matting, especially when we are faced with multi-megapixel
+synthesis, interactive image editing, and ﬁlm making.          images produced by today’s digital cameras. The progres-
+   Since the problem  is highly ill-posed, a trimap (or      sively moving window in Bayesian Matting [4] is computa-
+strokes)  indicating  deﬁnite  foreground,  deﬁnite  back-      tionally expensive. The geodesic framework [2] presents a
+ground, and unknown regions is usually given by the user.      linear time algorithm. But the model itself may not be able
+To infer the alpha matte in the unknown regions, Bayesian      to handel complex cases like hair.  Poisson Matting [19]
+Matting [4] uses a progressively moving window march-     and Random Walk Matting can be accelerated by a multi-
+ing inward from the known regions. In [2], the alpha value      grid solver or a GPU implementation, but lack satisfac-
+is calculated by the geodesic distance from a pixel to the      tory quality [16]. The methods using the matting Lapla-
+known regions.  Afﬁnity-matrix-based methods propagate     cian [12, 24, 14, 15] or other sophisticated matrices [18, 25]
+constraints from the known regions to the unknown regions:     have to solve a large linear system - a very time consum-
+Poisson matting [19] solves a homogenous Laplacian ma-     ing operation. Soft Scissor [21] locally solves a small lin-
+trix; Random Walk matting [7] deﬁnes the afﬁnity matrix      ear system while the user is drawing the trimap. But it is
+by a Gaussian function; in the closed-form matting [12],        still slow for mega-pixel images and not applicable for pre-
+a matting Laplacian matrix is proposed under a color line     drawn trimaps. A more efﬁcient method for high quality
+assumption. The matting Laplacian can also be combined     matting is still desired.
+
+
+                                                 1
+
+======================== PDF 第 2 页 ========================
+   In this paper, we propose a fast algorithm for high quality                                          j  ωk
+image matting using large kernel matting Laplacian matri-                           k  ωi
+                                                                                                                     ωi
+ces. The algorithm is based on an efﬁcient method to solve
+the linear system with the large kernel matting Laplacian.                        ωk                i
+Using a large kernel can accelerate the constraint propaga-
+tion, reduce the time of the linear solver for convergence,                                               r
+and improve the matting quality. To further speed-up the al-
+gorithm, we use a KD-tree based technique to decompose                                              2r
+the trimap so that we can assign an adaptive kernel size      Figure 2. According to (5), the (i, j) element of L is non-zero only
+to each sub-trimap. Thus, the number of iterations can be        if (푖, 푗) ∈휔푘. If the radius of the window 휔is r, the radius of the
+ﬁxed beforehand and the running time of the whole algo-      kernel centered at 푖is 2r. The kernel is a rectangle including all
+rithm is only linear to the number of the unknown pixels.      the gray pixels in this ﬁgure.
+We demonstrate that our algorithm is about 5 to 20 times
+faster than previous methods while achieving high quality                                                     where 훽is the trimap, D is a diagonal matrix whose ele-
+(Fig. 1). Our algorithm is also useful for other applications                                                      ments are one for constraint pixels and zero otherwise, and
+using the matting Laplacian, like haze removal [9], spatially                                                 휆is a large number. A data term speciﬁed by color sam-
+variant white balance [10], and intrinsic images [3].                                                               pling conﬁdence [24, 14] or a sparsity prior [15] can also
+                                                       be incorporated. The cost function (6) can be optimized by
+2. Background                                                             solving a sparse linear system:
+
+  The matting Laplacian matrix proposed in [12] is an
+                                                                   (L + 휆D)훼= 휆D훽.                 (7)
+afﬁnity matrix specially designed for image matting. The
+key assumption of this method is the color line model: the    The techniques of haze removal [9], spatially variant white
+foreground (or background) colors in a local window lie on     balance [10], and intrinsic images [3] also involve this linear
+a single line in the RGB color space. It can be proved that     system.
+훼is a linear transformation of I in the local window:             Given the linear system, we need to use an appropriate
+                                                                solver to recover 훼. Non-iterative methods like LU decom-           훼푖= aTI푖+ 푏, ∀푖∈휔,               (2)
+                                                                position are not effective to handle this system in large scale
+Here 푖is a pixel index, I푖and a are 3 × 1 vectors, and a and     due to the high memory cost. So iterative methods are usu-
+푏are assumed to be constant in the local window 휔.              ally applied, like the Jacobi method or Conjugate Gradient
+   Accordingly, a cost function 퐽(훼, a, 푏) can be deﬁned to    (CG) [17]. The information of the known pixels is propa-
+encourage the alpha obeying this model:                      gated into the unknown region by iteratively multiplying the
+    ∑ ∑                                        matrix. However, iterative methods are often time consum-
+  퐽(훼, a, 푏) =    (   (훼푖−aT푘I푖−푏푘)2 + 휀aT푘a푘),  (3)      ing. For example, the time complexity of CG is O(N1.5) for
+              푘∈I 푖∈휔푘                                    N unknowns. A medium size image (800 × 600) may take
+where 휔푘is the window centered at pixel 푘, and 휀is a regu-     hundreds or thousands of iterations. Another drawback of
+larization parameter. By minimizing the cost function w.r.t.      the iterative methods is that the time needed is hard to pre-
+(a, 푏), a quadratic function of 훼can be obtained:                 dict because the iteration number depends on the number of
+                                                     unknowns, the image content, and the trimap shape. This is
+                 퐽(훼) = 훼TL훼.                   (4)                                                            not favored for interactive image matting.
+                                                                 In [12], a coarse-to-ﬁne scheme is proposed to speed-Here 훼is denoted as an N×1 vector, where N is the number
+                                                    up the linear system solver. But the down-sampling pro-of unknowns. And L is called matting Laplacian.  It is an
+                                                              cess may degrades the matte quality, especially for the fore-N×N symmetric matrix whose (i, j) element is:
+                                                      ground with very thin structures. Moreover, in the ﬁne res- ∑                                    휀                                                                olution it also suffers from the drawbacks of the iterative      (훿푖푗−1            ∣휔푘∣(1+(I푖−휇푘)T(Σ푘+ ∣휔푘∣U)−1(I푗−휇푘))),   methods. Locally adapted hierarchical basis precondition-푘∣(푖,푗)∈휔푘
+                                                          (5)     ing in [20] is not directly applicable because the elements of
+where 훿푖푗is the Kronecker delta, 휇푘and Σ푘are the mean     the matting Laplacian matrix (5) are not ﬁrst-order smooth.
+and covariance matrix of the colors in window 휔푘, ∣휔푘∣is
+the number of pixels in 휔푘, and U is a 3×3 identity matrix.     3. Large Kernel Matting Laplacian
+  Combining this cost function with the user-speciﬁed
+                                                                 Existing methods [12, 24, 14, 15] usually use a smallconstraints (trimap), the whole cost function is deﬁned as:
+                                                window because the matrix will be less sparse with a larger
+       퐸(훼) = 훼TL훼+ 휆(훼−훽)TD(훼−훽),       (6)     window.  Conventional wisdoms hold that solving a less
+
+======================== PDF 第 3 页 ========================
+sparse system is even slower. But we point out it is not nec-     Proof: Written in matrix notation, from (9) there is an afﬁne
+essarily true. A less sparse system needs fewer iterations     transform:
+to converge; the only bottle neck is the increased computa-                  a∗= A푝,                    (12)
+tional burden in each iteration. In this section, we propose
+                                                     where A is a coefﬁcient matrix only dependent on I.  If
+an algorithm to greatly reduce the time needed for each iter-
+                                             we put (9) into (10), we can see that 푏∗is also 푝’s afﬁneation, so the solver is in fact faster if we use a larger window.
+                                                              transform: 푏∗= B푝.  Similarly, 푞is 푝’s afﬁne transform:
+  The kernel size of a matting Laplacian is deﬁned as the
+                                  푞= Q푝.
+the number of the non-zero elements in a row of L. De-
+                                                              Consequently, in order to show 푞= L푝, we only need tonote the window radius of 휔in (5) by 푟. The kernel size is
+                                                         prove ∂푞푖/∂푝푗= L(푖, 푗). Putting (10) into (11) and elimi-(4푟+ 1)2 (see Fig. 2). Existing methods mainly use 푟= 1
+                                                              nating 푏, we obtain:because L will become less sparse when r is larger. Both
+the memory and the time needed to solve the linear system       ∑         T                                                               ∂푞푖                    ∂a∗푘will increase tremendously.                        = ∣휔∣훿푖푗−     (∂¯푝푘 +     (I푖−휇푘))    (13)
+                                                          ∂푝푗                ∂푝푗    ∂푝푗  Take CG for example. The solver iteratively multiplies                        푘∈휔푖
+the conjugate vector by the Laplacian matrix (please see
+                                                           Here, we have:[17] for detailed description of CG). In each iteration, the
+matrix product L푝dominates the computation cost . Here 푝      ∑                                                                         ∂¯푝푘    1     ∂푝푛    1         1
+is the conjugate vector of the previous iteration. In the view        =        =                         (14)                                                          ∂푝푗    ∣휔∣     ∂푝푗   ∣휔∣훿푗∈휔푘= ∣휔∣훿푘∈휔푗
+of signal processing, the matrix product L푝is the response                  푛∈휔푘
+of a spatially variant ﬁlter L on 푝, whose 푖푡ℎelement is:
+        ∑                          where 훿푗∈휔푘is 1 if 푗∈휔푘, and is 0 otherwise. According
+               (L푝)푖=    L푖푗푝푗.                 (8)      to (9) we also have:
+                                     푗
+                                                        ∂a푘           1 ∑ ∂푝푖Computing L푝using (5) and (8) involves spatially vari-           =  Δ−1푘(          I푖−∂¯푝푘 휇푘)
+                                                             ∂푝푗             ∣휔∣     ∂푝푗     ∂푝푗
+ant convolution, whose time and memory complexity is                                 푖∈휔푘
+O(N푟2). This is not affordable when 푟gets larger.                                 1
+                                         =  Δ−1푘(                             (15)  We notice that in each iteration, a pixel can inﬂuence                    ∣휔∣I푗−1∣휔∣휇푘)훿푘∈휔푗
+another pixel that is 2r away. So the information is prop-
+                                                               Putting (14) and (15) into (13), we obtain:agated by 2r pixels. The CG solver will converge in fewer
+iterations if the kernel size is larger. This motivates us to en-        ∑                                                            ∂푞푖vision that the use of a large kernel may reduce the solver’s     = ∣휔∣훿푖푗−1        (1+(I푗−휇푘)TΔ−1푘(I푖−휇푘))                                                       ∂푝푗            ∣휔∣running time, if we can signiﬁcantly increase the speed of                        푘∈휔푖,푘∈휔푗
+the convolution in (8).
+  Toward this goal, we present an O(N) time (independent     This is exactly L(푖, 푗) in (5).               ■
+of r) algorithm to compute the product L푝in each iteration.       The proposed algorithm also has intuitive interpreta-
+Instead of computing L’s elements and the convolution ex-      tions: Equations (9) and (10) indeed are linear regression
+plicitly, we calculate the product L푝as a whole by the fol-      solutions and the regression model is 푝푖≈a∗푘 TI푖+푏∗푘, ∀푖∈
+lowing algorithm:                                         휔푘. Further, (11) can be rewritten as:
+                        ∑
+Algorithm for calculating L푝                                  (L푝)푖=    (푝푖−(a∗푘 TI푖+ 푏∗푘)).        (16)
+  Given a conjugate vector 푝, L푝can be calculated through                         푘∈휔푖
+the following three steps:
+        ∑                             For any pixel I푖, the term (푝푖−(a∗푘 TI푖+ 푏∗푘)) is the error                    1
+          a∗푘= Δ−1푘(        I푖푝푖−휇푘¯푝푘),          (9)     between 푝푖and its linear prediction. As I푖is involved in all                        ∣휔∣
+                          푖∈휔푘                                the regression processes satisfying 푘∈휔푖, equation (16) is
+                                                               the sum of errors in all windows around 푖.
+                   푏∗푘= ¯푝푘−a∗푘 T휇푘,               (10)
+        ∑   ∑                    All the summations in (9) and (11) can be very efﬁciently
+  (L푝)푖≡푞푖= ∣휔∣푝푖−((    a∗푘)TI푖+ (     푏∗푘)),  (11)     computed using the integral image technique [6]. Using the
+                         푘∈휔푖           푘∈휔푖                   integral image, the sum of the any window can be obtained
+where a∗푘is a 3×1 vector for each pixel 푘, ¯푝푘is the mean of      in constant time (four operations). Therefore, the time com-
+푝in 휔푘, Δ푘= Σ푘+ ∣휔푘∣U,휀    and we denote (L푝)푖as 푞푖.          plexity for computing L푝in each iteration is O(N’)≈O(N),
+                                                     where N’ is the size of the bounding box of the unknown
+Theorem: The 푞given by the above algorithm is identical      region. Note that the time complexity is independent of the
+to the L푝calculated by (5) and (8).                             kernel size.
+
+======================== PDF 第 4 页 ========================
+ (a)                  (b)                   (c)                  (d)                        (a)                (b)                 (c)                (d)
+
+
+
+
+
+                                                                  Figure 5. (a) A cropped image (636 × 636) from a 2080 × 2600
+   1                                                              image. (b) Trimap. (c) r=1. (d) r=60. We recommend viewing the
+   0  log10err                                                                       r=1r=5            electronic version of this paper for the ﬁne structures.
+                                                                                       r=10
+   -1                                                                                   r=20
+   -2                                                                to a higher probability of breaking the color line assump-
+   -3                                                                     tion. In the zoomed-in patches of Fig. 6, a large window
+   -4
+   -5                                                         covers more than one color clusters of the background, so
+   -6                                                           iteration        the colors do not lie in the same line.  Consequently, the
+      0           100          200          300          400          500          600       matte is not as accurate as using a small window.
+Figure 3. (a) Cropped image (98 × 130).  (b) Trimap.  (c) r=1,                                          We observe that in practice, the user draws a wide band
+iteration 519. (d) r=20, iteration 44. On the bottom are the curves                                                              of unknowns near a fuzzy object or an object with holes, as
+of error vs. iteration numbers.
+                                                                                              it is difﬁcult to provide a precise boundary; the band of un-
+                                                  knowns near a solid boundary is relatively narrow. We can
+ (a)                (b)                 (c)                (d)
+                                                             see this fact in Fig. 1(b) and Fig. 6(b). Besides, a high reso-
+                                                                   lution image may also result in a wider band of unknowns.
+                                                 So we prefer to use a large kernel to efﬁciently propagate
+                                                                  constraints in a wide band. For a narrow band, a small ker-
+                                                               nel is favored to avoid breaking the color line assumption.
+Figure 4. (a) Cropped image (231 × 231). (b) Trimap. (c) r=1. (d)                                                  To achieve this goal, in the next section, we adaptively set
+r=20.
+                                                               the kernel size based on a trimap segmentation technique.
+
+Discussion on Kernel Size                                 4. KD-tree Based Trimap Segmentation
+
+  Using the above algorithm, the running time of the CG        In  this  section, we propose a trimap segmentation
+solver can be greatly reduced if we use a large kernel - the    method to further improve both the quality and efﬁciency.
+solver converges in fewer iterations. In Fig. 3, we experi-     This allows us to assign different window sizes to different
+ment several different kernel sizes on the same image. The      regions.
+solver converges much faster in the large kernel case. Our       Given a trimap, we ﬁrst calculate the unknown region’s                                        ∑
+algorithm’s running time is 1.07s (r=1, converges in 519     barycenter (푥푐, 푦푐), x variance 휎2푥= 1n  U(푥푐−푥)2 and
+iterations) and 0.090s (r=20, converges in 44 iterations),    y variance 휎2푦, where U is the set of unknown pixels, and
+while the running time of brute force CG using (5) and (8)    n is the size of U. Then we use a line that passes through
+is 0.95s (r=1) and 22s (r=20). In this example, the resulting     (푥푐, 푦푐) to divide the map into two regions.  This line is
+mattes are almost visually identical (Fig. 3(c)(d)).                vertical to the axis (x or y) with a larger variance. A trimap
+  A large kernel may improve the quality because a       is recursively divided and a 2D KD-tree is built accordingly.
+large window may cover disconnected regions of the fore-       Next we discuss the conditions when the recursive pro-
+ground/background. This property is particularly favored     cess stops. We observe that if a cropped image covers
+when the foreground object has holes. In Fig. 4(c), r = 1 is     enough foreground and background constraints, a reason-
+too small to cover the known background and the holes. We     ably good matte can be obtained by only considering this
+can obtain a better matte if we use a larger window size r =     cropped image independently, as demonstrated in Fig. 3 and
+20 (Fig. 4(d)).                                                   Fig. 4. Therefore, we hope the segments are small enough,
+  Our large kernel method is typically appropriate for high     while as many of them as possible have both foreground (F)
+resolution images. In Fig. 5(c), a small window is not sufﬁ-     and background (B) constraints. So the recursive division
+cient to describe the color lines and results in the loss of the     stops until one of these conditions is satisﬁed: (a) the seg-
+ﬁne structures. However, a large window collects enough    ment only has F and U; (b) the segment only has B and U;
+color samples and gives a better result (Fig. 5(d)). A large      (c) if we divide the segment, one of its children only has F
+window also covers more known pixels near the boundary     and U, and the other only has B and U; (d) The segment’s
+of unknowns and provides more stable constraints.             min(width, height) is smaller than a threshold (32 in our ex-
+  The drawback of a large kernel is that when the fore-     periments). Fig. 7 gives an example of a segmented trimap.
+ground/background is complicated, a larger window leads     Notice that the band width of the unknowns in each segment
+
+======================== PDF 第 5 页 ========================
+             (a)                                      (b)                           (c)                                      (d)
+Figure 6. (a) A 640 × 600 image. (b) Trimap. (c) r=1. (d) r=10. We recommend viewing the matte in the electronic version of this paper.
+
+
+
+
+
+                                                                                                                                                                                                                                 (a-1)
+
+
+
+
+
+                                                                                                                                                                                                                            (a-2)
+
+
+                                                                                                                                (a)                               (a-1)                        (a-2)
+
+
+                Figure 7. Trimap segmentation.
+
+
+
+
+
+                                                                                                                          (b)                              (b-1)                       (b-2)
+                                              r=17, iteration 1      r=17, iteration 3      r=17, iteration 10
+
+
+
+
+
+                                              r=10, iteration 1      r=10, iteration 3      r=10, iteration 10
+                                                                                                                                (c)                               (c-1)                        (c-2)
+Figure 8. Propagation and window sizes. The band width 푤푏≈50
+in the ﬁrst row, and 푤푏≈30 in the second row,. The window
+radius 푟= 푤푏/3.
+
+is nearly uniform.
+  Once the trimap is segmented, we can solve the linear
+                                                                                                                          (d)                              (d-1)                       (d-2)
+system in each segment. The integral image is only calcu-
+                                                                  Figure 9. Local-global-local Scheme.  (a) Segmented trimap of
+lated in the bounding box of the unknowns in each segment.
+                                                                         Fig. 1. (b) Local step 1. (c) Global step. (d) Local step 2. Please
+We ﬁrst solve the segments that satisfy condition (c) or (d),
+                                                                             refer to the text for explanation. We recommend to see the elec-
+as they directly contain both F and B constraints.  Then,                                                                          tronic version of these images.
+other segments (that only have F and U, or B and U) are
+solved in inverse Breadth-First Search order, i.e., the deeper     the propagation speed is adaptive to the band width. The
+leaves in the KD-trees have a higher priority. As they do    same number of iterations provide high quality mattes for
+not contain F or B constraint, we use the solved matte of the     two bands of different width.
+neighboring segment as boundary conditions. The inverse
+Breadth-First Search order insures that at least one of their   A Local-Global-Local Scheme
+neighbors has been solved before.                          To prevent the result being too locally determined, we
+  More importantly, we adapt the kernel size to the band     propose a local-global-local scheme. Given the trimap seg-
+width of the unknowns. For each segment, let (w, h) be     mentation, we ﬁrst solve the matte for each segment. Here
+the width and height of U’s bounding box. We approximate    we let 휂=3. This step propagates information fast. We em-
+the width of the band by 푤푏=n/max(w,h). We set the win-      pirically ﬁx the iteration number to 10 which is sufﬁcient to
+dow radius 푟= 푤푏/휂, where 휂is a factor. Intuitively, the     get a good initial matte for the next step (Fig. 9(b)). Notice-
+propagation will inﬂuence the other side of the band in 휂/2     able seams may exist on segment boundaries (Fig. 9(b-1)).
+iterations (notice that the kernel radius is 2r). Therefore, the       Using the above obtained solution as initial guess, we
+number of iterations needed for convergence is in the order     optimize the whole linear system globally. In this step, we
+of 휂, and can be ﬁxed beforehand. In Fig. 8, we show that      set the window radius 푟to be min(w, h)/50 where w and h
+
+======================== PDF 第 6 页 ========================
+                                                                                                         1000
+
+                                                                                                                                                                                          902are the image’s width and height. The iteration number is          900   time / s
+ﬁxed on 5. This global step removes the seams (Fig. 9(c-          800              CGC-F                                                   790
+1)). But as the kernel size may be too large for some local          700                Ours                                           665
+regions, there are artifacts due to the failure of the color line          600                                                     560
+assumption (Fig. 9(c-2)).                                                                  500                                             449
+   In the ﬁnal step, we reﬁne this solution locally using the          400                                     345                                       352
+trimap segmentation again. Here we let 휂= 15 and run 20          300                            248                                 265    312
+iterations. In experiments we found that more iterations im-          200                      163.7                        185     225
+
+                                                                                                                                             105                                                                                                          100                                                                                                                                    35.5prove                                                                                                                                   91.8                        144      the          result              very                            little.                    The window                                         size                                                     is much                                                 smaller                                                                                                                                     74
+                                                                                                                             44                                                                                                                                                                             13.3     16.4      19.0     22.6      25.4       28.2                                                                                                                    18                                                                                                                                                                    10.9                                                                                                                                                                    7.8                                                                                                                                                         5.0                                                                                                                 0                                                                                                                                              2.5than the          ﬁrst              local                    step                      because                       we want                                             to                                          maintain                                                       the
+color line model. This suppresses the artifacts due to the               0               1               2   image size 3/ mega-pixel   4               5               6
+large window size used in previous two steps (Fig. 9(d-2)).                  Figure 10. Image size vs. running time.
+
+Time Complexity
+
+  Denote N’ as the total area of all the bounding boxes
+of the unknowns in all segments. The time complexity of
+the local steps is O(N’), since the time for calculating L푝in
+each iteration is O(N’) and the iteration number is ﬁxed. For
+the same reason, the time complexity of the global step is
+O(M), where M is the size of the bounding box of the whole
+unknown region. In experiment, we ﬁnd that the time for the
+global step is much less than that of the local steps due to
+fewer iterations. So the total time complexity is O(N’). As
+N’ is slightly larger than the number of unknowns N, the
+                                                                                                   (a)                       (b)                        (c)
+running time is almost linear to N. Besides, once the trimap
+is segmented, the time can be predicted before running the      Figure 14. Mattes from strokes. (a) Images and strokes. (b) Results
+                                                                      of the closed-form matting. (c) Our results. The images and strokesolver.
+                                                       maps are from [12].
+
+5. Results                                                  The time of our algorithm increases linearly with the image
+                                                                        size, while the time of CG and C-F increases super-linearly.  We compare our algorithm with the closed-form matting
+in [12] (i.e., r=1). For closed-form matting, we calculate        Next, we compare the matte qualities.  For medium
+the matting Laplacian using (5) and then solve the linear     images, the results are visually similar for fuzzy objects
+system using two different methods: brute force CG (simply      (Fig. 11). However, our method is better at handling holes,
+denoted as CG below), and the coarse-to-ﬁne (C-F) scheme      like Fig. 12 and the gap between the toys in Fig. 1. Fur-
+described in [12]. For CG, we ﬁx the convergence tolerance      ther, in Fig. 13 we show that our large kernel method greatly
+(10−5). For C-F, we run three levels and in each level we     improves the quality for high resolution images, as a large
+solve the system using CG. All algorithms are implemented     kernel collects enough samples to describe the color lines.
+using C++ on a laptop with an Intel Core Duo 2.0GHz CPU        In Fig. 14, we show the results of stroke-based con-
+and 4G memory.                                                       straints. The resulting mattes are visually very similar. Note
+   Table 1 shows the running time. Our algorithm is about 5      that the stroke-based framework has been proposed to re-
+to 20 times faster than CG or C-F for medium and large im-     duce the user’s labor. But strokes lead to large areas of un-
+ages. We also study the average running time per unknown     knowns, which increase the running time and often make
+pixel (휏= 푡/N). Our algorithm gives similar 휏(about 0.02)     the whole interaction process even longer. Our method pro-
+for different images. The small variation of our 휏is mainly     vides comparable results in very short time, so facilitates
+because the time is linear to N’ but not N. On the contrary,     the feedback from the user.
+휏varies severely for the other two algorithms, because it is        Table 2 shows the average rank of mean square error
+inﬂuenced by the number of unknowns, image content and    (MSE) on the benchmark data [1]. The MSE rank of our
+the shape of the trimap.  Their 휏is also much larger for     algorithm is comparable with the closed-from matting [12]
+mega-pixel images (Fig. 13).                              and Robust Matting [24]. Note that [24, 14, 15] combine
+  To further study the effect of image sizes on the running     the matting Laplacian with data terms, while our method
+time, we down-sample a 5.4M-pixel image (2080 × 2600,     and [12] do not. We believe that our algorithm can also
+the ﬁrst row of Fig. 13) and its trimap to ten different scales      greatly reduce their running time and further advance the
+and run all algorithms. The curves are shown in Fig. 10.      state-of-the-art in both efﬁciency and quality.
+
+======================== PDF 第 7 页 ========================
+                        image                              time                average time per k unknowns (휏)
+                             size      unknowns    CG        C-F       ours   CG   C-F          ours
+             Fig 1    800 × 563      180k       49s (20)     29s (11)     2.5s    0.27   0.16        0.014
+             Fig 11    720 × 515      48k        7.7s (10)     7.1s (9)     0.8s    0.16   0.15        0.017
+                    800 × 575      49k        9.4s (10)     6.8s (8)     0.9s    0.19   0.14        0.018
+             Fig 12    800 × 595      143k       44s (14)     28s (9)     3.1s    0.31   0.20        0.022
+                    800 × 524      57k       14s (11)     5.9s (5)     1.2s    0.25   0.10        0.023
+             Fig 13   2080 × 2600    1280k     902s (32)   352s (12)    28s    0.70   0.28        0.022
+                   3040 × 2350     766k      440s (28)   256s (16)   15.7s    0.57   0.33        0.020
+                   2890 × 2600     857k      464s (31)   206s (14)   14.9s    0.54   0.24        0.017
+             Fig 14    348 × 261      60k       12.6s (16)     2.4s (3)     0.8s    0.21   0.04        0.013
+                    342 × 329      80k       19s (19)     4.7s (5)      1s     0.24   0.06        0.013
+             Fig 15    800 × 602      67k       12.4s (11)   11.6s (11)    1.1s    0.19   0.17        0.016
+             Fig 16    278 × 333      86k       36s (51)     5.7s (8)     0.7s    0.42   0.07        0.008
+
+Table 1. Image sizes and running time. The numbers in the brackets are the ratios to our algorithm’s running time. Solving the closed-form
+matting using brute force Conjugate Gradient (CG) is very slow when the number of unknowns gets larger. The coarse-to-ﬁne scheme
+(C-F) in [12] accelerates the stroke-based examples (Fig. 14 & 16), but still takes hundreds of seconds for high-resolution image (Fig. 13).
+Our method is about 5 to 20 times faster. Even mega-pixel images with mega unknowns (Fig. 13) only takes 15 to 30 seconds.
+
+
+
+
+
+        image           trimap        CG            C-F              ours        CG        C-F         ours        ground truth
+
+                     Figure 11. Medium images of fuzzy objects. The images and trimaps are from [1] and [24].
+
+
+
+
+
+            input               trimap          CG              C-F                 ours         CG         C-F           ours
+
+                  Figure 12. Medium images of foreground objects with holes. The images and trimaps are from [1].
+
+
+
+
+
+         image           trimap        CG           C-F             ours         CG           C-F             ours        ground truth
+Figure 13. High resolution images. The images and trimaps are from [1]. We recommend to see the electronic version of this paper.
+
+======================== PDF 第 8 页 ========================
+           Improved color [14]    2    Random walk [7]     6.8                   [3] A. Bousseau, S. Paris, and F. Durand. User-assisted intrinsic             Our method        3.2      Geodesic [2]       7.5
+             Closed-form [12]     3.3      Bayesian [4]       8.8                     images. SIGGRAPH Asia, 2009.
+               Robust [24]        3.7    Easy matting [8]     9                    [4] Y. Chuang, B. Curless, D. Salesin, and R. Szeliski.  A
+               High-res [15]       4.4      Poisson [19]      10.9
+                 Iterative BP [22]      6.6                                          bayesian approach to digital matting. CVPR, 2001.
+Table 2. Average rank of mean square error (MSE) on a data set        [5] Z. Farbman, R. Fattal, D. Lischinski, and R. Szeliski. Edge-
+from [1]. Please visit [1] for a comprehensive comparison.                  preserving decompositions for multi-scale tone and detail
+                                                                         manipulation. SIGGRAPH, 2008.
+                                                                            [6] C. Franklin. Summed-area tables for texture mapping. SIG-
+                                                     GRAPH, 1984.
+                                                                            [7] L. Grady, T. Schiwietz, and S. Aharon. Random walks for
+                                                                                  interactive alpha-matting. VIIP, 2005.
+                                                                            [8] Y. Guan, W. Cheny, X. Liang, Z. Ding, and Q. Peng. Easy
+           input              trimap          closed-form            ours                    matting: A stroke based approach for continuous image mat-
+                                                                                      ting. Eurographics, 2006.
+                                                                            [9] K. He, J. Sun, and X. Tang. Single image haze removal using
+                                                                      dark channel prior. CVPR, 2009.
+                                                                      [10] E. Hsu, T. Mertens, S. Paris, S. Avidan, and F. Durand. Light
+                     input           closed-form            ours                         mixture estimation for spatially varying white balance. SIG-
+                                                     GRAPH, 2008.
+         Figure 15. Failure of the color line assumption.
+                                                                      [11] A. Levin, D. Lischinski, and Y. Weiss.  Colorization using
+                                                                            optimization. SIGGRAPH, 2004.
+                                                                      [12] A. Levin, D. Lischinski, and Y. Weiss. A closed-form solu-
+                                                                                tion to natural image matting. CVPR, 2006.
+                                                                      [13]  P. Perez, M. Gangnet, and A. Blake. Poisson image editing.
+          strokes                closed-form                  ours                additional strokes               ours            SIGGRAPH, 2003.
+                                                                      [14] C. Rhemann, C. Rother, and M. Gelautz. Improving colorFigure 16. Failure case where the constraints are too sparse.
+                                                                  modeling for alpha matting. BMVC, 2008.
+                                                                      [15] C. Rhemann, C. Rother, A. Rav-Acha, M. Gelautz, and   Like the closed-form matting, our method may fail when
+                                                                               T. Sharp. High resolution matting via interactive trimap seg-
+the color line assumption is invalid, e.g., when the fore-
+                                                                         mentation. CVPR, 2008.
+ground/backgroundcolors are complicated (Fig. 15). More-
+                                                                      [16] C. Rhemann, C. Rother, J. Wang, M. Gelautz, P. Kohli, and
+over, our method may give poorer results when the band of
+                                                                                        P. Rott. A perceptually motivated online benchmark for im-
+unknowns is too wide, because the large kernel increases the                                                                    age matting. CVPR, 2009.
+probability of breaking the color line assumption (Fig. 16).                                                                      [17] Y. Saad.  Iterative methods for sparse linear systems, page
+However, as our method runs quickly, it is convenient for           178. SIAM, 2003.
+the user to improve the result by reﬁning the trimap.              [18] D. Singaraju, C. Rother, and C. Rhemann. New appearance
+                                                                 models for natural image matting. CVPR, 2009.
+6. Conclusion and Discussion
+                                                                      [19]  J. Sun, J. Jia, C. Tang, and H. Shum. Poisson matting. SIG-
+   In this paper, we propose a fast and effective algorithm        GRAPH, 2004.
+for image matting. Our novel insight is that solving a large      [20] R. Szeliski. Locally adapted hierarchical basis precondition-
+                                                                                  ing. SIGGRAPH, 2006.kernel matrix is not necessarily slow. It indeed takes fewer
+                                                                      [21]  J. Wang, M. Agrawala, and M. Cohen. Soft scissors: An in-iterations to converge; we only need to focus on reducing
+                                                                                  teractive tool for realtime high quality matting. SIGGRAPH,
+the time in each iteration.  Besides, a large kernel may
+                                                                      2007.
+also improve quality. This will encourage us to restudy a
+                                                                      [22]  J. Wang and M. Cohen. An iterative optimization approach
+great category of matrices, like the homogenous Laplacian                                                                                for uniﬁed image segmentation and matting. ICCV, 2005.
+in Poisson image editing [13], Gaussian afﬁnity Laplacian                                                                      [23]  J. Wang and M. Cohen. Image and video matting: A survey.
+in colorization [11], or other edge-preserving matrices [5].                                                                     Foundations and Trends in Computer Graphics and Vision,
+Generalizing their deﬁnitions to larger kernels will lead to           2007.
+new research topics.                                                [24]  J. Wang and M. Cohen. Optimized color sampling for robust
+                                                                           matting. CVPR, 2007.
+References
+                                                                      [25] Y. Zheng and C. Kambhamettu. Learning based digital mat-
+ [1] http://www.alphamatting.com.                                              ting. ICCV, 2009.
+ [2] X. Bai and G. Sapiro. A geodesic framework for fast in-
+      teractive image and video segmentation and matting. ICCV,
+     2007.

@@ -1,0 +1,566 @@
+KH-A022 | ScribbleSup: Scribble-Supervised Convolutional Networks for Semantic Segmentation
+来源：https://arxiv.org/abs/1604.05144
+本地PDF：专题文献/何恺明/KH-A022_ScribbleSup_Scribble_Supervised_Convolutional_Networks_for_Semantic_Segmentation_CVPR2016.pdf
+SHA-256：9d37ea2a380c20ec00243f50983b79cbc876f02acbe5932c0145769d797663b7
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                ScribbleSup: Scribble-Supervised Convolutional Networks
+                                  for Semantic Segmentation
+
+
+                   Di Lin1∗    Jifeng Dai2     Jiaya Jia1    Kaiming He2     Jian Sun2
+                      1The Chinese Univeristy of Hong Kong     2Microsoft Research
+
+
+                        Abstract                         be a few tens.  This time-consuming task may limit the2016
+                                                            amount of data that have mask-level labels.
+            Large-scale data is of crucial importance for learning       The procedure of annotating segmentation masks is very
+         semantic segmentation models, but annotating per-pixel      similar to interactive image segmentation [4], which hasApr
+        masks is a tedious and inefﬁcient procedure. We note that     been a widely studied problem in the past decade [4, 26, 17,
+18   for the topic of interactive image segmentation, scribbles     11, 16, 19, 6]. Among various forms of user interactions,         are very widely used in academic research and commer-      scribbles are particularly popular [4, 17, 11, 16, 19, 6] and
+          cial software, and are recognized as one of the most user-     have been recognized as a user-friendly way of interacting.
+          friendly ways of interacting. In this paper, we propose to   A commercial implementation of scribble-based interactive
+         use scribbles to annotate images, and develop an algo-     segmentation is the Quick Selection1 tool in Adobe Photo-
+         rithm to train convolutional networks for semantic segmen-     shop, which is a prevalent tool for selecting complicated
+          tation supervised by scribbles. Our algorithm is based on a     regions in user photos.[cs.CV]   graphical model that jointly propagates information from        Driven by the popularity of using scribbles for interac-
+          scribbles to unmarked pixels and learns network param-      tive image segmentation, we believe that it is more efﬁcient
+           eters. We present competitive object semantic segmenta-      to use scribbles to annotate images. By dragging the cursor
+          tion results on the PASCAL VOC dataset by using scribbles      in the center of the objects, the annotators need not care-
+         as annotations. Scribbles are also favored for annotating      fully outline the object boundaries.  It is also easier to use
+           stuff (e.g., water, sky, grass) that has no well-deﬁned shape,      scribbles to annotate “stuff” (water, sky, grass, etc.) that
+        and our method shows excellent results on the PASCAL-    may have ambiguous boundaries and no well-deﬁned shape.
+      CONTEXT dataset thanks to extra inexpensive scribble an-      Fig. 1 shows an example of scribble annotations.
+          notations. Our scribble annotations on PASCAL VOC are      An obvious way of using scribbles to ease annotating is
+         available at http://research.microsoft.com/en-us/um/      to perform interactive image segmentation (e.g., Quick Se-
+        people/jifdai/downloads/scribble_sup.                      lection) when the annotators are interacting. But we argue
+                                                                                that to obtain precise masks that play as ground truth, the
+                                                                        annotators may still have to do many “touch-ups” on the
+         1. Introduction                                           imperfect outcome, which are inefﬁcient.  Instead of do-
+                                                                      ing so, we consider to directly use the sparse scribbles for
+           Recent success of semantic segmentation lies on thearXiv:1604.05144v1                                                                    training semantic segmentation models. The annotators just
+         end-to-end training of convolutional networks (e.g., [21])                                                               need to provide a few scribbles on the regions which they
+        and large-scale segmentation annotations (e.g., [18]). Even                                                                                feel conﬁdent and easy to draw.
+        though semantic segmentation models are being improved                                                               With this scenario, in this paper we develop an algorithm
+          rapidly, large-scale training data still have apparent beneﬁts                                                                                that exploits scribble annotations to train convolutional net-
+          for accuracy, as evidenced in [5, 31, 24, 7, 20].                                                             works for semantic segmentation. This problem belongs to
+           But it is painstaking to annotate precise, mask-level la-                                                                         the category of weakly-supervised learning, and occupies a
+          bels on large-scale image data. For example, powerful in-                                                                 middle ground between image-level supervision and box-
+          teractive tools [1] are adopted for annotating the MS COCO                                                                              level supervision. Comparing with image-level annotations
+          dataset [18], but it still takes minutes for an experienced                                                                              [24], scribbles provide location information at a few pixels,
+         annotator labeling one image [18]. The interactive tools of                                                             which should lead to better results; comparing with box-
+          [1] require annotators to draw polygons along object bound-                                                                              level annotations [24, 7], scribbles are lack of determinate
+           aries, and the number of polygon vertexes in an image can
+                                                                 1https://helpx.adobe.com/photoshop/using/
+             ∗This work was done when Di Lin was an intern at Microsoft Research.     making-quick-selections.html
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+                                                                          sky
+                                                                                                                                 sky
+                                                                                                                                             tree
+                                                                                     tree
+
+                                                                                               cow
+                                                          cow
+                                                                                                        cow
+                                                                     cow
+
+
+                                                                                                                          grass
+                                                                                grass
+
+
+                                (a) image                           (b) mask annotation                      (c) scribble annotation
+Figure 1. An image annotated with per-pixel masks (middle) and sparse scribbles (right). Scribbles are more user-friendly for annotators.
+
+
+bounds of objects and so are more ambiguous.                     jects.  In addition, box annotations imply that all pixels
+  We tackle scribble-supervised training by optimizing a     outside of the boxes are not of the concerned categories.
+graphical model. The graphical model propagates the in-     This implication is not available for scribbles. In the case of
+formation from the scribbles to the unmarked pixels, based      scribbles, we need to propagate information from the scrib-
+on spatial constraints, appearance, and semantic content.      bles to all other unknown pixels.
+Meanwhile, a fully convolutional network (FCN) [21] is       Our training algorithm accounts for two tasks. For the
+learned, which is supervised by the propagated labels and in      ﬁrst task, our training algorithm propagates the semantic
+turn provides semantic predictions for the graphical model.      labels from the scribbles to other pixels and fully anno-
+We formulate this model as a uniﬁed loss function, and de-      tates the images; for the second task, our training algorithm
+velop an alternating method to optimize it.                       learns a convolutional network for semantic segmentation.
+  To evaluate our method, we use the Amazon Mechan-     These two tasks are dependent on each other. We formulate
+ical Turk platform to annotate scribbles on the PASCAL      the training as optimizing a uniﬁed loss function that has
+VOC datasets.  Using training images with sparse scrib-     two terms. The dependency between the two tasks is made
+ble annotations, our method shows reasonable degrada-      explicit in an alternating training solution.
+tion compared to the strongly-supervised (by masks) coun-
+terpart on PASCAL VOC 2012.  Compared with other     2.1. Objective Functions
+weakly-supervised methods that are based on image-level
+                                          We use a graphical model to propagate information fromor box-level annotations, our scribble-supervised method
+                                                                  scribbles to unknown pixels. We build a graph on the super-has higher accuracy. Furthermore, by exploiting inexpen-
+                                                                  pixels of a training image. A vertex in the graph representssive scribble annotations on PASCAL VOC 2007 (which
+                                                          a super-pixel, and an edge in the graph represents the sim-has no mask annotations), our method achieves higher ac-
+                                                                            ilarity between two super-pixels (see Fig. 2). We use thecuracy on the PASCAL-CONTEXT dataset (that involves
+                                                    method of [10] to generate super-pixels.objects and stuff) than previous methods that are not able
+                                          We denote a training image as X, and its set of non-to harness scribbles. These results suggest that in practice                        S
+                                                            overlapping                                                                                                                                                             i xi = X and                                Tscribble annotations can be a cost-effective solution, and ac-                                                                             super-pixels as {xi} satisfying                                                             xi   xj = ∅,     j. The scribble annotations of this imagecuracy can be increased by larger amount of inexpensive                     ∀i,                                                                are S =        where sk is the pixels of a scribble k andtraining data. Our scribble annotations on PASCAL VOC             {sk, ck}                                                    0              is the scribble’s category label (assuming thereare available at http://research.microsoft.com/en-us/     ≤ck ≤C                                                                are C categories and ck = 0 for background). For a super-um/people/jifdai/downloads/scribble_sup.
+                                                                 pixel xi, we want to ﬁnd a category label 0 ≤yi ≤C. The
+2. Scribble-Supervised Learning                          set of {yi} is denoted as Y . The labeling Y provides full                                                              annotations of the image. Our objective function is:
+  An annotated scribble (e.g., Fig. 1) is a set of pixels with     X    X
+a category label. The scribbles are sparsely provided, and                  ψi(yi|X, S) +     ψij(yi, yj|X),        (1)the pixels that are not annotated are considered as unknown.                          i                         i,j
+Our training algorithm uses a set of images with annotated
+scribbles, and trains fully convolutional networks [21] for     where ψi is a unary term involving the super-pixel xi, and
+semantic segmentation.                                       ψij is a pairwise term involving a pair of super-pixels xi and
+  We argue that scribble-based training is more challeng-     xj. Formulation in this form is widely used for interactive
+ing than previous box-based training [24, 7]. A box anno-     image segmentation [4, 26, 17, 11, 16, 19].
+tation can provide determinate bounds of the objects, but        In our scenario, the unary term ψi has two parts. The ﬁrst
+scribbles are most often labeled on the internal of the ob-      part is based on scribbles and denoted as ψscri    . We deﬁne
+
+======================== PDF 第 3 页 ========================
+                                                           tree                       to have the label yi. It is simply the summation of the pixel-
+                                        person                        wise log probability of all pixels in the super-pixel xi. The
+                  snow                                    two parts of the unary terms are illustrated in Fig. 2. The
+                                                         unary term ψi is simply ψscr + ψnet, for which an implicit
+                                              scribble-based            balance weight of 1 is used.
+          scribbles                            unary term              The pairwise term ψij in Eqn.(1) models the similarity
+                                                       between two super-pixels. We only adopt a pairwise term
+         pairwise
+          term                                                     to adjacent super-pixels. We consider simple appearance
+                                                                      similarities for adjacent super-pixels. We build color and
+                                            network-based            texture histograms for xi. The color histogram hc(xi) on xi
+                                              unary term                is built on the RGB space using 25 bins for each channel.
+        super-pixels                                     The texture histogram ht(xi) is built on the gradients at the
+                                                                horizontal and the vertical orientations, where 10 bins are
+                                                         used for each orientation.  All bins are concatenated and
+                                                          normalized in the color/texture histograms respectively. We
+                                                     deﬁne the pairwise term as:
+
+                                                          n
+         network                                                                                                           2          prediction                                                   ψij(yi,      =[yi   yj] exp           −hc(xj)∥2                       FCN                                 yj|X)      ̸=        −∥hc(xi) δ2c
+                                                                o
+                                                                                                          2   .                                                                          −ht(xj)∥2                                                               −∥ht(xi) δ2t
+        training image                                                                                                           (4)
+Figure 2. Overview of our graphical model. The graph is built on     Here [·] is 1 if the argument is true and 0 otherwise. The pa-
+the super-pixels of the training image. The scribble-based unary     rameters δc and δt are set as 5 and 10 respectively. This deﬁ-
+term imposes constraints from the user annotations. The network-      nition means that for the adjacent super-pixels assigned dif-
+based unary term respects the predictions from a fully convolu-      ferent labels, the cost is higher if their appearance is closer.
+tional network. The pairwise terms are used to propagate informa-       With these deﬁnitions, we have the optimization problem
+tion into the unmarked pixels. In this ﬁgure, the super-pixels are      in this form:
+for the illustration purpose and are not their actual shapes.                  X     X      X
+                                                              ψscri  (yi|X, S)+   −log P(yi|X, Θ)+    ψij(yi, yj|X),
+this term as follows:                                                                  i                            i                                i,j                                                                                                                             (5)
+                     T             where there are two sets of variables to be optimized: Y =
+     0                   if yi = ck and xi   sk  ∅                        T ̸=                for labeling all super-pixels, and Θ for the fully con-                       1                                                         {yi}ψscri  (yi) =                                                                volutional network’s parameters. Eqn.(5) is for one training     −log( |{ck}|)   if yi ∈{ck} and xi  S = ∅
+      ∞            otherwise                      image. The total loss function sums over the loss functions                                                          (2)      for all training images.
+In this formulation, the ﬁrst condition means that if a super-
+pixel xi overlaps with a scribble sk, then it has zero cost     2.2. Optimization
+when being assigned the label ck. In the second condition,     We present an alternating solution to optimize the above
+if a super-pixel xi does not overlap with any scribble, it can      loss function. We ﬁx Θ and solve for Y , and vice versa. The
+be assigned any label annotated on this image with equal                                                    two alternating steps have clear intuitions: (i) with Θ ﬁxed,
+probability, but must not be assigned to those categories that                                                                the solver propagates labels to unmarked pixels, based on
+                                                                    scribbles, appearance, and also network predictions;  (ii)are absent in this image. Here |{ck}| denotes the number ofcategories annotated for this image. This exclusive infor-                                                          with Y ﬁxed, the solver learns a fully-convolutional net-
+mation is useful for reducing false positive predictions.                                                   work for pixel-wise semantic segmentation.
+  The second part of the unary term respects the output of
+                                                         Propagating scribble information to unmarked pixels. Witha fully convolutional network. We denote this unary term as
+                                                                                                                                             i  + ψneti   can be easilyψneti    , and deﬁne it as:                      Θ ﬁxed, the unary term of ψi = ψscr
+                                                              evaluated by enumerating all possible labels 0 ≤yi ≤C.
+            ψneti  (yi) =             Θ),            (3)    The pairwise terms can be pre-computed as a look-up table.                   −log P(yi|X,                                                     With these evaluated unary and pairwise terms, the opti-
+Here Θ  represents  the  parameters  of  the  network.     mization problem in Eqn.(5) can be solved by the graph cuts
+log P(yi|X, Θ) denotes the log probability of predicting xi      solution [3, 2]. We use the multi-label graph cuts solver in
+
+======================== PDF 第 4 页 ========================
+                                          bg
+
+
+
+
+
+                                person
+
+                                                            bottle
+
+                                         table
+
+
+
+
+
+                            person             mbike
+
+
+
+
+
+                                                bg
+
+                          training image                      iteration 1                        iteration 2                        iteration 3
+Figure 3. The propagated labels of a training image during the training process. Because of the network predictions that are aware of the
+high-level semantics, the propagated labels become more accurate.
+
+[2] with publicly available code2. This solver assigns a cat-        For inference, we only need to apply the FCN model
+egory label 0 ≤yi ≤C for each super-pixel xi, and thus     (represented by Θ) on the image. We note that the super-effectively propagate information to all unmarked pixels.        pixels and their graphical model are for training only, and
+                                                                are not needed for inference. Following [5], we adopt a CRFOptimizing network parameters. With the labeling Y ﬁxed
+                                                                   to post-process the results.for all super-pixels, solving for the network parameters Θ
+is equivalent to optimizing a network using the full-image                                                               2.3. Related Workannotation Y as the supervision. In this paper, we adopt the
+FCN [21] as our network model. Given the the labeling Y ,     Graphical models for segmentation. Graphical models are
+every pixel in the training image has been assigned a cate-     widely used for interactive image segmentation [4, 26, 17,
+gory label. So the FCN is directly trainable for handling this     11, 16, 19] and semantic segmentation [15, 29, 13, 14].
+pixel-wise regression problem. The last layer of FCN out-     Graphical models in general involves unary and pairwise
+puts the per-pixel log probability, which are used to update     terms, and are particularly useful for modeling local and
+the unary term in the graph.                                    global spatial constraints.  Interestingly, FCN [21], as one
+                                                              of the recent most successful method for semantic segmen-  The alternating solution is initialized from the graph cut
+                                                                        tation, performs pixel-wise regression and thus only has ex-step without using network prediction, and then iterates be-
+                                                                            plicit unary terms. But graphical models (e.g., CRF/MRF)tween the two steps. For every network optimizing step, we
+                                                                are later developed for FCN as post-processing [5] or jointﬁne-tune the network with a learning rate of 0.0003 for 50k
+                                                                   training [31, 20]. The graphical models in [5, 31, 20] aremini-batches and 0.0001 for the next 10k mini-batches, us-
+                                                         developed for strongly-supervised training and their effectsing a mini-batch size of 8. The network is (re-)initialized
+                                                                are mainly in improving mask boundaries [5], whereas ourby an ImageNet [28] pre-trained model (e.g., VGG-16 [30])
+                                                               graphical model plays a more important role in our scenarioat the beginning of every network optimizing step. We
+                                                                   for propagating information into the unknown pixels of thehave also experimented with going on training with the net-
+                                                                   training images. The graphical models in [5, 31, 20] op-work parameters learned by the last iteration, and observed
+                                                                   erates on pixels, in contrast to ours that operates on super-slightly poorer accuracy. We conjecture that this is because
+                                                                     pixels. Pixel-based models are preferred for reﬁning bound-when the labels are not reliable, the network parameters
+                                                                         aries, but our super-pixel-based model can propagate labelsmight be tuned to a poorer local optimum.
+                                                   more easily into regions that are distant from the scribbles.
+   Fig. 3 shows the evolution of the propagated labels on
+                                                           Weakly-supervised semantic segmentation. There have beena training image. With the network being updated, the se-
+                                                          a series of methods [25, 24, 7, 27] on weakly-supervisedmatic information from the network becomes more reliable,
+                                                               learning CNN/FCN for semantic segmentation. Image-leveland the propagated labels are getting more accurate. These
+                                                              annotations are more easily to obtain, but semantic segmen-propagated labels in turn improve network learning. We
+                                                                    tation accuracy [25, 24] by using only image-level labelsempirically ﬁnd that the alternating algorithm converges af-
+                                                                lags far behind strongly-supervised results. Results basedter three iterations, and more iterations have negligible im-
+                                                    on box-level annotations [24, 7] are much closer to strongly-provements.
+                                                             supervised ones. Alternating solvers are adopted in [24, 7]
+  2http://vision.csd.uwo.ca/code/gco-v3.0.zip           for addressing box-supervised training, as is also used by
+
+======================== PDF 第 5 页 ========================
+                                                                          chair                                                           sky             sofa                             wall                        wall
+                                               bg                                bg
+                           horse                                                                                                                                            cat
+
+                                                                                                                          tree
+
+                                                                  person                                                                                                           dog                       dog                    dog          person
+
+                                                                                                                                  grass                                cloth                                     ﬂoor
+
+                                                                                                                                               grass
+                                             bg                         sofa                                       sky                                                      building
+                                                               bg                                                          mountain                                                                   sky
+                                                  bird
+                                                                                                                                                                    cow
+                                                                                                                               aero                    mbike
+                                                                    person                                      tree
+                       person
+                                                                                                                                    road
+                                                                             sofa                                             grass                 ground                                             grass
+
+                 PASCAL VOC 2012                                 PASCAL-CONTEXT
+Figure 4. Examples of annotated scribbles via the crowdsourcing AMT platform. Left: PASCAL VOC 2012 that has 20 object categories.
+Right: PASCAL-CONTEXT that has 59 categories of objects and stuff.
+
+
+our method. But box annotations provide the object bounds               method                mIoU (%)
+and conﬁdent background regions, so it is not demanded              GrabCut+FCN                  49.1
+for the box-supervised training to propagate information.              LazySnapping+FCN            53.8
+Pairwise terms as ours are not considered in [24, 7], and                   ours, w/o pairwise terms         60.5
+graphical models are not used in their weakly-supervised                   ours, w/ pairwise terms          63.1
+training (except for CRF reﬁnements). On the contrary, we                                                                  Table 1. Semantic segmentation results on the PASCAL VOC 2012
+will show by experiments that information propagation is      validation set via different strategies of utilizing scribbles.
+inﬂuential in our scribble-supervised case.
+
+3. Experiments                                             takes several minutes per image [22, 18], the annotation ef-
+                                                                        fort by scribbles is substantially reduced. Fig. 4 shows some
+3.1. Annotating Scribbles                                 annotated scribbles. The scribbles have an average length of
+  To evaluate our method, we use the Amazon Mechanical   ∼70% of the longer side of the object’s bounding box.
+Turk (AMT) platform to obtain scribble annotations on the
+                                                               3.2. Experiments on PASCAL VOC 2012PASCAL VOC datasets. We annotate the PASCAL VOC
+2012 set [9] that involves 20 object categories and one back-        Following [21, 24, 7], we train the models on the 10,582
+ground category, and the PASCAL-CONTEXT dataset [22]     (denoted as 11k) training images [12] and evaluate on the
+that involves 59 categories of objects and stuff. We fur-     1,449 validation images. The accuracy is evaluated by the
+ther annotate the PASCAL VOC 2007 set using the 59 cat-    mean Intersection-over-Union (mIoU) score. We adopt the
+egories (which include the 20 object categories). We note    DeepLab-MSc-CRF-LargeFOV [5] as our strongly(mask)-
+that the 2007 set has no available mask-level annotations.     supervised baseline (using VGG-16 [30]). Our implemen-
+So although the scribble annotations for the 2012 and CON-      tation has 68.5% mIoU score, reasonably close to 68.7%
+TEXT sets are mainly for the investigation purpose (as these     reported in [5]. This network architecture also serves as our
+sets have available masks), the scribble annotations for the   FCN structure in our scribble-supervised models.
+2007 set can be actually exploited to improve results.
+                                                              Strategies of utilizing scribbles  Our scribble annotations were labeled by 10 annotators
+                                                    Our method  jointly propagates information into un-from the AMT platform. Each image is annotated by one
+                                                    marked pixels and learns network parameters. A simpler so-annotator, and is checked by another annotator (if neces-
+                                                                   lution is to ﬁrst use any existing interactive image segmenta-sary, to add missing scribbles and modify imprecise scrib-
+                                                                   tion method to generate masks based on scribbles, and thenbles). The annotators are asked to draw scribbles on the re-
+                                                          use these masks to train FCNs. In Table 1 we compare withgions which they feel conﬁdent and easy to draw; the object
+                                                                        this two-step solution.boundaries or ambiguous regions are not needed to anno-
+                                          We investigate two popular interactive image segmenta-tated. However, we require that every existing object (of the
+                                                                   tion algorithms for generating masks from scribbles: Grab-related categories) in an image must be labeled by at least
+                                                          Cut3 [26] and LazySnapping [17]. In our scenario, the dif-one scribble, so missing objects are not allowed (veriﬁed
+                                                              ference between [26] and [17] lies on their deﬁnitions of theby the checker annotator). According to our record, it takes
+                                                         unary and pairwise terms. Training FCNs using the masksan annotator on average 25 seconds to label an image with
+20 object categories, and 50 seconds with 59 object/stuff         3Although GrabCut used boxes as it was originally developed, its deﬁ-
+categories. Compared with annotating per-pixel masks that       nitions of unary/pairwise terms can be directly applied with scribbles.
+
+======================== PDF 第 6 页 ========================
+                                                chair                                      chair
+                                                            bg                                bg        chair                       bg                                 bg
+                                                                                                                                                                       chair
+
+
+                                            person     person                                person                              person                               person
+
+                                                                                                               person                               person
+                                                                            person
+
+
+                                            ratio 1                           ratio 0.8                          ratio 0.5                       ratio 0 (spot)
+         Figure 5. Scribbles of different lengths for investigating our method’s sensitivities to scribble quality. See also Table 2.
+
+
+                   length ratio   mIoU (%)                          method                  annotations   mIoU (%)
+                    1           63.1                        MIL-FCN [25]           image-level       25.1
+                       0.8          61.8                     WSSL [24]              image-level       38.2
+                       0.5          58.5                                                                            point supervision [27]        spot          46.1
+                       0.3          54.3                                               WSSL [24]               box          60.6
+                  0 (spot)        51.6
+                                                          BoxSup [7]               box          62.0
+Table 2. Sensitivities to scribble length evaluated on the PASCAL                                                                         ours                         spot          51.6
+VOC 2012 validation set. The shorter scribbles are synthesized                                                                         ours                        scribble         63.1
+from the annotated scribbles, reducing their length by a ratio. A
+ratio of 0 means spots are used.                                     Table 3. Comparisons of weakly-supervised methods on the PAS-
+                                           CAL VOC 2012 validation set, using different ways of annota-
+                                                                               tions. All methods are trained on the PASCAL VOC 2012 training
+generated by these methods shows inferior semantic seg-     images using VGG-16, except that the annotations are different.
+mentation accuracy (Table 1, all post-processed by CRFs of
+[5]). This is because the terms in these traditional methods
+[26, 17] only model low-level color/sptial information and      the “quality” of scribbles is somehow subjective and using
+are unaware of semantic content. The generated masks are      different sets of scribbles requires extra annotation efforts,
+not reliable “ground-truth” for training the networks.        we use synthesized scribbles based on the user annotations.
+  On  the  contrary,  our  scribble-supervised  method   We focus on the length of the scribbles. Given any user an-
+achieves a score of 63.1%, about 10% higher than the two-     notated scribble, we reduce the length of this scribble by a
+step solutions. This is because when the network gradually       ratio. For a shortened scribble, one of its end-points is ran-
+learns semantic content, the high-level information can help    domly chosen from the original scribble, and the other end-
+with the graph-based scribble propagation. This behavior is     point is determined by the reduced length. Fig. 5 shows ex-
+shown in Fig. 3: at the beginning of training when the net-     amples of the shortened scribbles, where a ratio of 0 means
+work is not reliable, the propagated labels tend to rely on     a spot is used.
+low-level color/texture similarities; but the erroneous prop-        Table 2 shows the results of our scribble-supervised al-
+agation can be corrected with the network feedback.           gorithm using scribbles of different lengths. Our method
+   In Table 1 we also show that the pairwise term is im-     performs gracefully when the scribbles are shortened, sug-
+portant for propagating information. We experiment with     gesting that our method is reasonably robust to the quality
+a case without using the pairwise terms, which leads to a     of scribbles. To the extreme, when the length approaches 0
+lower score of 60.5%. In this case, the unmarked pixels are     and the scribbles become spots, our method is still applica-
+ambiguous at initialization (as their cost of taking any avail-      ble and has a score of 51.6%.
+able label is equal), so we initialize them by the background                                                  Comparisons with other weakly-supervised methods
+label. Without the pairwise term, the problem in Eqn.(5)                                                                 In Table 3 we compare with other weakly-supervised
+only involves unary terms, and the graph cuts step actually                                                      methods using different ways of annotations.  We note
+degrades to winner-take-all selection of labels based on net-                                                                     that while image-level annotations are the most economi-
+work predictions. As such, the information propagation is                                                                         cal, their weakly-supervised learning accuracy (e.g., 38.2%
+only performed by the “fully convolutional” behavior (slid-                                                              of WSSL [24]) lags far behind other ways of annotations.
+ing a large receptive ﬁeld) that may implicitly impose local                                           On the other hand, our method achieves accuracy on par
+coherency. But this way of propagation is insufﬁcient as                                                          with box-supervised methods (60.6% of of WSSL [24] and
+shown by the lower accuracy.                                                  62.0% of BoxSup [7]), indicating that scribbles can be well
+Sensitivities to scribble quality                               exploited as a user-friendly alternative to boxes. Compar-
+  The quality of the annotated scribbles is subject to the be-     ing with a recent point-supervised method [27] (46.1%), our
+havior and experience of the annotators. So we investigate     spot-only result (51.6%) is over 5% higher (but we note that
+how sensitive our method is to the scribble quality. Because      the our annotations are different from those used in [27]).
+
+======================== PDF 第 7 页 ========================
+                          method       data/annotations                         mIoU (%)
+                   CFM [8]     5k w/ masks                                   34.4
+                    FCN [21]    5k w/ masks                                   35.1
+                          Boxsup [7]   5k w/ masks + 133k w/ boxes (COCO+VOC07)    40.5
+                                baseline      5k w/ masks                                   37.7
+                                 ours, weakly  5k w/ scribbles                                 36.1
+                                 ours, weakly  5k w/ scribbles + 10k w/ scribbles (VOC07)       39.3
+                                 ours, semi    5k w/ masks + 10k w/ scribbles (VOC07)         42.0
+                                 Table 5. Comparisons on the PASCAL-CONTEXT validation set.
+
+
+ supervision  # w/ masks  # w/ scribbles   total  mIoU (%)       competitive accuracy of our method suggests that using in-
+ weakly         -           11k           11k      63.1         expensive scribbles to increase the data size can be a practi-
+  strongly     11k            -             11k      68.5          cal solution.
+ semi        11k        10k (VOC07)   21k      71.3
+                                                               3.3. Experiments on PASCAL-CONTEXTTable 4. Comparisons of our method using different annotations
+on the PASCAL VOC 2012 validation set. The term “total” shows     We  perform  more  experiments  on  the PASCAL-
+the number of training images, “# w/ masks” shows the number of   CONTEXT dataset [22] with 59 categories. The images
+training images with mask-level annotations, and “# w/ scribbles”     of this dataset are fully annotated by [22], providing pixel-
+shows the number of training images with scribble annotations.                                                                    level masks on objects and stuff. We evaluate on the 5k
+                                                                 validation images, and train the models on the 5k training
+                                                       images or extra data. We note that scribbles are particularlyComparisons with using masks
+                                                             favored for annotating stuff, and annotating precise outlines   In Table 4 we compare our weakly-supervised results
+                                                              of stuff can be more time-consuming than objects. Table 5based on scribbles and strongly-supervised results based
+                                                      compares the results.on masks. When replacing all mask-level annotations with
+                                                    Our reproduced strongly-supervised baseline has a scorescribbles, our method has a degradation of about 5 points.
+                                                              of 37.7% on this dataset. Our weakly-supervised methodWe believe this is a reasonable gap considering the chal-
+                                                         based on scribbles has a score of 36.1%, showing a gracefullenges of exploiting scribbles.
+                                                             degradation of 1.6 point. This gap is smaller than that for  Our method can also be easily generalized to semi-
+                                          PASCAL VOC 2012 (Table 4), suggesting that it is easier tosupervised learning that uses both mask annotations and
+                                                           propagate stuff labels as stuff in general has uniform appear-scribble annotations.  For the training images that have
+                                                              ance. When using the extra (object+stuff) scribbles anno-mask-level annotations, the graphical model is not applied,
+                                                                   tated on the PASCAL VOC 2007 set, our weakly-supervisedand these images only contribute to the network training
+                                                                      result is boosted to 39.3%, demonstrating the effects of ex-step. To evaluate our semi-supervised results, we use the
+                                                                   ploiting more training data (which are yet efﬁcient to anno-mask-level annotations on the PASCAL VOC 2012 set, and
+                                                                             tate). Finally, our semi-supervised method that uses the pro-the scribble annotations on the PASCAL VOC 2007 set (that
+                                                          vided 5k mask-level annotations and extra 10k VOC 2007has no available mask annotation). Our semi-supervised re-
+                                                                   scribble-level annotations achieves a score of 42.0%. Thissult is a score of 71.3%, showing a gain of 2.8% higher than
+                                                   number compares favorably with BoxSup [7] (40.5%) thatthe baseline. This gain is due to the extra scribble anno-
+                                                                  exploits extra 133k box-level annotations      of ours). Wetations from the 2007 set. As a comparison, [24] reports                                   (×10                                                            note that box-level annotations are only applicable for ob-a strongly-supervised result of 71.7% on this validation set
+                                                                           jects, but is not for stuff. So even though BoxSup uses muchusing extra 123k COCO [18] images with masks. Our semi-
+                                                                   larger amount of data than ours, its accuracy is lower thansupervised result is on par with their strongly-supervised
+                                                            ours on this dataset that involves stuff. To the best of ourresult, but we only use 10k VOC 2007 scribble-level anno-
+                                                        knowledge, our accuracy is the current state of the art ontations as the extra data. Fig. 6 shows some results.
+                                                                        this dataset. Fig. 7 shows some example results.  We further evaluate our method on the PASCAL VOC
+2012 test set. By semi-supervised training using the mask-
+level annotations of the PASCAL VOC 2012 train and vali-     4. Conclusion and Future Work
+dation sets, as well as the scribble annotations on the VOC                                          We have presented a weakly-supervised method for se-
+2007 set, the trained model has a score of 73.1%. This num-                                                         mantic segmentation based on scribbles. Our method opti-
+ber is behind but close to the current state-of-the-art results
+on the test set4, without using the 123k COCO data. The      have test set accuracy of over 74.8% and 74.1%. The improvements of [23,
+                                                                         20] are orthogonal to our method, and these strongly-supervised methods
+   4Using only the VOC data, the strongly-supervised methods of [23, 20]      can be swapped into our system, in place of the FCN baseline.
+
+======================== PDF 第 8 页 ========================
+                                                                                            tv                                                   tv                                                    tv                                                  tv
+
+
+                                                                                               person                        cat           person
+                                                                                                cat                                                                                                                                                                                            cat         person                            cat       person
+
+
+
+
+
+                                                                                                            car                                                                                                                                                          car                                                                                                                                                                                                      car                                                                                                                                                                                                                                                   car
+                                                                                        person                                                                                                                                  person                                                                                                                                                                          person                                                                                                                                                                                                                   person
+
+                                                                                 mbike                                mbike                                 mbike                                  mbike
+
+
+
+
+
+                                                                                bus                                    bus                                      bus                                bus
+
+                                                                                                                                                                                                                              person                                                                                                                                            person                                                                                                  person
+                                                                             car                                                                                                                        car                                                                                                                                                                     car                                           car
+
+
+
+                             (a) image                 (b) ground-truth          (c) strongly-supervised      (d) scribble-supervised        (d) semi-supervised
+
+Figure 6. Our results on the PASCAL VOC 2012 validation set. The training data and annotations are: (c) 11k images with masks on VOC
+2012; (d) 11k images with scribbles on VOC 2012; (e) 11k images with masks on VOC 2012 and 10k images with scribbles on VOC 2007.
+See also Table 4.
+
+
+
+
+
+                                                                                                     wall                                            wall                                             wall                            light                 wall                                                                                              light
+
+                                                                                                                                                                                                                 light
+
+                                                                                                                                                                                                                                table
+                                                                               table
+                                                                                         sofa                                           sofa                                       sofa                                         sofa
+
+                                                                                                          ﬂoor                                       ﬂoor                                       ﬂoor                                       ﬂoor
+
+                                                                                       sky                                       sky                                       sky                                    sky
+
+
+
+                                                                                       mountain                                                                         mountain                                 mountain
+                                                                                                                                  water                                                                                        water
+                                                                                                                                    cow          water                                                                   sheep                                                                                                  cow                                                                                                                                                                     sheep            sheep        water                                                                                                                               sheep
+
+                                                                                     grass                                    grass                                        grass                                     grass
+
+
+
+                                                                                                                                           sky                                                                                                                                                                                   sky                                                                                                sky
+                                                                                                                                                                                           building                                                                                                                                                                                                                                      building                sky                                                                                        building                                                                                                                                         building
+
+
+
+                                                                                  bus
+                                                                              person                                       bus                                   bus                                     bus
+                                                                                                                                                                                                       person                     car                                                                           mbike                    car                                                                                      car
+                                                                                                                                                                                              mbike
+                                                                                       road                                     road                                     road                                       road
+
+
+
+                                                                                   sky                                       sky                                    sky                                      sky
+
+
+                                                                       mountain                             mountain                                    mountain                                 mountain
+                                                                                          building         boat        tree             building          boat                         building          boat                           building       boat         tree
+                                                                                     water                                   water                                     water                                     water
+
+                             (a) image                 (b) ground-truth          (c) strongly-supervised      (d) scribble-supervised        (e) semi-supervised
+
+Figure 7. Our results on the PASCAL-CONTEXT validation set. The training data and annotations are: (c) 5k images with masks on
+PASCAL-CONTEXT; (d) 5k images with scribbles on PASCAL-CONTEXT; (e) 5k images with masks on PASCAL-CONTEXT and 10k
+images with scribbles on VOC 2007. See also Table 5.
+
+mizes a graphical model for propagating information from    Acknowledgment
+scribbles. Although our formulation is motivated by the us-
+age of scribbles,  it is applicable for many other types of
+weak supervision including box-level or image-level anno-        This work is in part supported by a grant from the Re-
+tations. We plan to investigate these issues in the future.        search Grants Council of the Hong Kong SAR (project No.
+                                                          413113).
+
+======================== PDF 第 9 页 ========================
+References                                                      [23] H. Noh, S. Hong, and B. Han. Learning deconvolution net-
+                                                             work for semantic segmentation. In ICCV, 2015.
+ [1] S. Bell, P. Upchurch, N. Snavely, and K. Bala.  Opensur-                                                                     [24] G. Papandreou, L.-C. Chen, K. Murphy, and A. L. Yuille.
+      faces: A richly annotated catalog of surface appearance. In                                                                 Weakly- and semi-supervised learning of a dcnn for semantic
+    SIGGRAPH, 2013.                                                                image segmentation. In ICCV, 2015.
+ [2] Y. Boykov and V. Kolmogorov. An experimental comparison                                                                     [25] D. Pathak, E. Shelhamer, J. Long, and T. Darrell.  Fully
+     of min-cut/max-ﬂow algorithms for energy minimization in                                                                          convolutional multi-class multiple instance learning. arXiv
+      vision. TPAMI, 2004.                                                                             preprint arXiv:1412.7144, 2014.
+ [3] Y. Boykov, O. Veksler, and R. Zabih. Fast approximate en-                                                                     [26] C. Rother, V. Kolmogorov, and A. Blake. Grabcut: Interac-
+     ergy minimization via graph cuts. In ICCV, 1999.                                                                                     tive foreground extraction using iterated graph cuts. ACM
+ [4] Y. Y. Boykov and M.-P. Jolly. Interactive graph cuts for op-           Transactions on Graphics, 2004.
+     timal boundary & region segmentation of objects in nd im-                                                                     [27] O. Russakovsky, A. L. Bearman, V. Ferrari, and F.-F. Li.
+     ages. In ICCV, 2001.                                                                  What’s the point: Semantic segmentation with point super-
+ [5] L.-C. Chen, G. Papandreou, I. Kokkinos, K. Murphy, and            vision. arXiv preprint arXiv:1506.02106, 2015.
+     A. L. Yuille. Semantic image segmentation with deep con-      [28] O. Russakovsky, J. Deng, H. Su, J. Krause, S. Satheesh,
+      volutional nets and fully connected crfs. In ICLR, 2015.                S. Ma, Z. Huang, A. Karpathy, A. Khosla, M. Bernstein,
+ [6] A. Criminisi, T. Sharp, C. Rother, and P. P´erez. Geodesic             et al.  Imagenet large scale visual recognition challenge.
+     image and video editing. SIGGRAPH, 2010.                         arXiv:1409.0575, 2014.
+ [7]  J. Dai, K. He, and J. Sun.  Boxsup: Exploiting bounding      [29]  J. Shotton, J. Winn, C. Rother, and A. Criminisi.  Texton-
+     boxes to supervise convolutional networks for semantic seg-            boost:  Joint appearance, shape and context modeling for
+     mentation. In ICCV, 2015.                                             mulit-class object recognition and segmentation. In ECCV,
+ [8]  J. Dai, K. He, and J. Sun. Convolutional feature masking for           2006.
+      joint object and stuff segmentation. In CVPR, 2015.              [30] K. Simonyan and A. Zisserman.  Very deep convolutional
+ [9] M. Everingham, L. Van Gool, C. K. Williams, J. Winn, and          networks for large-scale image recognition. In ICLR, 2015.
+     A. Zisserman. The PASCAL Visual Object Classes (VOC)      [31] S. Zheng, S. Jayasumana, B. Romera-Paredes, V. Vineet,
+     Challenge. IJCV, 2010.                                             Z. Su, D. Du, C. Huang, and P. Torr.  Conditional random
+[10]  P. F. Felzenszwalb and D. P. Huttenlocher. Efﬁcient graph-           ﬁelds as recurrent neural networks. In ICCV, 2015.
+     based image segmentation. IJCV, 2004.
+[11] L. Grady. Random walks for image segmentation. PAMI,
+     2006.
+[12] B. Hariharan, P. Arbel´aez, L. Bourdev, S. Maji, and J. Malik.
+     Semantic contours from inverse detectors. In ICCV, 2011.
+[13]  P. Kohli, P. H. Torr, et al. Robust higher order potentials for
+     enforcing label consistency. IJCV, pages 302–324, 2009.
+[14]  P. Kr¨ahenb¨uhl and V. Koltun.  Efﬁcient inference in fully
+     connected crfs with gaussian edge potentials. In NIPS, 2012.
+[15]  J. Lafferty, A. McCallum, and F. C. Pereira. Conditional ran-
+    dom ﬁelds: Probabilistic models for segmenting and labeling
+     sequence data. In ICML, 2001.
+[16] A. Levin, D. Lischinski, and Y. Weiss. A closed form solu-
+      tion to natural image matting. CVPR, 2006.
+[17] Y. Li, J. Sun, C.-K. Tang, and H.-Y. Shum. Lazy snapping.
+     In SIGGRAPH, 2004.
+[18] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ra-
+     manan, P. Doll´ar, and C. L. Zitnick. Microsoft COCO: Com-
+    mon objects in context. In ECCV. 2014.
+[19]  J. Liu, J. Sun, and H.-Y. Shum.  Paint selection.  In SIG-
+    GRAPH, volume 28, page 69. ACM, 2009.
+[20] Z. Liu, X. Li, P. Luo, C. C. Loy, and X. Tang. Semantic im-
+     age segmentation via deep parsing network. In ICCV, 2015.
+[21]  J. Long, E. Shelhamer, and T. Darrell. Fully convolutional
+     networks for semantic segmentation. In CVPR, 2015.
+[22] R. Mottaghi, X. Chen, X. Liu, N.-G. Cho, S.-W. Lee, S. Fi-
+      dler, R. Urtasun, and A. Yuille. The role of context for object
+     detection and semantic segmentation in the wild. In CVPR.
+     2014.

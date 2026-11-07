@@ -1,0 +1,483 @@
+KH-A006 | Content-Aware Rotation
+来源：https://openaccess.thecvf.com/content_iccv_2013/html/He_Content-Aware_Rotation_2013_ICCV_paper.html
+本地PDF：专题文献/何恺明/KH-A006_Content_Aware_Rotation_ICCV2013.pdf
+SHA-256：786a25adee48c7a8876728b49ce6e3d05d282163e3f63e70472fd97f54627f97
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                        Content-Aware Rotation
+
+
+             Kaiming He            Huiwen Chang∗                Jian Sun
+         Microsoft Research Asia      Tsinghua University      Microsoft Research Asia
+
+
+                 Abstract
+
+  We present an image editing tool called Content-Aware
+Rotation. Casually shot photos can appear tilted, and are
+often corrected by rotation and cropping. This trivial so-
+lution may remove desired content and hurt image integri-
+ty. Instead of doing rigid rotation, we propose a warping
+method that creates the perception of rotation and avoids                                                                                                    (a) input                       (b) rotation (-5.8°)
+cropping. Human vision studies suggest that the perception
+of rotation is mainly due to horizontal/vertical lines. We de-
+sign an optimization-based method that preserves the rota-
+tion of horizontal/vertical lines, maintains the completeness
+of the image content, and reduces the warping distortion.
+An efﬁcient algorithm is developed to address the challeng-
+ing optimization. We demonstrate our content-aware rota-
+tion method on a variety of practical cases.
+                                                                                                     (c) crop from (b)              (d) content-aware rotation
+
+                                                                  Figure 1. Image rotation. (a) An input tilted image. (b) The user
+                                                                            rotates the image by -5.8◦(clockwise 5.8◦), such that its hori-1. Introduction
+                                                                       zontal lines become level.  (c) The rotated image is cropped by
+  Image rotation is one of the fundamental image editing      the largest inner upright rectangle. (d) Our content-aware rotation
+operations besides scaling and cropping. Photos casually       result.
+shot by hand-held cameras/phones can appear tilted, which
+are sensitive to human eyes even when the rotation angle is                                                                        [4, 31, 29, 25, 32, 8].  Instead of cropping or uniformly
+small (Fig. 1(a)). On the other hand, artists may adjust the                                                                   scaling, the pioneer work Seam Carving [4] resorts to a
+composition through manipulating the rotation [26].  For                                                           content-aware fashion. The philosophy is that the percep-
+these reasons and others, image rotation has been incorpo-                                                                     tual sensitivity is not equal among different image content.
+rated in a majority of image editing softwares.                                                 So it is possible to produce visually pleasing results if the
+  We assume the rotation angle has been given by users,                                                            manipulations are less noticeable, e.g., removing/inserting
+algorithms [12], or sensors in devices. A rigidly rotated im-                                                     seams as in [4]. This method has been implemented as the
+age inevitably has empty regions, and is often cropped to                                                        Content-Aware Scaling feature in the commercial software
+ﬁt an upright rectangle (Fig. 1(b)). But this trivial solution                                                 Adobe Photoshop [2]. Recent image retargeting methods
+may produce unwanted results: it may remove image con-                                                                are mostly based on warping [31, 29, 32, 8], and they are de-
+tent and hurt the integrity of the image (e.g., the building                                                            signed to preserve high-level content like local shapes and
+in Fig. 1(c)). Actually, the cropping operation reduces the                                                                     straight lines. A common motivation of warping methods
+area of a typical photo by 20% even when the rotation an-                                                                              is to maintain the completeness of the image content at the
+gle is as small as 5◦. A sophisticated solution is desired for                                                                 price of distortion (as unnoticeable as possible).
+common users and artists to reduce the loss of content when                                                       With a similar motivation,  in this paper we present
+rotating images.                                                        Content-Aware Rotation. We design a warping method that
+   Despite little attention has been paid to the above is-                                                         keeps the image content inside an upright rectangle while
+sue on rotation, there have been an abundance of literatures                                                               creating the perception of rotation. We are driven by sev-
+on image scaling/resizing, popularly known as retargeting                                                                     eral observations on human vision studies [13, 23, 22, 11].
+   ∗This work was done when Huiwen Chang was an intern at MSRA.         First, the perception of image tilting is mainly due to the
+
+
+                                                 1
+
+======================== PDF 第 2 页 ========================
+                 (a) input                               (b) initial mesh                             (c) optimized mesh                             (d) result
+Figure 2. Content-aware rotation using warping. (a) An input image to be rotated by 6.1◦. (b) The initialized grid mesh. (c) The optimized
+mesh. (d) The warping result.
+
+
+                                                                   for a multi-megapixel image) and produces visually com-
+normal angles                                                    pelling results (e.g., Fig. 1(d)).
+                                                    Our method performs particularly well for “small” rota-
+                                                                   tion angles like <10◦. We ﬁnd this range covers most real
+                   87°            90°             93°          cases of correcting careless camera tilt. We also notice that
+                                                human eyes are very sensitive to a rotation angle as small as
+oblique angles                                         3◦or even smaller (the famous Leaning Tower of Pisa leans
+                                                                        at about 3.99◦1), so the correction is still desired despite
+                   87°            90°             93°           the angles are “small”. We believe our solution can meet
+Figure 3. Perception of angles. Top: for normal angles, human      the need in many practices.
+eyes can easily notice the tilted vertical lines. Bottom: for oblique        This paper mainly has these contributions: (i) to the best
+angles, human eyes are not sensitive to the absolute angle values.     of our knowledge, this is the ﬁrst study on content-aware
+This ﬁgure is due to [13].                                           rotation based on human perception studies; (ii) we devel-
+                                                    op an optimization-based warping method to create the per-
+                                                              ception of rotation; (iii) our method is practically fast and
+perception of the tilted horizon (or lines parallel to it) [11].
+                                                                   high-quality, and can be a useful tool from common users.
+This is perhaps because the human visual system is hori-
+zontally binocular. Second, the human eyes are sensitive to
+                                                          2. Related Work
+the right angles (90◦) that are “normal” [13, 23], i.e., right
+angles with one edge being horizontal. As a result, the ver-     We review the related methods and tools on image rota-
+tical lines are easily noticeable if tilted.  Last, the human      tion, retargeting, and warping.
+eyes are not sensitive to the absolute values of angles when
+                                                 Image Rotation  Consider a popular way of manual rota-
+the angles are acute/obtuse [22] or when they are “oblique”
+                                                                   tion [1]: the user drags a straight line aligned to any hori-
+right angles (i.e., not “normal”) [13, 23]. The readers can
+                                                                    zontal/vertical line, and then the software rotates the image
+experience this in Fig. 3.
+                                                          so that the dragged line becomes horizontal/vertical. This
+  The above studies suggest that the human vision system
+                                                              user interface is inspiring: the human eyes are sensitive to
+is very sensitive to the horizontal/vertical lines but less so to
+                                                                            tilted horizontal/vertical lines. Our method harnesses this
+others. Driven by these studies, we propose to preserve the
+                                                             property to create the perception of rotation.
+orientation of the horizontal/vertical lines (after rotation) so
+                                      A method [12] that automatically estimates a rotation an-
+as to create the perception of rotation. The orientations of
+                                                                gle from a single image is based on a similar motivation.
+other lines are relaxed because they are less noticeable to
+                                                          This method ﬁnds the vanishing points and determines the
+human eyes.  This adaptive rotation makes it possible to
+                                                            horizon accordingly. The rotation angle that rectiﬁes the
+maintain the image integrity with less distortion (Sec. 3.4).
+                                                            horizon is chosen. Beyond 2D in-plane rotation, the method
+   Algorithmically, we optimize a grid mesh with several
+                                                                   in [20] automatically estimates 3D rotation angles (a ho-
+considerations. We constrain the horizontal/vertical lines
+                                                   mography matrix). This method harnesses both horizontal
+(after rotation) to be horizontal/vertial to create the percep-
+                                                      and vertical vanishing lines. Given the estimated rotation
+tion of rotation, but relax other lines. We constrain the
+                                                            angle (2D/3D), conventional methods [12, 20] transform the
+boundary vertexes on the image boundary to maintain the
+                                                     image rigidly and globally. On the contrary, our purpose is
+completeness of the content. We also minimize local distor-
+                                                                   to design locally adaptive transforms. We only consider 2D
+tion to preserve shapes. We formulate these considerations
+                                                               in-plane rotation in this paper.
+as an energy function, and minimize it by a half-quadratic
+splitting technique [28, 19]. Our method is very fast (<1s       1en.wikipedia.org/wiki/Leaning_Tower_of_Pisa
+
+======================== PDF 第 3 页 ========================
+Image Retargeting   Retargeting refers to the problem
+of changing image sizes (or most usually, aspect ratios).
+Uniform scaling may lead to notorious distortion, while
+cropping may remove desired content. The Seam Carving
+method [4] removes/inserts the most unnoticeable seams to
+resize the image.  This method may produce visible dis-
+continuities when the number of seams increases because
+it is greedy.  This problem is addressed by a variety of
+optimization-based warping methods [31, 29, 32, 8]. The
+warping strategy allows to introduce smooth distortion that
+are less noticeable to human eyes. Further, the mesh-based
+warping methods are able to preserve high-level perceptual
+properties like local shapes [29, 32, 8] and straight lines [8].
+
+Image Warping   Warping  is a successful solution to
+many other computer vision/graphics applications besides         input & detected lines       output & deformed lines
+retargeting. The method in [16] introduces an “as-rigid-
+                                                                  Figure 4. Top: the input and the content-aware rotation result. The
+as-possible” manipulation of shapes or images.  The s-                                                                          rotation angle is 5.2◦. Bottom: the detected lines in the input and
+tudies in [18, 7, 6] use the warping strategy to adaptive-                                                                               their deformed counterparts in the output. Here the “canonical”
+ly project wide-angle/panaramic images. Warping has al-       lines are marked as red - they are the lines to be horizontal/vertical
+so been adopted in image morphing [9], video stabilization       after rotation.
+[21], and panorama rectangling [14].
+
+3. Algorithm                                         be kept straight, and parallel lines will be kept parallel. We
+                                                          denote the common rotation angle in the m-th bin as θm.
+  We suppose the rotation angle ∆is given by users or au-    The set {θm}Mm=1 forms a M×1 vector θ.
+tomatic methods like [12], and is ﬁxed. We further suppose     We pay special attention to the lines that would be-
+that given this rotation angle, the horizon (or the lines paral-    come horizontal/vertical after rotation: they are in the bins
+lel to the horizon) would become horizontal after rigid rota-    m=1,M (horizontal) or M2 , M2 + 1 (vertical). We refer to
+tion. This is generally the case in practice. But our method     these four bins as “canonical” bins. We want to preserve the
+can easily adapt to “tilted composition” if a tilted horizon is      rotation of the lines in these bins (marked as red in Fig. 4).
+the artists’ purpose.
+  We optimize a quad mesh for warping.  The warping     3.2. Energy Function
+result is expected to maintain the orientations of horizon-
+                                          We design an energy function that encourages the fol-
+tal/vertical lines (after rotation) but relax others. To this
+                                                         lowing properties.  (1) The lines in the canonical bins are
+end, we design an energy function that can manipulate the
+                                                                           strictly constrained to be rotated by ∆. This is for creat-
+rotations of lines in different orientations.
+                                                             ing the perception of rotation. (2) The vertexes in the input
+3.1. Line Extraction and Quantization               mesh boundary are constrained to be on the upright rect-
+                                                             angular boundary of the output. This is for maintaining the
+  We ﬁrst extract and quantize the lines that will be used in                                                              content completeness. (3) The local distortion is minimized.
+the mesh optimization. This step is on the input image. We                                          We put a regular quad mesh on the input image (Fig. 2).
+extract lines using the code of [27]2 (Fig. 4 left). Then these                                        We denote the position of a vertex as vi = (xi, yi)T, and
+lines are cut by the input mesh grid, so each resulting line is                                                             concatenate all vertexes {vi} into a long vector V. Our
+within a single quad. Denote the orientation of the x-axis as                                                          energy function is with respect to V and θ.  It has the fol-
+0. We compute the orientations of the detected lines. The                                                         lowing terms:
+orientations are offset by periods of π such that they are in
+the range [−∆, π −∆) in the input image. If the image is     Rotation Manipulation  The energy ER manipulates the
+rigidly rotated by ∆, these lines would be in the range [0, π)      rotation angles of the lines:
+in the output.
+  We uniformly quantize the range [−∆, π −∆) into      ER(θ) = X δm(θm −∆)2 + X(θm −θm+1)2   (1)
+M=90 bins, each bin covering 2◦. As in [8], our energy           m           m
+function will encourage all the lines in the same bin to share
+                                                  The ﬁrst term is a data term. It encourages the rotation an-
+a common rotation angle. As such, a long straight line will
+                                                                gles to follow the desired ∆. The weight δm = 103 if bin m
+  2www.ipol.im/pub/art/2012/gjmr-lsd/                        is canonical, and δm = 0 otherwise. In this way we impose
+
+======================== PDF 第 4 页 ========================
+strong constraints only on the horizontal/vertical lines. The     where N is the quad number, q is a quad index. Deﬁned on
+second term is a smoothness term.  It encourages the two      the quad q, the 8×4 matrix Aq and the 8×1 vector Vq are:
+neighboring bins to be similar.  It smoothly propagates the
+                                             ˆxq,0   −ˆyq,0  1  0        xq,0 impact of the canonical bins to the non-canonical ones.
+                                                                                                   ˆyq,0     ˆxq,0   0  1                 yq,0  The energy ER(θ) allows to rotate the non-canonical
+                                               Aq =        :          :        :    :     ,  Vq =        :       . (5)lines by some angles different from ∆, so enables non-rigid
+                                                                                              ˆxq,3   −ˆyq,3  1  0                xq,3and adaptive rotation. The energy ER(θ) is quadratic on                                                                                                                                                               
+                                                                                                   ˆyq,3     ˆxq,3   0  1                 yq,3the vector θ.
+Line Preservation  The line preservation energy builds a     Here (xq,0, yq,0), ..., (xq,3, yq,3) denote the four vertexes of
+relation between the lines and the mesh vertexes.              a deformed quad, and (ˆxq,0, ˆyq,0), ..., (ˆxq,3, ˆyq,3) those of
+                                                                the input quad (see [32] for the derivation). The energy ES   For the k-th detected line, we can represent its two end-
+                                                                              is a quadratic function of V.points as bilinear interpolations of four vertexes. We com-
+                                                                                         It is possible to weight the terms in (4) to preserve facespute a directional vector ek by the difference of the two
+                                                                   [7] or other salient objects. In this paper we ignore theseendpoints. So ek can be written as a linear function of the
+                                                          concerns and keep the presentation of our core idea simple.vertexes V (that is, ek = PkV for some Pk).  Also, we
+use uk to denote the directional vector of this line in the in-    Boundary Preservation  To avoid the image content go-
+put image. Denoting the bin of this line as m(k) with the     ing outside an upright rectangular boundary, we constrain
+expected rotation angle θm(k), we consider the following      the boundary vertexes on this rectangle:
+energy measuring the distortion of line rotation:
+                                          EB(V) = X x2i + X (xi−w)2+ X y2i + X (yi−h)2.
+                    1
+        X ∥skRkuk −ek∥2.      (2)                       i∈left      i∈right             i∈top     i∈bottom      EL(V, θ, s) =
+            K                                                                                                 (6)
+                            k
+                                                     Here each summation is over the vertexes on each boundary.
+where K  is  the number of  lines,  the matrix Rk =    The values w and h are the width and height of an upright
+  cos θm(k)  −sin θm(k)                                         rectangle. We use a rectangle of the same size as the input
+                                 is a rotational matrix, and sk is   sin θm(k)    cos θm(k)                                    image. The energy EB(V) is quadratic on V.
+a scale associated to the line k.  Intuitively, we rotate the
+input vector uk by θm(k) and scale it by sk, and then we     Total Energy  We optimize the following energy:
+measure its distortion to ek.
+                                            E(V, θ) = ES(V)+λBEB(V)+λLEL(V, θ)+λRER(θ).
+  We assume the scale sk is independent to each other.                                                                                                                             (7)
+Minimizing EL with respect to each sk gives us sk =                                        We use λB = ∞(108) to impose hard boundary constraint.
+(uTkuk)−1uTkRTkek. Substituting sk into (2) we obtain:                                                         For λL and λR, our method involves the issue of parameter
+                                                                    settings as in other multi-term warping methods [7, 6, 8].                 1
+     EL(V, θ) = X ∥ RkUkRTk −I  ek∥2.     (3)   We ﬁnd λL = λR = 100 work well in various experiments.
+          K
+                        k                                 Throughout this paper we use this ﬁxed setting.
+
+where Uk = uk(uTkuk)−1uTk and I denotes a unit matrix.     3.3. Optimization
+Intuitively, this term encourages the angle between ek and                                          We use an alternating algorithm to optimize the energy
+uk to be θm(k), such that the line is to be rotated by θm(k).    E(V, θ). We divide the problem into two subproblems, and
+  The term EL(V, θ) takes effect like the “angle coupling      iteratively optimize each of them:
+energy” in [8]. But unlike [8], we have decoupled from s
+and obtained a closed-form on V and θ. This simpler form     Fix θ, solve for V. In this case E is a quadratic function
+allows us to handle the nonlinearity of θ in optimization     on V. The solution is simply given by a sparse linear sys-
+(Sec. 3.3). The energy EL(V, θ) is quadratic on V.            tem. Because V consists of several hundreds of unknowns,
+                                                                                             it takes only a few milliseconds to solve this subproblem.
+Shape Preservation   Various shape preservation func-
+                                                        Fix V, solve for θ. In this case the subproblem is to mini-tions have been proposed, e.g., in [16, 32]. In this paper we
+                                                          mize:adopt the one in [32]. This energy favors each quad to un-
+dergo a similarity transformation (“as-similar-as-possible”).           λL                      X                                                min                                                                  ∥ RkUkRTk −I ek∥2 + λRER(θ).  (8)The shape preservation energy ES is:                                                 θ  K                                                                           k
+            1
+   ES(V) = X ∥(Aq(ATqAq)−1ATq −I)Vq∥2,    (4)     This is a nontrivial problem due to the nonlinearity in the
+       N                     q                                              ﬁrst term. We adopt a half-quadratic splitting technique
+
+======================== PDF 第 5 页 ========================
+[28, 19] to solve this problem. We introduce a series of     Algorithm 1 Content-Aware Rotation: Optimization
+auxiliary variables φ = {φk}Kk=1. Intuitively, each φk de-         1: Initialize θ.
+notes the individual rotation angle of line k (while θm is         2: for iter = 1 to itermax do
+the common rotation angle of the lines in bin m). Denote         3:   Fix θ, solve for V due to (7).
+         cos φk  −sin φk                                                    4:   Fix V. Set β = β0.
+bRk =    sin φk    cos φk    as the individual rotation ma-         5:   while β < βmax do
+trix of line k. We rewrite the problem in (8) as:                         6:      Fix θ, solve for φk in (11) for all k.
+                                                                                     7:      Fix φ, solve for θ due to (10).             λL      X       min                                                                                     8:                                                                      Set                                                       β = β · βinc                    ∥  bRkUk bRTk −I  ek∥2        θ,φ  K                     k                                                                                     9:   end                                                                   while
+        +β X(φk −θm(k))2 + λRER(θ).        (9)       10: end for
+                 k
+
+Here β is a penalty weight, and when β →∞the solution to     optimizing the mesh, we deform the image using bilinear
+(9) converges to (8). The half-quadratic splitting technique      interpolation to produce the ﬁnal result. The interpolation
+warms up from a small β and gradually increases it to ∞.       is the main timing bottleneck, depending on image sizes.
+In each step when β has been ﬁxed, the problem in (9) is    Our current implementation takes about 0.5s to interpolate
+split into two subproblems:                               one 8-megapixel image. Our algorithm is implemented in
+                                           C++ and run on a PC with an Intel Core i7 3.0GHz CPU    (i) Fix φ, update θ.  This subproblem is
+                                                      and 8GB memory.
+       min β X(φk −θm(k))2 + λRER(θ).     (10)
+        θ      k                                            3.4. Discussions
+
+This is a quadratic function on θ and is solved by a linear     Adaptive Rotation  Algorithmically, our method is de-
+system. This step is fast because θ has M = 90 unknowns.     signed to strictly preserve the horizontal/vertical lines (after
+                                                                    rotation) while relaxing others. In Fig. 5 we show an exam-    (ii) Fix θ, update φ.  This problem is nonlinear, but the
+                                                                ple illustrating this mechanism. In the input image Fig. 5(a),φk is independent of each other and can be solved separate-
+                                                                the green pencil is tilted +10.5◦. This pencil will be hori-ly. The subproblem involving φk is:
+                                                                zontal if the image is rigidly rotated by ∆= +10.5◦. Our
+     λL                                                  content-aware method maintains such rotation of this pen- min
+  φk  K        ∥  bRkUk bRTk −I  ek∥2 + β(φk −θm(k))2. (11)       cil, as in Fig. 5(b). But our method relaxes the rotation of
+                                                               other pixels (i.e., lines in other orientations). In this interest-
+This is a single variable problem.  It is possible to solve it
+                                                             ing example, our method behaves like rearranging the pen-
+using a gradient descent method. But we adopt a simpler
+                                                                           cils but not strictly rotating all of them.
+look-up method inspired by [19].  Notice that if β = 0,
+                                                             This relaxation gives us more room to trade off other fac-
+the problem is solved by the angle between ek and uk:
+                                                                     tors like shape preservation. It can be expected that if lines
+φk = ∠(ek, uk) (this is the intuition of line preservation
+                                                              of all orientations are treated strictly, the result will be dis-
+(3)); and if β = ∞, it is solved by φk = θm(k). Intuitively,
+                                                                   torted more. To test this effect, we modify the data term
+the problem in (11) trades between these two values. So we
+                                                         weight δm in Eqn.(1) and set them as equal (103) for all theuniformly divide the range [∠(ek, uk), θm(k)] into 100 dis-
+                                                                    bins. Unlike our original way that adapts to the orientations,
+crete values, evaluate the cost in (11), and choose φk as the
+                                                                        this modiﬁed way is non-adaptive and forces lines of all ori-
+one that minimizes the cost. This is a very straightforward
+                                                                 entations to undergo strict rotation. Fig. 6(b)(c) shows the
+solution with clear intuitions.
+                                                         comparisons of these two ways. Fig. 6 (bottom) shows the
+Algorithm Summary.  Our overall optimization method      rotation angle θm of each bin m. We see the non-adaptive
+is in Algorithm 1. The angles θ are all initialized as ∆    way respects all rotation, but at the price of larger distortion
+(the given rotation angle).  There is no need to initialize      (Fig. 6(c)). On the contrary, our adaptive way produces a
+V because we start from updating V. The penalty weight      visually more pleasing result (Fig. 6(b)).  Fig. 6 (bottom)
+β warms up from β0 = 1, and stops at βmax = 104 with      also reveals that our adaptive method constrains only the
+the increment βinc = 10. The number of the outer iteration     canonical bins.
+is ﬁxed at itermax = 10, which is empirically sufﬁcient for       Note the “horizontal/vertical” lines are w.r.t. the 2D im-
+producing good visual quality.                              age coordinate system (not the 3D world coordinate sys-
+  We use a mesh with around 400 square quads in this pa-     tem). This is because in this paper we only model the per-
+per. Because the number of unknown is small (several hun-     ceptual sensitivities in the 2D coordinate system. We leave
+dreds), the optimization takes about 0.1-0.2 seconds. After      the case of 3D coordinate systems for future studies.
+
+======================== PDF 第 6 页 ========================
+                    (a) input                  (b) content-aware rotate -10.5°
+                                                                                        input                             input
+Figure 5. (a) The input image. The green pencil is +10.5◦tilt-
+ed. (b) Content-aware rotation (-10.5◦). The green pencil is kept
+horizontal, but the others are relaxed. The input is from [24].
+
+
+
+
+
+                                                                                       rotate -7.5°                       rotate 6.0°
+
+
+
+
+
+          (a) input                 (b) adaptive              (c) non-adaptive
+                                                                          content-aware rotation          content-aware rotation
+
+   θm
+
+
+
+
+
+                                    bin m
+Figure 6. Content-aware rotation using adaptive and non-adaptive
+angles. The desired rotation angle is ∆= −6.5◦. (a) Input. (b)
+Result using adaptive angles. (c) Result using non-adaptive angles.
+Bottom: the optimized rotation angle θm for each each bin m.                   input                rotate 6.1°          content-aware rotation
+                                                                  Figure 7. Rigid rotation + cropping vs. Content-aware rotation.
+
+About Retargeting   Our method is related to a line-
+preserving retargeting method [8] and a recent panorama
+warping method [14].  But our method has major differ-
+ences.  Unlike [8, 14] that only preserve the straightness
+or orientations of lines, our method manipulates the rota-
+tional angles θ of the lines - this is the focus of image ro-
+tation. Our method is capable of discriminatively handling
+rotational directions (horizontal/vertical vs. others), while
+[8, 14] are not. Our energy function also leads to a new and               Figure 8. The cropping results of Fig. 2 and 4.
+more challenging optimization problem.
+   Without angle manipulations, existing retargeting meth-
+                                                                      results that are identical or almost identical to the input.ods including [8, 14] have no effect when applied for
+content-aware rotation. In image rotation, the aspect ratio
+of the output image is unchanged or almost unchanged3. If     4. Experiments
+we apply the existing methods, we can only obtain trivial
+                                          We assume the rotation angles are given by the users.
+   3In “rigid rotation + cropping”, the output aspect ratio depends on the     There is no other user interaction. All parameters are ﬁxed.
+cropping strategy. One could ﬁnd a crop that preserves the input aspect
+ratio, or a largest inner crop that may change the aspect ratio.            Comparisons with Rigid Rotation + Cropping   In Fig. 1
+
+======================== PDF 第 7 页 ========================
+                                                (a) input                                        (b) rotated -7°                              (c) our content-aware rotation
+
+
+
+
+
+       (d) Photoshop, content-aware fill                  (e) Darabi et al., Siggraph 2012                           (f) He and Sun, ECCV 2012                     (g) Kopf et al., Siggraph Asia 2012
+Figure 9. Comparisons with state-of-the-art image completion techniques. (a) Input. (b) Rotated by -7◦. (c) Our result. (d) Content-aware
+ﬁlling in Photoshop [3]. (e) Darabi et al.’s [10]. (f) He and Sun’s [15]. (g) Kopf et al.’s [17].
+
+
+and Fig. 7 we show comparisons with rigid rotation fol-     be strictly rotated and others are relaxed. Fig. 10(c) shows
+lowed by cropping. We also show the cropping results of     two examples.
+Fig. 2 and 4 in Fig. 8. Our content-aware rotation method
+                                                          Limitations  Like retargeting methods, our content-aware
+creates perception similar to the results of rigid rotation, but
+                                                                   rotation method attempts to ﬁnd visually unnoticeable op-
+maintains the integrity of the image content.
+                                                                    erations. But this task becomes challenging when there is
+Comparisons with Image Completion   Another possi-       little room for such operations. This can be the case when
+ble solution is to ﬁll the missing region (after rigid rota-      the image content is visually important in many local re-
+tion) using image completion techniques, though they are      gions, or the rotation angle is large. In this case our method
+not originally designed for this purpose. We compare with    may produce noticeable distortion, as in Fig. 11.
+several recent state-of-the-art techniques in Fig. 9: Content-
+                                                          5. Conclusionaware ﬁll in Photoshop [3] (partially based on [30, 5]),
+Darabi et al.’s [10], He and Sun’s [15], and Kopf et al.’s                                          We have presented the perceptually motivated Content-
+[17].  All these image completion methods are exemplar-                                                   Aware Rotation. We believe it is interesting and useful to
+based. They may produce poor results when the required                                                             harness the human vision properties for developing com-
+examples are missing in the images. They also have limi-                                                               puter vision/graphics techniques.
+tations in synthesizing semantic content. Our warping so-                                                                   Technically, we have introduced a warping method that
+lution does not suffer from these problems. Please see the                                                        can directly and ﬂexibly manipulate the rotation angles.
+supplementary materials for more comparisons.                                                          This formulation can possibly be used in other warping-
+  From the viewpoint of users, image completion and our     based applications and improve the quality.
+solution are not competing. Users need a new option when
+completion fails. We expect our novel solution would help    References
+the users to better solve their practical problems.
+                                                                            [1] Straighten an image. helpx.adobe.com/photoshop/
+Generalizations  In some special cases, the artist may de-        using/adjusting-crop-rotation-canvas.
+                                                           html.liberately tilt the images, known as “tilted composition” in
+                                                                            [2] www.adobe.com/products/photoshop/photography [26]. Our content-aware rotation method can
+                                                     content-aware-scaling.html.
+be easily generalized to this application, thanks to its ﬂex-
+                                                                            [3] www.adobe.com/technology/projects/
+ibility on the angle manipulation. For simplicity we sup-                                                     content-aware-fill.html.
+pose the horizons are level in the input images (Fig. 10(a)),                                                                            [4] S. Avidan and A. Shamir. Seam carving for content-aware
+but other cases are compatible. Unlike in Sec. 3.1 where          image resizing. In SIGGRAPH, 2007.
+we considered “canonical” bins as those of output horizon-        [5] C. Barnes, E. Shechtman, A. Finkelstein, and D. B. Gold-
+tal/vertical lines, here we consider them as those of input          man. Patchmatch: a randomized correspondence algorithm
+horizontal/vertical lines. In this way, the input horizons will            for structural image editing. In SIGGRAPH, 2009.
+
+======================== PDF 第 8 页 ========================
+                                                                     [11] M. Freeman. The Photographer’s Eye: Composition and De-
+                                                                           sign for Better Digital Photos, chapter 1. The Image Frame.
+                                                                      Focal Press, 2007.
+                                                                     [12] A. C. Gallagher. Using vanishing points to correct camera
+                                                                                rotation in images.  In Computer and Robot Vision, pages
+                                                                  460–467, 2005.
+                                                                     [13] E. Goldmeier. Similarity in visually perceived forms. Psy-
+                                                                          chological Issues, 1972.
+                                     (a) input
+                                                                     [14] K. He, H. Chang, and J. Sun. Rectangling panoramic images
+                                                                            via warping. In SIGGRAPH, 2013.
+                                                                     [15] K. He and J. Sun. Statistics of patch offsets for image com-
+                                                                                  pletion. In ECCV, pages 16–29, 2012.
+                                                                     [16] T. Igarashi, T. Moscovich, and J. F. Hughes.  As-rigid-as-
+                                                                            possible shape manipulation. In SIGGRAPH, 2005.
+                                                                     [17]  J. Kopf, W. Kienzle, S. Drucker, and S. B. Kang.  Quality
+                                                                             prediction for image completion. In SIGGRAPH Asia, 2012.
+                                                                     [18]  J. Kopf, D. Lischinski, O. Deussen, D. Cohen-Or, and M. Co-
+                              (b) rotation + crop                                                                         hen.  Locally adapted projections to reduce panorama dis-
+                                                                                     tortions.  In Computer Graphics Forum, pages 1083–1089.
+                                                                 Wiley Online Library, 2009.
+                                                                     [19] D. Krishnan and R. Fergus. Fast image deconvolution using
+                                                                       hyper-Laplacian priors. In NIPS, 2009.
+                                                                     [20] H. Lee, E. Shechtman, J. Wang, and S. Lee. Automatic up-
+                                                                                  right adjustment of photographs. In CVPR, 2012.
+                                                                     [21]  F. Liu, M. Gleicher, H. Jin, and A. Agarwala.  Content-
+                                                                          preserving warps for 3d video stabilization. In SIGGRAPH,
+                            (c) content-aware rotation
+                                                                     2009.
+Figure 10. Deliberate tilting. The artists may tilt the upright im-      [22] S. Nundy, B. Lotto, D. Coppola, A. Shimpi, and D. Purves.
+ages on purpose for a visual novelty. Our content-aware method       Why are angles misperceived? Proceedings of the National
+can easily adapt to these purposes. The rotation angles are +5◦         Academy of Sciences, 2000.
+(left) and -8◦(right).                                                                     [23]  I. Rock.  Indirect perception, chapter 11. The Right Angle.
+                                                            The MIT Press, 1997.
+                                                                     [24] M. Rubinstein, D. Gutierrez, O. Sorkine, and A. Shamir. A
+                                                                      comparative study of image retargeting. In SIGGRAPH Asia,
+                                                                  page 160, 2010.
+                                                                     [25] M. Rubinstein, A. Shamir, and S. Avidan. Improved seam
+                                                                         carving for video retargeting. In SIGGRAPH, 2008.
+                                                                     [26]  J. Suler.  Photographic Psychology:  Image and Psyche.
+                                                                     2013.
+               input                  content-aware rotation -14°         [27] R. Von Gioi, J. Jakubowicz, J. Morel, and G. Randall. Lsd:
+            Figure 11. A failure case of our method.              A fast line segment detector with a false detection control.
+                                                            TPAMI, pages 722–732, 2010.
+                                                                     [28] Y. Wang, J. Yang, W. Yin, and Y. Zhang. A new alternating
+ [6] R. Carroll, A. Agarwala, and M. Agrawala.  Image warps           minimization algorithm for total variation image reconstruc-
+      for artistic perspective manipulation. In SIGGRAPH, pages             tion. SIAM Journal on Imaging Sciences, 2008.
+     127:1–127:9, 2010.                                             [29] Y.-S. Wang, C.-L. Tai, O. Sorkine, and T.-Y. Lee. Optimized
+ [7] R. Carroll, M. Agrawal, and A. Agarwala.   Optimizing            scale-and-stretch for image resizing.  In SIGGRAPH Asia,
+     content-preserving projections for wide-angle images.  In          pages 118:1–118:8, 2008.
+    SIGGRAPH, pages 43:1–43:9, 2009.                             [30] Y. Wexler, E. Shechtman, and M. Irani. Space-time comple-
+                                                                                tion of video. TPAMI, pages 463–476, 2007. [8] C.-H. Chang and Y.-Y. Chuang. A line-structure-preserving
+     approach to image resizing. In CVPR, 2012.                     [31] L. Wolf, M. Guttmann, and D. Cohen-Or. Non-homogeneous
+                                                                           content-driven video-retargeting. In ICCV, 2007.
+ [9] S. E. Chen and L. Williams. View interpolation for image
+                                                                     [32] G. Zhang, M. Cheng, S. Hu, and R. Martin. A shape-      synthesis. In SIGGRAPH, 1993.
+                                                                          preserving approach to image resizing. In Computer Graph-
+[10] S. Darabi, E. Shechtman, C. Barnes, D. B. Goldman, and
+                                                                                    ics Forum, pages 1897–1906. Wiley Online Library, 2009.
+      P. Sen. Image melding: combining inconsistent images using
+     patch-based synthesis. In SIGGRAPH, 2012.

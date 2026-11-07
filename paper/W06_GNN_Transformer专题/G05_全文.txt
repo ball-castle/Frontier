@@ -1,0 +1,1790 @@
+[PDF PAGE 1]
+NodeFormer: A Scalable Graph Structure Learning
+Transformer for Node Classification
+Qitian Wu1, Wentao Zhao1, Zenan Li1, David Wipf2, Junchi Yan1∗
+1Department of Computer Science and Engineering, Shanghai Jiao Tong University
+2Amazon Web Service, Shanghai AI Lab
+{echo740,permanent,emiyali,yanjunchi}@sjtu.edu.cn, davidwipf@gmail.com
+Abstract
+Graph neural networks have been extensively studied for learning with inter-
+connected data. Despite this, recent evidence has revealed GNNs’ deficiencies
+related to over-squashing, heterophily, handling long-range dependencies, edge
+incompleteness and particularly, the absence of graphs altogether. While a plausible
+solution is to learn new adaptive topology for message passing, issues concerning
+quadratic complexity hinder simultaneous guarantees for scalability and precision
+in large networks. In this paper, we introduce a novel all-pair message passing
+scheme for efficiently propagating node signals between arbitrary nodes, as an
+important building block for a pioneering Transformer-style network for node
+classification on large graphs, dubbed as NODE FORMER . Specifically, the efficient
+computation is enabled by a kernerlized Gumbel-Softmax operator that reduces the
+algorithmic complexity to linearity w.r.t. node numbers for learning latent graph
+structures from large, potentially fully-connected graphs in a differentiable manner.
+We also provide accompanying theory as justification for our design. Extensive
+experiments demonstrate the promising efficacy of the method in various tasks
+including node classification on graphs (with up to 2M nodes) and graph-enhanced
+applications (e.g., image classification) where input graphs are missing. The codes
+are available at https://github.com/qitianwu/NodeFormer.
+1 Introduction
+Relational structure inter-connecting instance nodes as a graph is ubiquitous from social domains
+(e.g., citation networks) to natural science (protein-protein interaction), where graph neural networks
+(GNNs) [32; 19; 14; 36] have shown promising power for leveraging such data dependence as
+geometric priors. However, there arises increasing evidence challenging the core GNN hypothesis
+that propagating information along observed graph structures will necessarily produce better node-
+level representations for prediction on each individual instance node. Conflicts with this premise
+lead to commonly identified deficiencies with GNN message-passing rules w.r.t. heterophily [53],
+over-squashing [2], long-range dependencies [8], and graph incompleteness [11], etc.
+Moreover, in graph-enhanced applications, e.g., text classification [46], vision navigation [12], physics
+simulation [30], etc., graph structures are often unavailable though individual instances are strongly
+inter-correlated. A common practice is to artificially construct a graph via some predefined rules (e.g.,
+k-NN), which is agnostic to downstream tasks and may presumably cause the misspecification of
+GNNs’ inductive bias on input geometry (induced by the local feature propagation design).
+Natural solutions resort to organically combining learning optimal graph topology with message
+passing. However, one critical difficulty is the scalability issue with O(N 2) (where N denotes
+∗Wentao Zhao and Zenan Li contribute equally. The SJTU authors are also with MoE Key Lab of Artificial
+Intelligence, SJTU. Junchi Yan is the correspondence author who is also with Shanghai AI Laboratory.
+36th Conference on Neural Information Processing Systems (NeurIPS 2022).
+arXiv:2306.08385v1  [cs.LG]  14 Jun 2023
+
+[PDF PAGE 2]
+#nodes) computational complexity, which is prohibitive for large networks (with10K ∼ 1M nodes).
+Some existing approaches harness neighbor sampling [51], anchor-based adjacency surrogates [4]
+and hashing schemes [ 43] to reduce the overhead; however, these strategies may sacrifice model
+precision and still struggle to handle graphs with million-level nodes. Another obstacle lies in the
+increased degrees of freedom due to at least an N × N all-pair similarity matrix, which may result in
+large combinatorial search space and vulnerability to over-fitting.
+In this work, we introduce a novel all-pair message passing scheme that can scale to large systems
+without compromising performance. We develop a kernelized Gumbel-Softmax operator that seam-
+lessly synthesizes random feature map [27] and approximated sampling strategy [16], for distilling
+latent structures among all the instance nodes and yielding moderate gradients through differentiable
+optimization. Though such a combination of two operations involving randomness could potentially
+result in mutual distortion, we theoretically prove that the new operator can still guarantee a well-
+posed approximation for concrete variables (discrete structures) with the error bounded by feature
+dimensions. Furthermore, such a design can reduce the algorithmic complexity of learning new
+topology per layer to O(N) by avoiding explicit computation for the cumbersome all-pair similarity.
+The proposed module opens the door to a new class of graph networks, i.e., NODE FORMER (Scalable
+Transformers for Node Classification), that is capable of efficiently propagating messages between
+arbitrary node pairs in flexible layer-specific latent graphs. And to accommodate input graphs (if any),
+we devise two simple techniques: a relational bias and an edge-level regularization loss, as guidance
+for properly learning adaptive structures. We evaluate our approach on diverse node classification
+tasks ranging from citation networks to images/texts. The results show its promising power for
+tackling heterophily, long-range dependencies, large-scale graphs, graph incompleteness and the
+absence of input graphs. The contributions of this paper are summarized as follows:
+• We develop a kernelized Gumbel-Softmax operator which is proven to serve as a well-posed
+approximation for concrete variables, particularly the discrete latent structure among data points. The
+new module can reduce the algorithmic complexity for learning new message-passing topology from
+quadratic to linear w.r.t. node numbers, without sacrificing the precision. This serves as a pioneering
+model that successfully scales graph structure learning to large graphs with million-level nodes.
+• We further propose NODE FORMER , a new class of graph networks with layer-wise message
+passing as operated over latent graphs potentially connecting all nodes. The latter are optimized in an
+end-to-end differentiable fashion through a new objective that essentially pursues sampling optimal
+topology from a posterior conditioned on node features and labels. To our knowledge,NODE FORMER
+is the first Transformer model that scales all-pair message passing to large node classification graphs.
+• We demonstrate the model’s efficacy by extensive experiments over a diverse set of datasets, in-
+cluding node classification benchmarks and image/text classification, where significant improvement
+over strong GNN models and SOTA structure learning methods is shown. Besides, it successfully
+scales to large graph datasets with up to 2M nodes where prior arts failed, and reduces the time/space
+consumption of the competitors by up to 93.1%/80.6% on moderate sized datasets.
+2 Related Works
+Graph Neural Networks. Building expressive GNNs is a fundamental problem in learning over graph
+data. With Graph Attention Networks (GAT) [36] as an early attempt, there are many follow-up works,
+e.g., [22; 42], considering weighting the edges in input graph for enhancing the expressiveness. Other
+studies, e.g., [28; 52] focus on sparsifying input structures to promote robust representations. There
+are also quite a few approaches that propose scalable GNNs through, e.g., subgraph sampling [48],
+linear feature mapping [39], and channel-wise transformation [49], etc. However, these works cannot
+learn new edges out of the scope of input geometry, which may limit the model’s receptive fields
+within local neighbors and neglect global information.
+Graph Structure Learning. Going beyond observed topology, graph structure learning targets
+learning a new graph for message passing among all the instances [54]. One line of work is similarity-
+driven where the confidence of edges are reflected by some similarity functions between node pairs,
+e.g., Gaussian kernels [43], cosine similarity [4], attention networks [17], non-linear MLP [7] etc.
+Another line of work optimizes the adjacency matrix. Due to the increased optimization difficulties,
+some sophisticated training methods are introduced, such as bi-level optimization [11], variational
+2
+
+[PDF PAGE 3]
+Table 1: Comparison of popular graph structure learning approaches for node-level tasks where in
+particular, the graph connects all instance nodes and one’s target is for prediction on each individual
+node. For parameterization, ‘Function’ means learning through functional mapping and ‘Adjacency’
+means directly optimizing graph adjacency. For expressivty, ‘Fixed’ means learning one graph shared
+by all propagation layers and ‘Layer-wise’ means learning graph structures per layers. Thelargest
+demo means the largest # nodes of datasets used. † m denotes # anchors (i.e., a subset of nodes).
+Models Parameterization Expressivity Input Graphs Inductive Complexity Largest Demo
+LDS-GNN [11] Adjacency Fixed Required No O(N2) 0.01M
+ProGNN [18] Adjacency Fixed Required No O(N2) 0.02M
+VGCN [10] Adjacency Fixed Required No O(N2) 0.02M
+BGCN [51] Adjacency Fixed Required No O(N2) 0.02M
+GLCN [17] Function Fixed Not necessary Yes O(N2) 0.02M
+IDGL [4] Function Fixed Required Yes O(N2) or O(N m)† 0.1M
+NODEFORMER (Ours) Function Layer-wise Not necessary Yes O(N) or O(E) 2M
+approaches [10; 20], Bayesian inference [51] and projected gradient descent [18]. To push further the
+limits of structure learning, this paper proposes a new model NODE FORMER (for enabling scalable
+node-level Transformers) whose merits are highlighted via a high-level comparison in Table 1. In
+particular, NODE FORMER enables efficient structure learning in each layer, does not require input
+graphs and successfully scales to graphs with 2M nodes.
+Node-Level v.s. Graph-Level Prediction. We emphasize upfront that our focus is on node-level
+prediction tasks involving a single large graph such that scalability is paramount, especially if we
+are to consider arbitrary relationships across all nodes (each node is an instance with label and
+one can treat all the nodes non-i.i.d. generated due to the inter-dependence) for structure-learning
+purposes. Critically though, this scenario is quite distinct from graph-level classification tasks
+whereby each i.i.d. instance is itself a small graph and fully connecting nodes within each graph is
+computationally inexpensive. While this latter scenario has been explored in the context of graph
+structure learning [38] and all-pair message passing design, e.g., graph Transformers [9], existing
+efforts do not scale to the large graphs endemic to node-level prediction.
+3 N ODE FORMER : A Transformer Graph Network at Scale
+Let G = (N , E) denote a graph with N a node set (|N | = N) and E ⊆ N × N an edge set (|E| = E).
+Each node u ∈ N is assigned with node features xu ∈ RD and a label yu. We define an adjacency
+matrix A = {auv} ∈ { 0, 1}N ×N where auv = 1 if edge (u, v) ∈ E and auv = 0 otherwise. Without
+loss of generality, E could be an empty set in case of no input structure. There are two common
+settings: transductive learning, where testing nodes are within the graph used for training, and
+inductive learning which handles new unseen nodes out of the training graph. The target is to learn a
+function for node-level prediction, i.e., estimate labels for unlabeled or new nodes in the graph.
+General Model and Key Challenges. We start with the observation that the input structures may not
+be the ideal one for propagating signals among nodes and instead there exist certain latent structures
+that could facilitate learning better node representations. We thus consider the updating rule
+˜A(l) = g(A, Z(l); ω), Z(l+1) = h( ˜A(l), A, Z(l); θ), (1)
+where Z(l) = {z(l)
+u }u∈N and ˜A(l) = {˜a(l)
+uv}u,v∈N denotes the node representations and the estimated
+latent graph of the l-th layer, respectively, and g, h are both differentiable functions aiming at 1)
+structure estimation for a layer-specific latent graph ˜A(l) based on node representations and 2) feature
+propagation for updating node representations, respectively. The model defined by Eqn. 1 follows the
+spirit of Transformers [35] (where in particular ˜A(l) can be seen as an attentive graph) that potentially
+enables message passing between any node pair in each layer, which, however, poses two challenges:
+• (Scalability): How to reduce the prohibitive quadratic complexity for learning new graphs?
+• (Differentiability): How to enable end-to-end differentiable optimization for discrete structures?
+Notice that the first challenge is non-trivial in node-level prediction tasks (the focus of our paper),
+since the latent graphs could potentially connect all the instance nodes (e.g., from thousands to
+millions, depending on dataset sizes), which is fairly hard to guarantee both precision and scalability.
+3
+
+[PDF PAGE 4]
+3.1 Efficient Learning Discrete Structures
+We describe our new message-passing scheme with an efficient kernelized Gumbel-Softmax operator
+to resolve the aforementioned challenges. We assume z(0)
+u = xu as the initial node representation.
+Kernelized Message Passing. We define a full-graph attentive network that estimates latent interac-
+tions among instance nodes and enables corresponding densely-connected message passing:
+˜a(l)
+uv =
+exp((W (l)
+Q z(l)
+u )⊤(W (l)
+K z(l)
+v ))
+PN
+w=1 exp((W (l)
+Q z(l)
+u )⊤(W (l)
+K z(l)
+w ))
+, z(l+1)
+u =
+NX
+v=1
+˜a(l)
+uv · (W (l)
+V z(l)
+v ), (2)
+where W (l)
+Q , W (l)
+K and W (l)
+V are learnable parameters in l-th layer. We omit non-linearity activation
+(after aggregation) for brevity. The updating forN nodes in one layer using Eqn. 2 requires prohibitive
+O(N 2) complexity. Also, given large N, the normalization in the denominator would shrink attention
+weights to zero and lead to gradient vanishing. We call this problem as over-normalizing.
+To accelerate the full-graph model, we observe that the dot-then-exponentiate operation in Eqn. 2 can
+be converted into a pairwise similarity function:
+z(l+1)
+u =
+NX
+v=1
+κ(W (l)
+Q z(l)
+u , W (l)
+K z(l)
+v )
+PN
+w=1 κ(W (l)
+Q z(l)
+u , W (l)
+K z(l)
+w )
+· (W (l)
+V z(l)
+v ), (3)
+where κ(·, ·) : Rd×Rd → R is a positive-definite kernel measuring the pairwise similarity. The kernel
+function can be further approximated by random features (RF) [ 27]which serves as an unbiased
+estimation via κ(a, b) = ⟨Φ(a), Φ(b)⟩V ≈ ϕ(a)⊤ϕ(b), where the first equation is by Mercer’s
+theorem with Φ : Rd → V a basis function and V a high-dimensional vector space, and ϕ(·) : Rd →
+Rm is a low-dimensional feature map with random transformation. There are many potential choices
+for ϕ, e.g., Positive Random Features (PRF) [6]
+ϕ(x) = exp (−∥x∥2
+2
+2 )√m [exp(w⊤
+1 x), · · · , exp(w⊤
+mx)], (4)
+where wk ∼ N (0, Id) is i.i.d. sampled random transformation. The RF converts dot-then-
+exponentiate operation into inner-product in vector space, which enables us to re-write Eqn. 3
+(assuming qu = W (l)
+Q z(l)
+u , ku = W (l)
+K z(l)
+u and vu = W (l)
+V z(l)
+u for simplicity):
+z(l+1)
+u =
+NX
+v=1
+ϕ(qu)⊤ϕ(kv)PN
+w=1 ϕ(qu)⊤ϕ(kw)
+· vv = ϕ(qu)⊤PN
+v=1 ϕ(kv) · v⊤
+v
+ϕ(qu)⊤PN
+w=1 ϕ(kw)
+. (5)
+The key advantage of Eqn. 5 is that the two summations are shared by each u, so that one only
+needs to compute them once and re-used for others. Such a property enables O(N) computational
+complexity for full-graph message passing, which paves the way for learning graph structures among
+large-scale instances. Moreover, one can notice that Eqn. 5 avoids computing the N × N similarity
+matrix, i.e., {˜a(l)
+uv}N ×N , required by Eqn. 2, thus also reducing the learning difficulties.
+Nevertheless, Eqn. 5 still suffers what we mentioned the over-normalizing issue. The crux is that
+the message passing is operated on a weighted fully-connected graph where, in fact, only partial
+edges are important. Also, such a deterministic way of feature aggregation over all the instances may
+increase the risk for over-fitting, especially when N is large. We next resolve the issues by distilling
+a sparse structure from the fully-connected graph.
+Differentiable Stochastic Structure Learning. The difficultly lies in how to enable differentiable
+optimization for discrete graph structures. The weight ˜a(l)
+uv given by Eqn. 2 could be used to define
+a categorical distribution for generating latent edges from distribution Cat(π(l)
+u ) where π(l)
+u =
+{π(l)
+uv}N
+v=1 and π(l)
+uv = p(v|u) = ˜a(l)
+uv. Then in principle, we can sample over the categorical
+distribution multiple times for each node to obtain its neighbors. However, the sampling process
+would introduce discontinuity and hinders back-propagation. Fortunately, we notice that the Eqn. 3
+can be modified to incorporate the reparametrization trick [16] to allow differentiable learning:
+z(l+1)
+u =
+NX
+v=1
+exp((q⊤
+u kv + gv)/τ)PN
+w=1 exp((q⊤u kw + gw)/τ)
+· vv =
+NX
+v=1
+κ(qu/√τ ,kv/√τ)egv/τ
+PN
+w=1 κ(qu/√τ ,kw/√τ)egw/τ
+· vv, (6)
+4
+
+[PDF PAGE 5]
+where gu is i.i.d. sampled from Gumbel distribution and τ is a temperature coefficient. Eqn. 6 is
+a continuous relaxation of sampling one neighbored node for u over Cat(π(l)
+u ) and τ controls the
+closeness to hard discrete samples [23]. Following similar reasoning as Eqn. 3 and 5, we can yield
+z(l+1)
+u ≈
+NX
+v=1
+ϕ(qu/√τ)⊤ϕ(kv/√τ)egv/τ
+PN
+w=1 ϕ(qu/√τ)⊤ϕ(kw/√τ)egw/τ
+·vv = ϕ(qu/√τ)⊤PN
+v=1 egv/τ ϕ(kv/√τ) · v⊤
+v
+ϕ(qu/√τ)⊤PN
+w=1 egw/τ ϕ(kw/√τ)
+.
+(7)
+Eqn. 7 achieves message passing over a sampled latent graph (where we only sample once for each
+node) and still guarantees linear complexity as Eqn. 5. In practice, we can sample K times (e.g.,
+K = 5) for each node and take an average of the aggregated results. Due to space limit, we defer
+more details concerning the differentiable sampling-based message passing to Appendix A. Besides,
+in Fig. 5 and Alg. 1 of Appendix A, we present an illustration for node embedding updating in each
+layer, from a matrix view that is practically used for implementation.
+3.2 Well-posedness of the Kernelized Gumbel-Softmax Operator
+One reasonable concern for Eqn. 7 is whether the RF approximation for kernel functions maintains the
+well-posedness of Gumbel approximation for the target discrete variables. As a justification for the
+new message-passing function, we next answer two theoretical questions: 1) How is the approximation
+capability of RF for the original dot-then-exponentiate operation with Gumbel variables in Eqn. 6? 2)
+Does Eqn. 7 still guarantee a continuous relaxation of the categorical distributions? We formulate the
+results as follows and defer proofs to Appendix B.
+Theorem 1 (Approximation Error for Softmax-Kernel). Assume ∥qu∥2 and ∥kv∥2 are bounded by r,
+then with probability at least 1 − ϵ, the gap ∆ =
+ϕ(qu/√τ)⊤ϕ(kv/√τ) − κ(qu/√τ ,kv/√τ)
+),
+where ϕ is defined by Eqn. 4, will be bounded by O
+q
+exp(6r/τ )
+mϵ
+
+.
+We can see that the error bound of RF for approximating original softmax-kernel function depends
+on both the dimension of feature map ϕ and temperature τ. Notably, the error bound is independent
+of node number N, which implies that the approximation ability is insensitive to dataset sizes.
+The second question is non-trivial since Eqn. 7 involves randomness of Gumbel variables
+and random transformation in ϕ, which cannot be decoupled apart. We define cuv =
+ϕ(qu/√τ )⊤ϕ(kv/√τ )egv /τ
+PN
+w=1 ϕ(qu/√τ )⊤ϕ(kw/√τ )egw /τ as the result from the kernelized Gumbel-Softmax and cu =
+{cuv}N
+v=1 denotes the sampled edge vector for node u. We can arrive at the result as follows.
+Theorem 2 (Property of Kernelized Gumbel-Softmax Random Variables). Suppose m is sufficiently
+large, we have the convergence property for the kernelized Gumbel-Softmax operator
+lim
+τ →0
+P(cuv > c uv′, ∀v′ ̸= v) = exp(q⊤
+u kv)PN
+w=1 exp(q⊤u kw)
+, lim
+τ →0
+P(cuv = 1) = exp(q⊤
+u kv)PN
+w=1 exp(q⊤u kw)
+.
+It shows that when i) the dimension of feature map is large enough and ii) the temperature goes
+to zero, the distribution from which latent structures are sampled would converge to the original
+categorical distribution.
+Remark. The two theorems imply a trade-off between RF approximation and Gumbel-Softmax
+approximation w.r.t. the choice of τ. A large τ would help to reduce the burden on kernel dimension
+m, and namely, smallτ would require a very largem to guarantee enough RF approximation precision.
+On the other hand, if τ is too large, the weight on each edge will converge to 1
+N , i.e., the model nearly
+degrades to mean pooling, while a small τ would endow the kernelized Gumbel-Softmax with better
+approximation to the categorical distribution. Empirical studies on this are presented in Appendix E.
+3.3 Input Structures as Relational Bias
+Eqn. 7 does not leverage any information from observed geometry which, however, is often recognized
+important for modeling physically-structured data [3]. We therefore accommodate input topology
+(if any) as relational bias via modifying the attention weight as ˜a(l)
+uv ← ˜a(l)
+uv + I[auv = 1] σ(b(l)),
+5
+
+[PDF PAGE 6]
+All-Pair
+MPMLP + All-Pair
+MP +… MLP +
+…
+…
+Figure 1: Illustration for the data flow of NODE FORMER which takes node embedding matrix X
+and (optional) graph adjacency matrix A as input. There are three components in NODE FORMER .
+The first one is the all-pair message passing (MP) module (colored red) which adopts our proposed
+kernelized Gumbel-Softmax operator to update node embeddings in each layer withO(N) complexity.
+The other two components are optional based on the availability of input graphs: 1) relational bias
+(colored green) that reinforces the propagation weight on observed edges; 2) edge regularization loss
+(colored blue) that aims to maximize the probability for observed edges. These two components
+require O(E) complexity. The final training loss L is the weighted sum of the standard supervised
+classification loss and the edge regularization loss.
+where b(l) is a learnable scalar as relational bias for any adjacent node pairs (u, v) and σ is a certain
+(bounded) activation function like sigmoid. The relational bias aims at assigning adjacent nodes in G
+with proper weights, and the node representations could be accordingly updated by
+z(l+1)
+u ← z(l+1)
+u +
+X
+v,auv=1
+σ(b(l)) · vv. (8)
+Eqn. 8 increases the algorithmic complexity for message passing to O(N + E), albeit within the
+same order-of-magnitude as common GNNs operating on input graphs. Also, one can consider
+higher-order adjacency as relational bias for better expressiveness at some expense of efficiency, as
+similarly done by [1]. We summarize the feed-forward computation of NODE FORMER in Alg. 1.
+3.4 Learning Objective
+Given training labels Ytr = {yu}u∈Ntr, where Ntr denotes the set of labeled nodes, the common
+practice is to maximize the observed data log-likelihood which yields a supervised loss (with C
+classes)
+Ls(Ytr, ˆYtr) = − 1
+Ntr
+X
+v∈Ntr
+CX
+c=1
+I[yu = c] log ˆyu,c, (9)
+where I[·] is an indicator function. However, it may not suffice to generalize well due to that the
+graph topology learning increases the degrees of freedom and the number of training labels is not
+comparable to that. Therefore, we additionally introduce an edge-level regularization:
+Le(A, ˜A) = − 1
+N L
+LX
+l=1
+X
+(u,v)∈E
+1
+du
+log π(l)
+uv, (10)
+where du denotes the in-degree of node u and π(l)
+uv is the predicted probability for edge (u, v) at the
+l-th layer. Eqn. 10 is a maximum likelihood estimation for edges in E, with data distribution defined
+p0(v|u) =
+ 1
+du
+, a uv = 1
+0, otherwise. (11)
+We next show how to efficiently obtainπ(l)
+uv. Although the feed-forward NODE FORMER computation
+defined by Eqn. 7 does not explicitly produce the value for each π(l)
+uv, we can query their values by
+π(l)
+uv =
+ϕ(W (l)
+Q z(l)
+u )⊤ϕ(W (l)
+K z(l)
+v )
+ϕ(W (l)
+Q z(l)
+u )⊤PN
+w=1 ϕ(W (l)
+K z(l)
+w )
+, (12)
+6
+
+[PDF PAGE 7]
+Figure 2: Experimental results for node classification in transductive setting on four common datasets.
+The missing results on Deezer is caused by out-of-memory (OOM).
+Table 2: Testing ROC-AUC and training memory
+cost on OGB-Proteins with batch size 10K.
+Method ROC-AUC (%)Train Mem
+MLP 72.04±0.48 2.0 GB
+GCN 72.51±0.35 2.5 GB
+SGC 70.31±0.23 1.2 GB
+GraphSAINT-GCN73.51±1.31 2.3 GB
+GraphSAINT-GAT 74.63±1.24 5.2 GB
+NODEFORMER 77.45±1.15 3.2 GB
+NODEFORMER-dt 75.50±0.64 3.1 GB
+NODEFORMER-tp 76.18±0.09 3.2 GB
+Table 3: Testing Accuracy and training memory
+cost on Amazon2M with batch size 100K.
+Method Accuracy (%)Train Mem
+MLP 63.46±0.10 1.4 GB
+GCN 83.90±0.10 5.7 GB
+SGC 81.21±0.12 1.7 GB
+GraphSAINT-GCN83.84±0.42 2.1 GB
+GraphSAINT-GAT85.17±0.32 2.2 GB
+NODEFORMER 87.85±0.24 4.0 GB
+NODEFORMER-dt 87.02±0.75 2.9 GB
+NODEFORMER-tp 87.55±0.11 4.0 GB
+where the summation term can be re-used from once computation, as is done by Eqn. 5 and Eqn. 7.
+Therefore, after once computation for the summation that requires O(N), the computation for each
+π(l)
+uv requires O(1) complexity, yielding the total complexity controlled within O(E) (since we only
+need to query the observed edges). The final objective can be the combination of two:L = Ls + λLe,
+where λ controls how much emphasis is put on input topology. We depict the whole data flow of
+NODE FORMER ’s training in Fig. 1.
+4 Evaluation
+We consider a diverse set of datasets for experiments and present detailed dataset information in
+Appendix D. For implementation, we set σ as sigmoid function and τ as 0.25 for all datasets. The
+output prediction layer is a one-layer MLP. More implementation details are presented in Appendix C.
+All experiments are conducted on a NVIDIA V100 with 16 GB memory.
+As baseline models, we basically consider GCN [ 19] and GAT [36]. Besides, we compare with
+some advanced GNN models, including JKNet [44] and MixHop [1]. These GNN models all rely on
+input graphs. We further consider DropEdge [28] and two SOTA graph structure learning methods,
+LDS-GNN [11] and IDGL [4] for comparison. For large-scale datasets, we additionally compare
+with two scalable GNNs, a linear model SGC [39] and a graph-sampling model GraphSAINT [48].
+More detailed information about these models are presented in Appendix C. All the experiments are
+repeated five times with different initializations.
+4.1 Experiments on Transductive Node Classification
+We study supervised node classification in transductive setting on common graph datasets: Cora,
+Citeseer, Deezer and Actor. The first two have high homophily ratios and the last two are
+identified as heterophilic graphs [53; 21]. These datasets are of small or medium sizes (with 2K∼20K
+nodes). We use random splits with train/valid/test ratios as 50%/25%/25%. For evaluation metrics, we
+use ROC-AUC for binary classification onDeezer and Accuracy for other datasets with more than
+2 classes. Results are plotted in Fig. 2 and NODE FORMER achieves the best mean Accuracy/ROC-
+AUC across four datasets and in particular, outperforms other models by a large margin on two
+heterophilic graphs. The results indicate that NODE FORMER can handle both homophilious and non-
+homophilious graphs. Compared with two structure learning models LDS and IDGL, NODE FORMER
+yields significantly better performance, which shows its superiority. Also, for Deezer, LDS and
+IDGL suffers from out-of-memory (OOM). In fact, the major difficulty for Deezer is the large
+7
+
+[PDF PAGE 8]
+Table 4: Experimental results on semi-supervised classficiation on Mini-ImageNet and
+20News-Groups where we use k-NN (with different k’s) for artificially constructing an input graph.
+Method Mini-ImageNet 20News-Groupk= 5 k= 10 k= 15 k= 20 k= 5 k= 10 k= 15 k= 20
+GCN 84.86±0.42 85.61±0.40 85.93±0.59 85.96±0.66 65.98±0.68 64.13±0.88 62.95±0.70 62.59±0.62
+GAT 84.70±0.48 85.24±0.42 85.41±0.43 85.37±0.51 64.06±0.44 62.51±0.71 61.38±0.88 60.80±0.59
+DropEdge 83.91±0.24 85.35±0.44 85.25±0.63 85.81±0.65 64.46±0.43 64.01±0.42 62.46±0.51 62.68±0.71
+IDGL 83.63±0.32 84.41±0.35 85.50±0.24 85.66±0.42 65.09±1.23 63.41±1.26 61.57±0.52 62.21±0.79
+LDS OOM OOM OOM OOM 66.15±0.36 64.70±1.07 63.51±0.64 63.51±1.75
+NODEFORMER 86.77±0.45 86.74±0.23 86.87±0.41 86.64±0.42 66.01±1.18 65.21±1.14 64.69±1.31 64.55±0.97
+NODEFORMERw/o graph 87.46±0.36 64.71±1.33
+0 1000 2000 3000 4000
+# removed nodes
+0
+200
+400
+600training time (s)
+0 1000 2000 3000 4000
+# removed nodes
+0.00
+0.25
+0.50
+0.75
+1.00
+1.25testing time (s)
+0 1000 2000 3000 4000
+# removed nodes
+2000
+4000
+6000
+8000
+10000GPU usage (MB)
+IDGL LDS NodeFormer
+Figure 3: Comparison of training/inference time and GPU memory cost w.r.t. different instance
+numbers (by removing a certain portion of nodes) on 20News-Groups.
+dimensions of input node features (nearly 30K), which causes OOM for IDGL even with the anchor
+approximation. In contrast, N ODE FORMER manages to scale and produce desirable accuracy.
+4.2 Experiments on Larger Graph Datasets
+To further test the scalability, we consider two large-sized networks,OGB-Proteins and Amazon2M,
+with over 0.1 million and 2 million of nodes, respectively.OGB-Proteins is a multi-task dataset with
+112 output dimensions, while Amazon2M is extracted from the Amazon Co-Purchasing network that
+entails long-range dependence [13]. For OGB-Proteins, we use the protocol of [15] and ROC-AUC
+for evaluation. For Amazon2M, we adopt random splitting with 50%/25%/25% nodes for training,
+validation and testing, respectively. Due to the large dataset size, we adopt mini-batch partition for
+training, in which case, for NODE FORMER we only consider structure learning among nodes in a
+random mini-batch. We use batch size 10000 and 100000 for Proteins and Amazon2M, respectively.
+While the mini-batch partition may sacrifice the exposure to all instances, we found using large
+batch size can yield decent performance, which is also allowable thanks to the O(N) complexity
+of our model. For example, even setting the batch size as 100000, we found NODE FORMER costs
+only 4GB GPU memory for training on Amazon2M. Table 2 presents the results on OGB-Proteins
+where for fair comparison mini-batch training is also used for other models except GraphSAINT.
+We found that NODE FORMER yields much better ROC-AUC and only requires comparable memory
+as simple GNN models. Table 3 reports the results on Amazon2M which shows that NODE FORMER
+outperforms baselines by a large margin and the memory cost is even fewer than GCN. This shows
+its practical efficacy and scalability on large-scale datasets and also the capability for addressing
+long-range dependence with shallow layers (we use L = 3).
+4.3 Experiments on Graph-Enhanced Applications
+We apply our model to semi-supervised image and text classification on Mini-ImageNet and
+20News-Groups datasets, without input graphs. The instances of Mini-ImageNet [37] are 84×84
+RGB images and we randomly choose 30 classes each of which contains 600 samples for experiments.
+20News-Groups [25] consists of nearly 10K texts whose features are extracted by TF-IDF. More
+details for preprocessing are presented in Appendix D. Also, for each dataset, we randomly split
+instances into 50%/25%/25% for train/valid/test. Since there is no input graph, we use k-NN (over
+input node features) for artificially constructing a graph for enabling GNN’s message passing and
+the graph-based components (edge regularization and relational bias) of NODE FORMER . Table 4
+presents the comparison results under different k’s. We can see thatNODE FORMER achieves the best
+performance in seven cases out of eight. The performance of GNN competitors varies significantly
+with different k values, and NODE FORMER is much less sensitive. Intriguingly, when we do not use
+8
+
+[PDF PAGE 9]
+the input graph, i.e., removing both the edge regularization and relational bias, NODE FORMER can
+still yield competitive even superior results on Mini-ImageNet. This suggests that the k-NN graphs
+are not necessarily informative and besides, our model learns useful latent graph structures from data.
+4.4 Further Discussions
+Comparison of Time/Space Consumption. Fig. 3 plots training/inference time and GPU memory
+costs of NODE FORMER and two SOTA structure learning models. Compared with LDS, NODE -
+FORMER reduces the training time, inference time, memory cost by up to 93.1%, 97.9%, 75.6%,
+respectively; compared with IDGL (using anchor-based approximation for speedup), NODE FORMER
+reduces the training time, inference time, memory cost by up to 61.8%, 80.8%, 80.6%, respectively.
+Ablation on Stochastic Components. Table 2 and 3 also include two variants of NODE FORMER for
+ablation study. 1) NODE FORMER -dt: replace Gumbel-Softmax by original Softmax (with temperature
+1.0) for deterministic propagation; 2) NODE FORMER -tp: use original Softmax with temperature
+set as 0.25 (the same as NODE FORMER ). There is performance drop when removing the Gumbel
+components, which may be due to over-normalizing or over-fitting that are amplified in large datasets,
+as we discussed in Section 3.1 and the kernelized Gumbel-Softmax operator shows its effectiveness.
+Ablation on Edge Loss and Relational Bias. We study the effects of edge-level regularization and
+relation bias as ablation study shown in Table 6 located in Appendix E, where the results consistently
+show that both components contribute to some positive effects and suggest that our edge-level loss
+and relation bias can both help to leverage useful information from input graphs.
+Impact of Temperature and Feature Map Dimension. We study the effects of τ and m in Fig. 6
+located in Appendix E and the variation trend accords with our theoretical analysis in Section 3.2.
+Specifically, the result shows that the test accuracy increases and then falls with the temperature
+changing from low to high values (usually achieves the peak accuracy with a temperature of 0.4).
+Besides, we can see that when the temperature is relatively small, the test accuracy goes high with the
+dimension of random features increasing. However, when the temperature is large, the accuracy would
+drop even with large feature dimension m. Such a phenomenon accords with the theoretical result
+presented in Section 3.2. For low temperature which enables desirable approximation performance for
+Gumbel-Softmax, then larger random feature dimension would help to produce better approximation
+to the original exponentiate-then-dot operator. In contrast, high temperature could not guarantee
+precise approximation for the original categorical distribution, which deteriorates the performance.
+Visualization and Implications. Fig. 4 visualizes node embeddings and edge connections (filter
+out the edges with weights larger than a threshold) on 20News-Groups and Mini-Imagenet, which
+show that NODE FORMER tends to assign more weights for nodes with the same class and sparse edges
+for nodes with different classes. This helps to interpret whyNODE FORMER improves the performance
+on downstream node-level prediction: the latent structures can propagate useful information to help
+the model learn better node representations that can be easily distinguished by the classifier. We also
+compare the learned structures with original graphs in Fig. 7 located in Appendix E. We can see
+that the latent structures learned by NODE FORMER show different patterns from the observed ones,
+especially for heterophilic graphs. Another interesting phenomenon is that there exist some dominant
+nodes which are assigned large weights by other nodes, forming some vertical ‘lines’ in the heatmap.
+This suggests that these nodes could contain critical information for the learning tasks and play as
+pivots that could improve the connectivity of the whole system.
+5 Why N ODE FORMER Improves Downstream Prediction?
+There remains a natural question concerning our learning process: how effective can the learned latent
+topology be for downstream tasks? We next dissect the rationale from a Bayesian perspective. In fact,
+our model induces a predictive distribution p(Y, ˜A|X, A) = p( ˜A|X, A)p(Y| ˜A, X, A) where we
+can treat the estimated graph ˜A as a latent variable.2 Specifically, p( ˜A|X, A) is instantiated with the
+structure estimation module and p(Y| ˜A, X, A) is instantiated with the feature propagation module.
+In principle, ideal latent graphs should account for downstream tasks and maximize the potentials
+2We assume one latent graph to simplify the illustration though we practically learn layer-specific graphs for
+each layer of NODE FORMER . The analysis can be trivially extended to such a case.
+9
+
+[PDF PAGE 10]
+(a) 20News-Groups
+ (b) Mini-ImageNet
+Figure 4: Visualization of node embeddings and edge connections produced by NODE FORMER on
+graph-enhanced application datasets. We mark the nodes with a particular class with one color. More
+comparison between the learned structures and original input graphs is presented in Appendix E.
+of message passing for producing informative node representations. Thus, optimal latent graphs
+presumably come from the posterior p( ˜A|Y, X, A) = p(Y|X,A, ˜A)p( ˜A|X,A)R
+Y p(Y|X,A, ˜A)p( ˜A|X,A)dY which is given by
+Bayes theorem. Unfortunately, such a posterior is unknown and intractable for the integration.
+A Variational Perspective. An intriguing conclusion stems from another view into the learning
+process: we can treat the structure estimation as a variational distribution q( ˜A|X, A) and our
+learning objective in Section 3.4 can be viewed as the embodiment of a minimization problem over
+the predictive and variational distributions via
+p∗, q∗ = arg min
+p,q
+−Eq[log p(Y| ˜A, X, A)]| {z }
+Ls
++ D(q( ˜A|X, A)∥p0( ˜A|X, A))| {z }
+Le
+, (13)
+where D denotes the Kullback-Leibler divergence. Specifically, thepredictive term is equivalent to
+minimizing the supervised loss (with Gumbel-Softmax as a surrogate for sampling-based estimates
+over q( ˜A|X, A)), and the KLregularization term is embodied with the edge-level MLE loss (Eqn. 10)
+(if we define the prior distribution p0( ˜A|X, A) following Eqn. 11). One may notice that Eqn. 13 is
+essentially the Evidence Lower Bound (ELBO) for the log-likelihood log p(Y|X, A).
+Proposition 1. Assume q can exploit arbitrary distributions over ˜A. When Eqn. 13 achieves the
+optimum, we have 1) D(q( ˜A|X, A)∥p( ˜A|Y, X, A)) = 0 and 2) log p(Y|X, A) is maximized.
+The proposition indicates that our adopted learning objective intrinsically minimizes the divergence
+between latent graphs generated by the model and the samples from the posterior p( ˜A|Y, X, A)
+that ideally helps to propagate useful adjacent information w.r.t. downstream tasks. Therefore, a
+well-trained network of NODE FORMER on labeled data could produce effective latent topology that
+contributes to boosting the downstream performance.
+6 Conclusion
+This paper proposes a scalable and efficient graph Transformer (especially for node level) that can
+propagate layer-wise node signals between arbitrary pairs beyond input topology. The key module,
+a kernelized Gumbel-Softmax operator, enables us to learn layer-specific latent graphs with linear
+algorithmic complexity without compromising the precision. The results on diverse graph datasets
+and situations verify the effectiveness, scalability, and stability. We provide more discussions on the
+limitations and potential impacts in Appendix F.
+Acknowledgement
+This work was partly supported by National Key Research and Development Program of China
+(2020AAA0107600), National Natural Science Foundation of China (61972250, 72061127003), and
+Shanghai Municipal Science and Technology (Major) Project (22511105100, 2021SHZDZX0102).
+10
+
+[PDF PAGE 11]
+References
+[1] Sami Abu-El-Haija, Bryan Perozzi, Amol Kapoor, Nazanin Alipourfard, Kristina Lerman, Hrayr
+Harutyunyan, Greg Ver Steeg, and Aram Galstyan. Mixhop: Higher-order graph convolutional
+architectures via sparsified neighborhood mixing. In International Conference on Machine
+Learning, pages 21–29, 2019.
+[2] Uri Alon and Eran Yahav. On the bottleneck of graph neural networks and its practical
+implications. In International Conference on Learning Representations, 2021.
+[3] Michael M. Bronstein, Joan Bruna, Yann LeCun, Arthur Szlam, and Pierre Vandergheynst.
+Geometric deep learning: going beyond euclidean data. CoRR, abs/1611.08097, 2016.
+[4] Yu Chen, Lingfei Wu, and Mohammed J. Zaki. Iterative deep graph learning for graph neural
+networks: Better and robust node embeddings. In Advances in Neural Information Processing
+Systems, 2020.
+[5] Wei-Lin Chiang, Xuanqing Liu, Si Si, Yang Li, Samy Bengio, and Cho-Jui Hsieh. Cluster-gcn:
+An efficient algorithm for training deep and large graph convolutional networks. In ACM
+SIGKDD International Conference on Knowledge Discovery & Data Mining, pages 257–266,
+2019.
+[6] Krzysztof Marcin Choromanski, Valerii Likhosherstov, David Dohan, Xingyou Song, Andreea
+Gane, Tamás Sarlós, Peter Hawkins, Jared Quincy Davis, Afroz Mohiuddin, Lukasz Kaiser,
+David Benjamin Belanger, Lucy J. Colwell, and Adrian Weller. Rethinking attention with
+performers. In International Conference on Learning Representations, 2021.
+[7] Luca Cosmo, Anees Kazi, Seyed-Ahmad Ahmadi, Nassir Navab, and Michael M. Bronstein.
+Latent patient network learning for automatic diagnosis. CoRR, abs/2003.13620, 2020.
+[8] Hanjun Dai, Zornitsa Kozareva, Bo Dai, Alexander J. Smola, and Le Song. Learning steady-
+states of iterative algorithms over graphs. In International Conference on Machine Learning,
+pages 1114–1122, 2018.
+[9] Vijay Prakash Dwivedi and Xavier Bresson. A generalization of transformer networks to graphs.
+CoRR, abs/2012.09699, 2020.
+[10] Pantelis Elinas, Edwin V . Bonilla, and Louis C. Tiao. Variational inference for graph convolu-
+tional networks in the absence of graph data and adversarial settings. In Advances in Neural
+Information Processing Systems, 2020.
+[11] Luca Franceschi, Mathias Niepert, Massimiliano Pontil, and Xiao He. Learning discrete
+structures for graph neural networks. In International Conference on Machine Learning, pages
+1972–1982, 2019.
+[12] Chen Gao, Jinyu Chen, Si Liu, Luting Wang, Qiong Zhang, and Qi Wu. Room-and-object
+aware knowledge reasoning for remote embodied referring expression. In IEEE Conference on
+Computer Vision and Pattern Recognition, pages 3064–3073, 2021.
+[13] Fangda Gu, Heng Chang, Wenwu Zhu, Somayeh Sojoudi, and Laurent El Ghaoui. Implicit
+graph neural networks. In Advances in Neural Information Processing Systems, 2020.
+[14] William L. Hamilton, Zhitao Ying, and Jure Leskovec. Inductive representation learning on
+large graphs. In Advances in Neural Information Processing Systems, pages 1024–1034, 2017.
+[15] Weihua Hu, Matthias Fey, Marinka Zitnik, Yuxiao Dong, Hongyu Ren, Bowen Liu, Michele
+Catasta, and Jure Leskovec. Open graph benchmark: Datasets for machine learning on graphs.
+In Advances in Neural Information Processing Systems, 2020.
+[16] Eric Jang, Shixiang Gu, and Ben Poole. Categorical reparameterization with gumbel-softmax.
+In International Conference on Learning Representations, 2017.
+[17] Bo Jiang, Ziyan Zhang, Doudou Lin, Jin Tang, and Bin Luo. Semi-supervised learning with
+graph learning-convolutional networks. In IEEE Conference on Computer Vision and Pattern
+Recognition, pages 11313–11320, 2019.
+11
+
+[PDF PAGE 12]
+[18] Wei Jin, Yao Ma, Xiaorui Liu, Xianfeng Tang, Suhang Wang, and Jiliang Tang. Graph structure
+learning for robust graph neural networks. In ACM SIGKDD Conference on Knowledge
+Discovery and Data Mining, pages 66–74, 2020.
+[19] Thomas N. Kipf and Max Welling. Semi-supervised classification with graph convolutional
+networks. In International Conference on Learning Representations (ICLR), 2017.
+[20] Danning Lao, Xinyu Yang, Qitian Wu, and Junchi Yan. Variational inference for training graph
+neural networks in low-data regime through joint structure-label estimation. In ACM SIGKDD
+Conference on Knowledge Discovery and Data Mining, pages 824–834, 2022.
+[21] Derek Lim, Xiuyu Li, Felix Hohne, and Ser-Nam Lim. New benchmarks for learning on
+non-homophilous graphs. CoRR, abs/2104.01404, 2021.
+[22] Dongsheng Luo, Wei Cheng, Wenchao Yu, Bo Zong, Jingchao Ni, Haifeng Chen, and Xiang
+Zhang. Learning to drop: Robust graph neural network via topological denoising. In ACM
+International Conference on Web Search and Data Mining, pages 779–787, 2021.
+[23] Chris J. Maddison, Andriy Mnih, and Yee Whye Teh. The concrete distribution: A continuous re-
+laxation of discrete random variables. In International Conference on Learning Representations,
+2017.
+[24] Julian J. McAuley, Rahul Pandey, and Jure Leskovec. Inferring networks of substitutable and
+complementary products. In ACM SIGKDD International Conference on Knowledge Discovery
+and Data Mining, pages 785–794, 2015.
+[25] Fabian Pedregosa, Gaël Varoquaux, Alexandre Gramfort, Vincent Michel, Bertrand Thirion,
+Olivier Grisel, Mathieu Blondel, Peter Prettenhofer, Ron Weiss, Vincent Dubourg, et al. Scikit-
+learn: Machine learning in python. the Journal of machine Learning research, 12:2825–2830,
+2011.
+[26] Hongbin Pei, Bingzhe Wei, Kevin Chen-Chuan Chang, Yu Lei, and Bo Yang. Geom-gcn: Geo-
+metric graph convolutional networks. In International Conference on Learning Representations,
+2020.
+[27] Ali Rahimi and Benjamin Recht. Random features for large-scale kernel machines. In Advances
+in Neural Information Processing Systems, pages 1177–1184, 2007.
+[28] Yu Rong, Wenbing Huang, Tingyang Xu, and Junzhou Huang. Dropedge: Towards deep
+graph convolutional networks on node classification. In International Conference on Learning
+Representations, 2020.
+[29] Benedek Rozemberczki and Rik Sarkar. Characteristic functions on graphs: Birds of a feather,
+from statistical descriptors to parametric models. In ACM International Conference on Informa-
+tion and Knowledge Management, pages 1325–1334, 2020.
+[30] Alvaro Sanchez-Gonzalez, Jonathan Godwin, Tobias Pfaff, Rex Ying, Jure Leskovec, and
+Peter W. Battaglia. Learning to simulate complex physics with graph networks. In International
+Conference on Machine Learning, pages 8459–8468, 2020.
+[31] Victor Garcia Satorras and Joan Bruna Estrach. Few-shot learning with graph neural networks.
+In International Conference on Learning Representations, 2018.
+[32] Franco Scarselli, Marco Gori, Ah Chung Tsoi, Markus Hagenbuchner, and Gabriele Monfardini.
+The graph neural network model. IEEE transactions on neural networks, 20(1):61–80, 2008.
+[33] Prithviraj Sen, Galileo Namata, Mustafa Bilgic, Lise Getoor, Brian Gallagher, and Tina Eliassi-
+Rad. Collective classification in network data. AI Mag., 29(3):93–106, 2008.
+[34] Rakshith Sharma Srinivasa, Cao Xiao, Lucas Glass, Justin Romberg, and Jimeng Sun. Fast graph
+attention networks using effective resistance based graph sparsification. CoRR, abs/2006.08796,
+2020.
+12
+
+[PDF PAGE 13]
+[35] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez,
+Łukasz Kaiser, and Illia Polosukhin. Attention is all you need. Advances in neural information
+processing systems, 30, 2017.
+[36] Petar Velickovic, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro Liò, and Yoshua
+Bengio. Graph attention networks. In International Conference on Learning Representations
+(ICLR), 2018.
+[37] Oriol Vinyals, Charles Blundell, Tim Lillicrap, Koray Kavukcuoglu, and Daan Wierstra. Match-
+ing networks for one shot learning. In Advances in Neural Information Processing Systems,
+pages 3630–3638, 2016.
+[38] Yue Wang, Yongbin Sun, Ziwei Liu, Sanjay E. Sarma, Michael M. Bronstein, and Justin M.
+Solomon. Dynamic graph CNN for learning on point clouds. ACM Trans. Graph., 38(5):146:1–
+146:12, 2019.
+[39] Felix Wu, Amauri H. Souza Jr., Tianyi Zhang, Christopher Fifty, Tao Yu, and Kilian Q. Wein-
+berger. Simplifying graph convolutional networks. In International Conference on Machine
+Learning, pages 6861–6871, 2019.
+[40] Qitian Wu, Chenxiao Yang, and Junchi Yan. Towards open-world feature extrapolation: An
+inductive graph learning approach. Advances in Neural Information Processing Systems, pages
+19435–19447, 2021.
+[41] Qitian Wu, Hengrui Zhang, Xiaofeng Gao, Junchi Yan, and Hongyuan Zha. Towards open-world
+recommendation: An inductive model-based collaborative filtering approach. In International
+Conference on Machine Learning, pages 11329–11339, 2021.
+[42] Tailin Wu, Hongyu Ren, Pan Li, and Jure Leskovec. Graph information bottleneck. InAdvances
+in Neural Information Processing Systems, 2020.
+[43] Xuan Wu, Lingxiao Zhao, and Leman Akoglu. A quest for structure: Jointly learning the graph
+structure and semi-supervised classification. In ACM International Conference on Information
+and Knowledge Management, pages 87–96, 2018.
+[44] Keyulu Xu, Chengtao Li, Yonglong Tian, Tomohiro Sonobe, Ken-ichi Kawarabayashi, and
+Stefanie Jegelka. Representation learning on graphs with jumping knowledge networks. In
+International Conference on Machine Learning, pages 5449–5458, 2018.
+[45] Chenxiao Yang, Qitian Wu, and Junchi Yan. Geometric knowledge distillation: Topology
+compression for graph neural networks. In Advances in Neural Information Processing Systems,
+2022.
+[46] Liang Yao, Chengsheng Mao, and Yuan Luo. Graph convolutional networks for text classifica-
+tion. In AAAI Conference on Artificial Intelligence, pages 7370–7377, 2019.
+[47] Rex Ying, Dylan Bourgeois, Jiaxuan You, Marinka Zitnik, and Jure Leskovec. GNN explainer:
+A tool for post-hoc explanation of graph neural networks. In Advances in Neural Information
+Processing Systems, 2019.
+[48] Hanqing Zeng, Hongkuan Zhou, Ajitesh Srivastava, Rajgopal Kannan, and Viktor Prasanna.
+Graphsaint: Graph sampling based inductive learning method. In International Conference on
+Learning Representations, 2020.
+[49] Tianqi Zhang, Qitian Wu, Junchi Yan, Yunan Zhao, and Bing Han. Scalegcn: Efficient and
+effective graph convolution via channel-wise scale transformation.IEEE Transactions on Neural
+Networks and Learning Systems, 2022.
+[50] Xiang Zhang and Marinka Zitnik. Gnnguard: Defending graph neural networks against
+adversarial attacks. In Advances in Neural Information Processing Systems, 2020.
+[51] Yingxue Zhang, Soumyasundar Pal, Mark Coates, and Deniz Üstebay. Bayesian graph convo-
+lutional neural networks for semi-supervised classification. In AAAI Conference on Artificial
+Intelligence, pages 5829–5836, 2019.
+13
+
+[PDF PAGE 14]
+[52] Cheng Zheng, Bo Zong, Wei Cheng, Dongjin Song, Jingchao Ni, Wenchao Yu, Haifeng Chen,
+and Wei Wang. Robust graph representation learning via neural sparsification. In International
+Conference on Machine Learning, pages 11458–11468, 2020.
+[53] Jiong Zhu, Yujun Yan, Lingxiao Zhao, Mark Heimann, Leman Akoglu, and Danai Koutra.
+Beyond homophily in graph neural networks: Current limitations and effective designs. In
+Advances in Neural Information Processing Systems, 2020.
+[54] Yanqiao Zhu, Weizhi Xu, Jinghao Zhang, Qiang Liu, Shu Wu, and Liang Wang. Deep graph
+structure learning for robust representations: A survey. CoRR, abs/2103.03036, 2021.
+14
+
+[PDF PAGE 15]
+Checklist
+1. For all authors...
+(a) Do the main claims made in the abstract and introduction accurately reflect the paper’s
+contributions and scope? [Yes]
+(b) Did you describe the limitations of your work? [Yes]
+(c) Did you discuss any potential negative societal impacts of your work? [Yes]
+(d) Have you read the ethics review guidelines and ensured that your paper conforms to
+them? [Yes]
+2. If you are including theoretical results...
+(a) Did you state the full set of assumptions of all theoretical results? [Yes]
+(b) Did you include complete proofs of all theoretical results? [Yes] See Appendix B
+3. If you ran experiments...
+(a) Did you include the code, data, and instructions needed to reproduce the main experi-
+mental results (either in the supplemental material or as a URL)? [Yes] The codes are
+public available. See Appendix D for dataset information.
+(b) Did you specify all the training details (e.g., data splits, hyperparameters, how they
+were chosen)? [Yes] See Appendix C
+(c) Did you report error bars (e.g., with respect to the random seed after running experi-
+ments multiple times)? [Yes] See the experiment section
+(d) Did you include the total amount of compute and the type of resources used (e.g., type
+of GPUs, internal cluster, or cloud provider)? [Yes] See Appendix C
+4. If you are using existing assets (e.g., code, data, models) or curating/releasing new assets...
+(a) If your work uses existing assets, did you cite the creators? [Yes] See Appendix D
+(b) Did you mention the license of the assets? [N/A]
+(c) Did you include any new assets either in the supplemental material or as a URL? [N/A]
+(d) Did you discuss whether and how consent was obtained from people whose data you’re
+using/curating? [N/A]
+(e) Did you discuss whether the data you are using/curating contains personally identifiable
+information or offensive content? [N/A]
+5. If you used crowdsourcing or conducted research with human subjects...
+(a) Did you include the full text of instructions given to participants and screenshots, if
+applicable? [N/A]
+(b) Did you describe any potential participant risks, with links to Institutional Review
+Board (IRB) approvals, if applicable? [N/A]
+(c) Did you include the estimated hourly wage paid to participants and the total amount
+spent on participant compensation? [N/A]
+15
+
+[PDF PAGE 16]
+Appendix
+A More Details for N ODE FORMER
+A.1 Differentiable Sampling-based Message Passing on Latent Structures
+We provide more details concerning the differentiable sampling-based message passing through our
+kernelized Gumbel-Softmax operator, as complementary to the content of Sec. 3.1. As illustrated in
+Sec. 3.1, the l-th layer’s feature propagation is defined over thel-th layer’s latent graph composed of
+the sampled edges e(l)
+uv ∼ Cat(πu)(l). For each layer, we sample K times for each node, i.e., there
+will be K sampled neighbored nodes for each node u. We assume ˜E (l) = {e(l)
+uv} as the set of sampled
+edges in the latent graph of the l-th layer. Then the updating rule for node embeddings at the l-th
+layer based on the latent graph can be written as
+z(l+1)
+u = 1
+K
+X
+v,e(l)
+uv∈ ˜E (l)
+vu = 1
+K
+X
+v
+I[e(l)
+uv ∈ ˜E (l)]vu. (14)
+The above equation introduces dis-continuity due to the sampling process that disables the end-to-end
+differentiable training. We thus adopt Gumbel-Softmax as a reparameterization trick to approximate
+the discrete sampled results via continuous relaxation:
+z(l+1)
+u ≈ 1
+K
+KX
+k=1
+NX
+v=1
+exp((q⊤
+u ku + gkv)/τ)PN
+w=1 exp((q⊤u kw + gkw)/τ)
+· vu, g kw ∼ Gumbel(0, 1). (15)
+The temperature τ controls the closeness to hard discrete samples [23]. If τ is close to zero, then the
+Gumbel-Softmax term exp((q⊤
+u ku+gkv )/τ )PN
+w=1 exp((q⊤u kw+gkw )/τ ) for any v converges to a one-hot vector:
+exp((q⊤
+u kv + gkv)/τ)PN
+w=1 exp((q⊤u kw + gkw)/τ)
+=
+
+1, if v satisfies q⊤
+u kv + gkv > q⊤
+u kv′ + gkv′∀v′ ̸= v,
+0, otherwise.
+(16)
+The Eqn. 15 requires O(N 2) for computing the embeddings for N nodes in one layer. To reduce
+the complexity to O(N), we resort to the kernel approximation idea, following similar reasoning as
+Eqn. 3 and 5:
+z(l+1)
+u ≈ 1
+K
+KX
+k=1
+NX
+v=1
+exp((q⊤
+u ku + gkv)/τ)PN
+w=1 exp((q⊤u kw + gkw)/τ)
+· vu
+= 1
+K
+KX
+k=1
+NX
+v=1
+exp((q⊤
+u ku + gkv)/τ)PN
+w=1 exp((q⊤u kw + gkw)/τ)
+· vu
+= 1
+K
+KX
+k=1
+NX
+v=1
+κ(qu/√τ ,kv/√τ)egkv /τ
+PN
+w=1 κ(qu/√τ ,kw/√τ)egkw /τ
+· vv
+≈ 1
+K
+KX
+k=1
+NX
+v=1
+ϕ(qu/√τ)⊤ϕ(kv/√τ)egkv /τ
+PN
+w=1 ϕ(qu/√τ)⊤ϕ(kw/√τ)egkw /τ
+· vv
+= 1
+K
+KX
+k=1
+ϕ(qu/√τ)⊤PN
+v=1 egkv /τ ϕ(kv/√τ) · v⊤
+v
+ϕ(qu/√τ)⊤PN
+w=1 egkw /τ ϕ(kw/√τ)
+.
+(17)
+The above result yields the one-layer updating rule for NODE FORMER ’s feed-forwarding w.r.t. each
+node u. In terms of practical implementation, we adopt matrix multiplications for computing the node
+embeddings for all the nodes in the next layer, for which we present the details in the next subsection.
+A.2 Model Implementation from the Matrix View
+In practice, the implementation of NODE FORMER is based on matrix operations that simultanenously
+update all the nodes in one layer. We present the feed-forward process of NODE FORMER from a
+16
+
+[PDF PAGE 17]
+samples [22]. Following similar reasoning as Eqn. 3 and 5, we can yield
+z(l+1)
+u ⇡
+NX
+v=1
+ (qu/p ⌧)>  (kv /p ⌧)egv /⌧
+P N
+w=1  (qu/p ⌧)>  (kw/p ⌧)egw /⌧
+·vv =  (qu/p ⌧)> P N
+v=1 egv /⌧  (kv /p ⌧) · vv
+ (qu/p ⌧)> P N
+w=1 egw /⌧  (kw/p ⌧)
+.
+(7)
+Eqn. 7 achieves message passing over a sampled latent graph (where we only sample once for each
+node) and still guarantees linear complexity as Eqn. 5. In practice, we can sample K times (e.g.,
+K =5 ) for each node and take an average of the aggregated results (see Alg. 1).
+3.2 Well-posedness of the Kernelized Gumbel-Softmax Operator
+One reasonable concern for Eqn. 7 is whether the RF approximation for kernel functions maintains the
+well-posedness of Gumbel approximation for the target discrete variables. As a justiﬁcation for the
+new message-passing function, we next answer two theoretical questions: 1) How is the approximation
+capability of RF for the original dot-then-exponentiate operation with Gumbel variables in Eqn. 6? 2)
+Does Eqn. 7 still guarantee a continuous relaxation of the categorical distributions? We formulate the
+results as follows and defer proofs to Appendix A.
+Theorem 1 (Approximation Error for Softmax-Kernel) . Assume kquk2 and kkv k2 are bounded by r,
+then with probability at least 1   ✏, the gap  =
+   (qu/p ⌧)>  (kv /p ⌧)   (qu/p ⌧, kv /p ⌧)
+  ),
+where   is deﬁned by Eqn. 4, will be bounded by O
+✓q
+exp(6r/⌧ )
+m✏
+◆
+.
+We can see that the error bound of RF for approximating original softmax-kernel function depends
+on both the dimension of feature map   and temperature ⌧. Notably, the error bound is independent
+of node number N , which implies that the approximation ability is insensitive to dataset sizes.
+The second question is non-trivial since Eqn. 7 involves randomness of Gumbel variables
+and random transformation in  , which cannot be decoupled apart. We deﬁne cuv =
+  (qu /p ⌧)>   (kv /p ⌧)egv /⌧
+PN
+w=1   (qu/p ⌧)>   (kw /p ⌧)egw /⌧ as the result from the kernelized Gumbel-Softmax and cu =
+{cuv }N
+v=1 denotes the sampled edge vector for node u. We can arrive at the result as follows.
+Theorem 2 (Property of Kernelized Gumbel-Softmax Random V ariables). Suppose m is sufﬁciently
+large, we have the convergence property for the kernelized Gumbel-Softmax operator
+lim
+⌧! 0
+P(cuv >c uv0, 8v06= v)= exp(q>
+u kv )P N
+w=1 exp(q>u kw)
+, lim
+⌧! 0
+P(cuv = 1) = exp(q>
+u kv )P N
+w=1 exp(q>u kw)
+.
+It shows that when i) the dimension of feature map is large enough and ii) the temperature goes
+to zero, the distribution from which latent structures are sampled would converge to the original
+categorical distribution.
+Algorithm 1: Scalable All-Pair Message Passing on Latent
+Graphs with Linear Complexity (O(N ) or O(N + E))
+Input: Node features Z(0) = X, input adjacency A.
+1 for l =0 ...,L   1 do
+2 Q(l)  W (l)
+Q Z(l), K(l)  W (l)
+K Z(l), V(l)  W (l)
+V Z(l);
+3 for k =1 , 2,...,K do
+4 Gk = {egku /⌧ }N
+u=1,g ku ⇠ Gumbel(0, 1);
+5 ˜Gk = Gk .unsqueeze(1).repeat(1,m );
+6 ˜K(l)
+k = ˜Gk    (K(l)/p⌧), ˜Q(l)
+k = ˜Gk    (Q(l)/p⌧);
+7 U(l)
+k  ( ˜K(l)
+k )>V(l), O(l)
+k  ( ˜K(l)
+k )>1N ⇥1;
+8 Z(l+1)  1
+K
+PK
+k=1
+˜Q(l)
+k U(l)
+k
+˜Q(l)
+k O(l)
+k
+; % average K samples
+9 Z(l+1)  Z(l+1) +  (b(l)) · AZ(l+1); % add relational bias
+Output: Predict node labels ˆY = MLP({Z(l)}L
+l=0).
+Remark. The two theorems
+imply a trade-off between RF
+approximation and Gumbel-
+Softmax approximation w.r.t.
+the choice of ⌧. A large ⌧ would
+help to reduce the burden on
+kernel dimension m, and namely,
+small ⌧ would require a very
+large m to guarantee enough RF
+approximation precision. On
+the other hand, if ⌧ is too large,
+the weight on each edge will
+converge to 1
+N , i.e., the model
+nearly degrades to mean pooling,
+while a small ⌧ would endow
+the kernelized Gumbel-Softmax
+with better approximation to the
+categorical distribution. Empirical studies on this are presented in Appendix D.
+5
+Figure 5: Alg. 1 presents the details for NODE FORMER ’s feed-forward process from a matrix
+view that is practically used in our implementation. The figure illustrates the layer-wise node
+representation updating based on the kernelized Gumbel-Softmax operator, which reduces the
+algorithmic complexity from quadratic to O(N) via avoiding explicit computation of the all-pair
+similarities. ⊙ in Alg. 1 denotes element-wise product. ˜ϕ(·) in the figure represents the random
+feature map with Gumbel noise whose details are shown by the blue part of Alg. 1.
+matrix view in Fig. 5 where Alg. 1 depicts how node embeddings are updated in each layer through our
+introduced kernelized Gumbel-Softmax message passing in Sec. 3.1. The right sub-figure illustrates
+the one layer’s updating which only requiresO(N) complexity by avoiding the cumbersome all-pair
+similarity matrix.
+B Proof for Technical Results
+B.1 Proof for Theorem 1
+To prove our theorem, we first introduce the following lemma given by the Lemma 2 in [6].
+Proposition 1. Denote a softmax kernel as SM(x, y) = exp( x⊤y). The Positive Random Fea-
+tures defined by Eqn. 4 for softmax-kernel estimation, i.e., cSMm(x, y) = 1
+m
+Pm
+i=1[exp(w⊤
+i x −
+∥x∥2
+2 ) exp(w⊤
+i y − ∥y∥2
+2 )], has the mean and variance over w ∼ N (0, Id) as
+Ew(cSMm(x, y)) =SM(x, y) = exp(x⊤y),
+Vw(cSMm(x, y)) = 1
+m exp(∥x + y∥2)SM2(x, y)
+(1 − exp(−∥x + y∥2)).
+(18)
+The lemma shows that the Positive Random Features can achieve unbiased approximation for the
+softmax kernel with a quantified variance.
+Back to our main theorem, suppose the L2-norms of qu and kv are bounded by r, we can derive the
+probability using the Chebyshev’s inequality:
+P(∆ ≤
+r
+exp(6r/τ )
+mϵ ) ≥ 1 − Vw(dSMm(qu/√τ ,kv/√τ))
+exp(6r/τ )/mϵ
+(19)
+where ∆ =
+dSMm(qu/√τ ,kv/√τ) − SM(qu/√τ ,kv/√τ)
+ denotes the deviation of the kernel
+approximation. Using the result in Lemma 1, we can further obtain that the RHS of Eqn. 19 is no
+greater than
+1 − ϵ exp(∥ qu + kv√τ ∥2 + 2q⊤
+u kv
+τ − 6 r
+τ ). (20)
+Since ∥ qu+kv√τ ∥2 ≤ 4r
+τ and 2 q⊤
+u kv
+τ ≤ 2r
+τ , we can achieve the stated result:
+P(∆ ≤
+r
+exp(6r/τ )
+mϵ ) ≥ 1 − ϵ. (21)
+17
+
+[PDF PAGE 18]
+B.2 Proof for Theorem 2
+Before entering the proof for the theorem, we first introduce two basic technical lemmas. While
+such results are already mentioned in previous studies [ 16; 23], their proofs will be useful for
+the subsequent reasoning. Therefore, we restate the proofs as building blocks for the following
+presentation.
+Proposition 2. Given real numbers xi, xj ∈ R and ui, uj i.i.d. sampled from uniform distribution
+within (0, 1). With Gumbel perturbation defined as g(u) = − log(− log(u)), we have the probability
+P (xi + g(ui) > x j + g(uj)) = 1
+1 + exp (−(xi − xj)) .
+Proof. Due to g(u) = − log(− log(u)), the inequality of interests xi + g(ui) > x j + g(uj) can be
+rearranged as
+exi−xj > log(ui)
+log(uj) . (22)
+Since log(uj) < 0, Eqn. 22 can be written as
+uj < u exj −xi
+i . (23)
+As ui, uj are i.i.d. sampled from a uniform distribution, the probability when the above formula can
+be calculated via:
+Z 1
+0
+Z uexj −xi
+i
+0
+dujdui =
+Z 1
+0
+uexj −xi
+i dui
+= 1
+1 + exp(−(xi − xj)) .
+(24)
+Thus, we conclude the proof with
+P (xi + g(ui) > x j + g(uj)) = 1
+1 + exp (−(xi − xj)) . (25)
+Proposition 3. Let X ∼ Gumbel(α, τ) (i.e. Xk = exp((log αk+gk)/τ )Pn
+i=1 exp((log αi+gi)/τ )) with location parameters
+α ∈ (0, ∞)n and temperature τ ∈ (0, ∞), then:
+• P (Xk > X i, ∀i ̸= k) = αkPn
+i=1 αi
+,
+• P (limτ →0 Xk = 1) = αkPn
+i=1 αi
+.
+Proof. This result can be similarly proved as Lemma 2. The event of interests Xk > X i, ∀i ̸= k is
+equivalent to
+log αk − log(− log uk) > log α1 − log(− log u1),
+log αk − log(− log uk) > log α2 − log(− log u2),
+...
+log αk − log(− log uk) > log αn − log(− log un).
+(26)
+Since all the above inequalities are independent given uk, we can rearrange the first inequality as
+u1 < u α1/αk
+k ≤ 1. (27)
+Since u1 ∼ U[0, 1], the probability for the first inequality in Eqn. 26 being true would be uα1/αk
+k .
+Thus, the probability for Eqn. 26 being true can be calculated via
+uα1/αk
+k uα2/αk
+k ...gαn/αk
+k = g(α1+α2+...+αn)/αk
+k = g(1/αk)−1
+k . (28)
+For simplicity, we assumePn
+i=1 αi = 1. Then for any gk ∈ [0, 1], we obtain
+P (Xk > X i, ∀i ̸= k) =
+Z 1
+0
+g(1/αk)−1
+k dgk
+= αkPn
+i=1 αi
+,
+(29)
+18
+
+[PDF PAGE 19]
+and arrive at the result for the first bullet point. For the second bullet point, when τ → 0, we have
+lim
+τ →0
+exp((log αi + gi)/τ)
+exp((log αj + gj)/τ)
+= lim
+τ →0
+exp((log αi + gi − log αj − gj)/τ)
+=
+
+∞, if αi > α j
+0, otherwise.
+(30)
+Such a fact indicates that the output of a Concrete distribution with τ → 0 will be a one-hot vector
+(Xarg maxi αi = 1). This yields the conclusion that
+P (lim
+τ →0
+Xk = 1) = P (Xk > X i, ∀i ̸= k) = αkPn
+i=1 αi
+. (31)
+Now we turn to the proof of our theorem. We are to prove that the kernelized form in Eqn. 7 has the
+same property as the original Gumbel-Softmax in the limit sense (when τ goes to zero). We recall
+that we have defined qu = W (l)
+Q z(l)
+u , ku = W (l)
+K z(l)
+u and vu = W (l)
+V z(l)
+u for simplicity.
+First, by definition we have
+ϕ( qu√τ )⊤ϕ( kv√τ )e
+gv
+τ
+= 1
+m exp(−
+|| qu√τ ||2 + || kv√τ ||2
+2 )
+mX
+i=1
+exp(ω⊤
+i ( qu√τ + kv√τ ) + gv
+τ ).
+(32)
+The property holds that for ∀w ̸= v, we have limτ →0
+ϕ( qu√τ )⊤ϕ( kv√τ )e
+gv
+τ
+ϕ( qu√τ )⊤ϕ( kw√τ )e
+gw
+τ
+equals to ∞ or 0, i.e. the
+output of the kernelized Gumbel-Softmax is still a one-hot vector when τ → 0. Let
+Yv =
+ϕ( qu√τ )⊤ϕ( kv√τ )e
+gv
+τ
+PN
+w=1 ϕ( qu√τ )⊤ϕ( kw√τ )e
+gw
+τ
+. (33)
+Here Yv is defined in the same way as cuv in Section 3.2. We thus have P (limτ →0 Yv = 1) =
+P (Yv > Y v′, ∀v′ ̸= v).
+To compute P (Yv > Y v′, ∀v′ ̸= v), for simplicity, let us consider the probability P (Yv > Y v′) =
+P (ϕ( qu√τ )⊤ϕ( kv√τ )e
+gv
+τ > ϕ( qu√τ )⊤ϕ( kv′√τ )e
+gv′
+τ ). To keep notation clean, we define
+βv = ϕ( qu√τ )⊤ϕ( kv√τ ), β v′ = ϕ( qu√τ )⊤ϕ( kv′
+√τ ). (34)
+Then the above-mentioned probability can be rewritten as P (log βv + gv
+τ > log βv′ + gv′
+τ ), where
+βv and βv′ are two i.i.d. random variables.
+From Lemma 1, we have E(βv) = exp( q⊤
+u kv/τ) = α
+1
+τ
+v , E(βv′) = exp( q⊤
+u kv′/τ) = α
+1
+τ
+v′, where
+αv and αv′ are two constant values. Then using Lemma 2, we have
+P (log α1/τ
+v + gv
+τ > log α1/τ
+v′ + gv′
+τ )
+=P (log αv + gv > log αv′ + gv′)
+= 1
+1 + exp(logαv′ − log αv)
+= αv′
+αv + αv′
+.
+(35)
+According to the Chebyshev’s inequality, we have P (|βv − α
+1
+τ
+v | ≤ ϵv) ≥ 1 − σ2
+v
+ϵ2v
+. Here σ2
+v =
+Vw(dSMm( qu√τ , kj√τ )), which can given by Lemma 1.
+19
+
+[PDF PAGE 20]
+Due to the convexity of logarithmic function, we have
+| log βv − 1
+τ log αv|
+|βv − α
+1
+τ
+v |
+≤ 1
+α
+1
+τ
+v − ϵv
+, (36)
+and subsequently,
+| log βv − 1
+τ log αv| ≤ |βv − α
+1
+τ
+v |
+α
+1
+τ
+v − ϵv
+≤ ϵv
+α
+1
+τ
+v − ϵv
+.
+(37)
+Therefore we have P (| log βv − 1
+τ log αv| ≤ ϵv
+α
+1
+τv −ϵv
+) ≥ P (|βv − α
+1
+τ
+v | ≤ ϵv). Based on this, we can
+derive the result:
+P (| log βv − 1
+τ log αv| ≤ ϵv
+α
+1
+τ
+v − ϵv
+) ≥ 1 − σ2
+v
+ϵ2v
+. (38)
+Since βv and βv′ are two i.i.d. random variables, we have
+P (| log βv − 1
+τ log αv| ≤ ϵv
+α
+1
+τ
+v − ϵv
+,
+| log βv′ − 1
+τ log αv′| ≤ ϵv′
+α
+1
+τ
+v′ − ϵv′
+) ≥ (1 − σ2
+v
+ϵ2v
+)(1 − σ2
+v′
+ϵ2
+v′
+).
+(39)
+For simplicity, we denote ϵ = ϵv
+α
+1
+τv −ϵv
++ ϵv′
+α
+1
+τ
+v′ −ϵv′
+and Pϵ = (1 − σ2
+v
+ϵ2v
+)(1 −
+σ2
+v′
+ϵ2
+v′
+). We therefore have
+P (| log βv − 1
+τ log αv| + | log βv′ − 1
+τ log αv′| ≤ ϵ) ≥ Pϵ. (40)
+Using the triangular inequality, we can yield
+|(log βv − 1
+τ log αv) − (log βv′ − 1
+τ log αv′)|
+≤ | log βv − 1
+τ log αv| + | log βv′ − 1
+τ log αv′|.
+(41)
+Combining Eqn. 40 and 41, we have
+P (|(log βv − 1
+τ log αv) − (log βv′ − 1
+τ log αv′)| ≤ ϵ) ≥ Pϵ. (42)
+Let c = log βv − log βv′, so that E(c) = 1
+τ (log αv − log αv′). From Eqn. 42, we can obtain
+P (c ≥ E(c) − ϵ) ≥ Pϵ. (43)
+According to Lemma 2, the probability P (E(c) − ϵ ≥ gv′ −gv
+τ ) can be written as
+P (log αv − log αv′ − τ ϵ ≥ gv′ − gv)
+= 1
+1 + exp(logαv′ − log αv + τ ϵ)
+= 1
+1 + αv′
+αv
+eτ ϵ .
+(44)
+Since c, gv, gv′ are generated independently, combining Eqn. 43 and 44, we can yield
+P (c ≥ gv′ − gv
+τ ) ≥ Pϵ
+1 + αv′
+αv
+eτ ϵ . (45)
+Similarly, from Eq. 42 we have P (c ≤ E(c) + ϵ) ≥ Pϵ and subsequently,
+P ( gv′ − gv
+τ ≥ E(c) + ϵ) = 1 − P (c + ϵ ≥ gv′ − gv
+τ )
+= 1 − 1
+1 + αv′
+αv
+e−τ ϵ .
+(46)
+20
+
+[PDF PAGE 21]
+Thus we have P (c ≤ gv′ −gv
+τ ) ≥ Pϵ(1 − 1
+1+
+αv′
+αv e−τ ϵ) and also
+P (c ≥ gv′ − gv
+τ ) ≤ 1 − Pϵ(1 − 1
+1 + αv′
+αv
+e−τ ϵ). (47)
+Combining Eqn. 45 and 47, we conclude that
+Pϵ
+1 + αv′
+αv
+eτ ϵ ≤ P (c ≥ gv′ − gv
+τ ) ≤ 1 − Pϵ(1 − 1
+1 + αv′
+αv
+e−τ ϵ). (48)
+Based on this we consider the limitation for two sides and thus obtain
+lim
+Pϵ→1
+lim
+τ →0
+P (c ≥ gv′ − gv
+τ ) = 1
+1 + αv′
+αv
+= αv
+αv + αv′
+. (49)
+Then with similar reasoning as Lemma 3, we have
+lim
+Pϵ→1
+lim
+τ →0
+P (Yv = 1)
+= lim
+Pϵ→1
+lim
+τ →0
+P (Yv > Y v′, ∀v′ ̸= v) = αv/(
+NX
+w=1
+αw).
+(50)
+Recall that
+Pϵ = (1 − σ2
+v
+ϵ2v
+)(1 − σ2
+v′
+ϵ2
+v′
+)
+σ2 = Vw(dSM
++
+m(x, y))
+= 1
+m exp(− ∥x∥2 + ∥y∥2
+2 )
+mX
+i=1
+exp(w⊤
+i (x + y)),
+(51)
+where x = qu√τ , y =
+kv,v′
+√τ . Therefore, Pϵ is dependent of the precision ϵv, ϵv′, the random feature
+dimension m, and the temperature τ. If m is sufficiently large, σ would converge to zero and Pϵ goes
+to 1. In such a case, Eqn. 50 holds once τ tends to zero. We thus conclude the proof.
+B.3 Proof for Proposition 1
+According to our definitions in Section 5, we have
+DKL(qϕ( ˜A|X, A)∥p( ˜A|Y, X, A))
+=
+Z
+A∗
+qϕ( ˜A|X, A) log qϕ( ˜A|X, A)
+p( ˜A|Y, X, A)
+d ˜A
+=
+Z
+A∗
+qϕ( ˜A|X, A) log qϕ( ˜A|X, A)pθ(Y|X, A)
+p( ˜A, Y|X, A)
+d ˜A
+=
+Z
+A∗
+qϕ( ˜A|X, A) log qϕ( ˜A|X, A)pθ(Y|X, A)
+p( ˜A, Y|X, A)
+d ˜A
+=
+Z
+A∗
+qϕ( ˜A|X, A) log qϕ( ˜A|X, A)pθ(Y|X, A)
+p(Y| ˜A, X, A)p( ˜A|X, A)
+d ˜A
+= − Eqϕ( ˜A|X,A)[log p(Y| ˜A, X, A)] + logpθ(Y|X, A) + DKL(qϕ( ˜A|X, A)∥p( ˜A|X, A))
+= − ELBO(θ, ϕ) + logpθ(Y|X, A)
+(52)
+Since we assume qϕ can exploit arbitrary distributions over ˜A, we know that when the ELBO is
+optimized to the optimum, DKL(qϕ( ˜A|X, A)∥p( ˜A|Y, X, A)) = 0 holds. Otherwise, there exists
+ϕ∗ ̸= ϕ such that ELBO(θ, ϕ∗) > ELBO(θ, ϕ). Pushing further, when the optimum is achieved,
+log pθ(Y|X, A) would equal to ELBO and namely is maximized.
+21
+
+[PDF PAGE 22]
+C Implementation Details
+We present implementation details in our experiments for reproducibility. For more concrete details
+concerning architectures and hyper-parameter settings forNODE FORMER , one can directly refer to our
+public repository https://github.com/qitianwu/NodeFormer. We next present descriptions
+for baseline models’ implementation. For baseline models MLP, GCN, GAT, MixHop and JKnet, we
+use the implementation provided by [21]3. For DropEdge and two structure learning baseline models
+(LDS and IDGL), we also refer to their implementation provided by the original papers [28; 11; 4].
+Concretely, we use GCN as the backbone for them.
+C.1 Details for Node Classification Experiments in Sec. 4.1
+Architectures. For experiments on the datasets Cora, Citeseer, Deezer and Actor, the baseline
+models (GCN, GAT, MixHop, JKNet) are implemented with the following settings:
+• Two GNN layers with hidden size 32 by default (unless otherwise mentioned). GAT uses 8 attention
+heads followed by its original setting.
+• The activation function is ReLU (except GAT using ELU).
+The architecture of our NODE FORMER is specified as follows:
+• Two message-passing layers with hidden size 32. We also consider multi-head designs for our
+all-pair attentive message passing, and for each head we use independent parameterization. The
+results for different heads are combined in an average manner in each layer.
+• The activation function is ELU that is only used for input MLP, and we do not use any activation
+for the feature propagation layers. In terms of relational bias, we specify σ as sigmoid function and
+consider 2-order adjacency to strengthen the observed links of the input graph.
+Training Details. In each epoch, we feed the whole data into the model, calculate the loss and
+conduct gradient descent accordingly. Concretely, we use BCE-Loss for two-class classification and
+NLL-Loss for multi-class classification, the Adam optimizer is used for gradient-based optimization.
+The training procedure will repeat the above process until a given budget of 1000 epochs. Finally, we
+report the test accuracy achieved by the epoch that gives the highest accuracy on validation dataset.
+Hyperparameters. For each model, we use grid search on validation set for hyper-parameter
+setting. The learning rate is searched within {0.01, 0.001, 0.0001, 0.00001}, weight decay within
+{0.05, 0.005, 0.0005, 0.00005}, and dropout probability within {0.0, 0.5}. The hyper-parameters for
+NODE FORMER is provided in our public codes. The hyperparameters for baseline models are set as
+follows (we use the same notation as the original papers).
+• For GCN and GAT, the learning rate is 0.01, and weight decay is set to 0.05. No dropout is used.
+• For MixHop, the hyperparameters are the same as above, except that we further use grid search for
+hidden channels within {8, 16, 32, 64, 128}. We adopt 2 hops for all the four datasets.
+• For JKNet, GCN is used as the backbone. Learning rate is set to 0.01 for Deezer and 0.001 for all
+the other three datasets. We concatenate the features in the final stage for Deezer, while we use
+max-pooling for the three other datasets. The hidden size is set as default, except for Deezer as 64.
+• For DropEdge, the hidden size is chosen from {32, 64, 96, 128, 160}, the learning rate is within
+{0.01, 0.001, 0.0001}, and the dropedge rate is chosen from {0.3, 0.4, 0.5}.
+• For LDS, the sampling time S = 16, the patience window size ρ = 6, the hidden size ∈ {8, 16,
+32, 64}, the inner learning rate γ ∈ {1e-4, 1e-3, 1e-2, 1e-1}, and the number of updates used to
+compute the truncated hypergradient τ ∈ {5, 10, 15}.
+• For IDGL, we use its original version without anchor approximation on Cora, Citeseer and
+Actor. For Deezer, even using anchor approximation, it would also suffer from out-of-memory.
+Besides, we set: ϵ = 0.01, hidden size ∈ {16, 64, 96, 128}, λ ∈ {0.5, 0.6, 0.7, 0.8}, η ∈ {0, 0.1,
+0.2}, α ∈ {0, 0.1, 0.2}, β ∈ {0, 0.1}, γ ∈ {0.1, 0.2}, m ∈ {6, 9, 12}.
+3https://github.com/CUAI/Non-Homophily-Benchmarks.
+22
+
+[PDF PAGE 23]
+C.2 Details for Node Classification on Larger Graphs in Sec. 4.2
+Architectures. For experiments on the two large datasets (OGB-Proteins and Amazon2M), the
+baseline models are implemented with the following settings:
+• Three GNN layers with hidden size 64.
+• The activation function is ReLU (except GAT using ELU).
+The architecture of our NODE FORMER is specified as follows:
+• Three message-passing layers with hidden size 64. The head number is set as 1.
+• The activation function is ELU that is used for all the layers. In terms of relational bias, we specify
+σ as identity function and consider 1-order adjacency to strengthen the observed links of the input
+graph.
+Training Details. In each epoch, we use random mini-batch partition to split the whole set of nodes
+and feed each mini-batch of nodes into the model for all-pair propagation, as we mentioned in
+Section 4.1. Similarly, we use BCE-Loss for two-class classification and NLL-Loss for multi-class
+classification, the Adam optimizer is used for gradient-based optimization. The training procedure
+will repeat the above process until a given budget of 1000 epochs. The evaluation on testing data is
+conducted on CPU which enables full-batch feature propagation. Finally, we report the test accuracy
+achieved by the epoch that gives the highest accuracy on validation dataset.
+C.3 Details for Graph-Enhanced Experiments in Sec. 4.3
+Architectures. The architectures of baselines (GCN, GAT, LDS and IDGL) and NODE FORMER
+model are the same as the transductive setting, except that we use grid search to adaptively tune the
+hidden size. Besides, we also adopt BatchNorm for baseline models.
+Training Details. The input data have no graph structures in this setting. As mentioned in Section 4.3,
+we use k-NN for artificially constructing a graph to enable message passing. The training procedure
+is the same as the transductive setting.
+Hyperparameters. The hyperparameters for baseline models are listed as follows.
+• For GCN, the learning rate is 0.01 and the weight decay is 5e-4 on both datasets. The size of hidden
+channel is set to 64. Dropout is not used during training.
+• For GAT, the learning rate is 0.001 and the weight decay is 5e-3 on both datasets. The size of
+hidden channel is 32 on Mini-ImageNet and 64 on 20News. No dropout is used during training.
+The number of attention heads is 8.
+• For LDS, its hyperparameters are determined by grid search in the same manner as in the transduc-
+tive setting.
+• For IDGL, we use its anchor-based version that can scale to these two datasets. Besides, on20News,
+we set: hidden size=64, learning rate=0.01 λ = 0.7, η = 0.1, α = 0.1, β = 0, γ = 0.1, ϵ = 0.01,
+m = 12 . On Mini-ImageNet, we set: hidden size=96, learning rate=0.01 λ = 0 .8, η = 0 .2,
+α = 0, β = 0, γ = 0.1, ϵ = 0.01, m = 12.
+D Dataset Information
+We present detailed information for our used datasets concerning the data collection, preprocessing
+and statistic information. Table 5 provides an overview of the datasets we used in the experiment.
+D.1 Dataset Information
+Node Classification Datasets. For experiments on transductive node classification, we evaluate
+our model on two homophilous datasets Cora and Citeseer [33], and other two non-homophilous
+datasets Actor [26] and Deezer [29]. The first two are citation network datasets that contain sparse
+bag-of-words feature vectors for each document and a list of citation links between documents.
+The citation links are treated as (undirected) edges and each document has a class label. Deezer
+is a social network of users on Deezer from European countries, where edges represent mutual
+follower relationships. The node features are based on artists liked by each user and nodes are labeled
+23
+
+[PDF PAGE 24]
+Table 5: Information for experiment datasets.
+Dataset Context Property # Task # Nodes # Edges # Node Feat # ClassCora Citation network homophilous 1 2,708 5,429 1,433 7Citeseer Citation network homophilous 1 3,327 4,732 3,703 6Deezer Social network non-homophilous 1 28,281 92,752 31,241 2Actor Actors in movies non-homophilous 1 7,600 29,926 931 5OGB-Proteins Protein interaction multi-task classification 112 132,534 39,561,252 8 2Amazon2M Product co-occurrence long-range dependence 1 2,449,029 61,859,140 100 47Mini-ImageNet Image classification no graph/k-NN graph 1 18,000 0 128 3020News-Groups Text classification no graph/k-NN graph 1 9,607 0 236 10
+with reported gender. Actor is a graph representing actor co-occurrence in Wikipedia pages. Each
+node corresponds to an actor, and the edge between two nodes denotes co-occurrence on the same
+Wikipedia page. Node features correspond to some keywords in the Wikipedia pages and the nodes
+are classified into five categories w.r.t. words of actor’s Wikipedia. These four datasets are relatively
+small with thousands of instances and edges (Deezer is the largest one with nearly 20K nodes).
+To evaluate NODE FORMER ’s scalability, we further consider two large datasets:OGB-Proteins [15]
+and Amazon2M [5]. These two datasets have million-level nodes and edges and require the model
+for scalable training. The OGB-Proteins dataset is an undirected, and typed (according to species)
+graph in which nodes represent proteins and edges indicate different types of biologically meaningful
+associations between proteins. All edges come with 8-dimensional features, where each dimension
+represents the approximate confidence of a single association type and takes on values between 0
+and 1. The proteins come from 8 species and our task is to predict the presence of 112 protein
+functions in a multi-label binary classification setup respectively. Amazon2M is extracted from
+Amazon Co-Purchasing network [ 24], where each node represents a product, and the graph link
+represents whether two products are purchased together, the node features are generated by extracting
+bag-of-word features from the product descriptions. The top-level categories are used as labels for
+the products.
+Graph-enhanced Application Datasets. We evaluate our model on two datasets without graph
+structure: 20News-Groups [25] and Mini-ImageNet [37]. The 20News dataset is a collection of
+approximately 20,000 newsgroup documents (nodes), partitioned (nearly) evenly across 20 different
+newsgroups. We take 10 classes from 20 newsgroups and use words (TFIDF) with a frequency of
+more than 5% as features. The Mini-ImageNet dataset consists of 84×84 RGB images from 100
+different classes with 600 samples per class. For our experiment use, we choose 30 classes from the
+dataset, each with 600 images (nodes) that have 128 features extracted by CNN.
+D.2 Dataset Preprocessing
+All the datasets we used in the experiment are directly collected from the source, except
+Mini-ImageNet, whose features are extracted by ourselves. Following the setting of [31], we com-
+pute node embeddings via a CNN model with 4 convolutional layers followed by a fully-connected
+layer resulting in a 128 dimensional embedding. Finally, the 128 dimensional outputs are treated as
+the features of the nodes (images) for subsequent GNN-based downstream task.
+E More Experiment Results
+We present extra ablation study results on the four transductive datasets forNODE FORMER w/ and
+w/o relational bias and edge-level regularization. Fig. 6 studies the impact of the temperature τ and
+the dimension of feature map m on Cora. Furthermore, we visualize the attention maps of two model
+layers and compare with original input graphs of Cora, Citeseer, Deezer and Actor in Fig. 7.
+Table 6: Ablation study results on transductive datasets, where “rb” denotes relational bias and “reg”
+represents edge-level regularization.
+Dataset NODEFORMER NODEFORMERw/o reg NODEFORMERw/o rb
+Cora 88.69±0.46 81.98±0.46 88.06±0.59
+Citeseer 76.33±0.59 70.60±1.20 74.12±0.64
+Deezer 71.24±0.32 71.22±0.32 71.10±0.36
+Actor 35.31±1.29 35.15±1.32 34.60±1.32
+24
+
+[PDF PAGE 25]
+log( )
+2
+1
+0
+1
+2
+m
+10
+20
+30
+40
+50
+60
+70
+80
+Accuracy
+80
+82
+84
+86
+88
+Figure 6: Impact of the temperature τ and the dimension of random feature map m on Cora.
+Cora Citeseer Deezer Actor
+Input GraphLayer 1Layer 2
+Figure 7: Visualization for input graph structures and latent graph structures (given by two layers of
+NODE FORMER ) with colors reflecting the weights.
+25
+
+[PDF PAGE 26]
+F Current Limitations, Outlooks and Potential Impacts
+Current Limitations. In the present work, we focus on node classification for experiments, though
+NODE FORMER can be used as a flexible (graph) encoder for other graph-related problems such as
+graph classification, link prediction, etc. Beyond testing accuracy, social aspects like robustness and
+explainability can also be considered as the target for future works on top of NODE FORMER .
+Potential Impact. Besides facilitating better node representations via message passing, graph
+structure learning also plays as key components in many other perpendicular problems in graph
+learning community, like explainability [47], knowledge transfer and distillation [45], adversarial
+robustness [50], training acceleration [34], handling feature extrapolation [40] and cold-start users in
+recommendation [41]. NODE FORMER can serve as a plug-in scalable structure learning encoder for
+uncovering underlying dependence, identifying novel structures and purifying noisy data in practical
+systems. Another promising direction is to leverage our kernelized Gumbel-Softmax operator as a
+plug-in module for designing efficient and expressive Transformers on graph data where the large
+graph size plays a critical performance bottleneck.
+26

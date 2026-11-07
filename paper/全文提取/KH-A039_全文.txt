@@ -1,0 +1,668 @@
+KH-A039 | Rethinking ImageNet Pre-training
+来源：https://arxiv.org/abs/1811.08883
+本地PDF：专题文献/何恺明/KH-A039_Rethinking_ImageNet_Pre_training_ICCV2019.pdf
+SHA-256：dbf0f88a9b169e93e7b3336d8737cbb5cda58251e1532b0ab418411089fae69d
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                          Rethinking ImageNet Pre-training
+
+
+                              Kaiming He   Ross Girshick   Piotr Doll´ar
+
+                                     Facebook AI Research (FAIR)
+
+
+                        Abstract                                                    bbox AP: R50-FPN, GN
+                                                                                   45
+
+         We report competitive results on object detection and in-        40
+         stance segmentation on the COCO dataset using standard2018                                                                            35
+        models trained from random initialization.  The results
+         are no worse than their ImageNet pre-training counterparts        30
+         even when using the hyper-parameters of the baseline sys-Nov                                                                            25
+        tem (Mask R-CNN) that were optimized for ﬁne-tuning pre-                                         typical
+21   trained models, with the sole exception of increasing the        20                           fine-tuningschedule        number of training iterations so the randomly initialized
+                                                                                   15
+        models may converge. Training from random initialization
+            is surprisingly robust; our results hold even when:  (i) us-        10
+         ing only 10% of the training data, (ii) for deeper and wider                                                                                    5                                  random init
+         models, and (iii) for multiple tasks and metrics.  Experi-                                              w/ pre-train
+        ments show that ImageNet pre-training speeds up conver-         0
+                                                                                     0         1         2         3         4         5[cs.CV]   gence early in training, but does not necessarily provide                                            iterations (105)
+          regularization or improve ﬁnal target task accuracy.  To
+                                                                            Figure 1. We train Mask R-CNN [13] with a ResNet-50 FPN [26]
+        push the envelope we demonstrate 50.9 AP on COCO ob-
+                                                                     and GroupNorm [48] backbone on the COCO train2017 set
+           ject detection without using any external data—a result on                                                                     and evaluate bounding box AP on the val2017 set, initializing
+        par with the top COCO 2017 competition results that used                                                                                  the model by random weights or ImageNet pre-training. We ex-
+        ImageNet pre-training.  These observations challenge the      plore different training schedules by varying the iterations at which
+         conventional wisdom of ImageNet pre-training for depen-      the learning rate is reduced (where the accuracy leaps). The model
+         dent tasks and we expect these discoveries will encourage      trained from random initialization needs more iterations to con-
+         people to rethink the current de facto paradigm of ‘pre-      verge, but converges to a solution that is no worse than the ﬁne-
+          training and ﬁne-tuning’ in computer vision.                     tuning counterpart. Table 1 shows the resulting AP numbers.
+
+
+                                                                    experiments is mixed: although improvements have been
+         1. Introduction                                                                      observed, for object detection in particular they are small
+          Deep convolutional neural networks [21, 23] revolution-     and scale poorly with the pre-training dataset size. That this
+                                                                     path will ‘solve’ computer vision is open to doubt.arXiv:1811.08883v1   ized computer vision arguably due to the discovery that fea-
+          ture representations learned on a pre-training task can trans-        This paper questions the paradigm of pre-training even
+           fer useful information to target tasks [9, 6, 50]. In recent      further by exploring the opposite regime: we report that
+          years, a well-established paradigm has been to pre-train     competitive object detection and instance segmentation ac-
+        models using large-scale data (e.g., ImageNet [39]) and then     curacy is achievable when training on COCO from random
+          to ﬁne-tune the models on target tasks that often have less      initialization (‘from scratch’), without any pre-training.
+          training data.  Pre-training has enabled state-of-the-art re-    More surprisingly, we can achieve these results by using
+           sults on many tasks, including object detection [9, 8, 36],     baseline systems [8, 36, 26, 13] and their hyper-parameters
+        image segmentation [29, 13], and action recognition [42, 4].      that were optimized for ﬁne-tuning pre-trained models. We
+       A path to ‘solving’ computer vision then appears to be    ﬁnd that there is no fundamental obstacle preventing us
+        paved by pre-training a ‘universal’ feature representation     from training from scratch,  if:  (i) we use normalization
+        on ImageNet-like data at massive scale [44, 30]. Attempts     techniques appropriately for optimization, and (ii) we train
+         along this path have pushed the frontier to up to 3000×      the models sufﬁciently long to compensate for the lack of
+         [30] the size of ImageNet. However, the success of these      pre-training (Figure 1).
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+  We show that training from random initialization on     2. Related Work
+COCO can be on par with its ImageNet pre-training coun-
+terparts for a variety of baselines that cover Average Preci-     Pre-training and ﬁne-tuning. The initial breakthrough of
+sion (AP, in percentage) from 40 to over 50. Further, we ﬁnd     applying deep learning to object detection (e.g., R-CNN
+that such comparability holds even if we train with as little      [9] and OverFeat [40]) were achieved by ﬁne-tuning net-
+as 10% COCO training data. We also ﬁnd that we can train     works that were pre-trained for ImageNet classiﬁcation.
+large models from scratch—up to 4× larger than a ResNet-     Following these results, most modern object detectors and
+101 [17]—without overﬁtting. Based on these experiments    many other computer vision algorithms employ the ‘pre-
+and others, we observe the following:                            training and ﬁne-tuning’ paradigm.  Recent work pushes
+                                                                        this paradigm further by pre-training on datasets that are    (i) ImageNet pre-training speeds up convergence, espe-
+                                         6× (ImageNet-5k [14]), 300× (JFT [44]), and even 3000×cially early on in training, but training from random ini-
+                                                            (Instagram [30]) larger than ImageNet. While this body oftialization can catch up after training for a duration that is
+                                                   work demonstrates signiﬁcant improvements on image clas-roughly comparable to the total ImageNet pre-training plus
+                                                                siﬁcation transfer learning tasks, the improvements on ob-ﬁne-tuning computation—it has to learn the low-/mid-level
+                                                                        ject detection are relatively small (on the scale of +1.5 APfeatures (such as edges, textures) that are otherwise given by
+                                                    on COCO with 3000× larger pre-training data [30]). Thepre-training. As the cost of ImageNet pre-training is often
+                                                           marginal beneﬁt from the kind of large-scale pre-trainingignored when studying the target task, ‘controlled’ compar-
+                                                              data used to date diminishes rapidly.isons with a short training schedule can veil the true behav-
+ior of training from random initialization.
+    (ii) ImageNet pre-training does not automatically give
+                                                          Detection from scratch. Before the prevalence of the ‘pre-
+better  regularization.   When  training with fewer im-
+                                                                   training and ﬁne-tuning’ paradigm, object detectors were
+ages (down to 10% of COCO), we ﬁnd that new hyper-
+                                                                 trained with no pre-training (e.g., [31, 38, 45])—a fact that
+parameters must be selected for ﬁne-tuning (from pre-
+                                                                              is somewhat overlooked today. In fact, it should not be sur-
+training) to avoid overﬁtting.  Then, when training from
+                                                                prising that object detectors can be trained from scratch.
+random initialization using these same hyper-parameters,
+the model can match the pre-training accuracy without any       Given the success of pre-training in the R-CNN paper
+extra regularization, even with only 10% COCO data.             [9], later analysis [1] found that pre-training plays an impor-
+                                                                     tant role in detector accuracy when training data is limited,    (iii) ImageNet pre-training shows no beneﬁt when the
+                                                              but also illustrated that training from scratch on more detec-target tasks/metrics are more sensitive to spatially well-
+                                                                   tion data is possible and can achieve 90% of the ﬁne-tuninglocalized predictions. We observe a noticeable AP improve-
+                                                               accuracy, foreshadowing our results.ment for high box overlap thresholds when training from
+scratch; we also ﬁnd that keypoint AP, which requires ﬁne      As modern object detectors [9, 15, 8, 36, 35, 28, 26, 13]
+spatial localization, converges relatively faster from scratch.     evolved under the pre-training paradigm, the belief that
+Intuitively, the task gap between the classiﬁcation-based,      training from scratch is non-trivial became conventional
+ImageNet-like pre-training and localization-sensitive target     wisdom. Shen et al. [41] argued for a set of new design
+tasks may limit the beneﬁts of pre-training.                      principles to obtain a detector that is optimized for the ac-
+                                                           curacy when trained from scratch. They designed a special-  Given the current literature, these results are surprising
+                                                              ized detector driven by deeply supervised networks [24] andand challenge our understanding of the effects of ImageNet
+                                                         dense connections [18]. DetNet [25] and CornerNet [22]pre-training.  These observations hint that ImageNet pre-
+                                                                also present results when training detectors from scratch.training is a historical workaround (and will likely be so for
+                                                              Similar to [41], these works [25, 22] focus on designingsome time) for when the community does not have enough
+                                                               detection-speciﬁc architectures. However, in [41, 25, 22]target data or computational resources to make training on
+                                                                there is little evidence that these specialized architecturesthe target task doable.  In addition, ImageNet has been
+                                                            are required for models to be trained from scratch.largely thought of as a ‘free’ resource, thanks to the readily
+conducted annotation efforts and wide availability of pre-        Unlike these papers, our focus is on understanding the
+trained models. But looking forward, when the community      role of ImageNet pre-training on unspecialized architec-
+will proceed with more data and faster computation, our      tures (i.e., models that were originally designed without the
+study suggests that collecting data and training on the tar-     consideration for training from scratch). Our work demon-
+get tasks is a solution worth considering, especially when      strates that it is often possible to match ﬁne-tuning accuracy
+there is a signiﬁcant gap between the source pre-training    when training from scratch even without making any archi-
+task and the target task. This paper provides new experi-      tectural specializations. Our study is on the comparison be-
+mental evidence and discussions for people to rethink the     tween ‘with vs. without pre-training’, under controlled set-
+ImageNet-like pre-training paradigm in computer vision.        tings in which the architectures are not tailored.
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+3. Methodology                                                         images                                         131.0M
+                                                                                          8.6M
+  Our  goal  is  to  ablate  the  role  of ImageNet  pre-                                                             149.1M
+training via controlled experiments that can be done without        instances                     62.8M
+ImageNet pre-training. Given this goal, architectural im-
+provements are not our purpose; actually, to better under-             pixels                                                                 9.5T
+                                                                                                                                                             9.2T
+stand what impact ImageNet pre-training can make,  it is                    ImageNet pre-train               COCO fine-tune
+desired to enable typical architectures to be trained from                    1.28M im × 100 ep                    115k im × 24 ep
+scratch under minimal modiﬁcations. We describe the only               COCO115k imfrom× 72randomep      init
+two modiﬁcations that we ﬁnd to be necessary, related to                                                                  Figure 2. Total numbers of images, instances, and pixels seen dur-
+model normalization and training length, discussed next.         ing all training iterations, for pre-training + ﬁne-tuning (green
+                                                                        bars) vs. from random initialization (purple bars). We consider
+3.1. Normalization                                                                             that pre-training takes 100 epochs in ImageNet, and ﬁne-tuning
+                                                                  adopts the 2× schedule (∼24 epochs over COCO) and random ini-  Image classiﬁer training requires normalization to help
+                                                                               tialization adopts the 6× schedule (∼72 epochs over COCO). Weoptimization.  Successful forms of normalization include
+                                                                 count instances in ImageNet as 1 per image (vs. ∼7 in COCO), and
+normalized parameter initialization [11, 16] and activation
+                                                                         pixels in ImageNet as 224×224 and COCO as 800×1333.
+normalization layers [20, 2, 46, 48]. When training object
+detectors from scratch, they face issues similar to training
+                                                      one can draw incomplete or incorrect conclusions about theimage classiﬁers from scratch [11, 16, 20]. Overlooking the
+                                                                   true capability of models that are trained from scratch.role of normalization can give the misperception that detec-
+tors are hard to train from scratch.                                Typical ImageNet pre-training involves over one million
+                                                       images iterated for one hundred epochs. In addition to any   Batch Normalization (BN) [20], the popular normaliza-
+                                                          semantic information learned from this large-scale data, thetion method used to train modern networks, partially makes
+                                                                  pre-training model has also learned low-level features (e.g.,training detectors from scratch difﬁcult.  Object detectors
+                                                              edges, textures) that do not need to be re-learned duringare typically trained with high resolution inputs, unlike im-
+                                                              ﬁne-tuning.1 On the other hand, when training from scratchage classiﬁers. This reduces batch sizes as constrained by
+                                                                the model has to learn low- and high-level semantics, somemory, and small batch sizes severely degrade the accu-
+                                                   more iterations may be necessary for it to converge well.racy of BN [19, 34, 48]. This issue can be circumvented if
+pre-training is used, because ﬁne-tuning can adopt the pre-       With this motivation, we argue that models trained from
+training batch statistics as ﬁxed parameters [17]; however,      scratch must be trained for longer than typical ﬁne-tuning
+freezing BN is invalid when training from scratch.              schedules. Actually, this is a fairer comparison in term of
+  We investigate two normalization strategies in recent      the number of training samples provided. We consider three
+works that help relieve the small batch issue:                 rough deﬁnitions of ‘samples’—the number of images, in-
+                                                                  stances, and pixels that have been seen during all training
+  (i) Group Normalization (GN) [48]:  as a recently pro-
+                                                                      iterations (e.g., one image for 100 epochs is counted as 100
+    posed alternative to BN, GN performs computation
+                                                             image-level samples). We plot the comparisons on the num-
+     that is independent of the batch dimension. GN’s ac-
+                                                              bers of samples in Figure 2.
+     curacy is insensitive to batch sizes [48].
+                                                              Figure 2 shows a from-scratch case trained for 3 times
+ (ii) Synchronized Batch Normalization (SyncBN) [34, 27]:    more iterations than its ﬁne-tuning counterpart on COCO.
+      this is an implementation of BN [20] with batch statis-     Despite using more iterations on COCO, if counting image-
+      tics computed across multiple devices (GPUs). This      level samples, the from-scratch case still sees considerably
+     increases the effective batch size for BN when using     fewer samples than its ﬁne-tuning counterpart—the 1.28
+    many GPUs, which avoids small batches.                  million ImageNet images for 100 epochs dominate. Actu-
+                                                                             ally, the sample numbers only get closer if we count pixel-
+Our experiments show that both GN and SyncBN can en-
+                                                                     level samples (Figure 2, bottom)—a consequence of object
+able detection models to train from scratch.
+                                                                 detectors using higher-resolution images. Our experiments
+  We also report that using appropriately normalized ini-
+                                                  show that under the schedules in Figure 2, the from-scratch
+tialization [16], we can train object detectors with VGG
+                                                                 detectors can catch up with their ﬁne-tuning counterparts.
+nets [43] from random initialization without BN or GN.
+                                                          This suggests that a sufﬁciently large number of total sam-
+3.2. Convergence                                             ples (arguably in terms of pixels) are required for the models
+                                                                 trained from random initialization to converge well.
+    It is unrealistic and unfair to expect models trained from
+random initialization to converge similarly fast as those ini-          1In fact, it is common practice [8, 36] to freeze the convolutional ﬁlters
+tialized from ImageNet pre-training. Overlooking this fact       in the ﬁrst few layers when ﬁne-tuning.
+
+
+                                                 3
+
+======================== PDF 第 4 页 ========================
+4. Experimental Settings                                                       bbox AP: R101-FPN, GN
+                                                                        45
+  We pursue minimal changes made to baseline systems
+                                                                        40
+for pinpointing the keys to enabling training from scratch.
+Overall, our baselines and hyper-parameters follow Mask        35
+R-CNN [13] in the publicly available code of Detectron
+                                                                        30
+[10], except we use normalization and vary the number of
+training iterations. The implementation is as follows.               25
+
+Architecture. We  investigate Mask R-CNN  [13] with        20
+ResNet [17] or ResNeXt [49] plus Feature Pyramid Net-        15
+work (FPN) [26] backbones.  We adopt the end-to-end
+fashion [37] of training Region Proposal Networks (RPN)        10
+jointly with Mask R-CNN. GN/SyncBN is used to replace         5                                  random init
+all ‘frozen BN’ (channel-wise afﬁne) layers. For fair com-                                              w/ pre-train
+parisons, in this paper the ﬁne-tuned models (with pre-         0 0         1         2         3         4         5
+training) are also tuned with GN or SyncBN, rather than                                            iterations (105)
+freezing them. They have higher accuracy than the frozen                                                                  Figure 3. Learning curves of APbbox on COCO val2017 using
+ones [34, 27, 48].                                                    Mask R-CNN with R101-FPN and GN. Table 1 shows the result-
+                                                                    ing AP numbers.Learning rate scheduling. Original Mask R-CNN mod-
+els in Detectron [10] were ﬁne-tuned with 90k iterations
+(namely, ‘1× schedule’) or 180k iterations (‘2× schedule’).                         bbox AP: R50-FPN, SyncBN
+                                                                        45
+For models in this paper, we investigate longer training and
+we use similar terminology, e.g., a so-called ‘6× schedule’        40
+has 540k iterations. Following the strategy in the 2× sched-                                                                        35
+ule, we always reduce the learning rate by 10× in the last
+60k and last 20k iterations respectively, no matter how many        30
+total iterations (i.e., the reduced learning rates are always        25
+run for the same number of iterations). We ﬁnd that training
+longer for the ﬁrst (large) learning rate is useful, but training        20
+for longer on small learning rates often leads to overﬁtting.        15
+
+Hyper-parameters. All  other  hyper-parameters  follow        10
+those in Detectron [10]. Specially, the initial learning rate
+                                                                         5                                  random init
+is 0.02 (with a linear warm-up [12]). The weight decay is                                                                                                    w/ pre-train
+0.0001 and momentum is 0.9. All models are trained in 8         0
+GPUs using synchronized SGD, with a mini-batch size of 2          0         1         2         3         4         5                                                                                                                               iterations (105)
+images per GPU.
+                                                                  Figure 4. Learning curves of APbbox on COCO val2017 using  By default Mask R-CNN in Detectron uses no data aug-
+                                                    Mask R-CNN with R50-FPN and SyncBN [34, 27] (that synchro-mentation for testing, and only horizontal ﬂipping augmen-
+                                                                      nizes batch statistics across GPUs). The results of the 6× schedule
+tation for training. We use the same settings. Also, unless
+                                                                       are 39.3 (random initialization) and 39.0 (pre-training).
+noted, the image scale is 800 pixels for the shorter side.
+
+5. Results and Analysis                                Baselines with GN and SyncBN. The validation bbox AP
+                                                            curves are shown in Figures 1 and 3 when using GN for
+5.1. Training from scratch to match accuracy
+                                                       ResNet-50 (R50) and ResNet-101 (R101) backbones and in
+  Our ﬁrst surprising discovery is that when only using the     Figure 4 when using SyncBN for R50. For each ﬁgure, we
+COCO data, models trained from scratch can catch up in     compare the curves between models trained from random
+accuracy with ones that are ﬁne-tuned.                             initialization vs. ﬁne-tuned with ImageNet pre-training.
+   In this subsection, we train the models on the COCO     We study ﬁve different schedules for each case, namely,
+train2017 split that has ∼118k (118,287) images, and    2× to 6× iterations (Sec. 4). Note that we overlay the ﬁve
+evaluate in the 5k COCO val2017 split. We evaluate     schedules of one model in the same plot. The leaps in the
+bounding box (bbox) Average Precision (AP) for object de-    AP curves are a consequence of reducing learning rates, il-
+tection and mask AP for instance segmentation.                  lustrating the results of different schedules.
+
+
+                                                 4
+
+======================== PDF 第 5 页 ========================
+         schedule      2×  3×  4×  5×  6×
+                                                                                            50   bbox AP, random init
+          random init   36.8   39.5   40.6   40.7   41.3                   bbox AP, w/ pre-train                                       48.648.3
+    R50                                                                                48   mask AP, random init
+          w/ pre-train   40.3   40.8   40.9   40.9   41.1                                                                               mask AP, w/ pre-train                    45.946.0                                                                                            46
+          random init   38.2   41.0   41.8   42.2   42.7
+   R101                                                                               44                        43.343.4
+          w/ pre-train   41.8   42.3   42.3   41.9   42.2
+                                                                                            42   41.341.1                                                            41.640.9
+Table 1. Object detection APbbox on COCO val2017 of training         40                              38.538.2            39.439.1
+schedules from 2× (180k iterations) to 6× (540k iterations). The         38          36.636.4
+model is Mask R-CNN with FPN and GN (Figures 1 and 3).                36
+
+                                                                                            34
+                   APbbox APbbox50   APbbox75   APmask APmask50   APmask75          32
+      random init  41.3   61.8   45.6   36.6   59.0   38.9         30                        aug              aug              aug                                                                                                                  baseline                train         +train                                                                                               +train/test R50 w/ pre-train  41.1   61.7   44.6   36.4   58.5   38.7         R50                                                                                                                                  cascade                                                                                                                                                   cascade
+     △      +0.2   +0.1   +1.0   +0.2   +0.5   +0.2
+      random init  42.7   62.9   47.0   37.6   59.9   39.7         50   bbox AP, random init                                       49.849.5
+                                                                                       bbox AP, w/ pre-train
+R101 w/ pre-train  42.3   62.6   46.2   37.2   59.7   39.7         48   mask AP, random init                   47.447.1
+                                                                               mask AP, w/ pre-train
+     △      +0.4   +0.3   +0.8   +0.4   +0.2    0.0          46                       45.0
+                                                                                                                           44.5
+                                                                                            44
+                                                                                                    42.7
+Table 2. Training from random initialization vs. with ImageNet                                                                                                       42.3                                                            42.541.9                                                                                            42
+                                                                                                                                                      40.0pre-training (Mask R-CNN with FPN and GN, Figures 1, 3), eval-         40                              39.539.3            40.5
+uated on COCO val2017. For each model, we show its results
+                                                                                            38          37.637.2corresponding to the schedule (2 to 6×) that gives the best APbbox.
+                                                                                            36
+
+                                                                                            34
+
+   Similar phenomena, summarized below, are consistently         32
+present in Figures 1, 3, and 4:                                                  30                        aug              aug              aug                                                                                                                  baseline                train         +train                                                                                 R101                                                                                               +train/test                                                                                                                                  cascade(i) Typical ﬁne-tuning schedules (2×) work well for the                                                              cascade
+models with pre-training to converge to near optimum (see      Figure 5. Comparisons between from random initialization vs.
+also Table 1, ‘w/ pre-train’). But these schedules are not     with pre-training on various systems using Mask R-CNN, includ-
+enough for models trained from scratch, and they appear to      ing: (i) baselines using FPN and GN, (ii) baselines with training-
+                                                                 time multi-scale augmentation,  (iii) baselines with Cascade R-be inferior if they are only trained for a short period.
+                                         CNN [3] and training-time augmentation, and (iv) plus test-time
+(ii) Models trained from scratch can catch up with their      multi-scale augmentation. Top: R50; Bottom: R101.
+ﬁne-tuning counterparts, if a 5× or 6× schedule is used—
+actually, when they converge to an optimum, their detection    Enhanced baselines. The phenomenon that training with
+AP is no worse than their ﬁne-tuning counterparts.            and without pre-training can be comparable is also observed
+                                                                   in various enhanced baselines, as compared in Figure 5. We   In the standard COCO  training  set, ImageNet pre-
+                                                                 ablate the experiments as follows:training mainly helps to speed up convergence on the target
+task early on in training, but shows little or no evidence of                                                      – Training-time scale augmentation: Thus far all mod-
+improving the ﬁnal detection accuracy.                                                                      els are trained with no data augmentation except horizontal
+                                                              ﬂipping. Next we use the simple training-time scale aug-
+Multiple detection metrics. In Table 2 we further com-                                                          mentation implemented in Detectron: the shorter side of im-
+pare different detection metrics between models trained                                                          ages is randomly sampled from [640, 800] pixels. Stronger
+from scratch and with pre-training, including box-level                                                              data augmentation requires more iterations to converge, so
+and  segmentation-level AP  of Mask R-CNN,  under                                             we increase the schedule to 9× when training from scratch,
+Intersection-over-Union (IoU) thresholds of 0.5 (AP50) and                                                      and to 6× when from ImageNet pre-training.
+0.75 (AP75).
+                                                              Figure 5 (‘train aug’) shows that in this case models
+   Table 2 reveals that models trained from scratch and with
+                                                                 trained with and without ImageNet pre-training are  still
+pre-training have similar AP metrics under various criteria,
+                                                          comparable. Actually, stronger data augmentation relieves
+suggesting that the models trained from scratch catch up not
+                                                                the problem of insufﬁcient data, so we may expect that mod-
+only by chance for a single metric.
+                                                                      els with pre-training have less of an advantage in this case.
+   Moreover, for the APbbox75  metric (using a high overlap
+threshold), training from scratch is better than ﬁne-tuning       – Cascade R-CNN [3]: as a method focusing on improv-
+by noticeable margins (1.0 or 0.8 AP).                         ing localization accuracy, Cascade R-CNN appends two ex-
+
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+tra stages to the standard two-stage Faster R-CNN system.                        APbbox APbbox50  APbbox75  APmask APmask50  APmask75
+We implement its Mask R-CNN version by simply adding      R101 w/ train aug  45.0   65.7   49.3   39.5   62.5   42.1
+a mask head to the last stage. To save running time for the      X152 w/ train aug  46.4   67.1   51.1   40.5   63.9   43.4
+from-scratch models, we train Mask R-CNN from scratch         + cascade    48.6   66.8   52.9   41.4   64.2   44.6
+without cascade, and switch to cascade in the ﬁnal 270k it-         + test aug    50.9   68.7   55.4   43.2   66.1   46.8
+erations, noting that this does not alter the fact that the ﬁnal      Table 3. Mask R-CNN with ResNeXt-152 trained from random
+model uses no ImageNet pre-training. We train Cascade R-       initialization (w/ FPN and GN), evaluated on COCO val2017.
+CNN under the scale augmentation setting.
+                                                                                                     keypoint AP: R50-FPN GN
+   Figure 5 (‘cascade +  train aug’) again shows  that         70                         Figure 6. Keypoint detection on
+Cascade R-CNN models have similar AP numbers with         60                COCO using Mask R-CNN with
+                                                                           R50-FPN and GN. We show key-and without ImageNet pre-training.   Supervision about
+                                                                                            50                           point AP on COCO val2017.localization is mainly provided by the target dataset and
+                                                                                   ImageNet  pre-training  has   little
+is not  explicitly available from the classiﬁcation-based         40                          beneﬁt, and training from random
+ImageNet pre-training. Thus we do not expect ImageNet                                                                                                                 initialization can quickly catch up
+pre-training to provide additional beneﬁts in this setting.             30                          without  increasing  training  itera-
+                                                                                                                tions. We only need to use 2× and  – Test-time augmentation: thus far we have used no test-         20
+                                                               3× schedules, unlike the object de-
+time augmentation. Next we further perform test-time aug-
+                                                                                            10              random init   tection case. The result is 65.6 vs.
+mentation by combining the predictions from multiple scal-                         w/ pre-train   65.5 (random initialization vs. pre-
+ing transformations, as implemented in Detectron [10].                0 0         1         2         3  training) with 2× schedules.
+   Again, the models trained from scratch are no worse than                            iterations (105)
+their pre-training counterparts.  Actually, models trained
+                                                     Keypoint detection. We also train Mask R-CNN for the
+from scratch are even slightly better in this case—for ex-
+                                     COCO human keypoint detection task. The results are in
+ample, mask AP is 41.6 (from scratch) vs. 40.9 for R50,
+                                                            Figure 6. In this case, the model trained from scratch can
+and 42.5 vs. 41.9 for R101.
+                                                              catch up more quickly, and even when not increasing train-
+                                                             ing iterations, it is comparable with its counterpart that usesLarge models trained from scratch. We have also trained
+                                                     ImageNet pre-training. Keypoint detection is a task morea signiﬁcantly larger Mask R-CNN model from scratch us-
+                                                                    sensitive to ﬁne spatial localization. Our experiment sug-ing a ResNeXt-152 8×32d [49] (in short ‘X152’) backbone
+                                                                 gests that ImageNet pre-training, which has little explicitwith GN. The results are in Table 3.
+                                                                   localization information, does not help keypoint detection.
+   This backbone has ∼4× more FLOPs than R101. De-
+spite being substantially larger, this model shows no notice-    Models without BN/GN — VGG nets. Thus far all of our
+able overﬁtting.  It achieves good results of 50.9 bbox AP     experiments involve ResNet-based models, which require
+and 43.2 mask AP in val2017 when trained from random    some form of activation normalization (e.g., BN or GN).
+initialization. We submitted this model to COCO 2018     Shallower models like VGG-16 [43] can be trained from
+competition, and it has 51.3 bbox AP and 43.6 mask AP      scratch without activation normalization as long as a proper
+in the test-challenge set. Our bbox AP is at the level      initialization normalization is used [16]. Our next experi-
+of the COCO 2017 winners (50.5 bbox AP, [34]), and is by     ment tests the generality of our observations by exploring
+far the highest number of its kind (single model, without      the behavior of training Faster R-CNN from scratch using
+ImageNet pre-training).                            VGG-16 as the backbone.
+  We have trained the same model with ImageNet pre-     We implement the model following the original Faster
+training.  It has bbox/mask AP of 50.3/42.5 in val2017    R-CNN paper [37] and its VGG-16 architecture; no FPN is
+(vs. from-scratch’s 50.9/43.2).  Interestingly, even for this     used. We adopt standard hyper-parameters with a learning
+large model, pre-training does not improve results.               rate of 0.02, learning rate decay factor of 0.1, and weight
+                                                        decay of 0.0001. We use scale augmentation during train-
+vs. previous from-scratch results. DSOD [41] reported      ing.  Following previous experiments, we use the exact
+29.3 bbox AP by using an architecture specially tailored for    same hyper-parameters when ﬁne-tuning and training from
+results of training from scratch. A recent work of CornerNet      scratch. When randomly initializing the model, we use the
+[22] reported 42.1 bbox AP (w/ multi-scale augmentation)    same MSRA initialization [16] for ImageNet pre-training
+using no ImageNet pre-training. Our results, of various ver-     and for COCO from scratch.
+sions, are higher than previous ones. Again, we emphasize       The baseline model with pre-training is able to reach a
+that previous works [41, 22] reported no evidence that mod-     maximal bbox AP of 35.6 after an extremely long 9× train-
+els without ImageNet pre-training can be comparably good     ing schedule (training for longer leads to a slight degra-
+as their ImageNet pre-training counterparts.                    dation in AP). Here we note that even with pre-training,
+
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+       bbox AP: 35k training images                        bbox AP: 35k training images                                     bbox AP: 10k training images
+  45                                    45                                                               45
+
+
+  40                                    40                                                               40
+                                                                     36.1                                       36.3
+  35                                    35                                                               35
+
+
+  30                                    30                                                               30
+                                                                                                                                         26.0                                           25.9
+  25                                    25                                                               25
+
+
+  20                                    20                                                               20
+
+
+  15                                    15                                                               15
+
+
+  10                                    10                                                               10
+
+   5                                     5                                  random init      5                                  random init
+                   w/ pre-train                                            w/ pre-train                                            w/ pre-train
+   0                                     0                                                                0
+    0         1         2         3      0         1         2         3         4         5            0             0.5           1             1.5           2
+                   iterations (105)                                                  iterations (105)                                                                    iterations (105)
+
+Figure 7. Training with fewer COCO images (left/middle: 35k; right: 10k). The model is Mask R-CNN with R50-FPN and GN,
+evaluated by bbox AP in val2017. Left: training with 35k COCO images, using the default hyper-parameters that were chosen for
+the 118k train2017. It shows overﬁtting before and after the learning rate changes. Middle: training with 35k COCO images, using
+hyper-parameters optimized for ‘w/ pre-train’ (the same hyper-parameters are then applied to the model from random initialization). Right:
+training with 10k COCO images, using hyper-parameters optimized for ‘w/ pre-training’.
+
+
+full convergence for VGG-16 is slow. The model trained       Then we train our model from scratch using the exact
+from scratch reaches a similar level of performance with a    same new hyper-parameters that are chosen for the pre-
+maximal bbox AP of 35.2 after an 11× schedule (training      training case. This obviously biases results in favor of the
+for longer resulted in a lower AP, too). These results indi-      pre-training model.  Nevertheless, the model trained from
+cate that our methodology of ‘making minimal/no changes’      scratch has 36.3 AP and catches up with its pre-training
+(Sec. 3) but adopting good optimization strategies and train-     counterpart (Figure 7, middle), despite less data.
+ing for longer are sufﬁcient for training comparably perfor-
+mant detectors on COCO, compared to the standard ‘pre-    10k COCO training images. We repeat the same set of
+training and ﬁne-tuning’ paradigm.                           experiments on a smaller training set of 10k COCO images
+                                                                                      (i.e., less than 1/10th of the full COCO set).  Again, we
+5.2. Training from scratch with less data               perform grid search for hyper-parameters on the models that
+                                                          use ImageNet pre-training, and apply them to the models
+  Our second discovery, which is even more surprising,                                                                 trained from scratch. We shorten the training schedules in
+is that with substantially less data (e.g., ∼1/10 of COCO),                                                                        this small training set (noted by x-axis, Figure 7, right).
+models trained from scratch are no worse than their coun-
+                                                    The model with pre-training reaches 26.0 AP with 60k
+terparts that are pre-trained.
+                                                                        iterations, but has a slight degradation when training more.
+                                                  The counterpart model trained from scratch has 25.9 AP at35k COCO training images. We start our next investiga-
+                                                    220k iterations, which is comparably accurate.tion with ∼1/3 of COCO training data (35k images from
+train2017, equivalent to the older val35k). We train
+                                                Breakdown regime: 1k COCO training images. That
+models with or without ImageNet pre-training on this set.
+                                                                   training from scratch in 10k images is comparably accurate
+   Figure 7 (left) is the result using ImageNet pre-training                                                                              is surprising. But it is not reasonable to expect this trend
+under the hyper-parameters of Mask R-CNN that were cho-                                                                   will last for arbitrarily small target data, as we report next.
+sen for the 118k COCO set. These hyper-parameters are
+                                                                 In Figure 8 we repeat the same set of experiments
+not optimal, and the model suffers from overﬁtting even
+                                                            using only 1k COCO training images (∼1/100th of full
+with ImageNet pre-training. It suggests that ImageNet pre-
+                                           COCO, again optimizing hyper-parameters for the pre-
+training does not automatically help reduce overﬁtting.
+                                                                   training case) and show the training loss. In terms of opti-
+  To obtain a healthy baseline, we redo grid search for                                                            mization (i.e., reducing training loss), training from scratch
+hyper-parameters on the models that are with ImageNet pre-                                                                              is still no worse but only converges more slowly, as seen
+training.2 The gray curve in Figure 7 (middle) shows the                                                                 previously.  However, in this case, the training loss does
+results. It has optimally 36.3 AP with a 6× schedule.                                                             not translate into a good validation AP: the model with
+                                                     ImageNet pre-training has 9.9 AP vs. the from scratch   2Our new recipe changes are: training-time scale augmentation range
+of [512, 800] (vs. baseline’s no scale augmentation), a starting learning rate     model’s 3.5 AP.  For one experiment only we also per-
+of 0.04 (vs. 0.02), and a learning rate decay factor of 0.02 (vs. 0.1).          formed a grid search to optimize the from-scratch case: the
+
+
+                                                 7
+
+======================== PDF 第 8 页 ========================
+                            Loss: 1k training images                                  - ImageNet pre-training does not necessarily help reduce
+     1.5                                  random init           overﬁtting unless we enter a very small data regime.
+                                            w/ pre-train
+                                                                                  - ImageNet pre-training helps less if the target task is
+      1                                               more sensitive to localization than classiﬁcation.
+
+     0.5                                                   Based on these observations, we provide our answers to
+                                                          a few important questions that may encourage people to re-
+      0       0               1               2               3                  think ImageNet pre-training:
+                                        iterations (104)                                 Is ImageNet pre-training necessary? No—if we have
+Figure 8. Training with 1k COCO images (shown as the loss     enough target data (and computation).  Our experiments
+in the training set). The model is Mask R-CNN with R50-FPN    show that ImageNet can help speed up convergence, but
+and GN. As before, we use hyper-parameters optimized for the     does not necessarily improve accuracy unless the target
+model with pre-training, and apply the same hyper-parameters to      dataset is too small (e.g., <10k COCO images).  It can be
+the model from random initialization. The randomly initialized                                                                 sufﬁcient to directly train on the target data if its dataset
+model can catch up for the training loss, but has lower validation
+                                                                 scale  is large enough.  Looking forward,  this suggests
+accuracy (3.4 AP) than the pre-training counterpart (9.9 AP).
+                                                                     that collecting annotations of target data (instead of pre-
+                                                                 training data) can be more useful for improving the target
+result improves to 5.4 AP, but does not catch up. This is a
+                                                                task performance.
+sign of strong overﬁtting due to the severe lack of data.
+                                                                      Is ImageNet helpful? Yes. ImageNet pre-training has
+  We also do similar experiments using 3.5k COCO train-
+                                                       been a critical auxiliary task for the computer vision com-
+ing images. The model that uses pre-training has a peak
+                                                       munity to progress. It enabled people to see signiﬁcant im-
+of 16.0 bbox AP vs. the trained from scratch counterpart’s
+                                                        provements before larger-scale data was available (e.g., in
+9.3 AP. The breakdown point in the COCO dataset is some-
+                                      VOC for a long while).  It also largely helped to circum-
+where between 3.5k to 10k training images.
+                                                             vent optimization problems in the target data (e.g., under the
+Breakdown regime: PASCAL VOC. Lastly we report the     lack of normalization/initialization methods).  Moreover,
+comparison in PASCAL VOC object detection [7]. We train     ImageNet pre-training reduces research cycles, leading to
+on the set of trainval2007+train2012, and evaluate      easier access to encouraging results—pre-trained models
+on val2012. Using ImageNet pre-training, our Faster R-      are widely and freely available today, pre-training cost does
+CNN baseline (with R101-FPN, GN, and only training-time     not need to be paid repeatedly, and ﬁne-tuning from pre-
+augmentation) has 82.7 mAP at 18k iterations. Its counter-      trained weights converges faster than from scratch. We
+part trained from scratch in VOC has 77.6 mAP at 144k      believe that these advantages will still make ImageNet un-
+iterations and does not catch up even training longer.           doubtedly helpful for computer vision research.
+   There are 15k VOC images used for training.  But      Do we need big data?   Yes.  But a generic large-
+these images have on average 2.3 instances per image (vs.      scale, classiﬁcation-level pre-training set is not ideal if we
+COCO’s ∼7) and 20 categories (vs. COCO’s 80). They are     take into account the extra effort of collecting and clean-
+not directly comparable to the same number of COCO im-     ing data—the cost of collecting ImageNet has been largely
+ages. We suspect that the fewer instances (and categories)     ignored, but the ‘pre-training’ step in the ‘pre-training +
+has a similar negative impact as insufﬁcient training data,     ﬁne-tuning’ paradigm is in fact not free when we scale out
+which can explain why training from scratch on VOC is not      this paradigm. If the gain of large-scale classiﬁcation-level
+able to catch up as observed on COCO.                          pre-training becomes exponentially diminishing [44, 30], it
+                                                    would be more effective to collect data in the target domain.
+6. Discussions                                              Shall we pursuit universal representations? Yes. We
+                                                                believe learning universal representations is a laudable goal.
+  We summarize the main observations from our experi-
+                                                  Our results do not mean deviating from this goal.  Actu-
+ments as follows:
+                                                                             ally, our study suggests that the community should be more
+    - Training from scratch on  target tasks  is possible
+                                                                 careful when evaluating pre-trained features (e.g., for self-
+without architectural changes.
+                                                             supervised learning [5, 47, 33, 32]), as now we learn that
+    - Training from scratch requires more iterations to sufﬁ-
+                                                        even random initialization could produce excellent results.
+ciently converge.
+    - Training from scratch can be no worse than  its        In closing, ImageNet and its pre-training role have been
+ImageNet pre-training counterparts under many circum-      incredibly inﬂuential in computer vision, and we hope that
+stances, down to as few as 10k COCO images.                 our new experimental evidence about ImageNet and its role
+    - ImageNet pre-training speeds up convergence on the      will shed light into potential future directions for the com-
+target task.                                              munity to move forward.
+
+
+                                                 8
+
+======================== PDF 第 9 页 ========================
+References                                                      [22] H. Law and J. Deng. CornerNet: Detecting objects as paired
+                                                                            keypoints. In ECCV, 2018. 2, 6
+ [1]  P. Agrawal, R. Girshick, and J. Malik. Analyzing the perfor-
+                                                                     [23] Y. LeCun, B. Boser,  J. S. Denker, D. Henderson, R. E.
+    mance of multilayer neural networks for object recognition.
+                                                               Howard, W. Hubbard, and L. D. Jackel.  Backpropagation
+     In ECCV, 2014. 2
+                                                                          applied to handwritten zip code recognition. Neural compu-
+ [2]  J. L. Ba, J. R. Kiros, and G. E. Hinton. Layer normalization.
+                                                                                    tation, 1989. 1
+     arXiv:1607.06450, 2016. 3
+                                                                     [24] C.-Y. Lee, S. Xie, P. Gallagher, Z. Zhang, and Z. Tu. Deeply-
+ [3] Z. Cai and N. Vasconcelos. Cascade R-CNN: Delving into
+                                                                         supervised nets. In AISTATS, 2015. 2
+     high quality object detection. In CVPR, 2018. 5
+                                                                     [25] Z.  Li,  C.  Peng,  G.  Yu,  X.  Zhang,  Y.  Deng,  and [4]  J. Carreira and A. Zisserman. Quo vadis, action recognition?
+                                                                                                 J. Sun. DetNet: A backbone network for object detection.     a new model and the kinetics dataset. In CVPR, 2017. 1
+                                                                      arXiv:1804.06215, 2018. 2 [5] C. Doersch, A. Gupta, and A. A. Efros. Unsupervised vi-
+      sual representation learning by context prediction. In ICCV,      [26] T.-Y. Lin, P. Doll´ar, R. Girshick, K. He, B. Hariharan, and
+     2015. 8                                                                S. Belongie. Feature pyramid networks for object detection.
+                                                                           In CVPR, 2017. 1, 2, 4 [6]  J. Donahue, Y.  Jia, O. Vinyals,  J. Hoffman, N. Zhang,
+     E. Tzeng, and T. Darrell. Decaf: A deep convolutional acti-      [27] S. Liu, L. Qi, H. Qin, J. Shi, and J. Jia.  Path aggregation
+     vation feature for generic visual recognition. In ICML, 2014.          network for instance segmentation. In CVPR, 2018. 3, 4
+    1                                                               [28] W. Liu, D. Anguelov, D. Erhan, C. Szegedy, S. Reed, C.-Y.
+ [7] M. Everingham, L. Van Gool, C. K. Williams, J. Winn, and           Fu, and A. C. Berg. Ssd: Single shot multibox detector. In
+     A. Zisserman.  The Pascal Visual Object Classes (VOC)        ECCV, 2016. 2
+     Challenge. IJCV, 2010. 8                                       [29]  J. Long, E. Shelhamer, and T. Darrell. Fully convolutional
+ [8] R. Girshick. Fast R-CNN. In ICCV, 2015. 1, 2, 3                    networks for semantic segmentation. In CVPR, 2015. 1
+ [9] R. Girshick, J. Donahue, T. Darrell, and J. Malik. Rich fea-      [30] D. Mahajan, R. Girshick, V. Ramanathan, K. He, M. Paluri,
+      ture hierarchies for accurate object detection and semantic           Y. Li, A. Bharambe, and L. van der Maaten. Exploring the
+     segmentation. In CVPR, 2014. 1, 2                                       limits of weakly supervised pretraining. In ECCV, 2018. 1,
+[10] R.  Girshick,   I.  Radosavovic,  G.  Gkioxari,  P.  Doll´ar,             2, 8
+     and K. He.    Detectron.   https://github.com/      [31] O. Matan, C. J. Burges, Y. LeCun, and J. S. Denker. Multi-
+    facebookresearch/detectron, 2018. 4, 6                        digit recognition using a space displacement neural network.
+[11] X. Glorot and Y. Bengio.  Understanding the difﬁculty of           In NIPS, 1992. 2
+      training deep feedforward neural networks.  In AISTATS,                                                                     [32] D. Pathak, R. Girshick, P. Doll´ar, T. Darrell, and B. Hariha-
+     2010. 3                                                                                 ran. Learning features by watching objects move. In CVPR,
+[12]  P.  Goyal,   P.   Doll´ar,   R.  Girshick,   P.  Noordhuis,                                                                     2017. 8
+     L. Wesolowski, A. Kyrola, A. Tulloch, Y. Jia, and K. He.
+                                                                     [33] D. Pathak, P. Krahenbuhl, J. Donahue, T. Darrell, and A. A.
+     Accurate, large minibatch SGD: Training ImageNet in 1
+                                                                             Efros. Context encoders: Feature learning by inpainting. In
+     hour. arXiv:1706.02677, 2017. 4                                                         CVPR, 2016. 8
+[13] K. He, G. Gkioxari, P. Doll´ar, and R. Girshick. Mask R-
+                                                                     [34] C. Peng, T. Xiao, Z. Li, Y. Jiang, X. Zhang, K. Jia, G. Yu,
+    CNN. In ICCV, 2017. 1, 2, 4
+                                                                 and J. Sun. MegDet: A large mini-batch object detector. In
+[14] K. He, G. Gkioxari, P. Doll´ar, and R. Girshick. Mask R-
+                                                         CVPR, 2018. 3, 4, 6
+    CNN. TPAMI, 2018. 2
+                                                                     [35]  J. Redmon, S. Divvala, R. Girshick, and A. Farhadi. You
+[15] K. He, X. Zhang, S. Ren, and J. Sun. Spatial pyramid pooling
+                                                                      only look once:  Uniﬁed, real-time object detection.   In
+      in deep convolutional networks for visual recognition.  In
+                                                         CVPR, 2016. 2
+    ECCV, 2014. 2
+                                                                     [36] S. Ren, K. He, R. Girshick, and J. Sun. Faster R-CNN: To-[16] K. He, X. Zhang, S. Ren, and J. Sun.  Delving deep into
+                                                                 wards real-time object detection with region proposal net-      rectiﬁers: Surpassing human-level performance on imagenet
+                                                                     works. In NIPS, 2015. 1, 2, 3      classiﬁcation. In ICCV, 2015. 3, 6
+[17] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning      [37] S. Ren, K. He, R. Girshick, and J. Sun. Faster R-CNN: To-
+      for image recognition. In CVPR, 2016. 2, 3, 4                      wards real-time object detection with region proposal net-
+                                                                     works. TPAMI, 2017. 4, 6[18] G. Huang, Z. Liu, L. van der Maaten, and K. Q. Weinberger.
+     Densely connected convolutional networks. In CVPR, 2017.      [38] H. A. Rowley, S. Baluja, and T. Kanade. Human face detec-
+    2                                                                         tion in visual scenes. In NIPS, 1996. 2
+[19] S. Ioffe. Batch renormalization: Towards reducing minibatch      [39] O. Russakovsky, J. Deng, H. Su, J. Krause, S. Satheesh,
+     dependence in batch-normalized models. In NIPS, 2017. 3             S. Ma, Z. Huang, A. Karpathy, A. Khosla, M. Bernstein,
+[20] S. Ioffe and C. Szegedy. Batch normalization: Accelerating          A. C. Berg, and L. Fei-Fei. ImageNet Large Scale Visual
+     deep network training by reducing internal covariate shift. In           Recognition Challenge. IJCV, 2015. 1
+    ICML, 2015. 3                                                  [40]  P. Sermanet, D. Eigen, X. Zhang, M. Mathieu, R. Fergus,
+[21] A. Krizhevsky, I. Sutskever, and G. Hinton. Imagenet clas-          and Y. LeCun. Overfeat: Integrated recognition, localization
+     siﬁcation with deep convolutional neural networks. In NIPS,          and detection using convolutional networks. In ICLR, 2014.
+     2012. 1                                                   2
+
+
+                                                 9
+
+======================== PDF 第 10 页 ========================
+[41] Z. Shen, Z. Liu, J. Li, Y.-G. Jiang, Y. Chen, and X. Xue.
+    DSOD: Learning deeply supervised object detectors from
+      scratch. In ICCV, 2017. 2, 6
+[42] K. Simonyan and A. Zisserman. Two-stream convolutional
+     networks for action recognition in videos. In NIPS, 2014. 1
+[43] K. Simonyan and A. Zisserman.  Very deep convolutional
+     networks for large-scale image recognition. In ICLR, 2015.
+      3, 6
+[44] C. Sun, A. Shrivastava, S. Singh, and A. Gupta. Revisiting
+     unreasonable effectiveness of data in deep learning era. In
+    ICCV, 2017. 1, 2, 8
+[45] C. Szegedy, A. Toshev, and D. Erhan. Deep neural networks
+      for object detection. In NIPS, 2013. 2
+[46] D. Ulyanov, A. Vedaldi, and V. Lempitsky.  Instance nor-
+     malization:  The missing ingredient  for  fast  stylization.
+     arXiv:1607.08022, 2016. 3
+[47] X. Wang and A. Gupta. Unsupervised learning of visual rep-
+      resentations using videos. In ICCV, 2015. 8
+[48] Y. Wu and K. He. Group normalization. In ECCV, 2018. 1,
+      3, 4
+[49] S. Xie, R. Girshick, P. Doll´ar, Z. Tu, and K. He. Aggregated
+      residual transformations for deep neural networks. In CVPR,
+     2017. 4, 6
+[50] M. D. Zeiler and R. Fergus. Visualizing and understanding
+     convolutional neural networks. In ECCV, 2014. 1
+
+
+
+
+
+                                                 10

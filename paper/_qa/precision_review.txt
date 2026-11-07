@@ -1,0 +1,95 @@
+事实与论证精度独立复核
+复核日期：2026-11-05
+范围：paper/十组精读/01.json、02.json、portfolio_body.html。W06 的主题授权及专题更新按协调者说明处理，不重复列为问题。
+操作：读取本地原 PDF；直接渲染 W01 p16、W02 p17–18 核对数学排版；读取项目证据及固定提交；没有训练、修改研究仓库或改动被审文件。本次唯一写入文件为本报告。
+
+结论
+
+01/02 的重点数学质疑有原文依据，所核关键数值与算力口径准确；没有发现需要撤销主要研究判断的事实错误。portfolio 有一项应在实验协议落地前修正的可比性问题：GEM 与 MemEvo 的写入时信息条件不同，不宜无说明地并列成未知未来查询条件下的原生直接基线。其余两项是措辞精化，不改变结论。
+
+需修正或澄清
+
+1. [P2，实验可比性] portfolio_body.html，“第一轮实验应回答的问题”第3项。
+   当前把 GEM、MemEvo 并列为直接对照，同时要求同一查询到达时刻。GEM 原文 p8 §5.1 及 p18 Appendix B.1 的 goal protection 使用 current task；state protection 使用 current state query、artifact paths 和编辑/执行模式。它解决已知任务下 agent 历史压缩，不是直接为未知未来问题设计的流式视觉写入方法。MemEvo p1、p4 明确将 q_tau 在冻结前缀记忆之后才揭示。
+   建议改为：“MemEvo 作原生 query-agnostic 直接基线；GEM 作明确适配后的跨任务证据保护基线，写入时不得读未来查询，并单列其原任务条件结果。DeltaStreamer/FOLIO/MoM 按适用任务及其历史访问条件比较。”
+   这不是对 GEM 机制总结的否定，而是避免把任务已知与任务未知两种可见信息条件混在同一公平性主张中。主报告也已提醒相同可见信息，应把这一具体差别落实。
+
+2. [P3，避免机制误读] 01.json W02 contribution 的“可训练的静态分块稀疏 mask”。
+   p6 Eq4 是固定距离规则；p7 §4.3 学的是 Q/K/V/O 上的 LoRA 参数。建议写“可用于训练的固定分块稀疏 mask”，避免读成 mask 本身可学习。现有 mechanism 和 compute 已把真正训练对象说明清楚。
+
+3. [P3，数学措辞] 01.json W01 formulas_and_conditions 的“需要额外 majorization/位置对齐等条件”。
+   质疑本身正确，但单说“位置对齐”不是已陈述的充分条件。可改为“需补充能保证混合分布熵不升的结构条件，例如证明混合分布 majorizes 原分布；仅 H(R)≤H(P) 不够”。如果只想保留最短版本，删除这半句而保留“现有推导不足”也准确。
+
+01 组逐篇核对
+
+W01 / Neural Dynamics Self-Attention for Spiking Transformers
+- p5 Eq8：全局 Q(K^T V) 加局部支路；两条3×3 depthwise、dilation 3/5，有原文支持。
+- p6 Eq12/13：沿 token n 的递推 X_n=A⊙X_(n−1)+ΓToken_n；树突数设8。报告区分 n 与脉冲时间 t、将 LRF-Dyn 视为结构近似而非任意输入的严格等价，这一表述稳妥。
+- p8 Table1：Spikformer-8-512 为73.38；LRF-SSA74.62；LRF-Dyn74.51；29.68M→29.71M；相关存储 O(d²)→O(kd)，全吻合。
+- p8 Table2：SDT-V3小/大模型 mIoU33.6/41.3→36.3/43.1，T=4，吻合。
+- p9 Fig5正文：+1.13个百分点、内存减少49.4%；Table3 LRF-Dyn77.78→78.57，均吻合。报告没有将该内存比例扩成所有模型、整个训练峰值或能耗，口径合适。
+- p16 Eq19→Eq20：已直接看原页。Eq19 有正的二元熵 h(λ)，H(R)≤H(P) 只能得到 H(mix)≤H(P)+h(λ)，不能删掉 h(λ)。报告指出推导不足是正确的。
+  独立代数反例：P=(0.9,0.1)，R=(0,1)，λ=0.5，H(R)=0≤H(P)=0.3250829734，而H(mix)=0.6881388137。这个例子仅反驳“低熵分布混合必降低熵”这一步，不冒称满足论文所有空间条件。
+  进一步数值检查也可以保留线性递减 P 和更小平均半径：P=(5,4,3,2,1)/15；R=(5/9,10^-6,10^-6,4/9−2×10^-6,0)；λ=0.001。H(P)=1.4897503189，H(R)=0.6869895858，H(mix)=1.4897657166；μ_R=1.3333303333≤μ_P=1.3333333333。这说明较低熵和较小平均半径本身仍不足以保证混合熵下降。此项是数学检查，不是模型实验。
+
+W02 / Radial Attention
+- p6 Eq4 与报告条件一致：r=floor(log2 max(|i−j|,1))；带内条件 |k−l|+1≤s/2^r；远距同位置、按 ceil(2^r/s) 抽帧；首帧 sink 另加。
+- p6 Eq6 给4s²f log2 f上界；固定 s、增长 f 才可写 O(n log n)，报告限定正确。p8 默认前12个去噪步及第1个DiT块保留 dense；p18训练前2块 dense。报告将渐近复杂度限制为稀疏模块而非无条件完整混合系统，准确。
+- p7 Table1 + p8实施：117帧、768p、单H100，1649s→876s，1.88×；PSNR27.3、LPIPS0.114；Vision Reward0.141→0.139，准确。
+- p8 Table2：Hunyuan509帧，训练93.6h→21.4h，推理2895s→781s；4.37×/3.71×；88.3%稀疏；0.133→0.134 Vision Reward，准确。该长视频 Hunyuan/Mochi 推理用8卡；Wan推理单卡；训练均8卡，报告对 Hunyuan 的口径没有混用。
+- GPU-hours 换算：8×21.4=171.2，8×93.6=748.8，准确，且已明确是表值换算，未拿近似首页数字冒充精确值。
+- p18 LoRA：rank128；Hunyuan2×/4×为2400/1200步、global batch1；Mochi5000步、batch1；Wan2500步、batch8，准确。
+- p8 Mochi667帧：PA A.Q./I.Q.=0.633/0.650；Radial0.618/0.638；Vision Reward0.107/0.113，报告保留多指标取舍正确。
+- p17–18 A.2 已直接看原页：w(Δt)=s/2^floor(log2 max(Δt,1))；下一页确实写“Δt≤s 时 w≥s/2”。s=16、Δt=8 给w=2<8，是有效反例，不是文本提取误差。报告只断言 Eq7 当前证明不足，不宣称实现或实验失效，措辞准确。
+  原附录还把w列为{1,2,4,…,s}，但无限时间网格会使其小于1；p17保留条件缺正文Eq4的+1。这些附录不一致可留在审查记录，不必把读书报告扩成错误清单。
+
+W03 / SEER
+- p4：22,330实例、1,811病例；1,120抽查中7异常，7/1120=0.625%，四舍五入0.63%，准确。
+- p6 Table1：PENGWIN自由文本VoxTell92.26/79.34/7.49→SEER97.39/95.47/0.98；BrainMetShare52.15/46.71/3.35→53.83/51.44/1.67，准确。
+- p8 Table2：Vanilla VLM84.84/14.15，grounded fine-tune95.92/3.84，SEER97.39/0.98，准确；报告没有把该消融唯一归因到视觉grounding。
+- p8跨骨干：MedSAM3均值5.75→19.97，worst3.67→3.94，Std6.40→13.30，准确。“均值收益但稳定性不单调”正确。
+- p7 A100、Qwen3-VL-4B视觉编码器冻结其余全更新均明确；报告未擅写LoRA、卡数或GPU-hours。
+- p6 Eq6是按技能是否检索划分的条件期望差，报告不把它当随机干预因果效应，正确；81.94%未直接从主表Std还原成variance结论，谨慎且准确。
+
+02 组逐篇核对
+
+W04 / ZGCM-1
+- p4架构探针是8 H100、10B token、4096序列；SWA5:1=9566 tokens/s/GPU、tail loss1.93；MLA7645、SWA3:1 loss1.92。p5 Fig4a明确non-parameter-matched，报告准确。
+- p4–5：32层=27局部+5全局，局部窗口128，末全局层是0-indexed29；报告1-indexed6/12/18/24/30正确。
+- p5：256K相对吞吐3.94×；batch1、BF16 KV cache32.0/7.0/5.0GiB；6.4倍是KV口径，非整模型显存，报告准确。
+- p7：1.4×1.5×1.8×1.1=4.158≈4.2。原文是估计性乘积，报告保留了非完整端到端归因的边界。
+- p30 Table6：16K配置2/1/1/96→192；64K配置2/1/4/24→192；256K配置2/2/4/12→192。报告“按并行度乘积推算”用词正确，不应改成只用8卡完成基础训练。
+- p30：staged 256K loss1.16 vs direct1.19，准确。64K/256K表项是长上下文qualification配置，不宜据此倒推每个完整生命周期阶段都连续使用192卡或完整GPU-hours；现报告没有这样倒推。
+- p7：600.51B中训取自2.86T候选池；p14：256K SFT为10 epochs，正文写19.46B packed tokens。报告保留原句口径，没有自行再乘10，合适。
+- p12：SFT一般/代理row share96.46%/3.54%，准确。这里是样本行比例，不能换成训练token比例；现报告未作此转换。
+
+W05 / PromptMoE
+- p4 Eq1–5：独立normal/abnormal池，实例视觉特征经query cross-attention、平均、两层MLP logits、top-k softmax、加权prompt嵌入；balance对完整router softmax作batch均值平方；decouple对平均后归一化专家嵌入Gram矩阵惩罚，报告公式与机制吻合。
+- p5与p10：CLIP ViT-L/14@336px冻结、实际输入518²；层6/12/18/24、Nq=8、E=8、k=4、Mn=5、Ma=6、Mq=8；15epoch、batch16、Adam(0.6,0.999)、lr0.001、3epoch warmup；单NVIDIA GeForce RTX3090，准确。
+- p10：τ/τ'=0.07/0.01、sigma4、α/β=0.01/0.005，准确。
+- p6 Table1：MVTec I-AUROC93.8 vs AdaCLIP92.0/FAPrompt91.9；工业平均92.4 vs91.7；工业像素平均AUROC96.2持平、PRO89.2 vs88.0；医疗像素85.6持平、PRO68.8 vs68.2，准确。
+- p6、p12：HeadCT98.2/98.2 vs94.8/93.5，只有100正常+100异常，准确；医疗5个分割集正常数量皆0，现报告没有据此声称图像假阳性性能。
+- p10 Table5：共享prompt池91.4/83.3，共享两部分90.9/82.6，准确。专家是prompt嵌入段，非多个大型网络，报告正确。
+
+portfolio 项目与推断边界
+
+- project_inventory.json 的 repositories 实有78条。主文说元数据范围78、科研仓库进一步阅读而非全部逐行审计，范围声明准确。
+- ESN_spread：通过GitHub只读工具重新读取固定提交 c36d3b735b0f51fef4afd7b4d2a9412d5c50b93e 的 research/ROUND19_COVERAGE_EXECUTION.md。600 banks、1800 task-bank records；RPMC340/600=56.7%、CRM360/600=60.0%、RZ4148/600=24.7%。是预先冻结bank分布上的覆盖率，不是全部未来任务的成功率。portfolio 的“声明的有限仿射因子任务程序”及UNCERTIFIED解释正确。建议显示三个任务名以提升可读性，但不是事实错误。
+  来源：https://github.com/ball-castle/ESN_spread/blob/c36d3b735b0f51fef4afd7b4d2a9412d5c50b93e/research/ROUND19_COVERAGE_EXECUTION.md
+- SYNTH-AF单侧充分性：project_evidence_supplement.json保存的Round17摘要明确positive witness与包含关系条件、negative inconclusive及不主张SGD收敛。portfolio 没有把表达/类风险证书改成优化成功证书，准确。
+- Dynamics_Learnability_Frontier：保存的C2_FINAL_STATUS与真实模型归因结果分别支持非投稿档案和ROUTE_EXHAUSTED。主文区分主稿/C2并不建议用更多GPU延续关闭路线，依据充分。
+- Succinct-but-Unlearnable：保存的接口选择final_status支持NOVELTY GATE FAIL、pilot未跑和冻结稿未改；现主文未夸大为普遍SGD不可能性，准确。
+- video-event-fidelity：重新读取5f2be794cf89fd3d9e492f5f166f7105c6134ddc的2026-10-28 RESEARCH_NOTE。原文明确局部GN代数、合成验证，没有新VAE推理、自然事件或人工标签；portfolio概括准确，且没有把旧远端“0源文件”重复成当前全面状态。
+  来源：https://github.com/ball-castle/video-event-fidelity/blob/5f2be794cf89fd3d9e492f5f166f7105c6134ddc/docs/research/2026-10-28/RESEARCH_NOTE.md
+- OVS：supplement中的STATUS支持独立sibling blocks、共同正truth support下DP，冲突/嵌套/missing-truth指数fallback；主文限定准确。
+- Photonic_RC：supplement中的原稿§6.6及表7显示FD001、64校准窗、5 seeds，DAFRSC61.69±9.34、Vanilla RLS50.02±5.10；主文方向与数值准确。
+- SINN：重新只读获取修订_237_harder_candidate.json，note明确是DeepSeek看图答对后再修改的三选题，共237条。portfolio不从名称推断SNN研究，并提醒独立测试划分，有原文支持。
+- VISION_FRONTIER状态在本轮仅按已保存独立审查交叉核对，没有重新逐文件遍历本地研究工作区；其余应用repo结论也只是现有证据范围内的成熟度判断。
+- 补充论文摘要核对：GEM的证据保护、MemEvo的未知未来query与有界程序、DeltaStreamer变化记录/历史回放、FOLIO实体语义记忆、MoM写时提交并保留替代来源、BEACON竞争假设/EIG及三动作控制、REVEAL充分性核验、CLOSER主动视觉验证均与本地PDF首页相符。GEM用途边界见P2项。
+- “两周/6–10周”“20%相对错误改善/1个百分点准确率阈值”均被主文明确标为建议与工作量估计，不是论文观察值或保证；目前措辞合适。
+- 会议时间已独立打开官方页面：ECCV首页明确September 8–12,2026及偶数年；ICML首页明确July31–August6,2027，且CFP will be posted soon。主文截至2026-11-05的表述准确。
+  来源：https://eccv.ecva.net/ ； https://icml.cc/
+
+审核边界
+
+本报告不把网页/仓库“存在”当成已完整下载权重或成功复现，也不复核未指定的其余八组逐项事实。报告中的方法建议仍是建议；关键数据均按本地指定PDF版本核对。数学检查与现有实验结果有效性分开判断。W01/W02批评维持“所给推导不足”的结论即可，无须把它们扩成整个算法不可用的判断。

@@ -1,0 +1,616 @@
+KH-A027 | Transitive Invariance for Self-supervised Visual Representation Learning
+来源：https://arxiv.org/abs/1708.02901
+本地PDF：专题文献/何恺明/KH-A027_Transitive_Invariance_for_Self_supervised_Visual_Representation_Learning_ICCV2017.pdf
+SHA-256：39d99de18b0c5b576f9e0482b8f7961488b3d10b989f1f86306b875dd6f873ac
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+          Transitive Invariance for Self-supervised Visual Representation Learning
+
+
+                           Xiaolong Wang1     Kaiming He2     Abhinav Gupta1
+                             1Carnegie Mellon University   2Facebook AI Research
+
+
+                        Abstract                                                                                                                          Inter-instance
+                                                                                                                   Invariance
+           Learning  visual  representations  with  self-supervised                                        A                       B2017   learning has become popular in computer vision. The idea
+            is to design auxiliary tasks where labels are free to obtain.
+        Most of these tasks end up providing data to learn speciﬁc           Intra-instance                                      Intra-instanceAug   kinds of invariance useful for recognition.  In this paper,            Invariance                                      Invariance
+       we propose to exploit different self-supervised approaches                                      Transitive15   to learn representations invariant to (i) inter-instance vari-                                    Invariance
+          ations               (two                      objects                               in the same                                           class should                                                have similar
+          features)               and                               (ii) intra-instance                                         variations                                                    (viewpoint,                                                              pose,         A'                                  B'
+         deformations, illumination, etc.). Instead of combining two
+         approaches with multi-task learning, we argue to organize
+        and reason the data with multiple variations. Speciﬁcally,      More Examples:                                                                                                Tracked     Tracked       we propose to generate a graph with millions of objects                                                                          Object A     Object B[cs.CV]                                                                                                    Object A'    Object B'        mined from hundreds of thousands of videos. The objects
+         are connected by two types of edges which correspond to
+        two types of invariance:  “different instances but a simi-
+          lar viewpoint and category” and “different viewpoints of
+          the same instance”. By applying simple transitivity on the
+        graph with these edges, we can obtain pairs of images ex-
+          hibiting richer visual invariance. We use this data to train
+        a Triplet-Siamese network with VGG16 as the base archi-
+          tecture and apply the learned representations to different
+         recognition tasks. For object detection, we achieve 63.2%                                                                     Figure 1: We propose to obtain rich invariance by apply-
+      mAP on PASCAL VOC 2007 using Fast R-CNN (compare                                                                      ing simple transitive relations. In this example, two differ-
+          to 67.3% with ImageNet pre-training). For the challenging                                                                         ent cars A and B are linked by the features that are good
+      COCO dataset, our method is surprisingly close (23.5%)                                                                             for inter-instance invariance (e.g., using [9]); and each car
+          to the ImageNet-supervised counterpart (24.4%) using the                                                                                          is linked to another view (A′ and B′) by visual trackingarXiv:1708.02901v3   Faster R-CNN framework. We also show that our network      [61]. Then we can obtain new invariance from object pairs
+        can perform signiﬁcantly better than the ImageNet network                                                               ⟨A, B′⟩, ⟨A′, B⟩, and ⟨A′, B′⟩via transitivity. We show
+          in the surface normal estimation task.                                                          more examples in the bottom.
+
+
+         1. Introduction                                                                             to complicated visual recognition tasks [17, 38].
+
+            Visual invariance is a core issue in learning visual rep-        In the scheme of supervised learning, human annotations
+          resentations. Traditional features like SIFT [39] and HOG      that map a variety of examples into a single label provide
+          [6] are histograms of edges that are to an extent invariant to     supervision for learning invariant representations. For ex-
+          illumination, orientations, scales, and translations. Modern     ample, two horses with different illumination, poses, and
+        deep representations are capable of learning high-level in-     breeds are invariantly annotated as a category of “horse”.
+         variance from large-scale data [47] , e.g., viewpoint, pose,     Such human knowledge on invariance is expected to be
+         deformation, and semantics. These can also be transferred     learned by capable deep neural networks [33, 28] through
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+carefully annotated data. However, large-scale, high-quality     2. Related Work
+annotations come at a cost of expensive human effort.
+                                                           Unsupervised learning of visual representations is a re-
+   Unsupervised or “self-supervised” learning (e.g., [61, 9,
+                                                             search area of particular interest. Approaches to unsuper-
+45, 63, 64, 35, 44, 62, 40, 66]) recently has attracted in-
+                                                              vised learning can be roughly categorized into two main
+creasing interests because the “labels” are free to obtain.
+                                                              streams:   (i) generative models, and  (ii) self-supervised
+Unlike supervised learning that learns invariance from the
+                                                                  learning.  Earlier methods for generative models include
+semantic labels, the self-supervised learning scheme mines
+                                                        Anto-Encoders [43, 56, 34, 32] and Restricted Boltzmann
+it from the nature of the data. We observe that most self-
+                                                     Machines (RBMs) [24, 4, 54, 12].  For example, Le et
+supervised approaches learn representations that are invari-
+                                                                            al. [32] trained a multi-layer auto-encoder on a large-scale
+ant to: (i) inter-instance variations, which reﬂects the com-
+                                                                 dataset of YouTube videos: although no label is provided,
+monality among different instances. For example, relative
+                                                 some neurons in high-level layers can recognize cats and
+positions of patches [9] (see also Figure 3) or channels of
+                                                human faces. Recent generative models such as Generative
+colors [63, 64] can be predicted through the commonality
+                                                             Adversarial Networks [20] and Variational Auto-Encoders
+shared by many object instances; (ii) intra-instance varia-
+                                                              [27] are capable of generating more realistic images. The
+tions.  Intra-instance invariance is learned from the pose,
+                                                            generated examples or the neural networks that learn to gen-
+viewpoint, and illumination changes by tracking a single
+                                                                   erate examples can be exploited to learn representations of
+moving instance in videos [61, 44]. However, either source
+                                                              data [11, 10].
+of invariance can be as rich as that provided by human an-
+                                                                  Self-supervised learning is another popular stream fornotations on large-scale datasets like ImageNet.
+                                                               learning invariant features.  Visual invariance can be cap-
+  Even  after signiﬁcant advances in the ﬁeld of  self-
+                                                               tured by the same instance/scene taken in a sequence of
+supervised learning, there is still a long way to go compared
+                                                          video frames [61, 53, 26, 1, 41, 57, 35, 44, 42, 21]. For
+to supervised learning. What should be the next steps?  It
+                                                         example, Wang and Gupta [61] leverage tracking of objects
+seems that an obvious way is to obtain multiple sources
+                                                                   in videos to learn visual invariance within individual ob-
+of invariance by combining multiple self-supervised tasks,
+                                                                          jects; Jayaraman and Grauman [26] train a Siamese net-
+e.g., via multiple losses. Unfortunately, this na¨ıve solution
+                                                   work to model the ego-motion between two frames in a
+turns out to give little improvement (as we will show by
+                                                              scene; Mathieu et al. [41] propose to learn representations
+experiments).
+                                                    by predicting future frames; Pathak et al. [44] train a net-
+  We argue that the trick lies not in the tasks but in the way                                                   work to segment the foreground objects where are acquired
+of exploiting data. To leverage both intra-instance and inter-                                                                via motion cues. On the other hand, common character-
+instance invariance, in this paper we construct a huge afﬁn-                                                                            istics of different object instances can also be mined from
+ity graph consisting of two types of edges (see Figure 1):                                                              data [9, 63, 64, 30, 31]. For example, relative positions of
+the ﬁrst type of edges relates “different instances of similar                                                     image patches [9] may reﬂect feasible spatial layouts of ob-
+viewpoints/poses and potentially the same category”, and                                                                          jects; possible colors can be inferred [63, 64] if the networks
+the second type of edges relates “different viewpoints/poses                                                        can relate colors to object appearances. Rather than rely on
+of an identical instance”. We instantiate the ﬁrst type of                                                          temporal changes in video, these methods are able to exploit
+edges by learning commonalities across instances via the                                                                                       still images.
+approach of [9], and the second type by unsupervised track-
+                                                    Our work is also closely related to mid-level patch clus-
+ing of objects in videos [61]. We set up simple transitive re-
+                                                                   tering [51, 7, 8] and unsupervised discovery of semantic
+lations on this graph to infer more complex invariance from
+                                                                 classes [48, 52] as we attempt to ﬁnd reliable clusters in
+the data, which are then used to train a Triplet-Siamese net-
+                                                          our afﬁnity graph. In addition, the ranking function used in
+work for learning visual representations.
+                                                                        this paper is related to deep metric learning with Siamese
+   Experiments show that our representations learned with-                                                                  architectures [5, 22, 19, 59, 25].
+out any annotations can be well transferred to the object
+detection task. Speciﬁcally, we achieve 63.2% mAP with     Analysis of the two types of invariance.  Our generic
+VGG16 [50] when ﬁne-tuning Fast R-CNN on VOC2007,     framework can be instantiated by any two self-supervised
+against the ImageNet pre-training baseline of 67.3%. More     methods that can respectively learn inter-/intra-instance in-
+importantly, we also report the ﬁrst-ever result of un-/self-      variance. In this paper we adopt Doersch et al.’s [9] con-
+supervised pre-training models ﬁne-tuned on the challeng-      text prediction method to build inter-instance invariance,
+ing COCO object detection dataset [37], achieving 23.5%     and Wang and Gupta’s [61] tracking method to build intra-
+AP comparing against 24.4% AP that is ﬁne-tuned from an      instance invariance. We analyze their behaviors as follows.
+ImageNet pre-trained counterpart (both using VGG16). To       The context prediction task in [9] randomly samples a
+our knowledge, this is the closest accuracy to the ImageNet     patch (blue in Figure 3) and one of its eight neighbors (red),
+pre-training counterpart obtained on object detection tasks.     and trains the network to predict their relative position, de-
+
+======================== PDF 第 3 页 ========================
+                    intra-instance                             edge
+                                                   1  2  3       1  2  3                    inter-instance edge
+                                                                                1  2  3
+                                                   4     5       4     5
+                                                                                4     5
+                                                   6  7  8       6  7  8
+                                                                                6  7  8
+                                              X=(      ),Y=7 X=(      ),Y=7  X=(      ),Y=2
+
+                                                            Figure 3: The context prediction task deﬁned in [9]. Given
+            parent                                        two patches in an image, it learns to predict the relative po-
+            cluster                                                     sition between them.
+                                  child
+                                   cluster
+
+Figure 2:  Illustrations for our graph construction.  We     an image patch. We deﬁne two types of edges in the graph
+ﬁrst cluster the object nodes into coarser clusters (namely      that relate image patches to each other. The ﬁrst type of
+“parent” clusters) and then inside each cluster we perform     edges, called inter-instance edges, link two nodes which
+nearest-neighbor search to obtain “child” clusters consist-     correspond to different object instances of similar visual ap-
+ing of 4 samples. Samples in each child cluster are linked     pearance; the second type of edges, called intra-instance
+to each other with the “inter-instance” edges. We add new     edges, link two nodes which correspond to an identical ob-
+samples via visual tracking and link them to the original      ject captured at different time steps of a track. The solid
+objects by “intra-instance” edges.                            arrows in Figure 1 illustrate these two types of edges.
+                                                         Given the built graph, we want to transit the relations via
+                                                                the known edges and associate unconnected nodes that may
+ﬁned as an 8-way classiﬁcation problem.  In the ﬁrst two
+                                                            provide under-explored invariance (Figure 1, dash arrows).
+examples in Figure 3, the context prediction model is able
+                                                                Speciﬁcally, as shown in Figure 1, if patches ⟨A, B⟩are
+to predict that the “leg” patch is below the “face” patch of
+                                                               linked via an inter-instance edge and ⟨A, A′⟩and ⟨B, B′⟩
+the cat, indicating that the model has learned some com-
+                                                                 respectively are linked via “intra-instance” edges, we hope
+monality of spatial layout from the training data. However,
+                                                                   to enrich the invariance by simple transitivity and relate
+the model would fail if the pose, viewpoint, or deforma-
+                                                                 three new pairs of: ⟨A′, B′⟩, ⟨A, B′⟩, and ⟨A′, B⟩(Figure 1,
+tion of the object is changed drastically, e.g., in the third
+                                                         dash arrows).
+example of Figure 3 — unless the dataset is diversiﬁed and
+                                          We train a Triplet-Siamese network that encourages sim-large enough to include gradually changing poses, it is hard
+                                                                              ilar visual representations between the invariant samplesfor the models to learn that the changed pose can be of the
+                                                                             (e.g., any pair consisting of A, A′, B, B′) and at the samesame object type.
+                                                          time discourages similar visual representations to a third  On the other hand, these changes can be more success-
+                                                                     distractor sample (e.g., a random sample C unconnectedfully captured by the visual tracking method presented in
+                                                                   to A, A′, B, B′).   In  all of our experiments, we apply[61], e.g., see ⟨A, A′⟩and ⟨B, B′⟩in Figure 1.  But by
+                                         VGG16 [50] as the backbone architecture for each branchtracking an identical instance we cannot associate different
+                                                              of this Triplet-Siamese network. The visual representationsinstances of the same semantics. Thus we expect the rep-
+                                                              learned by this backbone architecture are evaluated on otherresentations learned in [61] are weak in handling the varia-
+                                                               recognition tasks.tions between different objects in the same category.
+
+3. Overview                                            4. Graph Construction
+
+  Our goal is to learn visual representations which cap-     We construct a graph with inter-instance and  intra-
+ture: (i) inter-instance invariance (e.g., two instances of cats      instance edges.  Firstly, we apply the method of [61] on
+should have similar features), and (ii) intra-instance invari-     a large set of 100K unlabeled videos (introduced in [61])
+ance (pose, viewpoint, deformation, illumination, and other     and mine millions of moving objects using motion cues
+variance of the same object instance). We have tried to for-      (Sec. 4.1). We use the image patches of them to construct
+mulate this as a multi-task (multi-loss) learning problem in      the nodes of the graph.
+our initial experiments (detailed in Table 2 and 3) and ob-     We  instantiate  inter-instance  edges  by  the   self-
+served unsatisfactory performance. Instead of doing so, we     supervised method of [9] that learns context predictions on
+propose to obtain a richer set of invariance by performing     a large set of still images, which provide features to cluster
+transitive reasoning on the data.                                 the nodes and set up inter-instance edges (Sec. 4.2). On the
+  Our ﬁrst step is to construct a graph that describes the     other hand, we connect the image patches in the same visual
+afﬁnity among image patches. A node in the graph denotes      track by intra-instance edges (Sec. 4.3).
+
+======================== PDF 第 4 页 ========================
+                                                      means) is time consuming. So we apply a hierarchical clus-
+                                                                   tering approach (2-stage in this paper) where we ﬁrst group
+                                                                the images into a relatively small number of clusters, and
+                                                            then ﬁnd groups of small number of examples inside each
+                                                                    cluster via nearest-neighbor search.
+                                                                  Speciﬁcally, in the ﬁrst stage of clustering, we apply K-
+                                                   means clustering with K = 5000 on the image patches. We
+                                                            then remove the clusters with number of examples less than
+                                                    100 (this reduces K to 546 in our experiments on the im-
+                                                        age patches mined from the video dataset). We view these
+                                                                    clusters as the “parent” clusters (blue circles in Figure 2).
+                                                   Then in the second stage of clustering, inside each parent
+                                                                        cluster, we perform nearest-neighbor search for each sam-
+                                                                ple and obtain its top 10 nearest neighbors in the feature
+                                                               space. We then ﬁnd any group of samples with a group size
+Figure 4: Some example clustering results. Each row shows     of 4, inside which all the samples are each other’s top-10
+the 4 examples in a child cluster (Sec. 4.2).                      nearest neighbors. We call these small clusters with 4 sam-
+                                                                ples “child” clusters (green circles in Figure 2). We then
+                                                                   link these image patches with each other inside a child clus-
+4.1. Mining Moving Objects                                     ter via “inter-instance” edges. Note that different child clus-
+                                                                        ters may overlap, i.e., we allow the same sample to appear  We follow the approach in [61] to ﬁnd the moving ob-
+                                                                   in different groups. However, in our experiments we ﬁndjects in videos. As a brief introduction, this method ﬁrst ap-
+                                                                     that most samples appear only in one group. We show someplies Improved Dense Trajectories (IDT) [58] on videos to
+                                                                      results of clustering in Figure 4.extract SURF [2] feature points and their motion. The video
+frames are then pruned if there is too much motion (indicat-     4.3. Intra-instance Edges via Tracking
+ing camera motion) or too little motion (e.g., noisy signals).
+For the remaining frames, it crop a 227×227 bounding box       To obtain rich variations of viewpoint and deformation
+(from ∼600×400 images) which includes the most number     changes of the same object instance, we apply visual track-
+of moving points as the foreground object. However, for     ing on the mined moving objects in the videos as in [61].
+computational efﬁciency, in this paper we rescale the image    More speciﬁcally, given a moving object in the video, it ap-
+patches to 96×96 after cropping and we use them as inputs      plies KCF [23] to track the object for N = 30 frames and
+for clustering and training.                                     obtain another sample of the object in the end of the track.
+                                                     Note that the KCF tracker does not require any human su-
+4.2. Inter-instance Edges via Clustering                   pervision. We add these new objects as nodes to the graph
+                                                      and link the two samples in the same track with an intra-
+  Given the extracted image patches which act as nodes,
+                                                               instance edge (purple in Figure 2).
+we want to link them with extra inter-instance edges. We
+rely on the visual representations learned from [9] to do this.                                                          5. Learning with Transitions in the Graph
+We connect the nodes representing image patches which are
+close in the feature space.  In addition, motivated by the       With the graph constructed, we want to link more image
+mid-level clustering approaches [51, 7], we want to obtain     patches (see dotted links in Figure 1) which may be related
+millions of object clusters with a small number of objects in      via the transitivity of invariance. Objects subject to differ-
+each to maintain high “purity” of the clusters. We describe      ent levels of invariance can thus be related to each other.
+the implementation details of this step as follows.               Speciﬁcally, if we have a set of nodes {A, B, A′, B′} where
+  We extract the pool5 features of the VGG16 network     ⟨A, B⟩are connected by an inter-instance edge and ⟨A, A′⟩
+trained as in [9]. Following [9], we use ImageNet without     and ⟨B, B′⟩are connected by an intra-instance edge, by as-
+labels to train this network.  Note that because we use a     suming transitivity of invariance we expect the new pairs of
+patch size of 96×96, the dimension of our pool5 feature     ⟨A, B′⟩, ⟨A′, B⟩, and ⟨A′, B′⟩to share similar high-level
+is 3×3×512=4608. The distance between samples is cal-      visual representations. Some examples are illustrated in
+culated by the cosine distance of these features. We want     Figure 1 and 5.
+the object patches in each cluster to be close to each other     We train a deep neural network (VGG16) to gener-
+in the feature space, and we care less about the differences      ates similar visual representations if the image patches are
+between clusters. However, directly clustering millions of     linked by inter-instance/intra-instance edges or their transi-
+image patches into millions of small clusters (e.g., by K-      tivity (which we call a positive pair of samples). To avoid a
+
+======================== PDF 第 5 页 ========================
+                                                    ﬁne their distance as: D(A, B) = 1 − ∥FF(A)∥∥F(A)·F (B)(B)∥where
+   Object A                                                  F(·) is the representation mapping of the network. With a
+                                                                            triplet of (X, X+, X−) where (X, X+) is a positive pair
+                                                      and (X, X−) is a negative pair as deﬁned above, we mini-
+   Object B
+                                                     mize the ranking loss:
+
+   Tracked                                          L(X, X+, X−) = max{0, D(X, X+) −D(X, X−) + m},
+   Object A′
+                                                     where m is a margin set as 0.5 in our experiments.  Al-
+   Tracked                                                  though we have only one objective function, we have dif-
+   Object B′                                                           ferent types of training examples. As illustrated in Figure
+                                                                     6, given the set of related samples {A, B, A′, B′} (see Fig-
+                                                             ure 5) and a random distractor sample C from another par-Figure 5: Examples used for training the network. Each
+                                                                ent cluster, we can train the network to handle, e.g., view-column shows a set of image patches {A, B, A′, B′}. Here,
+                                                               point invariance for the same instance via L(A, A′, C) andA and B is linked by an inter-instance edge, and A′/B′ is
+                                                               invariance to different objects sharing the same semanticslinked to A/B via intra-instance edges.
+                                                                via L(A, B′, C).
+                                                             Besides exploring these relations, we have also tried to
+                                         2 conv
+      (𝐴, 𝐴′, 𝐶)    (𝐴, 𝐵′, 𝐶)               2 conv                               enforce the distance between different objects to be larger
+                                                   3 conv 3 conv   3 conv       4096 1024                                                            than the distance between two different viewpoints of the
+𝑋                                                 same object, e.g., D(A, A′) < D(A, B′). But we have not
+                                                                             sharing                  found this extra relation brings any improvement.  Inter-
+                                                                      estingly, we found that the representations learned by our
+                                                    method can in general satisfy D(A, A′) < D(A, B′) after𝑋+                                                                                                                                                                                      Ranking      training.
+                                                                             sharing
+                                                          6. Experiments
+𝑋−
+                                          We perform extensive analysis on our self-supervised
+                                                                  representations. We ﬁrst evaluate our ConvNet as a fea-
+Figure 6: Our Triplet-Siamese network. We can feed in the      ture extractor on different tasks without ﬁne-tuning . We
+network with different combinations of examples.              then show the results of transferring the representations to
+                                                                vision tasks including object detection and surface normal
+                                                              estimation with ﬁne-tuning.
+trivial solution of identical representations, we also encour-     Implementation Details.  To prepare the data for train-
+age the network to generate dissimilar representations if a      ing, we download the 100K videos from YouTube using the
+node is expected to be unrelated. Speciﬁcally, we constrain    URLs provided by [36, 61]. By mining the moving objects
+the image patches from different “parent” clusters (which     and tracking in the videos, we obtain ∼10 million image
+are more likely to have different categories) to have differ-     patches of objects. By applying the transitivity on the graph
+ent representations (which we call a negative pair of sam-      constructed, we obtain 7 million positive pairs of objects
+ples). We design a Triplet-Siamese network with a ranking     where each pair of objects are two different instances with
+loss function [59, 61] such that the distance between related      different viewpoints. We also randomly sample 2 million
+samples should be smaller than the distance of unrelated      object pairs connected by the intra-instance edges.
+samples.                                    We train our network with these 9 million pairs of images
+  Our Triplet-Siamese network includes three towers of     using a learning rate of 0.001 and a mini-batch size of 100.
+a ConvNet with shared weights (Figure 6).   For each     For each pair we sample the third distractor patch from a
+tower, we adopt the standard VGG16 architecture [50] to      different “parent cluster” in the same mini-batch. We use
+the convolutional layers, after which we add two fully-      the network pre-trained in [9] to initialize our convolutional
+connected layers with 4096-d and 1024-d outputs.  The      layers and randomly initialized the fully connected layers.
+Triplet-Siamese network accepts a triplet sample as its in-   We train the network for 200K iterations with our method.
+put: the ﬁrst two image patches in the triplet are a positive
+                                                               6.1. Qualitative Results without Fine-tuningpair, and the last two are a negative pair. We extract their
+1024-d features and calculate the ranking loss as follows.       We ﬁrst perform nearest-neighbor search to show qual-
+  Given an arbitrary pair of image patches A and B, we de-      itative results. We adopt the pool5 feature of the VGG16
+
+======================== PDF 第 6 页 ========================
+   Query        (a) Context Prediction Network               (b) Our Network              (c) ImageNet Pre-trained Network
+
+Figure 7: Nearest-neighbor search on the PASCAL VOC dataset. We extract three types of features: (a) context prediction
+network from [9], (b) network trained with our self-supervised method, and (c) the network pre-trained in the annotated
+ImageNet dataset. We show that our network can represent a greater variety (e.g., viewpoints) of objects of the same category.
+
+
+                                                               6.2. Analysis on Object Detection
+
+                                          We evaluate how well our representations can be trans-
+                                                                 ferred  to  object  detection by ﬁne-tuning Fast R-CNN
+                                                              [16] on PASCAL VOC 2007 [13]. We use the standard
+                                           trainval set for training and test set for testing with
+                                         VGG16 as the base architecture. For the detection network,
+                                             we initialize the weights of convolutional layers from our
+                                                                self-supervised network and randomly initialize the fully-
+                                                          connected layers using Gaussian noise with zero mean and
+                                                         0.001 standard deviation.
+                                                          During ﬁne-tuning Fast R-CNN, we use 0.00025 as the
+                                                                     starting learning rate. We reduce the learning rate by 1/10
+                                                                   in every 50K iterations. We ﬁne-tune the network for 150K
+Figure 8: Top 6 responses for neurons in 4 different convo-                                                                        iterations. Unlike standard Fast R-CNN where the ﬁrst few
+lutional units of our network, visualized using [65].                                                              convolutional layers of the ImageNet pre-trained network
+                                                                are ﬁxed, we ﬁne-tuned all layers on the PASCAL data as
+                                                          our model is pre-trained in a very different domain (e.g.,network for all methods without any ﬁne-tuning (Figure 7).
+                                                          video patches).We do this experiment on the object instances cropped from
+the PASCAL VOC 2007 dataset [13] (trainval). As Fig-     We report the results in Table 1.  If we train Fast R-
+ure 7 shows, given an query image on the left, the network   CNN from scratch without any pre-training, we can only
+pre-trained with the context prediction task [9] can retrieve     obtain 39.7% mAP. With our self-supervised trained net-
+objects of very similar viewpoints. On the other hand, our    work as initialization, the detection mAP is increased to
+network shows more variations of objects and can often re-    63.2% (with a 23.5 points improvement). Our result com-
+trieve objects with the same class as the query. We also     pares competitively (4.1 points lower) to the counterpart us-
+show the nearest-neighbor results using fully-supervised     ing ImageNet pre-training (67.3% with VGG16).
+ImageNet pre-trained features as a comparison.               As we incorporate the invariance captured from [61] and
+  We also visualize the features using the visualization      [9], we also evaluate the results using these two approaches
+technique of [65]. For each convolutional unit in conv5 3,      individually (Table 1). By ﬁne-tuning the context predic-
+we retrieve the objects which give highest activation re-      tion network of [9], we can obtain 61.5% mAP. To train
+sponses and highlight the receptive ﬁelds on the images. We      the network of [61], we use exactly the same loss function
+visualize the top 6 images for 4 different convolutional units     and initialization as our approach except that there are only
+in Figure 8. We can see these convolutional units are cor-      training examples of the same instance in the same visual
+responding to different semantic object parts (e.g., fronts of      track (i.e., only the samples linked by intra-instance edges
+cars or buses wheels, animal legs, eyes or faces).                 in our graph). Its results is 60.2% mAP. Our result (63.2%)
+
+======================== PDF 第 7 页 ========================
+ method     mAP  aero  bike  bird  boat  bottle  bus   car   cat   chair cow  table  dog  horse  mbike  persn  plant  sheep  sofa  train   tv
+ from scratch    39.7  51.7  55.8  21.7  24.0  10.5  58.7  59.2  41.1  18.2  32.9  35.6  33.4  60.4   57.3   45.5  19.7   29.2  30.8  61.0  47.3
+ Vid-Edge [35]   44.2  54.4  58.2  39.6  30.8  12.5  58.7  61.9  51.0  22.0  41.4  47.4  41.5  63.2   58.4   47.5  17.2   27.6  45.4  59.8  45.4
+ Context [9]     61.5  70.8  72.1  54.7  49.7  31.0  72.3  76.9  70.8  44.6  61.1  59.8  67.0  74.6   72.5   68.3  29.4   58.5  66.9  75.1  54.3
+ Tracking [61]   60.2  65.7  73.2  55.4  46.4  30.9  74.0  76.9  67.8  40.9  58.0  60.9  65.0  74.1   71.6   67.1  31.5   55.0  61.8  73.9  53.8
+ Ours           63.2  68.4  74.6  57.1  49.6  34.1  73.5  76.9  73.2  45.8  63.3  66.3  68.6  74.9   74.2   69.5  31.9   57.4  70.3  75.9  59.3
+ ImageNet       67.3  74.4  78.0  65.9  54.4  39.7  76.4  78.6  82.5  48.6  73.3  67.2  78.4  77.3   75.7   72.2  32.2   65.8  66.8  75.2  62.4
+
+Table 1: Object detection Average Precision (%) on the VOC 2007 test set using Fast R-CNN [16] (with selective search proposals [55]):
+comparisons among different self-supervised learning approaches.
+
+
+ method       mAP  aero  bike  bird  boat  bottle  bus   car   cat   chair cow  table  dog  horse  mbike  persn  plant  sheep  sofa  train   tv
+ Ours             63.2  68.4  74.6  57.1  49.6  34.1  73.5  76.9  73.2  45.8  63.3  66.3  68.6  74.9   74.2   69.5  31.9   57.4  70.3  75.9  59.3
+ Multi-Task        62.1  70.0  74.2  57.2  48.4  33.0  73.6  77.6  70.7  45.0  61.5  64.8  67.2  74.0   72.9   68.3  32.4   56.6  64.1  74.1  57.5
+ Ours (15-frame)   61.5  70.3  74.1  53.3  47.1  33.5  74.6  77.1  67.7  43.3  58.1  65.5  65.8  75.2   72.2   67.6  31.6   55.5  65.6  74.6  57.2
+ Ours (HOG)      60.4  65.8  73.4  54.7  47.7  30.2  75.6  77.1  67.6  42.0  58.8  63.2  65.3  74.1   72.0   67.2  29.9   54.4  62.1  72.9  53.9
+
+Table 2: More ablative studies on object detection on the VOC 2007 test set using Fast R-CNN [16] (with selective search proposals [55]).
+
+
+is better than both methods. This comparison indicates the                           All  >c1  >c2  >c3  >c4  >c5
+effectiveness of exploiting a greater variety of invariance in
+                                                                   Context [9]       62.6  61.1  60.9  57.0  49.7  38.1
+representation learning.                                                                   Tracking [61]     62.2  61.5  62.2  61.4  58.9  39.5
+Is multi-task learning sufﬁcient? An alternative way of         Multi-Task [9, 61] 62.4  63.2  63.5  62.9  58.7  27.6
+                                                              Ours             65.0  64.5  63.6  60.4  55.7  43.1obtaining both intra- and inter-instance invariance is to ap-
+ply multi-task learning with the two losses of [9] and [61].        ImageNet         70.9  71.1  71.1  70.2  70.3  64.3
+Next we compare with this method.
+                                                           Table 3:  Object detection Average Precision (%) on the VOC
+   For the task in [61], we use the same network architec-
+                                                          2007 test set using joint training Faster R-CNN [46].
+ture as our approach; for the task in [9], we follow their
+design of a Siamese network. We apply different fully con-
+nected layers for different tasks, but share the convolutional                                                                    better features for object detection.
+layers between these two tasks. Given a mini-batch of train-
+                                         How important is clustering? Furthermore, we want toing samples, we perform ranking among these images as
+                                                           understand how important it is to cluster images with fea-well as context prediction in each image simultaneously via
+                                                                   tures learned from still images [9]. We perform another ab-two losses. The representations learned in this way, when
+ﬁne-tuned with Fast R-CNN, obtain 62.1% mAP (“Multi-      lative analysis by replacing the features of [9] with HOG
+                                                                   [6] during clustering. The rest of the pipeline remains ex-task” in Table 2). Comparing to only using context pre-
+                                                                   actly the same. The ﬁnal result is 60.4% mAP (“HOG” indiction [9] (61.5%), the multi-task learning only gives a
+                                                           Table 2). This shows that if the features for clustering aremarginal improvement (0.6%).  This result suggests that
+                                                             not invariant enough to handle different object instances, themulti-task learning in this way is not sufﬁcient; organiz-
+                                                                        transitivity in the graph becomes less reliable.ing and exploiting the relationships of data, as done by our
+method, is more effective for representation learning.
+                                                               6.3. Object Detection with Faster R-CNN
+  How important is tracking? To further understand how
+                                                          Although Fast R-CNN [16] has been a popular testbed
+much visual tracking helps, we perform ablative analysis
+                                                              of un-/self-supervised features, it relies on Selective Search
+by making the visual tracks shorter: we track the mov-
+                                                             proposals [55] and thus is not fully end-to-end. We fur-
+ing objects for 15 frames instead of by default 30 frames.
+                                                                   ther evaluate the representations on object detection with
+This is expected to reduce the viewpoint/pose/deformation
+                                                                the end-to-end Faster R-CNN [46] where the Region Pro-
+variance contributed by tracking.  Our model pre-trained
+                                                              posal Network (RPN) may suffer from the features if they
+in this way shows 61.5% mAP (“15-frame” in Table 2)
+                                                                are low-quality.
+when ﬁne-tuned for detection.  This number is similar to
+that of using context prediction only (Table 1).  This re-     PASCAL VOC 2007 Results. We ﬁne-tune Faster R-
+sult is not surprising, because it does not add much new   CNN in 8 GPUs for 35K iterations with an initial learn-
+information for training. It suggests adding stronger view-     ing rate of 0.00025 which is reduced by 1/10 after every
+point/pose/deformation invariance is important for learning    15K iterations. Table 3 shows the results of ﬁne-tuning all
+
+======================== PDF 第 8 页 ========================
+              AP AP50  AP75 APS APM APL                       Mean   Median 11.25◦22.5◦30◦
+                                                                                       (lower is better)   (higher is better)
+  from scratch       20.5  40.1   19.0   5.6   22.5  32.7
+  Context [9]        22.7  43.5   21.2   6.6   24.9  36.5              from scratch   31.3     25.3    24.2  45.6  56.8
+  Tracking [61]      22.6  42.8   21.6   6.3   25.0  36.2               Context [9]    29.0     21.6    28.8  51.5  61.9
+  Multi-Task [9, 61] 22.0  42.3   21.1   6.6   24.5  35.0               Tracking [61]  27.8     21.8    27.4  51.1  62.5
+  Ours              23.5  44.4   22.6   7.1   25.9  37.3              Ours          26.0     18.0    33.9  57.6  67.5
+                                                               ImageNet      27.8     21.2    29.0  52.3  63.4
+  ImageNet (shorter) 23.7  44.5   23.5   7.2   26.9  37.4
+  ImageNet         24.4  46.4   23.1   7.9   27.4  38.1                                                           Table 5: Results on NYU v2 for per-pixel surface normal
+                                                                 estimation, evaluated over valid pixels.Table 4:  Object detection Average Precision (%, COCO def-
+initions) on COCO minival using joint training Faster R-CNN
+[46]. “(shorter)” indicates a shorter training time (fewer iterations,
+61.25K) used by the codebase of [46].
+                                      RGB image as input, we train the network to predict the
+                                                               normal/orientation of the pixels. We evaluate our method
+                                                    on the NYUv2 RGBD dataset [49] dataset. We use the of-layers (“All”) and also ablative results on freezing different
+                                                                 ﬁcial split of 795 images for training and 654 images forlevels of convolutional layers (e.g., the column >c3 repre-
+                                                                       testing. We follow the same protocols for generating sur-sents freezing all the layers below and including conv3 x in
+                                                               face normal ground truth and evaluations as [14, 29, 15].VGG16 during ﬁne-tuning). Our method gets even better
+results of 65.0% by using Faster R-CNN, showing a larger       To train the network for surface normal estimation, we
+gap compared to the counterparts of [9] (62.6%) and [61]     apply the Fully Convolutional Network (FCN 32-s) pro-
+(62.2%). Noteworthily, when freezing all the convolutional     posed in [38] with the VGG16 network as base architecture.
+layers and only ﬁne-tuning the fully-connected layers, our     For the loss function, we follow the design in [60]. Specif-
+method (43.1%) is much better than other competitors. And       ically, instead of direct regression to obtain the normal, we
+we again ﬁnd that the multi-task alternative does not work     use a codebook of 40 codewords to encode the 3-dimension
+well for Faster R-CNN.                                      normals. Each codeword represents one class thus we turn
+                                                                the problem into a 40-class classiﬁcation for each pixel. We  COCO Results. We further report results on the chal-
+                                                          use the same hyperparameters as in [38] for training and thelenging COCO detection dataset [37]. To the best of our
+                                                        network is ﬁne-tuned for same number of iterations (100K)knowledge this is the ﬁrst work of this kind presented on
+                                                                   for different initializations.COCO detection. We ﬁne-tune Faster R-CNN in 8 GPUs
+for 120K iterations with an initial learning rate of 0.001       To initialize the FCN model with self-supervised nets,
+which is reduced by 1/10 after 80k iterations. This is trained    we copy the weights of the convolutional layers to the cor-
+on the COCO trainval35k split and evaluated on the     responding layers in FCN. For ImageNet pre-trained net-
+minival5k split, introduced by [3].                        work, we follow [38] by converting the fully connected lay-
+  We report the COCO results on Table 4. Faster R-CNN      ers to convolutional layers and copy all the weights. For the
+ﬁne-tuned with our self-supervised network obtains 23.5%     model trained from scratch, we randomly initialize all the
+AP using the COCO metric, which is very close (<1%) to      layers with “Xavier” initialization [18] .
+ﬁne-tuning Faster R-CNN with the ImageNet pre-trained
+                                                              Table 5 shows the results. We report mean and median
+counterpart (24.4%). Actually, if the ﬁne-tuning of the Ima-
+                                                                   error for all visible pixels (in degrees) and also the percent-
+geNet counterpart follows the “shorter” schedule in the pub-
+                                                        age of pixels with error less than 11.25, 22.5 and 30 de-
+lic code (61.25K iterations in 8 GPUs, converted from 490K
+                                                                  grees. Surprisingly, we obtain much better results with our
+in 1 GPU)1, the ImageNet supervised pre-training version
+                                                                self-supervised trained network than ImageNet pre-training
+has 23.7% AP and is comparable with ours. This compari-
+                                                                   in this task (3 to 4% better in most metrics). As a com-
+son also strengthens the signiﬁcance of our result.
+                                                                 parison, the network trained in [9, 61] are slightly worse
+  To the best of our knowledge, our model achieves the
+                                                            than the ImageNet pre-trained network. These results sug-
+best performance reported to date on VOC 2007 and COCO
+                                                                gest that our learned representations are competitive to Ima-
+using un-/self-supervised pre-training.
+                                                      geNet pre-training for high-level semantic tasks, but outper-
+6.4. Adapting to Surface Normal Estimation           forms it on tasks such as surface normal estimation. This
+                                                          experiment suggests that different visual tasks may prefer
+  To show the generalization ability of our self-supervised                                                                    different levels of visual invariance.
+representations, we adopt the learned network to the sur-
+face normal estimation task.  In this task, given a single
+                                                   Acknowledgement:  This work was supported by ONR
+  1https://github.com/rbgirshick/py-faster-rcnn     MURI N000141612007 and Sloan Fellowship to AG.
+
+======================== PDF 第 9 页 ========================
+References                                                       2015.
+                                                                     [24] G. E. Hinton and R. R. Salakhutdinov. Reducing the dimen-
+ [1]  P. Agrawal, J. Carreira, and J. Malik.  Learning to see by            sionality of data with neural networks. Science, 2006.
+     moving. 2015.                                                  [25] E. Hoffer and N. Ailon. Deep metric learning using triplet
+ [2] H. Bay, T. Tuytelaars, and L. V. Gool.  Surf: Speeded up           network. arXiv, 2015.
+     robust features. In ECCV, 2006.                                 [26] D. Jayaraman and K. Grauman. Learning image representa-
+ [3] S. Bell, C. L. Zitnick, K. Bala, and R. Girshick.  Inside-            tions tied to egomotion. In ICCV, 2015.
+     outside net: Detecting objects in context with skip pooling      [27] D. Kingma and M. Welling.   Auto-encoding variational
+     and recurrent neural networks. arXiv, 2015.                           bayes. In ICLR, 2014.
+ [4] Y. Bengio,  P. Lamblin, D. Popovici, and H. Larochelle.      [28] A. Krizhevsky, I. Sutskever, and G. E. Hinton.  Imagenet
+     Greedy layer-wise training of deep networks. In NIPS, 2007.            classiﬁcation with deep convolutional neural networks.  In
+ [5] S. Chopra, R. Hadsell, and Y. LeCun. Learning a similarity          NIPS, 2012.
+     metric discriminatively, with application to face veriﬁcation.      [29] L. Ladick´y, B. Zeisl, and M. Pollefeys.  Discriminatively
+     In CVPR, 2005.                                                         trained dense surface normal estimation. In ECCV, 2014.
+ [6] N. Dalal and B. Triggs. Histograms of oriented gradients for      [30] G. Larsson, M. Maire, and G. Shakhnarovich. Learning rep-
+    human detection. In CVPR, 2005.                                      resentations for automatic colorization. In European Confer-
+ [7] C. Doersch, A. Gupta, and A. A. Efros.  Mid-level visual          ence on Computer Vision (ECCV), 2016.
+     element discovery as discriminative mode seeking. In NIPS,      [31] G. Larsson, M. Maire, and G. Shakhnarovich. Colorization
+     2013.                                                                as a proxy task for visual understanding. In CVPR, 2017.
+ [8] C. Doersch, A. Gupta, and A. A. Efros. Context as supervi-      [32] Q. V. Le, M. A. Ranzato, R. Monga, M. Devin, K. Chen,
+     sory signal: Discovering objects with predictable context. In          G. S. Corrado, J. Dean, and A. Y. Ng. Building high-level
+    ECCV, 2014.                                                            features using large scale unsupervised learning. In ICML,
+ [9] C. Doersch, A. Gupta, and A. A. Efros. Unsupervised vi-           2012.
+      sual representation learning by context prediction. In ICCV,      [33] Y. LeCun, B. Boser,  J. S. Denker, D. Henderson, R. E.
+     2015.                                                      Howard, W. Hubbard, and L. D. Jackel.  Backpropagation
+[10]  J. Donahue, P. Kr¨ahenb¨uhl, and T. Darrell. Adversarial fea-           applied to handwritten zip code recognition. Neural compu-
+      ture learning. arXiv, 2016.                                                 tation, 1989.
+[11] V. Dumoulin, I. Belghazi, B. Poole, A. Lamb, M. Arjovsky,      [34] H. Lee, R. Grosse, R. Ranganath, and A. Y. Ng. Convolu-
+     O. Mastropietro, and A. Courville. Adversarially learned in-            tional deep belief networks for scalable unsupervised learn-
+      ference. arXiv, 2016.                                                ing of hierarchical representations. In ICML, 2009.
+[12] S. M. A. Eslami, N. Heess, and J. Winn. The shape boltz-      [35] Y. Li, M. Paluri, J. M. Rehg, and P. Doll´ar. Unsupervised
+    mann machine: a strong model of object shape. In CVPR,            learning of edges. In CVPR, 2016.
+     2012.                                                           [36] X. Liang, S. Liu, Y. Wei, L. Liu, L. Lin, and S. Yan. Compu-
+[13] M. Everingham, L. Van Gool, C. K. I. Williams, J. Winn,             tational baby learning. arXiv, 2014.
+     and A. Zisserman. The Pascal Visual Object Classes (VOC)      [37] T. Lin, M. Maire, S. Belongie, L. D. Bourdev, R. B. Girshick,
+     Challenge. IJCV, 2010.                                                             J. Hays, P. Perona, D. Ramanan, P. Doll´ar, and C. L. Zitnick.
+[14] D. F. Fouhey, A. Gupta, and M. Hebert.  Data-driven 3D           Microsoft COCO: common objects in context. arXiv, 2014.
+      primitives for single image understanding. In ICCV, 2013.        [38]  J. Long, E. Shelhamer, and T. Darrell. Fully convolutional
+[15] D. F. Fouhey, A. Gupta, and M. Hebert. Unfolding an indoor          networks for semantic segmentation. In CVPR, 2015.
+     origami world. In ECCV, 2014.                                  [39] D. Lowe.  Distinctive Image Features from Scale-Invariant
+[16] R. Girshick. Fast R-CNN. In ICCV, 2015.                            Keypoints. IJCV, 2004.
+[17] R. Girshick, J. Donahue, T. Darrell, and J. Malik. Rich fea-      [40] Z. Luo, B. Peng, D.-A. Huang, A. Alahi, and L. Fei-Fei.
+      ture hierarchies for accurate object detection and semantic          Unsupervised Learning of Long-Term Motion Dynamics for
+     segmentation. In CVPR, 2014.                                      Videos. In CVPR, 2017.
+[18] X. Glorot and Y. Bengio.  Understanding the difﬁculty of      [41] M. Mathieu, C. Couprie, and Y. LeCun. Deep multi-scale
+      training deep feedforward neural networks.  In AISTATS,           video prediction beyond mean square error. arXiv, 2015.
+     2010.                                                           [42]  I. Misra, C. L. Zitnick, and M. Hebert. Shufﬂe and Learn:
+[19] Y. Gong, Y. Jia, T. K. Leung, A. Toshev, and S. Ioffe.          Unsupervised Learning using Temporal Order Veriﬁcation.
+    Deep convolutional ranking for multilabel image annotation.           In ECCV, 2016.
+     arXiv, 2013.                                                    [43] B. A. Olshausen and D. J. Field. Sparse coding with an over-
+[20]  I.  Goodfellow,   J.  Pouget-Abadie,  M.  Mirza,  B.  Xu,          complete basis set: A strategy employed by v1?  Vision re-
+     D. Warde-Farley, S. Ozair, A. Courville, and Y. Bengio. Gen-            search, 37(23):3311–3325, 1997.
+      erative adversarial nets. In NIPS, 2014.                          [44] D. Pathak, R. Girshick, P. Doll´ar, T. Darrell, and B. Hariha-
+[21] R. Goroshin, J. Bruna, J. Tompson, D. Eigen, and Y. LeCun.            ran. Learning features by watching objects move. In CVPR,
+     Unsupervised learning of spatiotemporally coherent metrics.           2017.
+    ICCV, 2015.                                                    [45] L. Pinto and A. Gupta. Supersizing self-supervision: Learn-
+[22] R. Hadsell, S. Chopra, and Y. LeCun. Dimensionality reduc-           ing to grasp from 50k tries and 700 robot hours. In ICRA,
+      tion by learning an invariant mapping. In CVPR, 2006.               2016.
+[23]  J. F. Henriques, R. Caseiro, P. Martins, and J. Batista. High-      [46] S. Ren, K. He, R. Girshick, and J. Sun. Faster R-CNN: To-
+     speed tracking with kernelized correlation ﬁlters. TPAMI,          wards real-time object detection with region proposal net-
+
+======================== PDF 第 10 页 ========================
+     works. In NIPS, 2015.
+[47] O. Russakovsky, J. Deng, H. Su, J. Krause, S. Satheesh,
+      S. Ma, Z. Huang, A. Karpathy, A. Khosla, M. Bernstein,
+     A. C. Berg, and L. Fei-Fei. Imagenet large scale visual recog-
+      nition challenge. IJCV, 2015.
+[48] B. C. Russell, A. A. Efros, J. Sivic, W. T. Freeman, and
+     A. Zisserman. Using multiple segmentations to discover ob-
+      jects and their extent in image collections. In CVPR, 2006.
+[49] N. Silberman, D. Hoiem, P. Kohli, and R. Fergus.  Indoor
+     segmentation and support inference from RGBD images. In
+    ECCV, 2012.
+[50] K. Simonyan and A. Zisserman.  Very deep convolutional
+     networks for large-scale image recognition. arXiv, 2014.
+[51] S. Singh, A. Gupta, and A. A. Efros. Unsupervised discovery
+     of mid-level discriminative patches. In ECCV, 2012.
+[52]  J. Sivic, B. C. Russell, A. A. Efros, A. Zisserman, and W. T.
+     Freeman. Discovering objects and their location in images.
+     In ICCV, 2005.
+[53] N. Srivastava, E. Mansimov, and R. Salakhutdinov. Unsuper-
+     vised learning of video representations using LSTMs. arXiv,
+     2015.
+[54] Y. Tang, R. Salakhutdinov, and G. Hinton. Robust boltzmann
+     machines for recognition and denoising. In CVPR, 2012.
+[55]  J. Uijlings, K. van de Sande, T. Gevers, and A. Smeulders.
+      Selective search for object recognition. IJCV, 2013.
+[56]  P. Vincent, H. Larochelle, Y. Bengio, and P. Manzagol. Ex-
+      tracting and composing robust features with denoising au-
+     toencoders. In ICML, 2008.
+[57]  J. Walker, C. Doersch, A. Gupta, and M. Hebert. An uncer-
+      tain future: Forecasting from variational autoencoders.  In
+    ECCV, 2016.
+[58] H. Wang and C. Schmid. Action recognition with improved
+      trajectories. In ICCV, 2013.
+[59]  J. Wang,  Y. Song,  T. Leung, C. Rosenberg,  J. Wang,
+       J. Philbin, B. Chen, and Y. Wu. Learning ﬁne-grained im-
+     age similarity with deep ranking. In CVPR, 2014.
+[60] X. Wang, D. F. Fouhey, and A. Gupta. Designing deep net-
+     works for surface normal estimation. In CVPR, 2015.
+[61] X. Wang and A. Gupta. Unsupervised learning of visual rep-
+      resentations using videos. In ICCV, 2015.
+[62] A. R. Zamir, T. Wekel, P. Agrawal, C. Wei, J. Malik, and
+      S. Savarese. 3D Representations via Pose Estimation and
+     Matching. In ECCV, 2016.
+[63] R. Zhang, P. Isola, and A. A. Efros. Colorful image coloriza-
+      tion. In ECCV, 2016.
+[64] R. Zhang, P. Isola, and A. A. Efros.  Split-brain autoen-
+     coders: Unsupervised learning by cross-channel prediction.
+     In CVPR, 2017.
+[65] B. Zhou, A. Khosla, A. Lapedriza, A. Oliva, and A. Torralba.
+     Object detectors emerge in deep scene cnns. In ICLR, 2015.
+[66] T. Zhou, M. Brown, N. Snavely, and D. Lowe. Unsupervised
+     Learning of Depth and Ego-motion from Video. In CVPR,
+     2017.

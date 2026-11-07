@@ -1,0 +1,505 @@
+KH-A004 | Computing Nearest-Neighbor Fields via Propagation-Assisted KD-Trees
+来源：https://people.csail.mit.edu/kaiming/publications.html
+本地PDF：专题文献/何恺明/KH-A004_Computing_Nearest_Neighbor_Fields_via_Propagation_Assisted_KD_Trees_CVPR2012.pdf
+SHA-256：ca0fcacf8f9fa0d9723f7fa3fd62818b182ce379f05f6114220ac1c7fd8cd389
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+    Computing Nearest-Neighbor Fields via Propagation-Assisted KD-Trees
+
+
+                           Kaiming He               Jian Sun
+                                    Microsoft Research Asia
+
+
+                 Abstract                          checking a small portion of candidates. Tree-based methods
+                                                               are still among the state-of-the-art ANN solutions nowadays
+  Matching patches between two images, also known as      [24, 29]. However, the backtracking behavior [15, 2] in the
+computing nearest-neighbor ﬁelds, has been proven a use-      tree methods prevents interactive or real-time computation
+ful technique in various computer vision/graphics algo-     of ANN ﬁelds, where the amount of queries is massive.
+rithms. But this is a computationally challenging nearest-       The queries are treated individually in the traditional
+neighbor search task, because both the query set and the   ANN methods. But they are strongly dependent in ANNF
+candidate set are of image size. In this paper, we propose     problems, because they are overlapping patches from the
+Propagation-Assisted KD-Trees to quickly compute an ap-    same image. A milestone method called PatchMatch [4] ob-
+proximate solution. We develop a novel propagation search     serves that the images are coherent, so the matching result
+method for kd-trees. In this method the tree nodes checked     of a query patch can be propagated to the nearby queries and
+by each query are propagated from the nearby queries. This     thus be reused. This method is found to be much faster than
+method not only avoids the time-consuming backtracking in      kd-trees, enabling ANNF computation at interactive rate.
+traditional tree methods, but is more accurate. Experiments     Nevertheless, PatchMatch does not consider the candidate
+on public data show that our method is 10-20 times faster      distributions and visits many implausible candidates. Also,
+than the PatchMatch method [4] at the same accuracy, or     the results tend to be trapped in local optimum due to the
+reduces its error by 70% at the same running time. Our      short-distance propagation.
+method is also 2-5 times faster and is more accurate than        In this paper, we propose Propagation-Assisted KD-
+Coherency Sensitive Hashing [22], a latest state-of-the-art     Trees for efﬁcient ANNF computation. Our key insight is
+method.                                                            that we can jointly exploit the distribution of the candidates
+                                                                              (all patches in B) and the dependency of the queries (all
+                                                            patches in A). After organizing the candidates in a kd-tree,
+1. Introduction                                         our method checks for each query its own leaf 1 and an ex-
+                                                                          tra leaf propagated from nearby queries. The candidates in
+   Non-parametric patch sampling is of central importance                                                               the propagated leaf need not be spatially close, so the algo-
+in various computer vision/graphics algorithms, including                                                            rithm can jump out of local optimum. Our algorithm is very
+image inpainting/retargeting [31, 28], denoising [8, 10],                                                                        fast because it only checks a small number of candidates
+texture synthesis [13, 30], super-resolution [17], matching       (e.g., 20 per query) and has no backtracking. In addition
+self-similarities [26], and rendering [21]. A common step                                                                   to efﬁciency, our algorithm is highly accurate thanks to the
+in non-parametric patch sampling is to compute approxi-                                                               data-adaptive structure of the kd-tree. In the experiments
+mate nearest-neighbor ﬁelds (ANNF) [4, 22]: given two im-                                                    on the public data set [9], we observe 10-20 times speedup
+ages A and B, ﬁnd for every patch in A a similar patch in                                                             versus PatchMatch at the same accuracy, or 70% less error
+B. ANNF computation is a special nearest-neighbor search                                                                        at the same running time. Very recently, a method called
+problem, where the query/candidateset consists of all (over-                                                      Coherency Sensitive Hashing (CSH) [22] improves Patch-
+lapping) patches in the image A/B. It is challenging to com-                                                   Match by introducing a hashing scheme. We ﬁnd that our
+pute ANNF quickly, because the sizes of both sets are very                                                    method is 2 to 5 times faster than this latest state-of-the-art
+large.                                                    method and is more accurate.
+   Traditional approximate nearest-neighbor (ANN) algo-                                                                        Interestingly, our experiments also show a traditional kd-
+rithms organize the candidates to facilitate searching. A                                                                     tree (where each query is treated independently) combined
+popular and effective way is through trees, such as the kd-                                                          with a suitable representation has comparable performance
+tree [15] and other varieties [30, 11, 23, 24]. Tree-based                                                          with PatchMatch. This is in contrast to the results reported
+methods organize the candidates adaptively to their distri-
+bution in the searching space. A query can ﬁnd its ANN by          1In our experiments a typical leaf contains 8 candidates.
+
+
+                                                 1
+
+======================== PDF 第 2 页 ========================
+                image A                           image B
+               (query patches)                       (candidate patches)
+
+
+                     pA(x, y)
+
+          pA(x-1, y)
+                                                            pB(x’, y’)
+
+                                              pB(x’-1, y’)
+                                                                  Figure 2. The ﬁrst 16 Walsh-Hadamard Transform (WHT) bases
+                                                                    (white = 1, black = -1). Each basis is a 4n×4n-pixel kernel.Figure 1. Propagation in PatchMatch. Each square represents the
+top left pixel of a patch, so the nearby patches are actually over-
+lapping. The solid arrow indicates a good match. The dash arrow
+                                                                   to the next query, providing a good initial guess which is up-indicates a candidate to be checked.
+                                                            dated by some randomly sampled candidates. The random
+                                                             search in turn provides better sources for propagation. This
+in [4], which ﬁnds kd-trees are inferior. Our discovery indi-     process is iterated. PatchMatch has been shown 20 to 100
+cates that candidate distributions (exploited by kd-trees) and     times faster than kd-trees plus Principal Component Anal-
+query dependency (exploited by PatchMatch) can be almost      ysis (PCA) [4]. But because PatchMatch does not organize
+equally contributing to ANNF computation. Thus combin-     the data beforehand, most randomly sampled candidates are
+ing these two aspects as in our method can make signiﬁcant     unlikely to be good matches. And its local propagation of-
+improvement.                                                  ten leads to over-smoothed results.
+                                                     Most recently, a method called Coherency Sensitive
+2. Related Work                                     Hashing (CSH) [22] improves PatchMatch by combining
+                                                              Locality Sensitive Hashing (LSH) [12].  All the patches
+  We review the works most related to our method: Tree-                                                                (queries and candidates) are hashed into bins, and similar
+based methods, and PatchMatch and its improvements.                                                            patches have a good chance to fall into the same bin. Ran-
+Tree-based methods. A classical method for ANN search    dom candidates are sampled from the bins that most po-
+is the kd-tree [15].   It is a binary tree where each node      tentially contain good matches.  This hashing method is
+denotes a subset of the candidate data with a partitioning     combined with propagation. This method is also iterative,
+boundary of the data space. The partitioning is adaptive to     switching the hashing function in each pass.  It shows 3-
+the distribution of the data. Given a query, the search meth-    4 times of speedup versus PatchMatch. But this binning
+ods [15, 2] descend the tree to a leaf and backtrack other    scheme is in general unbalanced and not aware of the data
+leaves that are close to the query. The searching accuracy      distribution, and the bin sizes need to be adjusted carefully.
+depends on the amount of backtracking [2, 27].               Random sampling is required in PatchMatch/CSH to re-
+  To better organize the candidates and reduce backtrack-     duce candidates checked. Our method has no randomness,
+ing, various types of trees have been proposed, including     and reduces candidates checked via data organization.
+the k-means tree [16, 24], bbd-tree [3], TSVQ [30], vp-tree
+[23], rp-tree [11], multiple randomized kd-trees [27, 24],     3. Algorithm
+and so on. Though all these methods can improve accuracy,
+they spend extra effort in building the trees, e.g., the build-     We observe that the distribution of the candidates and
+ing time of a k-means tree [24] is 10-20 times more than a      the dependency of the queries can be exploited jointly. We
+kd-tree. This is not favored in ANNF computation, because     use a kd-tree with a suitable representation to organize the
+we often have to build the tree on-line.                          candidates. Then we propose a novel propagation-assisted
+   Recent studies [24, 29] show that tree-based methods, in-     search method for fast and accurate querying.
+cluding the simple kd-tree, are still among the state-of-the-
+                                                               3.1. Patch Representation
+art ANN methods nowadays. But it is worth noticing that in
+these evaluations the queries are treated independently.       A p-by-p patch in a color image can be represented by a
+PatchMatch.  The PatchMatch method [4] utilizes the de-     vector in a 3p2-dimensional space. The similarity between
+pendency among the queries and performs searching col-     two patches is described by the L2 distance in this space.
+laboratively. It is observed that the images are coherent: the     Because the kd-tree is less effective for high dimensional
+patches in a neighborhood in image A are likely to match      data, it is recommended to reduce dimensionality via PCA
+the patches in a neighborhood in image B. Typically, if a      [27, 4]. But projecting each patch on each PCA basis re-
+pair of patches are similar, they are likely to remain similar      quires slow O(3p2) time pre-computation.
+when shifted one or some pixels simultaneously (see Fig.1).        Instead we use the Walsh-Hadamard Transform (WHT)
+Thus the matching result of a query patch can be propagated     [20] as the bases (Fig. 2).  It is a Fourier-like orthogonal
+
+======================== PDF 第 3 页 ========================
+       (a) Standard search            (b) Priority search           (c) Randomized kd-trees      (d) Propagation from GT     (e) Our propagation search
+             (err: 11.13)                      (err: 10.71)                       (err: 7.80)                        (err: 2.77)                        (err: 3.04)
+ 120                               120                               120                              120                               120
+
+
+e1                    e1                    e1                    e1                    e1
+
+
+   0         e0                0                                 0                                 0                                 0                                120           e0           120           e0           120           e0           120           e0           120
+Figure 3. The joint distribution P(e0, e1) in different search strategies: (a) standard search; (b) priority search; (c) randomized kd-trees; (d)
+propagation from GT; (e) our propagation method. A darker color means higher probability. The Leaf #0 is the same in all these ﬁgures,
+so the marginal distribution P(e0) is identical. We only change Leaf #1. In the brackets is the average error of the best candidate in the
+union set of Leaf #0 and #1. The error in Leaf #0 alone is 13.84. The error is reduced only when e1 < e0, i.e., below the diagonal line. The
+distributions are computed using the images in [25]. Each leaf contains m = 8 candidates in this test. Here the error is computed through
+the 24-d representation.
+
+
+transform. In natural images the ﬁrst few WHT bases con-     Denote the ﬁrst leaf visited in backtracking as Leaf #1. We
+tribute a large portion of L2 distance [20], just like the PCA     deﬁne e1 as the error of the best match in this leaf:
+bases. Speed-wise, projecting on each WHT basis requires
+only 2 operations per patch [6]. We use the ﬁrst 16 WHT       e1(pA) =   min   (∥pA −pB∥2) −∥pA −ˆpB∥2,  (1)
+                                                                             pB∈Leaf #1
+bases for the Y channel2 and 4 for each chrominance chan-
+nel (Cb/Cr) throughout this paper. Thus we represent each     where pA is a query patch, pB is a candidate patch, and
+patch by a 24-d vector. In CSH [22] the WHT is used for      ˆpB is the true nearest neighbor in the whole image. We
+constructing hashing functions.                             can deﬁne e0 as the error of the best match in Leaf #0 in a
+                                                                 similar way. To see how well Leaf #1 improves the result,
+3.2. Building a KD-Tree
+                                             we test on the images in [25] and plot the joint probability
+   After computing the WHT, we build a traditional kd-tree      distribution P(e0, e1) in Fig. 3 (a). Notice that Leaf #1 can
+[15] in the 24-d representation space. Given any candidate     improve the result only when e1 < e0, i.e., below the line
+set, we choose the dimension with the maximum spread3     e1 = e0. But the distribution is mostly above this line. In
+and split the space by the median value of the candidate da-      this example the average error in Leaf #0 alone (mean(e0))
+ta in this dimension. The median split is to ensure balance.       is 13.84, and combining Leaf #1 reduces the error to 11.13
+The candidate set is divided recursively until the each ter-     (mean(min(e0, e1))). The improvement is minor.
+minal node (leaf) contains at most m candidates. We test       The priority search method [2] backtracks the sub-trees
+m=8 to 64 in this paper.                                          in the order of their distance to the query, so better leaves are
+                                                          expected to be visited earlier. In this case, the distribution
+3.3. Analysis of Search Strategies                                                       P(e0, e1) is shown in Fig. 3 (b). We see that most points are
+   In the search step, a query greedily descends the tree        still located above the line e1 = e0, and the improvement is
+from the root to a leaf by checking the partitioning bound-     not much (error = 10.71).
+ary in each node. We denote this leaf as Leaf #0. The query        In [27] it is observed that the leaves visited via back-
+lies in the hyper-cube determined by this leaf, so any search     tracking are mutually dependent, and the improvement of
+strategy should check all candidates in Leaf #0. But there is      visiting more leaves is diminishing. The method in [27]
+a chance that better candidates lie in other leaves, e.g., when      instead builds multiple randomized kd-trees, so the search-
+the query is very close to the boundary. One may ﬁnd a bet-     es are largely independent among trees. Here we generate
+ter result by checking other leaves. A common question in     Leaf #1 by descending a second kd-tree with random rota-
+tree-based methods is: how to determine the next leaves to      tion [27]. We ﬁnd the joint distribution P(e0, e1) is well
+be checked?                                             symmetric (Fig. 3 (c)). Almost a half of the results are im-
+  The standard search method [15] backtracks in depth-     proved by Leaf #1. The error is reduced to 7.80. This is
+ﬁrst order and examines those leaves close to the query.     perhaps the best outcome we can expect for any individual
+                                                         query after checking two leaves.
+   2Computing 16 WHT bases requires p to be a multiple of 4. But we
+                                                        But the queries in ANNF tasks can be handled cooper-
+can relax this constraint by interpolation and allow any patch size.
+   3The spread is deﬁned as the difference between the largest and small-      atively. If a query has found a good match, it can provide
+est values in the dimension [3].                                     information for the nearby queries. Suppose a query patch
+
+======================== PDF 第 4 页 ========================
+                                                       Step 2: Propagate a leaf from left, i.e., along x-axis (as in
+                                                                 Fig. 4). Speciﬁcally, denoting pB(x′ −1, y′) as the result
+                            Leaf #1                          found by pA(x −1, y). We pick out the patch pB(x′, y′)
+                                                      and retrieve the leaf containing it. This leaf can be retrieved
+                                                           without any traversing4. Similarly, we also propagate a leaf
+                                                     from top, i.e., along y-axis.                pA(x, y)
+
+     pA(x-1, y)                                             Step 3: Find the nearest-neighbor of pA(x, y) in all the
+                                                      pB(x’, y’)             leaves obtained in Step 1 & 2.
+
+                                         pB(x’-1, y’)
+                                                    Our algorithm is non-iterative and ﬁnishes in one scan. It
+            image A                           image B              need not randomly sample candidates. The above algorith-
+Figure 4. Propagation-assisted kd-tree. The symbols are analogous   m alone performs quite well, but we can further improve
+to those in Fig. 1. The dotted arrow indicates the propagated leaf.       its speed and accuracy by three more operations, namely,
+Given the matching result pA(x −1, y) →pB(x′ −1, y′), the                                                            enrichment, pruning, and re-ranking.
+candidates for pA(x, y) are all the patches in the leaf that contains
+the patch pB(x′, y′) (like the shaded ones).
+                                                   Enrichment  The kd-tree is a good method for searching
+                                                  k nearest-neighbors (k > 1). We adopt this property to fur-
+pA(x−1, y) has found a similar patch pB(x′−1, y′) (Fig.4).      ther improve quality. We maintain the best k candidates for
+We use it to improve the result of pA(x, y). We take the leaf     each query. Although this does not impact the outcome of
+that contains pB(x′, y′) as Leaf #1. This is an extension of      the current query, the extra k −1 candidates can propagate
+                                                                         (at most) k −1 leaves to the following query, enriching itsthe propagation step in PatchMatch: we propagate a group
+of candidates instead of a single one. These candidates ap-     candidates pool. The propagation is just similar to that in
+pear similar but need not be spatially nearby (see the shaded     Step 2. In all the experiments we set k = 2. Combining
+patches in Fig.4). We name this strategy as propagation-     with the “pruning” operation introduced below, the enrich-
+assisted kd-tree search.                                 ment operation reduces the error by 15% with almost no
+                                                                 extra time cost.   In a very special case that pB(x′ −1, y′) is the ground
+truth best match of pA(x −1, y), we plot the error distribu-
+tion of pA(x, y) in Fig. 3 (d). We observe that over half of     Pruning  For each query we obtain at most 2k propagated
+                                                               leaves (k from left and k from top) besides the query’s ownthem are improved by Leaf #1 (below the line e1 = e0). The
+                                                        Leaf #0. To reduce time cost, we select only one leaf fromerror is signiﬁcantly reduced to 2.77. This test suggests that
+                                                               these 2k leaves. This is achieved by ﬁrst checking the patchﬁnding a very good result without backtracking is possible,
+                                                     which “guides” us to a leaf (e.g., pB(x′, y′) in Fig.4). Wewhen the queries can propagate their information.
+                                                        have 2k such guide patches and compute their similarities  Though the propagation search using the ground truth
+                                                                   to the query, approximately measuring how good the leavesbest match of pA(x −1, y) to help the search of pA(x, y)
+                                             may be. We only keep the single leaf with the best guideis not practical, we can expect a similar performance if the
+                                                                patch, and ignore the others. The plot in Fig. 3 (e) is givenmatch of pA(x−1, y) is good enough. Actually we can ﬁnd
+                                                    by the Leaf #1 obtained in this way.a good match of pA(x−1, y) by another propagation search
+                                                        With this pruning technique our algorithm checks at(propagated from pA(x−2, y)), and so on. We describe the
+                                                     most 2k+2m candidates per query: 2k “guide” patches, anddetails in the next subsection. The distribution P(e0, e1)
+                                      2m patches from Leaf #0 and #1 (each leaf has m patches).in Fig. 3 (e) is generated by the Leaf #1 obtained in our
+algorithm. It is not much different from Fig. 3 (d), and the
+                                                    Candidate checking and re-ranking  Given the candi-error (=3.04) is only slightly larger.
+                                                               dates in Leaf #0 and #1, the simplest way to ﬁnd an ANN of
+3.4. Propagation-Assisted KD-tree Search              a query is to compute its L2 distance to each candidate using
+                                                               the 24-d representation. Although this strategy may lose ac-
+  Next we describe our search algorithm driven by the
+                                                          curacy due to dimensionality reduction, in experiments we
+above analysis. Our algorithm scans the image A in raster
+                                                  ﬁnd that its time-error tradeoff is satisfactory.
+order (from left to right, top to bottom). For a query patch
+                                          We can obtain a better solution by computing the L2 dis-
+pA(x, y) being scanned, we do the following 3 steps:                                                             tance in the original 3p2-dimensional space, but this is much
+                                                                slower. A compromising way is to ﬁnd K nearest-neighbors
+Step 1: Descend the tree to the Leaf #0.
+                                                          4We maintain a leaf pointer for each candidate pB when building a tree.
+
+======================== PDF 第 5 页 ========================
+using the 24-d representation, and re-rank these K candi-     each query patch and its nearest neighbor found by an algo-
+dates in the original space. Re-ranking not only improves     rithm, using the original RGB colors of the p-by-p pixels.
+the result of the current query, but also impacts the propaga-    The running time is averaged on all 133 image pairs in the
+tion quality. We set K = 2 in this paper5. We compare both     data set. We test our method using m ∈{8, 16, 32, 64}.
+strategies (without and with re-ranking) in experiments.      We also test our method without and with re-ranking. All
+                                                           pre-computation time (WHT and tree-building) is included
+3.5. Complexity                                                in all reports.
+                                                                 In Fig. 5 it is clear that our algorithm signiﬁcantly out-  Given an N-pixel image,  the  tree building time  is
+                                                         performs PM and CSH. At the same accuracy our fastestO(dN log N) where d = 24 is the dimensionality. The
+                                                                    setting (no re-ranking and m=8) is 18 times faster than PMreason for the factor d is because all dimensions of all da-
+                                                      and 3 times faster than CSH; a more precise setting (re-ta in each node are scanned to ﬁnd the maximum spread.
+                                                              ranking, m=8) is 4-5 times faster than CSH to approachTo reduce time cost, we only sample 1/d data in spread
+                                                                 similar accuracy. Given the same running time, our methodcomputation (in other operations we still use all data). This
+                                                           reduces the error  (i.e., the discrepancy between groundsimpliﬁcation rarely changes the ﬁrst several branches, and
+                                                                      truth) of PM by 70% and the error of CSH by 50% in mosthas negligible inﬂuence on quality in experiments. The tree
+                                                                    settings (e.g., on our curve “re-ranking”). Our algorithmbuilding time is thus reduced to O(N log N).
+                                                    manages to achieve very good accuracy (e.g., re-ranking,  Suppose both images are of N pixels. The search time is
+                                               m=64) that is not available in PM/CSH after 30 iterations.O(N log N)+O(Nmd), where the ﬁrst term is for descend-
+                                             When m=8 our method checks about 20 candidates pering the tree and the second term is for candidate checking.
+                                                               query. In comparison, this number is ∼60 in PM and 50 inIn practice the linear part O(Nmd) is dominant, e.g., when
+N=1Mp (log N=20), m=8, and d=24. Table 1 shows the   CSH after 5 iterations (their default). Our method is more
+                                                              accurate even if it checks much fewer candidates. This istypical running time of each stage.
+                                                         because the accuracy of PM/CSH can only be guaranteed
+   image size  WHT    tree building      search       total        given a sufﬁciently large number of random samples.
+                                        O(NlogN)                          It is worth noticing that our better time-accuracy trade-    N      O(Nd)    O(NlogN)
+                                   +O(Nmd)                  off versus PM is not purely due to the shorter representation
+    0.5Mp      0.08s        0.2s          0.32s       0.6s                                                              of WHT. Though PM uses the original representation, the
+    2Mp       0.3s         0.9s           1.5s       2.7s
+                                                           average effective dimensionality checked is only 20-40%
+Table 1. Typical running time of each stage (m=8, no re-ranking).     of 3p2 due to “early stop” [4] (when the partial sum ex-
+                                                          ceeds the current best sum), while the WHT hardly bene-
+                                                                ﬁts from early stop due to its compact energy. Moreover,  The memory complexity of our method is about O(Nd),
+                                                        though the shorter WHT representation leads to faster can-mainly for storing the WHT coefﬁcients.  In practice,  it
+                                                               didate checking, it also impacts quality. In experiment wetakes around 100MB memory when N=1Mp.
+                                                  ﬁnd PM+WHT generally has worse time-accuracy tradeoffs
+                                                            than PM alone.
+4. Experiments
+                                          We also compare our method with PM/CSH using vari-
+  We compare our algorithm with PatchMatch (PM) and     ous image sizes and patch sizes, as shown in Fig. 6. Sim-
+CSH. Our algorithm is implemented in C++. The PM and       ilar performance comparisons are observed: our method is
+CSH codes are from the authors’ websites [25, 9], both es-     about 10-20 times faster than PM and 2-5 times faster than
+sentially in C++. All algorithms are run on a PC with an   CSH to achieve the same accuracy.
+Intel Core i7 3.0GHz CPU and 8GB RAM. Here we com-
+pare single core implementations6. We experiment on the    Comparisons with traditional kd-trees  We also com-
+public data set VidPairs [9]. This is a challenging data set     pare the traditional kd-tree method (no propagation) in
+where each pair of images have very large displacement.        Fig. 5. We ﬁx the parameter m=8 when building this tree.
+                                                  The marker “⊗” (leftmost on the curve) shows the perfor-
+Time-accuracy tradeoffs  In Fig. 5 we show the time-    mance without any backtracking:  it is better than the ﬁrst
+accuracy curves using 8-by-8 patches and 2Mp images. The      iteration of PM/CSH, even if PM/CSH has already exploit-
+accuracy is described by the average L2 distance between     ed propagation. This means that a kd-tree with WHT rep-
+                                                                 resentations is a good way to organize the candidates. Al-
+  5We have tested K > 2 in re-ranking (and also k > 2 in enrichment)     though CSH also groups the candidates before searching,
+and found that the gain is not much given the extra running time.
+                                                                                   its binning structure is in general unbalanced and less data-   6Our method can be parallelized just like PM. In dual/quad-core con-
+ﬁgurations we observe similar speedup versus PM (parallel CSH has not      adaptive. On the contrary, a kd-tree is fully balanced and
+been provided in [9]).                                            well adaptive to the data.
+
+======================== PDF 第 6 页 ========================
+    65
+
+                                                    2Mp, 8x8              PM
+    60                                                              CSH
+
+                                                                                      Ours (no re-ranking)
+    55                                                                                  Ours (re-ranking)
+ dist.
+L2                                                                                                     Traditional kd-tree
+    50
+                                                                                  Ground Truth
+
+
+    45
+
+
+
+
+    40
+       0                 5                10                15                20                25                30                35                40                45                50
+                                                                           seconds
+Figure 5. Time-accuracy tradeoffs averaged on 133 image pairs. The image size is 2Mp, and the patch size is 8-by-8. Each marker on
+PM/CSH’s curve represents the performance after each iteration. Each marker on our method’s curve represents its performance at each
+m value (m=8,16,32,64, from faster to slower). Each marker “×” on the traditional kd-tree’s curve represents its performance at each
+C value, where C=16,32,64,128,256 is the maximum candidates visited per query. Specially, the marker “⊗” represents the traditional
+kd-tree without backtracking. The dash line is the ground truth average L2 distance.
+
+  The markers “×” in Fig. 5 show the performance of a tra-                 14040                       0.4Mp, 4x4                     PM
+
+                                                                                                                                               36                                                                CSHditional kd-tree with different strengths of backtracking. We                 136
+
+
+                                                                                                                                                                                                                                         Ours                                                                                                                                                                                                                                                                                               (re-ranking)use the standard backtracking implementation of the ANN                 13232                                                                                     Ours (no re-ranking)
+                                                                                                                                                                                                                               Groundlib[1]. We set the “error bound” ε = 3 and vary the maxi-               dist.                                                                                                        Truth
+                                                                  L2 12828mum number C of candidates visited by any query (C=16
+to 256). Fig. 5 shows that its performance is slightly bet-                 12424
+ter than PM. This is in contrast to the result reported in [4],
+where the kd-tree plus PCA is found inferior. Our result                 12020 0            0.5          1           1.5          2            2.5          3            3.5          4           4.5          5
+                                                                                                              seconds
+is reasonable: the traditional kd-tree exploits the candidate                 105
+distributions and PM exploits the query dependency, and                 100                       0.4Mp, 8x8                     PM
+these two aspects can be equally contributing. All patch-                  95                                                                CSHOurs (no re-ranking)
+es in the candidate/query set are from one or another im-                  90                                                                                     OursGround(re-ranking)Truth                                                                                                                                                                              dist.age, so the data relations inside each set should have similar                                                                  L2 85
+strength. Thus a traditional kd-tree can actually be compa-
+rable with PM.                                                                                                              80
+                                                                                                                                              75
+
+
+
+                                                                                                                                                  0            0.5          1           1.5          2            2.5          3            3.5          4           4.5          5ANN ﬁelds and error maps  In Fig. 7 we demonstrate the                  70
+                                                                                                              seconds
+ANNFs and the error maps. The ANNF is given by a map                 115
+of the coordinates of the matched patches. In Fig. 7 we ﬁnd                 110                    2Mp, 12x12                    PM
+that the ANNF of PM is much smoother than the ground                 105                                                                CSHOurs (no(N/A)re-ranking)
+
+                                                                                                                                                                                                                                         Ours                                                                                                                                                                                                                                                                                               (re-ranking)
+
+                                                                                                                                                                                                                               Ground                                                                                                                                                                                                                                                                       Truth                                                                                                                                              100truth. Our method and CSH overcome this problem because               dist.
+both methods allow non-local propagation. But our ANNF      L2  95
+appears much more similar to the ground truth than CSH                  90
+(e.g., see the zoom-in regions).                                                                             85
+  On the error maps, we compute the error e of a query                  80
+patch pA by:                                                                                                                       0          5          10         15         20  seconds25         30         35         40         45         50
+                                                                  Figure 6. Comparison with PM/CSH in different settings. CSH is
+         e(pA) = ∥pA −pB∥2 −∥pA −ˆpB∥2,        (2)
+                                                                    not available in the third ﬁgure because it does not support patch
+where pB is the matched patch given by any algorithm , ˆpB       sizes other than 2nx2n.
+is the ground truth match, and ∥· ∥2 is computed by the
+original RGB representation. The error map of the ground
+truth matching is an all-zero map. Fig. 7 shows our matched     Reconstruction  One can reconstruct the image A by the
+patches have smaller error in general, typically on the edges     matched patches found in image B. This is a main step in
+and texture regions.                                     image inpainting, retargeting, and reshufﬂing [31, 28]. Any
+                                                                 pixel in the reconstructed image is “voted” by all the patch-
+
+======================== PDF 第 7 页 ========================
+ img A                         img B
+
+
+
+
+
+ PM
+
+
+
+
+
+ CSH
+
+
+
+
+
+ Ours
+                                            PM       CSH         Ours       GT
+
+
+
+
+
+ GT
+
+
+
+
+
+                        PM    CSH    Ours    GT
+
+Figure 7. ANN ﬁelds and the error maps. 1st row: inputs. 2nd-4th
+rows: the ANN ﬁelds (left) and the error maps (right) of PM, CSH
+and our method. 5th row: ground truth ANNF (left) and zoom-
+in of all the ANNFs. The ANNFs only show the x-coordinates,
+visualized in hue. In the error maps a darker pixel means larger
+error (a GT error map is all white). Here we use 0.4Mp images
+and 8x8 patches. The PM and CSH are after 5 iterations, and ours
+is using m=64 with re-ranking (running time: PM 2.3s, CSH 1.4s,       PM       CSH         Ours       GT
+and ours 1.2s). The images are from the VidPairs set.
+
+
+es covering this pixel. In Fig. 8 we show the reconstruction
+results. The “GT” reconstruction is the result voted by the
+ground truth matched patches. Our results are visually bet-
+ter than PM/CSH in various cases like thin structures (Fig. 8
+top), textures (Fig. 8 middle), edges (Fig. 8 bottom), and
+faces (Fig. 8 bottom, note the eyes and mouth). Our results
+are visually comparable to the ground truth.
+  When the image A is iteratively reconstructed using the
+same image B (as in [31, 28]), we only need to build the kd-
+tree using the patches in B once. Thus our speedups versus
+PM/CSH can be even greater in these applications.
+                                            PM       CSH         Ours       GT
+Scalability  Fig. 9 shows our running time at 10 different      Figure 8. Visual comparisons of the reconstructed images. On the
+image sizes. The time is almost linear in image sizes, since      top of each group are the images A and B. The images are 0.4Mp
+                                                            and the patches are 8x8. PM and CSH are run 1 iteration, andthe candidate checking time is dominant.
+                                                                 our method is m=8 without re-ranking. Thus the running time of
+                                                                                       all methods is nearly the same (∼0.5s). The images are from the
+5. Discussions and Future Work                         VidPairs set. This ﬁgure is best viewed in the electronic version.
+
+  We have shown our method is faster and more accurate
+than existing methods including PatchMatch. But it is worth
+
+======================== PDF 第 8 页 ========================
+     3                                                                  [11] S. Dasgupta and Y. Freund. Random projection trees and low
+    2.5                                                                   dimensional manifolds.  In Proceedings of the 40th annual
+     2                                          ACM symposium on Theory of computing, 2008.
+    1.5                                                                  [12] M. Datar, N. Immorlica,  P. Indyk, and V. S. Mirrokni.seconds 1                                                                           Locality-sensitive hashing scheme based on p-stable distri-
+    0.5                                                                           butions. In Proceedings of the twentieth annual symposium
+                                                              on Computational geometry, pages 253–262, 2004.
+     0
+       0                        0.5                    1                        1.5                    2         [13] A. A. Efros and T. K. Leung.  Texture synthesis by non-
+                         image size (Mp)
+                                                                         parametric sampling. In ICCV, page 1033, 1999.
+    Figure 9. Scalability of our method (m=8, no re-ranking).          [14] L. Fei-Fei and P. Perona. A bayesian hierarchical model for
+                                                                            learning natural scene categories. In CVPR, pages 524–531,
+                                                                      2005.
+mentioning that PatchMatch has other advantages.  First,      [15]  J. H. Friedman, J. L. Bentley, and R. A. Finkel. An algorithm
+PatchMatch has been generalized to search across scales            for ﬁnding best matches in logarithmic expected time. ACM
+and rotations [5] or color transformations [18]. Second, the           Trans. Math. Softw., pages 209–226, 1977.
+similarity function (L2) in PatchMatch can be extended to      [16] K. Fukunaga and P. M. Narendra. A branch and bound algo-
+special forms other than Lp norms, such as those tailored           rithm for computing k-nearest neighbors. IEEE Trans. Com-
+for image matting [19] or stereo vision [7]. Besides, Patch-             put., pages 750–753, 1975.
+Match is more memory efﬁcient. In the future we will im-      [17] D. Glasner, S. Bagon, and M. Irani. Super-resolution from a
+prove our method in these directions.                                     single image. In ICCV, 2009.
+                                                                      [18] Y. HaCohen, E. Shechtman, D. B. Goldman, and D. Lischin-  The key idea of our method is that querying can be per-
+                                                                                        ski.  Non-rigid dense correspondence with applications for
+formed collaboratively in traditional ANN methods if the
+                                                                image enhancement. In SIGGRAPH, 2011.
+queries are dependent.  It motivates us to study other sim-
+                                                                      [19] K. He, C. Rhemann, C. Rother, X. Tang, and J. Sun. A global
+ilar scenarios. For example, in object categorization [14]
+                                                                    sampling method for alpha matting. In CVPR, pages 2049–
+overlapping patches are quantized by searching nearest-                                                                      2056, 2011.
+neighbors in a codebook.  It may be accelerated by prop-                                                                      [20] Y. Hel-Or and H. Hel-Or. Real time pattern matching using
+agation search. We will study this topic in the future.                   projection kernels. In ICCV, pages 1430–1445, 2003.
+                                                                      [21] A. Hertzmann, C. E. Jacobs, N. Oliver, B. Curless, and D. H.
+                                                                               Salesin. Image analogies. In SIGGRAPH, 2001.
+References                                                       [22] S. Korman and S. Avidan. Coherency sensitive hashing. In
+                                                             ICCV, 2011.
+ [1] ANN library. www.cs.umd.edu/˜mount/ANN/.                                                                      [23] N. Kumar, L. Zhang, and S. Nayar. What is a good nearest
+ [2] S. Arya and D. M. Mount. Algorithms for fast vector quan-                                                                       neighbors algorithm for ﬁnding similar patches in images?
+      tization. In Proc. DCC ’93: Data Compression Conf, pages                                                                          In ECCV, pages 364–378, 2008.
+     381–390, 1993.
+                                                                      [24] M. Muja and D. G. Lowe. Fast approximate nearest neigh-
+ [3] S. Arya, D. M. Mount, N. S. Netanyahu, R. Silverman, and           bors with automatic algorithm conﬁguration. In In VISAP-
+     A. Y. Wu. An optimal algorithm for approximate nearest        P International Conference on Computer Vision Theory and
+     neighbor searching ﬁxed dimensions. J. ACM, 1998.                   Applications, 2009.
+ [4] C. Barnes, E. Shechtman, A. Finkelstein, and D. B. Gold-      [25] PatchMatch website.  http://gfx.cs.princeton.
+     man. Patchmatch: a randomized correspondence algorithm        edu/pubs/Barnes_2009_PAR/.
+      for structural image editing. In SIGGRAPH, 2009.                [26] E. Shechtman and M. Irani. Matching local self-similarities
+ [5] C. Barnes, E. Shechtman, D. B. Goldman, and A. Finkel-           across images and videos. In CVPR, pages 1–8, 2007.
+      stein. The generalized patchmatch correspondence algorith-      [27] C. Silpa-Anan and R. Hartley. Optimised kd-trees for fast
+    m. In ECCV, pages 29–43, 2010.                                image descriptor matching. In CVPR, pages 1–8, 2008.
+ [6] G. Ben-Artzi, H. Hel-Or, and Y. Hel-Or. The gray-code ﬁlter      [28] D. Simakov, Y. Caspi, E. Shechtman, and M. Irani. Sum-
+      kernels. TPAMI, pages 382–393, 2007.                              marizing visual data using bidirectional similarity. In CVPR,
+ [7] M. Bleyer, C. Rhemann, and C. Rother. Patchmatch stereo          pages 1–8, 2008.
+       - stereo matching with slanted support windows. In BMVC,      [29] A. Vedaldi and B. Fulkerson. Vlfeat: an open and portable
+     2011.                                                                      library of computer vision algorithms. In ACM Multimedi-
+                                                                           a’10, 2010. [8] A. Buades, B. Coll, and J.-M. Morel. A non-local algorithm
+      for image denoising. In CVPR, pages 60–65, 2005.               [30] L.-Y. Wei and M. Levoy. Fast texture synthesis using tree-
+                                                                              structured vector quantization. In SIGGRAPH, 2000.
+ [9] CSH website. www.eng.tau.ac.il/˜simonk/CSH/.
+                                                                      [31] Y. Wexler, E. Shechtman, and M. Irani.  Space-time video
+[10] K. Dabov, A. Foi, V. Katkovnik, and K. Egiazarian. Image
+                                                                        completion. In CVPR, pages 120–127, 2004.
+     denoising by sparse 3-d transform-domain collaborative ﬁl-
+      tering. TIP, pages 2080–2095, 2007.

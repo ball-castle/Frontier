@@ -1,0 +1,547 @@
+KH-A011 | A Geodesic-Preserving Method for Image Warping
+来源：https://openaccess.thecvf.com/content_cvpr_2015/html/Li_A_Geodesic-Preserving_Method_2015_CVPR_paper.html
+本地PDF：专题文献/何恺明/KH-A011_A_Geodesic_Preserving_Method_for_Image_Warping_CVPR2015.pdf
+SHA-256：666f20ecdaf862aeb4d0ca5fa3eaf208623ee01b26cea6a748426c37c5f1418e
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+         A Geodesic-Preserving Method for Image Warping
+
+
+
+                   Dongping Li1, Kaiming He2, Jian Sun2, and Kun Zhou1
+
+                            1Zhejiang University , 2Microsoft Research
+
+
+
+
+Abstract The manipulation of panoramic/wide-angle im-
+ages is usually achieved via image warping. Though vari-
+ous techniques have been developed for preserving shapes
+                                                                               camera        geodesic
+and straight lines for warping, these are not sufﬁcient for
+panoramic/wide-angle images. The image projections will                                      straight
+turn the straight lines into curved “geodesic lines”, and it
+is fundamentally impossible to keep all these lines straight.                                                                                   spherical projection         cylindrical projection
+In this work, we propose a geodesic-preserving method for
+content-aware image warping.  An energy term is intro-      Figure 1. When a straight line is projected to a manifold, it be-
+                                                        comes a curve. In the case of spherical projection (left), the curveduced to preserve the geodesic appearance of the geodesic
+                                                                                       is a section of a great circle; in the case of cylindrical projection
+lines, and can be used with shape-preserving terms. Our
+                                                                                  (right), the curve is a section of an ellipse.
+method is demonstrated in various applications, including
+rectangling panoramas, resizing panoramic/wide-angle im-
+ages, and wide-angle image manipulation. An extension to     on the projected images and then preserved. But if the lines
+ellipse preservation for general images is also presented.       have become curved due to the projection, this method can
+                                                                               fail to address them (Fig. 2(b)).
+1. Introduction                                               Instead of preserving straightness, in this work we pro-
+                                                         pose to preserve geodesic  lines.  We deﬁne “geodesic
+   Panoramic/wide-angle images are getting increasingly                                                                   lines” as projections of 3-D straight lines onto 2-D man-
+popular for common users, thanks to the inexpensive and                                                                    ifolds (Fig. 1). They are great circles on spheres and el-
+convenient devices, such as phones that capture panoramas                                                                    lipses on cylinders2.  Unlike the methods in [6, 11] that
+[2] and GoPro cameras [1] that capture wide-angle pho-                                                                  straighten geodesic lines, our method allows them to be
+tos.  Panoramic/wide-angle images are inevitably warped                                                              curved.  But an unnaturally curved geodesic line can be
+in the image formation procedures, so image warping is a                                                               noticeable (Fig. 2(b)), because a geodesic line is not sim-
+natural way of processing and manipulating these images                                                             ply a locally smooth curve. In our solution, we constrain
+[14, 23, 3, 12, 6, 11, 9, 22].                                                          a geodesic line to remain “geodesic”:  it should be warped
+   Studies on image warping have paid particular atten-      into another geodesic line, so can preserve its geodesic ap-
+tion to preserving shapes [10, 15, 24] and straight lines     pearance. Fig. 2(c) is an example of our solution.
+[6, 11, 5, 7, 9]. However, these techniques are not sufﬁcient        Preserving geodesic lines is a challenging task. Firstly,
+for warping panoramic/wide-angle images. It has been long     a geodesic line is a non-local geometric entity whose points
+realized in cartography [16] and computer science [18] that     can be far away from each other.  So we need to use
+it is impossible to preserve all straight lines when projecting    some non-local representations.  Secondly, geodesic lines
+panoramic/wide-angle images1. As Carroll et al. [6] recog-      are complex nonlinear entities, and it is difﬁcult to repre-
+nized, the straight-line-preserving methods can fail if the      sent them via curve equations. To address these problems,
+number of straight lines is large. Carroll et al. [6] and Kopf    we rely on 3-D planes that are linear and non-local. We
+et al. [11] also observe if a straight line is long spanned,      treat a geodesic line as the intersection of a 3-D plane and
+preserving its straightness can seriously distort other con-      the projection manifold. Then we constrain all points of a
+tent. In He et al.’s work [9], the straight lines are detected     geodesic line to be on another plane after warping, so as to
+
+   1Perspective projection always preserves straight lines but only applies       2A great circle is mathematically “geodesic” (shortest path), but an el-
+to narrow-angles < 60◦[26, 18].                                                   lipse is not. For simplicity, in this paper we term them as “geodesic lines”.
+
+
+                                                 1
+
+======================== PDF 第 2 页 ========================
+            (a) input panorama
+
+
+                                                      (b) He et al.’s rectangling result                           (c) our rectangling result
+Figure 2. An example of preserving straight lines vs. geodesic lines. He et al. [9] warp an irregularly shaped panorama to ﬁt a rectangle, and
+preserve the straight lines detected on the projected image (a). This method will distort geodesic lines as in (b). Our method can preserve
+geodesic lines and produce a better result as in (c). On the bottom are the zoom-in regions.
+
+
+
+
+
+          (a) detected lines         (b) lines on manifolds  (c) lines grouped           (d) before warping         (e) warp with geodesic lines preserved
+Figure 3. An overview of our approach. (a) Straight lines are detected on images before projection and stitching. These lines become curves
+(blue) on the projected image. (b) On the 3-D coordinate system, these lines are geodesic lines (great circles) on the manifold. (c) The
+geodesic lines are grouped according to their normal directions. We use one color to represent one group. (d) The image before warping
+with the grouped lines. (e) The image warped by our algorithm to ﬁt a rectangle. (For illustrations, not all detected lines are displayed.)
+
+
+preserve its geodesic appearance. We formulate this as an     these methods have different formulations, they share some
+optimization problem.                                    key components. Firstly, these methods cut a long straight
+  We demonstrate our algorithm in various applications,      line into small segments, such that each segment can be ma-
+including  rectangling panoramas  [9]  (Fig.  2),  resizing     nipulated by a local mesh quad. Secondly, these methods
+panoramic/wide-angle images, and wide-angle image ma-     introduce some non-local variables that relate these seg-
+nipulation [6]. Experiments show that our method is more     ments together. The rotational angle or its equivalence is
+ﬂexible than the methods that preserve straight lines, and     a non-local variable used by these methods.
+produces pleasing visual quality in challenging cases. We
+further extend our method to ellipse preservation in general     3. Our Approach
+(non-panoramic/wide-angle) warping tasks.
+                                                                     Spherical/cylindrical projections are commonly used
+                                                                projections [17].  They will map a straight line in the2. Related Work
+                                                  3-D world into a geodesic line on the projecting mani-
+                                                                fold (Fig. 1). A 3-D straight line and the camera center
+Preserving Local Shapes. In the pioneer work of Igarashi
+                                                     form a 3-D plane. This plane intersects with the manifold
+et al. [10], an as-rigid-as-possible formulation is proposed
+                                                                 (sphere/cylinder) and produces a geodesic line. In the 3-D
+for warping images. This method encourages each triangle
+                                                              coordinate systems, the geodesic lines are nonlinear curves
+in the mesh to undergo a “rigid” transform (rotation+shift).
+                                                                              - they are great circles or ellipses.  In the 2-D coordinate
+A Moving-Least-Squares method [15] generalizes  it and
+                                                         systems on the projected manifolds, the curve equations are
+supports afﬁne/similarity transforms. Zhang et al. [24] de-
+                                                   more complicated combinations of trigonometric functions.
+rive a matrix form of as-similar-as-possible warping. This
+                                                 Due to the nonlinearity, it is more challenging to preserve
+form produces a single linear system and is ﬂexible to be
+                                                                the geodesic lines than straight lines. We resort to a linear
+combined with other energy terms.   It has been applied
+                                                          subspace as a guidance. Consider a group of points on a
+in image retargeting [24, 7], video retargeting [20], video
+                                                           geodesic line. They lie on a common plane before warp-
+stabilization [13], rectangling panoramas [9], and content-
+                                                                    ing. After warping, if they are on another common plane
+aware rotation [8].
+                                                          (and intersect the manifold), they can still produce another
+Preserving Straight Lines. Several methods [6, 5, 7, 9, 8]     geodesic line. Because planes are linear subspaces, it is eas-
+have been proposed for preserving straight lines. Though      ier for us to manipulate them.
+
+======================== PDF 第 3 页 ========================
+3.1. Overview                                                                                         Rθ,φ
+                                                                                                 n^  The overview of our warping algorithm is in Fig. 3. Here
+we use panorama rectangling [9] as an example warping                           p
+application.  First we detect the geodesic lines in the im-
+age (Fig. 3(a)). These lines are projected on the manifolds
+(Fig. 3(b)), and are clustered into groups (Fig. 3(c)). The
+line segments in each group are approximately in the same
+                                                    ^
+3-D plane, and correspond to a consistent geodesic line.       ^p1       p2                p^
+With the grouped lines, the image is warped by optimizing
+a grid mesh (Fig. 3(d,e)). The details are as follows.                                             (a)                                (b)
+                                                                  Figure 4. Left: ˆp1 and ˆp2 are two end points of a geodesic line
+3.2. Detecting and Grouping Geodesic Lines                                                             segment before warping. Right: ˆp = ˆBs is a shifted point on the
+  We ﬁrst detect the geodesic lines. We assume the projec-     same plane (black) as ˆp1 and ˆp2. This plane is rotated by Rθ,φ and
+tion coordinate system is known. For panoramas, the pro-     mapped to another plane (red). Then ˆp becomes p after warping.
+jection is used when stitching the source image sequence
+[17] and is known. We detect the straight lines in each                                                              In the second part, the transform rotates this plane by some
+source image (before projection) using the LSD method                                                             angles (θ, φ) (Fig. 4(b)).  This rotation can be written as
+[19].  These straight lines are projected onto the stitched
+                                                          a 3-D rotation matrix Rθ,φ (see supplementary materials).
+image and become detected geodesic lines (Fig. 3(a)). For                                                    Combining these two parts, the transform T  is:
+wide-angle images, the projection can be given by camera
+calibration [25] and the rest is similar.                                  T (s, θ, φ) = Rθ,φ ˆBs.                (1)
+  Next we group the geodesic lines, such that the lines in
+a group should be approximately on the same plane. We     We deﬁne an energy to minimize the difference between
+ﬁrst cut all the geodesic lines into small segments, such that     a point p and its expected transformed position:
+each segment is inside a mesh quad. For each segment, we
+ﬁnd the 3-D coordinates of their two endpoints on the man-                 e(p, s, θ, φ) = ∥Rθ,φ ˆBs −p∥2.           (2)
+ifold, and compute their normal vector (Fig. 3(b)). Then
+                                                     Here p is the 3-D position (of p1 or p2) after warping andwe run k-means clustering on the set of all normal vectors.
+                                                                   will be related to the mesh vertexes, and {θ, φ} are non-The resulting K k-means centers represent the normal vec-
+                                                                 local variables that are shared by all the segments in thetors of the K planes (Fig. 3(c)). Each group approximately
+                                                   same group.corresponds to a consistent geodesic line (Fig. 3(d)).
+                                          We ﬁrst minimize Eqn.(2) w.r.t. s and obtain:
+3.3. Energy for Preserving Geodesic Lines
+                                                                       s = (ˆBT ˆB)−1 ˆBTRTθ,φp                  (3)
+  The segments in the same group should have a non-local
+property, i.e., they are expected to lie on a common plane     This shows a nice property that s is a linear function of p.
+after warping. This non-local property is given by the two      Substituting s into Eqn.(2) we obtain:
+rotation angles (θ, φ) that rotate one plane to another3. Next
+we present a warping energy function that only involves the                     e(p, θ, φ) = ∥Cθ,φp∥2,               (4)
+non-local variables (θ, φ) and the mesh vertexes.
+                                                          with a matrix Cθ,φ deﬁned as:   Consider a single segment with two endpoints ˆp1, ˆp2
+before warping (Fig. 4(a)). ˆp1, ˆp2 are 3-D points and rep-
+                                                                  Cθ,φ ≜Rθ,φ ˆB(ˆBT ˆB)−1 ˆBTRTθ,φ −I,         (5)resented as 3×1 vectors. We use the camera center as the
+origin of the 3-D coordinates.                                                     where I is a unit matrix. e(p, θ, φ) is quadratic on p.
+  Assume a 3-D point p can be modeled by a transform                                                         Given all segments clustered into K groups, the energy
+T from ˆp1, ˆp2. The transform involves two parts. In the                                      EG for preserving all geodesic lines is:
+ﬁrst part, it is shifted inside the plane spanned by the two
+vectors ˆp1, ˆp2 (see ˆp in Fig. 4(b)). If we use a 3×2 matrix                    K                                                                        1
+ˆB = {ˆp1, ˆp2} to denote the basis4 of this plane, then ˆp can      EG({p}, {θk, φk}) = X X X ∥Cθk,φkpl,i∥2.
+                                                     Lbe written as ˆBs, where s is a 2×1 vector to be determined.                           k=1 l∈G(k) i=1,2
+                                                                                                                             (6)   3Though a 3-D rotation should be fully represented by three Euler an-
+gles (θ, φ, ψ), the in-plane rotation ψ does not impact the coplanarity and
+thus need not be considered.                                   Here L is the number of segments, pl,i (i=1,2) are the two
+   4These basis need not be orthogonal.                           end points in a segment l, and l belongs to the k-th group
+
+======================== PDF 第 4 页 ========================
+                                                     Algorithm 1 Optimization
+                                                                                     1: Initialize V.
+individual Rθ,φ                                     individual Rθ                     2: for iter = 1 to itermax do
+  shared Rθ,φ                                                                        3:   Fix V, update θk, φk in each group k.
+                                                       shared Rθ                 4:   Fix all {θk, φk}, do:
+      before                                                                          5:    for t = 1 to tmax do
+    warping                                                         before              6:      Solve a linear system on Vt with Vt−1 ﬁxed.
+                                                               warping              7:   end for
+                                                                                     8: end for
+
+            (a) Preserve geodesic lines      (b) Preserve straight lines
+
+Figure 5. Use non-local properties to preserve lines. (a) Preserve
+geodesic lines. The non-local properties are the 3-D rotation Rθ,φ.      set λB = 108 for hard constraints, and set λS = 1 and
+If the points after warping have inconsistent θ, φ, the geodesic line    λG = 100. The details of the terms are as below.
+is distorted (green).  (b) Preserve straight lines [7, 9]. The non-      EB(V) is deﬁned on the boundary vertexes to repre-
+local properties are the 2-D rotation Rθ. If the line segments have                                                                sent boundary constraints, as required in image resizing [7]
+inconsistent θ, the straight line is distorted (green).
+                                                      and panorama rectangling [9].  It has a quadratic form as
+                                          EB(V) = (V −ˆV)TD(V −ˆV). Here D is a diagonal ma-
+                                                                           trix whose diagonal entry is 1 for a boundary vertex and 0G(k). The notations θk and φk imply that the rotation angles
+                                                               otherwise. ˆV is the pre-deﬁned boundary constraints (usu-are shared by the segments in the group k, such that these
+                                                                     ally a rectangle).segments are expected on the same plane after warping. So
+{θk, φk} are non-local variables of the group k.              ES(V) is a term that preserves local shapes. We adopt
+   Fig. 5(a) illustrates the effect of the non-local variables.      the form used in [24, 7, 9] that expects the input/warped
+The black points are in the same plane before warping.  If     quads are “as-similar-as-possible”:  ES(V) = VTLV
+they share the same rotation {θ, φ}, they will be on the same     where L is a Laplacian matrix as derived in [24] (see also
+plane after warping. Then they still present as a geodesic     supplementary materials).
+line (Fig. 5(a) red).  If the points have individual rotation       The geodesic-preserving term EG  is due to Eqn.(6).
+angles, they are not on the same plane and the geodesic line    When deﬁned on the vertexes V, it has the following form:
+is distorted (Fig. 5(a) green).
+  The above derivation is related to the methods for pre-                  K                                                                     1
+serving 2-D straight lines as in [7, 9].  In the 2-D cases,    EG(V, {θk, φk}) = X X X ∥Cθk,φkf(Ml,iV)∥2,
+                                                   L
+the straight line segments are grouped into bins. The seg-                        k=1 l∈G(k) i=1,2
+ments on the same straight line (Fig. 5(b) black) are in the                                                                (8)
+same bin. The nonlocal variable is a 2-D rotation angle θ.     where Cθk,φk  is as in  (5).  Here the matrix Ml,i de-
+If these segments share the same θ, then they still have the     notes the coefﬁcients used to bilinearly interpolate an end
+same orientations after rotation. Thus the line is still straight     point of a segment from its nearby four vertexes.  This
+(Fig. 5(b) red). If the segments have individual rotation an-     matrix only depends on the input vertexes and the in-
+gles, the line will be distorted (Fig. 5(b) green). Our method     put position of the (l, i)th end point, and so can be pre-
+introduces linear planes as guidance, and generalizes this     computed. The reverse projection function f projects any
+behavior to 3-D.                                               point on the 2-D manifold back to 3-D. Its form depends
+                                                    on the projections [18]: for spherical projections f(u, v) =
+3.4. The Energy Function                                   (sin u cos v; sin v; cos u cos v) and for cylindrical projec-
+                                                                   tions f(u, v) = (sin u; v; cos u). The function f can also be
+  Next we incorporate the geodesic-preserving energy                                                               other projections, e.g., a lens distortion function obtained
+Eqn.(6) in a warping energy. We consider quad meshes                                                    by camera calibration [25].
+in this paper. The vertexes are denoted as {vj} with each
+vj = (uj, vj) as 2-D coordinates. Denote all the vertexes
+                                                               3.5. Optimizationby a vector V. The warping energy is deﬁned as:
+
+                                          We adopt an iterative algorithm to minimize Eqn.(7). We
+    E(V, {θk, φk}) = λBEB(V) + λSES(V)                                                 ﬁx {θk, φk} and update V, and vice versa. The two sub-
+                +λGEG(V, {θk, φk}).        (7)     problems are both non-linear.
+
+Here EB is a boundary-preserving term, ES  is a shape-     Fix {θk, φk}, update V. This subproblem is nonlinear on
+preserving term, and EG is a geodesic-preserving term. We   V because of the function f in Eqn.(8). We adopt the Gauss-
+
+======================== PDF 第 5 页 ========================
+Newton method. We expand f(Ml,iV) in (8) as:
+
+f(Ml,iVt) ≈f ′(Ml,iVt−1)Ml,i(Vt−Vt−1)+f(Ml,iVt−1),
+                                                          (9)
+where f ′ is the derivative (Jacobian matrix) of f, Vt−1 is the
+solution in iteration t−1, and Vt is the solution in iteration
+t. With Vt−1 ﬁxed, the energy is a quadratic on Vt and can                                             (a) input
+be solved by a linear system. This procedure is iterated.
+
+Fix V, update {θk, φk}. In this case, we can independently
+estimate θk, φk for each group k:
+
+        min X X ∥Cθk,φkf(Ml,iV)∥2.      (10)
+           θk,φk
+                l∈G(k) i=1,2
+
+Intuitively, this is a regression problem of ﬁtting a plane,
+such that all the vectors pi,k ≜f(Ml,iV) are expected to              (b) line-preserving      (c) virtual sphere    (d) ellipse-preserving
+be on this plane. We propose a simple solution based on      Figure 6. Preserving ellipses in general image resizing. (a) Input
+this intuition. Suppose ˆnk is the normal vector of the input     and a user-marked ellipse. (b) Retargeting (50% width) with line-
+plane (i.e., before warping) corresponding to group k. We      preserving only. (c) A virtual sphere ﬁtted to guide ellipses. (d)
+                                                        Our ellipse-preserving resizing.randomly select two points p1,k and p2,k in the group k.
+The cross product p1,k × p2,k will give us a normal vector
+orthogonal to the plane spanned by these two points.  It is      positions, which may not create a new ellipse if without
+easy to compute the angles (θk, φk) that rotates ˆnk to this      preservation (Fig. 6(b)). Then we ﬁt (using least squares)
+new normal vector. These values of (θk, φk) are a candidate     a new ellipse using the warped sample points, and create a
+solution to (10). Actually, this is a solution to a single term      virtual 3-D sphere whose cross section is the ﬁtted ellipse
+Pi=1,2 ∥Cθk,φkf(Ml,iV)∥2 = 0. We randomly select 100      (Fig. 6(c)).
+pairs of (p1,k, p2,k) and obtain 100 candidates solutions.     We expect the new ellipse to be an intersection of this
+Then we put each candidate solution into (10) and evalu-     sphere and a plane through the center of it.  This can be
+ate the energy. The candidate that gives the smallest energy      easily modeled as in our above derivations. We only need to
+will be chosen. In practice we ﬁnd this simple solution ef-     modify the projection function f in Eqn.(8). For an upright
+fectively reduces the energy.                                    sphere, we use f in this form:
+
+                                           q
+  The optimization is described in Algorithm 1. To ini-        f(u, v) = (u −u0; v −v0; ±  r2 −(u −u0)2 −(v −v0)2).  (11)
+tialize, we solve a linear system on V by ignoring the term     Here (u0, v0) is the center of the virtual 3-D sphere in the
+EG in (7). The iteration numbers are ﬁxed as itermax=10     image plane, and r is its radius. The sign ± is given by the
+and tmax=10. The size of the optimization problem is quite     sign of v−v0. Intuitively, this function f maps a point in the
+small. We use a mesh with around 400 vertices, so V is     image plane back onto the surface of the sphere. With this
+800-dimensional. The angles {θk, φk} contribute K pairs      f, we optimize the energy in (7) and warp the image again
+of variables, where the group number K depends on image      to preserve the ellipse (Fig. 6(d)).
+content. In our implementation we initialize 200 clusters,
+and remove empty clusters during the k-means iterations.     4. Results and Applications
+This usually leaves K ∼102. The optimization in Algo-
+                                                               4.1. Rectangling Panoramasrithm 1 on such a small size is efﬁcient, taking < 0.2 sec-
+onds in our C++ implementation.                               This is an application proposed in [9]. The purpose is to
+                                                    warp an irregularly shaped panorama image and ﬁt it to a
+3.6. Preserving Ellipses in General Image Warping
+                                                                  rectangle. The boundary constraint EB in Eqn.(7) is given
+   In above we focus on panoramic/wide-angle images.     by the rectangle boundary. In [9] the straight lines in the
+Next we extend our method to ellipse preservation in warp-     projected panorama are detected and preserved.
+ing general (non-panoramic/wide-angle) images.                   Fig. 2 and Fig. 7 show the comparisons between He et
+  We ﬁrst require the user to mark an ellipse to be pre-       al.’s and our method. The results of He et al. are provided
+served in the input image. Take image resizing for exam-     by the authors. Though He et al.’s method is able to pre-
+ple. We apply an existing resizing method (e.g., [7]) to pre-     serve straight lines,  it distorts the geodesic lines (see the
+liminarily warp the image to the desired size. The sample     zoom-in in Fig. 7).  It often treats geodesic lines as piece-
+points on the user-marked ellipse are warped to their new     wise linear curves. In contrast, our algorithm manages to
+
+======================== PDF 第 6 页 ========================
+                                                                                   zoom-in                                         zoom-in
+
+
+
+
+
+                                                                                   zoom-in                                         zoom-in
+
+
+
+
+
+                                                                                   zoom-in                                         zoom-in
+
+
+
+                                                                               zoom-in                                         zoom-in
+
+
+
+
+
+                (a) input panorama                          (b) He et al.’s rectangling                                (c) our rectangling
+
+                 Figure 7. Rectangling panoramas [9]. (a) Input panoramas. (b) He et al.’s results [9]. (c) Our results.
+
+
+
+
+
+            (a) input panorama                    (b) preserving local smoothness                  (c) our geodesic-preserving
+
+Figure 8. Local-smoothness-preserving vs. Geodesic-preserving. (a) Input panorama. (b) Rectangling result of only preserving the local
+smoothness of the geodesic lines. (c) Rectangling result of preserving the geodesic lines.
+
+
+preserve the geodesic lines. The zoom-in windows in Fig. 2      local entities. In Fig. 8(c), our result does not have these
+and Fig. 7 demonstrate that the geodesic lines are non-local       artifacts.
+geometric entities: they should remain consistent on a large
+area of the image.                                              4.2. Wide-angle/Panoramic Image Resizing
+
+Geodesic Lines vs. Smooth Curves. The geodesic lines        Content-aware image resizing or retargeting is a widely
+are not simply locally smooth curves but non-local enti-     studied topic [4, 21, 24, 7]. However, little attention has
+ties. A key component in our method is the usage of the     been paid to the case of resizing wide-angle/panoramic im-
+non-local variables (θk, φk).  To show the importance of      ages. We point out this is a practical scenario of resizing,
+the non-local property, we implement a curve-preserving     because these images are often taken with special lens or
+method that preserves the local smoothness of the curve. In     photographic techniques, and thus exhibit a larger variety
+this method, the adjacent segments on a curve (in our case     of aspect ratios.  These images almost inevitably present
+a geodesic line) are encouraged to have similar directions,     geodesic lines, so our technique is desired.
+so as to preserve the local smoothness of the curve. The        In Fig. 9 we compare with Chang and Chuang’s method
+technical details of this alterative can be found in the sup-      [7], a resizing technique for preserving straight lines. For
+plementary materials. Fig. 8 shows the comparison between       fair comparisons, we adopt the same saliency map as in
+our geodesic-preserving method and the local-smoothness-      [7] that weights the shape-preserving terms in Eqn.(7). As
+preserving method.  In Fig. 8(b), the long geodesic lines     such, our method only differs from their method in the
+still appear wiggled, because they are not treated as non-    ways of addressing lines.  Fig. 9 shows that preserving
+
+======================== PDF 第 7 页 ========================
+        (a) input                     (b) scaling 2x width                          (c) Chang and Chuang’s                               (d) ours
+
+
+
+
+
+                             (a) input                                   (b) scale 50% width           (c) Chang and Chuang’s                 (d) ours
+
+
+            zoom-in of (c)                         zoom-in of (d)                         zoom-in of (c)                         zoom-in of (d)
+
+Figure 9. Resizing wide-angle (top, by 2× width) and panoramic (bottom, by 50% width) images. (a) Input. (b) Uniform scaling. (c)
+Chang and Chuang’s [7] line-preserving retargeting. (d) Our results.
+
+
+
+
+
+                  (a) input wide-angle     stereographic projection              (b) Carroll et al.’s                         (c) ours
+
+
+
+
+
+          (a) input wide-angle                      (b) Carroll et al.’s                              (c) ours                zoom-in (b)     zoom-in (c)
+
+Figure 10. Wide-angle image manipulation [6]. (a) Input images with user-speciﬁed lines. (b) Carroll et al.’s results obtained from their
+paper [6]. This method attempts to keep all these lines straight. (c) Our method treats the long-spanned lines (magenta) as geodesic lines,
+and preserve the rest as straight lines. The results are manually cropped for display.
+
+
+straight lines in wide-angle/panoramic images is not suf-      lines in Fig. 10(a). In this case, the image content would be
+ﬁcient. The straight-line-preserving method treats geodesic     severely distorted (Fig. 10(b)).
+lines as piece-wise linear curves. Our solution can better
+                                                    Our method is more ﬂexible than preserving straighthandle these images.
+                                                                         lines.  In this interactive case, we use user interactions
+                                                                   to specify lines that are preserved as straight (green in4.3. Wide-angle Image Manipulation
+                                                                  Fig. 10(a)) or as geodesic (magenta in Fig. 10(a)).  To
+   Carroll et al. [6] propose an interactive tool of manip-     preserve straight lines, we incorporate the straight-line-
+ulating wide-angle images - the user marks several lines     preserving term of [9] into our energy function. This in-
+in the wide-angle image, and these lines are straightened     troduces a new set of variables (2-D rotation angles {θ′}
+(Fig. 10(a)). But as Carroll et al. indicate in the limitation     of the straight lines) besides V and {θk, φk} in our energy
+of their work, distortion is unavoidable if the long straight      Eqn.(7). To optimize this new energy, we simply iterate
+lines span very wide angles like ∼180◦, such as the magenta    among these three sets of variables, ﬁxing two and updating
+
+======================== PDF 第 8 页 ========================
+                                                                                            zoom-in                                      zoom-in
+
+
+
+
+
+                    (a) input                     (b) scale 50% width     (c) Chang and Chuang’s line-preserving               (d) our ellipse-preserving
+Figure 11. Images resizing with ellipse preservation.  (a) Input image and user-marked ellipses.  (b) Uniform scaling.  (c) Chang and
+Chuang’s [7] line-preserving retargeting. (d) Our result with ellipse preservation.
+
+
+
+
+                                                                                                                                                                                          (b)
+
+
+
+
+
+                                                                                                                                                                                                              (c)
+
+
+
+
+
+                                                                                                                                                                                        (b)
+
+
+
+
+
+                                                                                                                                                                                                            (c)
+
+
+
+
+                 (a) input and user interactions                    (b) line-preserving only       (c) our ellipse-preserving              (d) zoom-in
+
+Figure 12. Interactive perspective manipulation [5]. (a) Input and user interaction (more details in supplementary materials). (b) Warping
+for perspective manipulation with line-preserving only. (c) Our ellipse-preserving results. (d) Zoom-in. The images are manually cropped
+for display.
+
+
+
+                                                               serves the ellipses.
+                                                                 In Fig. 12 we show examples of warping-based perspec-
+                                                                        tive manipulation proposed in [5] - the user marks sev-
+                                                                     eral perspective lines and vanishing points, and manipulates
+                                                    them to change the perspective appearance. The image con-
+                                                                     tent is warped subject to the user-marked constraints. The
+ zoom-in                               zoom-in                         warping method may lead to noticeable distortion if ellipses
+                                                               present (Fig. 12(b)). Our ellipse-preserving method reme-           input panorama                  our rectangling result
+                                                                dies this problem (Fig. 12(c)).
+Figure 13. A limitation. Our method cannot preserve an arbitrary
+curve that is not a geodesic line.
+                                                          5. Limitations and Conclusions
+
+                                                    Our method  is not a solution to preserving general
+the rest one. Fig. 10(c) shows our result. Our method man-                                                                curves. The geodesic lines and ellipses have special proper-
+ages to preserve the long-spanned lines as geodesic lines,                                                                              ties: they are curves generated by the intersections of mani-
+and straighten the other lines.                                                                     folds. Our method may fail if a curve is really from a curved
+                                                                   object. Fig. 13 shows a failure example. The geodesic line
+4.4. Ellipse Preservation
+                                                               preservation term does not take effect on this curve. More
+  Our method can be extended to preserve ellipses in gen-      failure images are in the supplementary materials.
+eral image warping. Fig. 6 and 11 show examples of image       Our algorithm requires to know the projections of the
+resizing.  Fig. 11(c) shows Chang and Chuang’s [7] line-     wide-angle/panoramic images. This was also required, e.g.,
+preserving result. Without ellipse preservation, this method      in [6]. As future work, we will study estimating the projec-
+distorts the glasses.  Fig. 11(d) shows our result that pre-      tion only from the projected image.
+
+======================== PDF 第 9 页 ========================
+References                                                      [22]  J. Zaragoza, T.-J. Chin, M. S. Brown, and D. Suter.  As-
+                                                                              projective-as-possible image stitching with moving dlt.  In
+ [1] GoPro cameras. http://gopro.com/.                                                                             International Conference on Computer Vision and Pattern
+ [2] iPhone 5s  tips and  tricks:  panorama. https://www.                                                                       Recognition (CVPR), 2013.
+    apple.com/iphone-5s/tips/.
+                                                                     [23] L. Zelnik-Manor, G. Peters, and P. Perona. Squaring the cir-
+ [3] A. Agarwala, M. Agrawala, M. Cohen, D. Salesin, and                                                                                cle in panoramas. In International Conference on Computer
+     R. Szeliski. Photographing long scenes with multi-viewpoint                                                                           Vision (ICCV), 2005.
+     panoramas. In ACM SIGGRAPH ’06, pages 853–861, 2006.
+                                                                     [24] G. Zhang, M. Cheng, S. Hu, and R. Martin. A shape-
+ [4] S. Avidan and A. Shamir. Seam carving for content-aware
+                                                                          preserving approach to image resizing. In Computer Graph-
+     image resizing. In ACM SIGGRAPH ’07, 2007.
+                                                                                    ics Forum, pages 1897–1906. Wiley Online Library, 2009.
+ [5] R. Carroll, A. Agarwala, and M. Agrawala. Image warps for
+                                                                     [25] Z. Zhang. A ﬂexible new technique for camera calibration.
+       artistic perspective manipulation. In ACM SIGGRAPH ’10,
+                                                         IEEE Transactions on Pattern Analysis and Machine Intelli-
+     2010.
+                                                                   gence (TPAMI), 2000.
+ [6] R. Carroll, M. Agrawal, and A. Agarwala.   Optimizing
+                                                                     [26] D. Zorin and A. H. Barr. Correction of geometric perceptual
+     content-preserving projections for wide-angle images.  In
+                                                                                 distortions in pictures. In ACM SIGGRAPH ’95, 1995.
+   ACM SIGGRAPH ’09, 2009.
+ [7] C.-H. Chang and Y.-Y. Chuang. A line-structure-preserving
+     approach to image resizing. In International Conference on
+    Computer Vision and Pattern Recognition (CVPR), 2012.
+ [8] K. He, H. Chang, and J. Sun.  Content-aware rotation.  In
+     International Conference on Computer Vision (ICCV), 2013.
+ [9] K. He, H. Chang, and J. Sun. Rectangling panoramic images
+     via warping. In ACM SIGGRAPH ’13, 2013.
+[10] T. Igarashi, T. Moscovich, and J. F. Hughes.  As-rigid-as-
+     possible shape manipulation. In ACM SIGGRAPH ’05, 2005.
+[11]  J. Kopf, D. Lischinski, O. Deussen, D. Cohen-Or, and M. Co-
+     hen.  Locally adapted projections to reduce panorama dis-
+      tortions.  In Computer Graphics Forum, pages 1083–1089.
+     Wiley Online Library, 2009.
+[12]  J. Kopf, M. Uyttendaele, O. Deussen, and M. F. Cohen. Cap-
+      turing and viewing gigapixel images. In ACM SIGGRAPH
+      ’07, 2007.
+[13] S. Liu, L. Yuan, P. Tan, and J. Sun. Bundled camera paths
+      for video stabilization. In ACM SIGGRAPH ’13, 2013.
+[14] S. Peleg, B. Rousso, A. Rav-Acha, and A. Zomet. Mosaicing
+    on adaptive manifolds. IEEE Transactions on Pattern Anal-
+      ysis and Machine Intelligence (TPAMI), pages 1144–1154,
+     2000.
+[15] S. Schaefer, T. McPhail, and J. Warren. Image deformation
+     using moving least squares. In ACM SIGGRAPH ’06, 2006.
+[16]  J. Snyder. Flattening the earth: two thousand years of map
+      projections. University of Chicago, Chicago, 1993.
+[17] R. Szeliski. Image alignment and stitching: A tutorial. Foun-
+     dations and TrendsR⃝in Computer Graphics and Vision,
+     2006.
+[18] R. Szeliski and H.-Y. Shum. Creating full view panoramic
+     image mosaics and environment maps. In ACM SIGGRAPH
+      ’97, 1997.
+[19] R. von Gioi, J. Jakubowicz, J. Morel, and G. Randall. Lsd:
+   A fast line segment detector with a false detection control.
+    IEEE Transactions on Pattern Analysis and Machine Intelli-
+     gence (TPAMI), pages 722–732, 2010.
+[20] Y.-S. Wang, H.-C. Lin, O. Sorkine, and T.-Y. Lee. Motion-
+     based video retargeting with optimized crop-and-warp.  In
+   ACM SIGGRAPH ’10, 2010.
+[21] Y.-S. Wang, C.-L. Tai, O. Sorkine, and T.-Y. Lee. Optimized
+      scale-and-stretch for image resizing.  In ACM SIGGRAPH
+     Asia ’08, 2008.

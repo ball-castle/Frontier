@@ -1,0 +1,663 @@
+KH-A049 | Exploring Simple Siamese Representation Learning
+来源：https://arxiv.org/abs/2011.10566
+本地PDF：专题文献/何恺明/KH-A049_Exploring_Simple_Siamese_Representation_Learning_CVPR2021.pdf
+SHA-256：37d37c81d423d503f54d99bc5c9d9dc23d07c7bd1aad62f37b47ec7d2871e63e
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                   Exploring Simple Siamese Representation Learning
+
+
+                                           Xinlei Chen    Kaiming He
+
+                                     Facebook AI Research (FAIR)
+
+
+
+                                                                                                                                       similarity
+                        Abstract
+
+           Siamese networks have become a common structure in                        predictor h                             stop-grad
+         various recent models for unsupervised visual representa-2020
+          tion learning.  These models maximize the similarity be-
+        tween two augmentations of one image, subject to certain                     encoder f                  encoder f
+         conditions for avoiding collapsing solutions. In this paper,Nov  we report surprising empirical results that simple Siamese                  x1                         x2
+         networks can learn meaningful representations even using
+                                                                                                             image x20  none of the following: (i) negative sample pairs, (ii) large
+                                                                            Figure 1. SimSiam architecture. Two augmented views of one          batches, (iii) momentum encoders. Our experiments show
+                                                                    image are processed by the same encoder network f (a backbone
+          that collapsing solutions do exist for the loss and structure,
+                                                                                plus a projection MLP). Then a prediction MLP h is applied on one
+         but a stop-gradient operation plays an essential role in pre-                                                                                         side, and a stop-gradient operation is applied on the other side. The
+         venting collapsing. We provide a hypothesis on the impli-                                                                  model maximizes the similarity between both sides. It uses neither
+         cation of stop-gradient, and further show proof-of-concept      negative pairs nor a momentum encoder.[cs.CV]   experiments verifying it. Our “SimSiam” method achieves
+         competitive results on ImageNet and downstream tasks. We
+                                                                              clustering, BYOL [15] relies only on positive pairs but it
+        hope this simple baseline will motivate people to rethink the
+                                                                 does not collapse in case a momentum encoder is used.
+          roles of Siamese architectures for unsupervised representa-
+                                                                           In this paper, we report that simple Siamese networks
+          tion learning. Code will be made available.
+                                                                 can work surprisingly well with none of the above strategies
+                                                                             for preventing collapsing. Our model directly maximizes
+         1. Introduction                                             the similarity of one image’s two views, using neither neg-
+                                                                               ative pairs nor a momentum encoder. It works with typical
+            Recently there has been steady progress in un-/self-     batch sizes and does not rely on large-batch training. We
+         supervised representation learning, with encouraging re-      illustrate this “SimSiam” method in Figure 1.
+           sults on multiple visual tasks (e.g., [2, 17, 8, 15, 7]). Despite       Thanks to the conceptual simplicity, SimSiam can serve
+         various original motivations, these methods generally in-     as a hub that relates several existing methods.  In a nut-
+         volve certain forms of Siamese networks [4]. Siamese net-      shell, our method can be thought of as “BYOL without the
+        works are weight-sharing neural networks applied on two or    momentum encoder”. Unlike BYOL but like SimCLR and
+                                         comparing (includ-    SwAV, our method directly shares the weights between thearXiv:2011.10566v1  more inputs. They are natural tools for
+         ing but not limited to “contrasting”) entities. Recent meth-     two branches, so  it can also be thought of as “SimCLR
+        ods deﬁne the inputs as two augmentations of one image,     without negative pairs”, and “SwAV without online cluster-
+        and maximize the similarity subject to different conditions.      ing”. Interestingly, SimSiam is related to each method by
+        An undesired trivial solution to Siamese networks is     removing one of its core components. Even so, SimSiam
+            all outputs “collapsing” to a constant.  There have been     does not cause collapsing and can perform competitively.
+          several general strategies for preventing Siamese networks     We empirically show that collapsing solutions do exist,
+        from collapsing. Contrastive learning [16], e.g., instantiated     but a stop-gradient operation (Figure 1) is critical to pre-
+          in SimCLR [8], repulses different images (negative pairs)     vent such solutions. The importance of stop-gradient sug-
+         while attracting the same image’s two views (positive pairs).      gests that there should be a different underlying optimiza-
+        The negative pairs preclude constant outputs from the solu-      tion problem that is being solved. We hypothesize that there
+          tion space. Clustering [5] is another way of avoiding con-      are implicitly two sets of variables, and SimSiam behaves
+          stant output, and SwAV [7] incorporates online clustering      like alternating between optimizing each set. We provide
+          into Siamese networks. Beyond contrastive learning and     proof-of-concept experiments to verify this hypothesis.
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+  Our simple baseline suggests that the Siamese architec-     Algorithm 1 SimSiam Pseudocode, PyTorch-like
+tures can be an essential reason for the common success
+                                                          # f: backbone + projection mlp
+of the related methods.  Siamese networks can naturally     # h: prediction mlp
+introduce inductive biases for modeling invariance, as by                                                          for x in loader: # load a minibatch x with n samples
+deﬁnition “invariance” means that two observations of the        x1, x2 = aug(x), aug(x) # random augmentation
+                                                             z1, z2 = f(x1), f(x2) # projections, n-by-d
+same concept should produce the same outputs.  Analo-        p1, p2 = h(z1), h(z2) # predictions, n-by-d
+gous to convolutions [25], which is a successful inductive
+                                                             L = D(p1, z2)/2 + D(p2, z1)/2 # loss
+bias via weight-sharing for modeling translation-invariance,
+the weight-sharing Siamese networks can model invariance        L.backward() # back-propagate                                                             update(f, h) # SGD update
+w.r.t. more complicated transformations (e.g., augmenta-
+                                                          def D(p, z): # negative cosine similarity
+tions). We hope our exploration will motivate people to        z = z.detach() # stop gradient
+rethink the fundamental roles of Siamese architectures for
+                                                             p = normalize(p, dim=1) # l2-normalize
+unsupervised representation learning.                           z = normalize(z, dim=1) # l2-normalize
+                                                             return -(p*z).sum(dim=1).mean()
+2. Related Work
+
+Siamese networks. Siamese networks [4] are general mod-
+                                                         branch is a momentum encoder.1 It is hypothesized in [15]els for comparing entities. Their applications include sig-
+                                                                     that the momentum encoder is important for BYOL to avoidnature [4] and face [34] veriﬁcation, tracking [3], one-shot
+                                                                  collapsing, and it reports failure results if removing the mo-learning [23], and others. In conventional use cases, the in-
+                                                mentum encoder (0.3% accuracy, Table 5 in [15]).2 Ourputs to Siamese networks are from different images, and the
+                                                              empirical study challenges the necessity of the momentumcomparability is determined by supervision.
+                                                         encoder for preventing collapsing. We discover that the
+Contrastive learning. The core idea of contrastive learn-                                                                stop-gradient operation is critical.  This discovery can be
+ing [16] is to attract the positive sample pairs and repulse the                                                          obscured with the usage of a momentum encoder, which is
+negative sample pairs. This methodology has been recently                                                         always accompanied with stop-gradient (as it is not updated
+popularized for un-/self-supervised representation learning                                                    by its parameters’ gradients). While the moving-average
+[36, 30, 20, 37, 21, 2, 35, 17, 29, 8, 9]. Simple and effective                                                            behavior may improve accuracy with an appropriate mo-
+instantiations of contrastive learning have been developed                                                mentum coefﬁcient, our experiments show that it is not di-
+using Siamese networks [37, 2, 17, 8, 9].                                                                    rectly related to preventing collapsing.
+   In practice, contrastive learning methods beneﬁt from a
+large number of negative samples [36, 35, 17, 8]. These     3. Method
+samples can be maintained in a memory bank [36].  In a
+Siamese network, MoCo [17] maintains a queue of negative       Our architecture (Figure 1) takes as input two randomly
+samples and turns one branch into a momentum encoder     augmented views x1 and x2 from an image x. The two
+to improve consistency of the queue. SimCLR [8] directly     views are processed by an encoder network f consisting of
+uses negative samples coexisting in the current batch, and it     a backbone (e.g., ResNet [19]) and a projection MLP head
+requires a large batch size to work well.                            [8]. The encoder f shares weights between the two views.
+                                    A prediction MLP head [15], denoted as h, transforms the
+Clustering. Another category of methods for unsupervised
+                                                             output of one view and matches it to the other view. Denot-
+representation learning are based on clustering [5, 6, 1, 7].
+                                                             ing the two output vectors as p1 ≜h(f(x1)) and z2 ≜f(x2),
+They alternate between clustering the representations and
+                                             we minimize their negative cosine similarity:
+learning to predict the cluster assignment. SwAV [7] incor-
+porates clustering into a Siamese network, by computing                                 p1     z2                                                                  D(p1, z2) = −         ·         ,            (1)
+the assignment from one view and predicting it from an-                              ∥p1∥2 ∥z2∥2
+other view. SwAV performs online clustering under a bal-
+                                                     where ∥·∥2  is ℓ2-norm.  This is equivalent to the meananced partition constraint for each batch, which is solved by
+                                                          squared error of ℓ2-normalized vectors [15], up to a scalethe Sinkhorn-Knopp transform [10].
+  While clustering-based methods do not deﬁne negative       1MoCo [17] and BYOL [15] do not directly share the weights between
+exemplars, the cluster centers can play as negative proto-       the two branches, though in theory the momentum encoder should con-
+                                                                          verge to the same status as the trainable encoder. We view these models as
+types. Like contrastive learning, clustering-based methods
+                                                                    Siamese networks with “indirect” weight-sharing.
+require either a memory bank [5, 6, 1], large batches [7], or          2In BYOL’s arXiv v3 update, it reports 66.9% accuracy with 300-epoch
+a queue [7] to provide enough samples for clustering.               pre-training when removing the momentum encoder and increasing the
+                                                                                   predictor’s learning rate by 10×. Our work was done concurrently with
+BYOL. BYOL [15] directly predicts the output of one view        this arXiv update. Our work studies this topic from different perspectives,
+from another view.  It is a Siamese network in which one      with better results achieved.
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+                                         1
+-0.5                      √
+                                        d                                     50                w/ stop-grad
+   loss             w/o stop-grad         std                                                                                                                                                  acc.                                                         acc. (%)
+
+                                                                                                      w/                                                                                                                             stop-grad  67.7±0.1                                                                                                             kNN      training                                                                                                     output             w/ stop-grad                                                                             w/ stop-grad      w/o                                                                                                                             stop-grad                                                                                                                                            0.1
+                                              w/o stop-grad                   w/o stop-grad
+  -1                                      0                                      0
+    0            epochs            100     0            epochs            100     0            epochs            100
+
+Figure 2. SimSiam with vs. without stop-gradient. Left plot: training loss. Without stop-gradient it degenerates immediately. Middle
+plot: the per-channel std of the ℓ2-normalized output, plotted as the averaged std over all channels. Right plot: validation accuracy of a
+kNN classiﬁer [36] as a monitor of progress. Table: ImageNet linear evaluation (“w/ stop-grad” is mean±std over 5 trials).
+
+
+of 2. Following [15], we deﬁne a symmetrized loss as:             (ablation in Sec. 4.4) or ReLU. This MLP has 2 layers.
+                                                    The dimension of h’s input and output (z and p) is d =
+               1           1
+        L = 2D(p1, z2) + 2D(p2, z1).           (2)       2048, and h’s hidden layer’s dimension is 512, making h                                                            a bottleneck structure (ablation in supplement).
+This is deﬁned for each image, and the total loss is averaged
+over all images. Its minimum possible value is −1.         We use ResNet-50 [19] as the default backbone. Other im-
+  An important component for our method to work is a     plementation details are in supplement. We perform 100-
+stop-gradient (stopgrad) operation (Figure 1). We im-     epoch pre-training in ablation experiments.
+plement it by modifying (1) as:
+                                                     Experimental setup. We do unsupervised pre-training on
+              D(p1, stopgrad(z2)).               (3)      the 1000-class ImageNet training set [11] without using la-
+                                                                      bels. The quality of the pre-trained representations is evalu-
+This means that z2 is treated as a constant in this term. Sim-     ated by training a supervised linear classiﬁer on frozen rep-
+ilarly, the form in (2) is implemented as:                         resentations in the training set, and then testing it in the val-
+                                                                 idation set, which is a common protocol. The implementa-
+ L=1     stopgrad(z2))+1     stopgrad(z1)).       tion details of linear classiﬁcation are in supplement.    2D(p1,                2D(p2,
+                                                          (4)
+Here the encoder on x2 receives no gradient from z2 in the     4. Empirical Study
+ﬁrst term, but it receives gradients from p2 in the second
+                                                                 In this section we empirically study the SimSiam behav-term (and vice versa for x1).
+                                                                          iors. We pay special attention to what may contribute to the  The pseudo-code of SimSiam is in Algorithm 1.
+                                                         model’s non-collapsing solutions.
+Baseline settings. Unless speciﬁed, our explorations use
+the following settings for unsupervised pre-training:            4.1. Stop-gradient
+• Optimizer. We use SGD for pre-training. Our method        Figure 2 presents a comparison on “with vs. without
+  does not require a large-batch optimizer such as LARS      stop-gradient”. The architectures and all hyper-parameters
+  [38] (unlike [8, 15,  7]).  We use a learning rate of      are kept unchanged, and stop-gradient is the only difference.
+  lr×BatchSize/256 (linear scaling [14]), with a base lr =        Figure 2 (left) shows the training loss.  Without stop-
+  0.05.  The learning rate has a cosine decay schedule      gradient, the optimizer quickly ﬁnds a degenerated solution
+  [27, 8]. The weight decay is 0.0001 and the SGD mo-     and reaches the minimum possible loss of −1. To show that
+  mentum is 0.9.                                               the degeneration is caused by collapsing, we study the stan-
+  The batch size is 512 by default, which is friendly to typi-     dard deviation (std) of the ℓ2-normalized output z/∥z∥2. If
+  cal 8-GPU implementations. Other batch sizes also work      the outputs collapse to a constant vector, their std over all
+  well (Sec. 4.3). We use batch normalization (BN) [22]     samples should be zero for each channel. This can be ob-
+  synchronized across devices, following [8, 15, 7].            served from the red curve in Figure 2 (middle).
+                                                 As a comparison,  if the output z has a zero-mean
+• Projection MLP. The projection MLP (in f) has BN ap-                                                                   isotropic Gaussian distribution, we can show that the std of
+  plied to each fully-connected (fc) layer, including its out-
+                                                     z/∥z∥2 is √1d.3 The blue curve in Figure 2 (middle) shows  put fc. Its output fc has no ReLU. The hidden fc is 2048-d.
+  This MLP has 3 layers.
+                                                                       3Here is an informal derivation: denote z/∥z∥2 as z′, that is, z′i =
+                                                                                           1
+                                                                                           2 for the i-th channel. If zj is subject to an i.i.d Gaussian• Prediction MLP. The prediction MLP (h) has BN applied     zi/(Pdj=1 z2j )
+  to its hidden fc layers.  Its output fc does not have BN        distribution: zj ∼N(0, 1), ∀j, then z′i ≈zi/d 1                  1                                                                                                                        2 and std[z′i]≈1/d 2 .
+
+
+                                                 3
+
+======================== PDF 第 4 页 ========================
+                          pred. MLP h             acc. (%)                     batch size    64    128    256    512   1024   2048   4096
+             baseline     lr with cosine decay        67.7                        acc. (%)    66.1   67.3   68.1   68.1    68.0    67.9    64.0
+                (a)      no pred. MLP                0.1                                                                  Table 2. Effect of batch sizes (ImageNet linear evaluation accu-
+               (b)      ﬁxed random init.             1.5
+                                                                    racy with 100-epoch pre-training).
+                 (c)        lr not decayed              68.1
+
+Table 1. Effect of prediction MLP (ImageNet linear evaluation                                 proj. MLP’s BN   pred. MLP’s BN
+accuracy with 100-epoch pre-training). In all these variants, we               case         hidden   output   hidden   output    acc. (%)
+use the same schedule for the encoder f (lr with cosine decay).            (a)   none                -           -           -           -        34.6
+                                                                                  (b)   hidden-only   ✓          -    ✓          -        67.4
+                                                                                          (c)   default     ✓    ✓    ✓          -        68.1
+                                                   ✓    ✓    ✓    ✓     unstablethat with stop-gradient, the std value is near √1d. This indi-         (d)    all
+cates that the outputs do not collapse, and they are scattered      Table 3. Effect of batch normalization on MLP heads (Ima-
+on the unit hypersphere.                                      geNet linear evaluation accuracy with 100-epoch pre-training).
+   Figure 2 (right) plots the validation accuracy of a k-
+nearest-neighbor (kNN) classiﬁer [36]. This kNN classiﬁer
+can serve as a monitor of the progress. With stop-gradient,      collapsing. The training does not converge, and the loss
+the kNN monitor shows a steadily improving accuracy.         remains high. The predictor h should be trained to adapt to
+  The linear evaluation result is in the table in Figure 2.      the representations.
+SimSiam achieves a nontrivial accuracy of 67.7%.  This     We also ﬁnd that h with a constant lr (without decay) can
+result is reasonably stable as shown by the std of 5 trials.    work well and produce even better results than the baseline
+Solely removing stop-gradient, the accuracy becomes 0.1%,     (Table 1c). A possible explanation is that h should adapt
+which is the chance-level guess in ImageNet.                    to the latest representations, so it is not necessary to force
+                                                                                             it converge (by reducing lr) before the representations are
+Discussion. Our experiments show that there exist collaps-
+                                                                sufﬁciently trained. In many variants of our model, we have
+ing solutions. The collapse can be observed by the mini-
+                                                          observed that h with a constant lr provides slightly better
+mum possible loss and the constant outputs.4 The existence
+                                                                         results. We use this form in the following subsections.
+of the collapsing solutions implies that it is insufﬁcient for
+our method to prevent collapsing solely by the architecture     4.3. Batch Size
+designs (e.g., predictor, BN, ℓ2-norm). In our comparison,
+all these architecture designs are kept unchanged, but they        Table 2 reports the results with a batch size from 64 to
+do not prevent collapsing if stop-gradient is removed.          4096. When the batch size changes, we use the same linear
+  The introduction of stop-gradient implies  that there      scaling rule (lr×BatchSize/256) [14] with base lr = 0.05.
+should be another optimization problem that is being solved   We use 10 epochs of warm-up [14] for batch sizes ≥1024.
+underlying. We propose a hypothesis in Sec. 5.               Note that we keep using the same SGD optimizer (rather
+                                                            than LARS [38]) for all batch sizes studied.
+4.2. Predictor                                        Our method works reasonably well over this wide range
+                                                              of batch sizes. Even a batch size of 128 or 64 performs de-   In Table 1 we study the predictor MLP’s effect.
+                                                                     cently, with a drop of 0.8% or 2.0% in accuracy. The results  The model does not work if removing h (Table 1a), i.e.,
+                                                                are similarly good when the batch size is from 256 to 2048,h is the identity mapping.  Actually, this observation can
+                                                      and the differences are at the level of random variations.be expected if the symmetric loss (4) is used. Now the loss
+  1                           1                                 This behavior of SimSiam is noticeably different fromis 2D(z1, stopgrad(z2)) + 2D(z2, stopgrad(z1)). Its
+                                            SimCLR [8] and SwAV [7]. All three methods are Siamesegradient has the same direction as the gradient of D(z1, z2),
+                                                         networks with direct weight-sharing,  but SimCLR andwith the magnitude scaled by 1/2. In this case, using stop-
+                                        SwAV both require a large batch (e.g., 4096) to work well.gradient is equivalent to removing stop-gradient and scaling
+                                          We also note that the standard SGD optimizer does notthe loss by 1/2. Collapsing is observed (Table 1a).
+                                                   work well when the batch is too large (even in supervised  We note that this derivation on the gradient direction is
+                                                               learning [14, 38]), and our result is lower with a 4096 batch.valid only for the symmetrized loss. But we have observed
+that the asymmetric variant (3) also fails if removing h,   We expect a specialized optimizer (e.g., LARS [38]) will
+while it can work if h is kept (Sec. 4.6). These experiments     help in this case. However, our results show that a special-
+suggest that h is helpful for our model.                         ized optimizer is not necessary for preventing collapsing.
+    If h is ﬁxed as random initialization, our model does not
+                                                               4.4. Batch Normalization
+work either (Table 1b). However, this failure is not about
+                                                              Table 3 compares the conﬁgurations of BN on the MLP  4We note that a chance-level accuracy (0.1%) is not sufﬁcient to indi-
+cate collapsing. A model with a diverging loss, which is another pattern of     heads.  In Table 3a we remove all BN layers in the MLP
+failure, may also exhibit a chance-level accuracy.                       heads (10-epoch warmup [14] is used speciﬁcally for this
+
+
+                                                 4
+
+======================== PDF 第 5 页 ========================
+entry). This variant does not cause collapse, although the     4.7. Summary
+accuracy is low (34.6%). The low accuracy is likely because
+                                          We have empirically shown that in a variety of settings,
+of optimization difﬁculty. Adding BN to the hidden layers
+                                                  SimSiam can produce meaningful results without collaps-
+(Table 3b) increases accuracy to 67.4%.
+                                                                    ing. The optimizer (batch size), batch normalization, sim-
+   Further adding BN to the output of the projection MLP
+                                                                            ilarity function, and symmetrization may affect accuracy,
+(i.e., the output of f) boosts accuracy to 68.1% (Table 3c),
+                                                              but we have seen no evidence that they are related to col-
+which is our default conﬁguration.  In this entry, we also
+                                                               lapse prevention.  It is mainly the stop-gradient operation
+ﬁnd that the learnable afﬁne transformation (scale and off-
+                                                                     that plays an essential role.
+set [22]) in f’s output BN is not necessary, and disabling it
+leads to a comparable accuracy of 68.2%.                     5. Hypothesis
+  Adding BN to the output of the prediction MLP h does
+not work well (Table 3d). We ﬁnd that this is not about     We discuss a hypothesis on what is implicitly optimized
+collapsing. The training is unstable and the loss oscillates.     by SimSiam, with proof-of-concept experiments provided.
+   In summary, we observe that BN is helpful for optimiza-
+                                                               5.1. Formulation
+tion when used appropriately, which is similar to BN’s be-
+havior in other supervised learning scenarios. But we have       Our hypothesis is that SimSiam is an implementation of
+seen no evidence that BN helps to prevent collapsing: actu-     an Expectation-Maximization (EM) like algorithm.  It im-
+ally, the comparison in Sec. 4.1 (Figure 2) has exactly the      plicitly involves two sets of variables, and solves two un-
+same BN conﬁguration for both entries, but the model col-     derlying sub-problems. The presence of stop-gradient is the
+lapses if stop-gradient is not used.                           consequence of introducing the extra set of variables.
+                                          We consider a loss function of the following form:
+4.5. Similarity Function
+                                                                             h                   2 i                                                                 L(θ, η) = Ex,T  Fθ(T (x)) −ηx  2  .        (5)   Besides the cosine similarity function (1), our method
+also works with cross-entropy similarity. We modify D as:                                    F is a network parameterized by θ. T  is the augmentation.
+D(p1, z2) = −softmax(z2)· log softmax(p1). Here the    x is an image. The expectation E[·] is over the distribution
+softmax function is along the channel dimension. The out-                                                              of images and augmentations. For the ease of analysis, here
+put of softmax can be thought of as the probabilities of be-                                             we use the mean squared error ∥· ∥22, which is equivalent
+longing to each of d pseudo-categories.                                                                   to the cosine similarity if the vectors are ℓ2-normalized. We
+  We simply replace the cosine similarity with the cross-                                                    do not consider the predictor yet and will discuss it later.
+entropy similarity, and symmetrize it using (4). All hyper-                                                                 In (5), we have introduced another set of variables which
+parameters and architectures are unchanged, though they                                             we denote as η. The size of η is proportional to the number
+may be suboptimal for this variant. Here is the comparison:                                                              of images. Intuitively, ηx is the representation of the image
+                                cosine      cross-entropy                 x, and the subscript x means using the image index to ac-
+                acc. (%)         68.1           63.2                    cess a sub-vector of η. η is not necessarily the output of a
+The cross-entropy variant can converge to a reasonable re-     network; it is the argument of an optimization problem.
+sult without collapsing. This suggests that the collapsing       With this formulation, we consider solving:
+prevention behavior is not just about the cosine similarity.
+                                                                min L(θ, η).                     (6)
+   This variant helps to set up a connection to SwAV [7],                                  θ,η
+which we discuss in Sec. 6.2.                                                     Here the problem is w.r.t. both θ and η. This formulation
+4.6. Symmetrization                                                  is analogous to k-means clustering [28]. The variable θ is
+                                                          analogous to the clustering centers:  it is the learnable pa-
+  Thus far our experiments have been based on the sym-                                                            rameters of an encoder. The variable ηx is analogous to the
+metrized loss (4). We observe that SimSiam’s behavior of                                                          assignment vector of the sample x (a one-hot vector in k-
+preventing collapsing does not depend on symmetrization.                                                         means): it is the representation of x.
+We compare with the asymmetric variant (3) as follows:                                                          Also analogous to k-means, the problem in (6) can be
+                      sym.         asym.       asym. 2×           solved by an alternating algorithm, ﬁxing one set of vari-
+        acc. (%)         68.1           64.8           67.3              ables and solving for the other set. Formally, we can alter-
+The asymmetric variant achieves reasonable results. Sym-     nate between solving these two subproblems:
+metrization is helpful for boosting accuracy, but it is not
+                                                                                θt ←  arg min L(θ, ηt−1)            (7)
+related to collapse prevention. Symmetrization makes one                                     θ
+more prediction for each image, and we may roughly com-                    ηt ←  arg min L(θt, η)               (8)
+pensate for this by sampling two pairs for each image in the                                   η
+asymmetric version (“2×”). It makes the gap smaller.         Here t is the index of alternation and “←” means assigning.
+
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+Solving for θ. One can use SGD to solve the sub-problem     Symmetrization. Our hypothesis does not involve sym-
+(7). The stop-gradient operation is a natural consequence,      metrization. Symmetrization is like denser sampling T in
+because the gradient does not back-propagate to ηt−1 which      (11).  Actually, the SGD optimizer computes the empiri-
+is a constant in this subproblem.                                  cal expectation of Ex,T [·] by sampling a batch of images
+                                                      and one pair of augmentations (T1, T2).  In principle, the
+Solving for η. The sub-problem (8) can be solved inde-     empirical expectation should be more precise with denser
+pendently for each ηx. Now the problem is to minimize:     sampling. Symmetrization supplies an extra pair (T2, T1).
+ET h ∥Fθt(T (x)) −ηx∥22 i for each image x, noting that the     This explains that symmetrization is not necessary for our
+                                                    method to work, yet it is able to improve accuracy, as we
+expectation is over the distribution of augmentation T . Due
+                                                        have observed in Sec. 4.6.
+to the mean squared error,5 it is easy to solve it by:
+                                                               5.2. Proof of concept
+                 ηtx ←ET h Fθt(T (x))i .               (9)                                          We design a series of proof-of-concept experiments that
+                                                       stem from our hypothesis. They are methods different with
+This indicates that ηx is assigned with the average repre-     SimSiam, and they are designed to verify our hypothesis.
+sentation of x over the distribution of augmentation.
+                                                          Multi-step alternation. We have hypothesized that the
+One-step alternation. SimSiam can be approximated by    SimSiam algorithm is like alternating between (7) and (8),
+one-step alternation between (7) and (8). First, we approxi-     with an interval of one step of SGD update. Under this hy-
+mate (9) by sampling the augmentation only once, denoted      pothesis, it is likely for our formulation to work if the inter-
+as T ′, and ignoring ET [·]:                                       val has multiple steps of SGD.
+                                                                 In this variant, we treat t in (7) and (8) as the index
+                   ηtx ←Fθt(T ′(x)).               (10)     of an outer loop; and the sub-problem in (7) is updated
+                                                    by an inner loop of k SGD steps.  In each alternation,
+                                             we pre-compute the ηx required for all k SGD steps usingInserting it into the sub-problem (7), we have:
+                                                              (10) and cache them in memory. Then we perform k SGD
+                                                                 steps to update θ. We use the same architecture and hyper-                     h                            2 i  θt+1 ←arg min                 Ex,T  Fθ(T (x)) −Fθt(T ′(x)) 2  .       parameters as SimSiam. The comparison is as follows:                 θ
+                                                     (11)
+                                                                                                   1-step       10-step     100-step     1-epoch
+                                                                                       acc. (%)       68.1         68.7         68.9         67.0
+Now θt is a constant in this sub-problem, and T ′ implies
+another view due to its random nature. This formulation ex-     Here, “1-step” is equivalent to SimSiam, and “1-epoch” de-
+hibits the Siamese architecture. Second, if we implement     notes the k steps required for one epoch.  All multi-step
+(11) by reducing the loss with one SGD step, then we can      variants work well. The 10-/100-step variants even achieve
+approach the SimSiam algorithm: a Siamese network natu-      better results than SimSiam, though at the cost of extra pre-
+rally with stop-gradient applied.                              computation. This experiment suggests that the alternating
+                                                              optimization is a valid formulation, and SimSiam is a spe-
+Predictor. Our above analysis does not involve the predic-      cial case of it.
+tor h. We further assume that h is helpful in our method                                                        Expectation over augmentations. The usage of the pre-
+because of the approximation due to (10).                                                                   dictor h is presumably because the expectation ET [·] in (9)
+  By deﬁnition, the predictor h is expected to minimize:                                                                              is ignored. We consider another way to approximate this
+                                . The optimal solution to h should sat-      expectation, in which we ﬁnd h is not needed.Ez h h(z1) −z2  22 i
+isfy: h(z1)=Ez[z2]=ET f(T (x))  for any image x. This        In this variant, we do not update ηx directly by the
+term is similar to the one in (9). In our approximation in     assignment (10); instead, we maintain a moving-average:
+(10), the expectation ET [·] is ignored. The usage of h may     ηtx ←m ∗ηt−1x + (1 −m) ∗Fθt(T ′(x)), where m is a mo-
+ﬁll this gap.  In practice,  it would be unrealistic to actu-    mentum coefﬁcient (0.8 here). This computation is similar
+ally compute the expectation ET . But it may be possible      to maintaining the memory bank as in [36]. This moving-
+for a neural network (e.g., the preditor h) to learn to pre-     average provides an approximated expectation of multiple
+dict the expectation, while the sampling of T  is implicitly     views. This variant has 55.0% accuracy without the predic-
+distributed across multiple epochs.                                 tor h. As a comparison, it fails completely if we remove h
+                                                              but do not maintain the moving average (as shown in Ta-
+    5If we use the cosine similarity, we can approximately solve it by ℓ2-      ble 1a). This proof-of-concept experiment supports that the
+normalizing F’s output and ηx.                                   usage of predictor h is related to approximating ET [·].
+
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+                                                batch     negative  momentum
+                       method                                         100 ep   200 ep   400 ep   800 ep                                                       size        pairs     encoder
+                    SimCLR (repro.+)    4096    ✓                   66.5     68.3     69.8     70.4
+                  MoCo v2 (repro.+)    256     ✓     ✓       67.4     69.9     71.0     72.2
+                 BYOL (repro.)       4096          ✓       66.5     70.6     73.2     74.3
+                  SwAV (repro.+)      4096                             66.5     69.1     70.7     71.8
+                     SimSiam            256                              68.1     70.0     70.8     71.3
+
+Table 4. Comparisons on ImageNet linear classiﬁcation. All are based on ResNet-50 pre-trained with two 224×224 views. Evaluation
+is on a single crop. All competitors are from our reproduction, and “+” denotes improved reproduction vs. original papers (see supplement).
+
+
+                       VOC 07 detection    VOC 07+12 detection    COCO detection     COCO instance seg.
+               pre-train            AP50   AP    AP75   AP50   AP    AP75   AP50   AP    AP75  APmask50   APmask APmask75
+              scratch                35.9    16.8    13.0    60.2    33.8    33.1    44.0    26.4    27.8    46.9    29.3    30.8
+           ImageNet supervised   74.4    42.4    42.7    81.3    53.5    58.8    58.2    38.2    41.2    54.7    33.3    35.2
+         SimCLR (repro.+)     75.9    46.8    50.1    81.8    55.5    61.4    57.7    37.9    40.9    54.6    33.3    35.3
+         MoCo v2 (repro.+)     77.1    48.5    52.5    82.3    57.0    63.3    58.8    39.2    42.5    55.5    34.3    36.6
+        BYOL (repro.)        77.1    47.0    49.9    81.4    55.3    61.1    57.8    37.9    40.9    54.3    33.2    35.0
+         SwAV (repro.+)       75.5    46.5    49.6    81.5    55.4    61.4    57.6    37.6    40.3    54.2    33.1    35.1
+           SimSiam, base        75.5    47.0    50.2    82.0    56.4    62.8    57.5    37.9    40.9    54.2    33.2    35.2
+           SimSiam, optimal     77.3    48.5    52.5    82.4    57.0    63.7    59.3    39.2    42.1    56.0    34.4    36.7
+
+Table 5. Transfer Learning. All unsupervised methods are based on 200-epoch pre-training in ImageNet. VOC 07 detection: Faster
+R-CNN [32] ﬁne-tuned in VOC 2007 trainval, evaluated in VOC 2007 test; VOC 07+12 detection: Faster R-CNN ﬁne-tuned in VOC 2007
+trainval + 2012 train, evaluated in VOC 2007 test; COCO detection and COCO instance segmentation: Mask R-CNN [18] (1× schedule)
+ﬁne-tuned in COCO 2017 train, evaluated in COCO 2017 val. All Faster/Mask R-CNN models are with the C4-backbone [13]. All VOC
+results are the average over 5 trials. Bold entries are within 0.5 below the best.
+
+5.3. Discussion                                              Table 4 shows the results and the main properties of the
+                                                         methods. SimSiam is trained with a batch size of 256, using
+  Our hypothesis is about what the optimization problem
+                                                                 neither negative samples nor a momentum encoder. Despite
+can be.  It does not explain why collapsing is prevented.
+                                                                                             it simplicity, SimSiam achieves competitive results.  It has
+We point out that SimSiam and its variants’ non-collapsing
+                                                                the highest accuracy among all methods under 100-epoch
+behavior still remains as an empirical observation.
+                                                                    pre-training, though its gain of training longer is smaller. It
+  Here we brieﬂy discuss our understanding on this open
+                                                          has better results than SimCLR in all cases.
+question. The alternating optimization provides a different
+trajectory, and the trajectory depends on the initialization.     Transfer Learning. In Table 5 we compare the represen-
+It is unlikely that the initialized η, which is the output of a      tation quality by transferring them to other tasks, includ-
+randomly initialized network, would be a constant. Starting     ing VOC [12] object detection and COCO [26] object de-
+from this initialization, it may be difﬁcult for the alternating      tection and instance segmentation. We ﬁne-tune the pre-
+optimizer to approach a constant ηx for all x, because the      trained models end-to-end in the target datasets. We use the
+method does not compute the gradients w.r.t. η jointly for     public codebase from MoCo [17] for all entries, and search
+all x. The optimizer seeks another trajectory (Figure 2 left),      the ﬁne-tuning learning rate for each individual method. All
+in which the outputs are scattered (Figure 2 middle).          methods are based on 200-epoch pre-training in ImageNet
+                                                            using our reproduction.
+6. Comparisons                                            Table 5 shows that SimSiam’s representations are trans-
+                                                                 ferable beyond the ImageNet task. It is competitive among6.1. Result Comparisons
+                                                               these leading methods. The “base” SimSiam in Table 5 uses
+ImageNet. We compare with the state-of-the-art frame-      the baseline pre-training recipe as in our ImageNet experi-
+works in Table 4 on ImageNet linear evaluation. For fair     ments. We ﬁnd that another recipe of lr=0.5 and wd=1e-5
+comparisons, all competitors are based on our reproduc-     (with similar ImageNet accuracy) can produce better results
+tion, and “+” denotes improved reproduction vs. the original      in all tasks (Table 5, “SimSiam, optimal”).
+papers (see supplement). For each individual method, we     We emphasize that all these methods are highly success-
+follow the hyper-parameter and augmentation recipes in its      ful for transfer learning—in Table 5, they can surpass or
+original paper.6 All entries are based on a standard ResNet-     be on par with the ImageNet supervised pre-training coun-
+50, with two 224×224 views used during pre-training.           terparts in all tasks.  Despite many design differences, a
+                                             common structure of these methods is the Siamese network.   6In our BYOL reproduction, the 100, 200(400), 800-epoch recipes fol-
+low the 100, 300, 1000-epoch recipes in [15]: lr is {0.45, 0.3, 0.2}, wd is     This comparison suggests that the Siamese structure is a
+{1e-6, 1e-6, 1.5e-6}, and momentum coefﬁcient is {0.99, 0.99, 0.996}.       core factor for their general success.
+
+
+                                                 7
+
+======================== PDF 第 8 页 ========================
+6.2. Methodology Comparisons                                             grad           similarity &         grad       grad            similarity                                                                                                                                  dissimilarity
+  Beyond accuracy, we also compare the methodologies of                                                                 predictor
+these Siamese architectures. Our method plays as a hub to                                                                moving
+                                                                                                                                                                       average    momentum
+connect these methods. Figure 3 abstracts these methods.             encoder                    encoder           encoder                    encoder
+The “encoder” subsumes all layers that can be shared be-
+tween both branches (e.g., backbone, projection MLP [8],                                                                                                           image                                     image
+prototypes [7]). The components in red are those missing in                                                             SimCLR                 BYOL
+SimSiam. We discuss the relations next.
+                                                                                                    grad            similarity                      grad            similarity
+Relation to SimCLR [8]. SimCLR relies on negative sam-
+                                                                                                                                                  Sinkhorn-Knopp         predictor
+ples (“dissimilarity”) to prevent collapsing. SimSiam can be
+thought of as “SimCLR without negatives”.
+                                                                                                    encoder                    encoder           encoder                    encoder
+  To have a more thorough comparison, we append the
+prediction MLP h and stop-gradient to SimCLR.7 Here is
+the ablation on our SimCLR reproduction:                                                 image                                     image
+                                                         SwAV                      SimSiam      SimCLR          w/ predictor     w/ pred. & stop-grad
+          66.5                 66.4                 66.0                Figure 3.   Comparison on Siamese architectures.  The en-
+                                                                 coder includes all layers that can be shared between both branches.
+Neither the stop-gradient nor the extra predictor is neces-                                                        The dash lines indicate the gradient propagation ﬂow. In BYOL,
+sary or helpful for SimCLR. As we have analyzed in Sec. 5,     SwAV, and SimSiam, the lack of a dash line implies stop-gradient,
+the introduction of the stop-gradient and extra predictor is     and their symmetrization is not illustrated for simplicity. The com-
+presumably a consequence of another underlying optimiza-      ponents in red are those missing in SimSiam.
+tion problem.  It is different from the contrastive learning
+problem, so these extra components may not be helpful.
+                                                       an alternating formulation [7]. This may explain why stop-
+Relation to SwAV [7]. SimSiam is conceptually analogous
+                                                               gradient should not be removed from SwAV.
+to “SwAV without online clustering”. We build up this
+connection by recasting a few components in SwAV. (i)     Relation to BYOL [15]. Our method can be thought of as
+The shared prototype layer in SwAV can be absorbed    “BYOL without the momentum encoder”, subject to many
+into  the Siamese  encoder.     (ii) The  prototypes were     implementation differences. The momentum encoder may
+weight-normalized outside of gradient propagation in [7];     be beneﬁcial for accuracy (Table 4), but it is not necessary
+we instead implement by full gradient computation [33].8      for preventing collapsing. Given our hypothesis in Sec. 5,
+(iii) The similarity function in SwAV is cross-entropy. With      the η sub-problem (8) can be solved by other optimizers,
+these abstractions, a highly simpliﬁed SwAV illustration is       e.g., a gradient-based one. This may lead to a temporally
+shown in Figure 3.                                        smoother update on η. Although not directly related, the
+  SwAV applies the Sinkhorn-Knopp (SK) transform [10]    momentum encoder also produces a smoother version of
+on the target branch (which is also symmetrized [7]). The      η. We believe that other optimizers for solving (8) are also
+SK transform is derived from online clustering [7]:  it is      plausible, which can be a future research problem.
+the outcome of clustering the current batch subject to a bal-
+anced partition constraint. The balanced partition can avoid     7. Conclusion
+collapsing. Our method does not involve this transform.
+  We study the effect of the prediction MLP h and stop-     We have explored Siamese networks with simple de-
+gradient on SwAV. Note that SwAV applies stop-gradient      signs. The competitiveness of our minimalist method sug-
+on the SK transform, so we ablate by removing it. Here is      gests that the Siamese shape of the recent methods can be
+the comparison on our SwAV reproduction:                   a core reason for their effectiveness. Siamese networks are
+                                                                 natural and effective tools for modeling invariance, which is      SwAV           w/ predictor       remove stop-grad
+          66.5                 65.2            NaN              a focus of representation learning. We hope our study will
+                                                                         attract the community’s attention to the fundamental role of
+Adding the predictor does not help either. Removing stop-                                                       Siamese networks in representation learning.
+gradient (so the model is trained end-to-end) leads to diver-
+gence. As a clustering-based method, SwAV is inherently
+                                               References
+  7We append the extra predictor to one branch and stop-gradient to the
+other branch, and symmetrize this by swapping.                                [1] Yuki Markus Asano,  Christian Rupprecht, and Andrea
+   8This modiﬁcation produces similar results as original SwAV, but it can           Vedaldi. Self-labelling via simultaneous clustering and rep-
+enable end-to-end propagation in our ablation.                                     resentation learning. arXiv:1911.05371, 2019.
+
+
+                                                 8
+
+======================== PDF 第 9 页 ========================
+ [2] Philip Bachman, R Devon Hjelm, and William Buchwalter.      [20] R Devon Hjelm, Alex Fedorov, Samuel Lavoie-Marchildon,
+     Learning representations by maximizing mutual information          Karan Grewal, Adam Trischler, and Yoshua Bengio. Learn-
+     across views. arXiv:1906.00910, 2019.                               ing deep representations by mutual information estimation
+ [3] Luca Bertinetto, Jack Valmadre, Joao F Henriques, Andrea          and maximization. In ICLR, 2019.
+     Vedaldi, and Philip HS Torr.  Fully-convolutional Siamese      [21] Olivier J. H´enaff, Aravind Srinivas, Jeffrey De Fauw, Ali
+     networks for object tracking. In ECCV, 2016.                         Razavi, Carl Doersch, S. M. Ali Eslami, and Aaron van den
+ [4] Jane  Bromley,  Isabelle Guyon,  Yann LeCun,  Eduard          Oord. Data-efﬁcient image recognition with contrastive pre-
+      S¨ackinger, and Roopak Shah.  Signature veriﬁcation using            dictive coding. arXiv:1905.09272v2, 2019.
+     a “Siamese” time delay neural network. In NeurIPS, 1994.        [22] Sergey Ioffe and Christian Szegedy.  Batch normalization:
+ [5] Mathilde Caron,  Piotr Bojanowski, Armand Joulin, and           Accelerating deep network training by reducing internal co-
+     Matthijs Douze. Deep clustering for unsupervised learning            variate shift. In ICML, 2015.
+     of visual features. In ECCV, 2018.                               [23] Gregory Koch, Richard Zemel, and Ruslan Salakhutdinov.
+                                                                 Siamese neural networks for one-shot image recognition. In [6] Mathilde Caron, Piotr Bojanowski, Julien Mairal, and Ar-
+                                                    ICML deep learning workshop, 2015.    mand Joulin.  Unsupervised pre-training of image features
+                                                                     [24] Alex Krizhevsky. Learning multiple layers of features from    on non-curated data. In ICCV, 2019.
+                                                                                 tiny images. Tech Report, 2009. [7] Mathilde Caron, Ishan Misra, Julien Mairal, Priya Goyal, Pi-
+                                                                     [25] Yann LeCun, Bernhard Boser, John S Denker, Donnie      otr Bojanowski, and Armand Joulin.  Unsupervised learn-
+                                                                    Henderson,  Richard E Howard, Wayne Hubbard,  and     ing of visual features by contrasting cluster assignments.
+                                                               Lawrence D Jackel. Backpropagation applied to handwrit-     arXiv:2006.09882, 2020.
+                                                                            ten zip code recognition. Neural computation, 1989.
+ [8] Ting Chen, Simon Kornblith, Mohammad Norouzi, and Ge-
+                                                                     [26] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays,
+      offrey Hinton. A simple framework for contrastive learning
+                                                                              Pietro Perona, Deva Ramanan, Piotr Doll´ar, and C Lawrence
+     of visual representations. arXiv:2002.05709, 2020.
+                                                                               Zitnick. Microsoft COCO: Common objects in context. In
+ [9] Xinlei Chen, Haoqi Fan, Ross Girshick, and Kaiming He.
+                                                       ECCV. 2014.
+     Improved baselines with momentum contrastive learning.
+                                                                     [27] Ilya Loshchilov and Frank Hutter. SGDR: Stochastic gradi-
+     arXiv:2003.04297, 2020.
+                                                                            ent descent with warm restarts. In ICLR, 2017.
+[10] Marco Cuturi. Sinkhorn distances: Lightspeed computation                                                                     [28] James MacQueen et al. Some methods for classiﬁcation and
+     of optimal transport. In NeurIPS, 2013.                                                                             analysis of multivariate observations. 1967.
+[11]  Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li,                                                                     [29] Ishan  Misra  and  Laurens  van  der  Maaten.      Self-
+     and Li Fei-Fei. ImageNet: A large-scale hierarchical image                                                                         supervised  learning  of  pretext-invariant  representations.
+     database. In CVPR, 2009.                                                                      arXiv:1912.01991, 2019.
+[12] Mark Everingham, Luc Van Gool, Christopher KI Williams,      [30] Aaron van den Oord, Yazhe Li, and Oriol Vinyals.  Rep-
+     John Winn, and Andrew Zisserman. The PASCAL Visual            resentation  learning  with  contrastive  predictive  coding.
+     Object Classes (VOC) Challenge. IJCV, 2010.                       arXiv:1807.03748, 2018.
+[13] Ross Girshick, Ilija Radosavovic, Georgia Gkioxari, Piotr      [31] Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer,
+      Doll´ar, and Kaiming He. Detectron, 2018.                        James Bradbury, Gregory Chanan, Trevor Killeen, Zeming
+[14] Priya Goyal, Piotr Doll´ar, Ross Girshick, Pieter Noord-            Lin, Natalia Gimelshein, Luca Antiga, et al. PyTorch: An
+      huis, Lukasz Wesolowski, Aapo Kyrola, Andrew Tulloch,           imperative style, high-performance deep learning library. In
+     Yangqing Jia, and Kaiming He.  Accurate, large minibatch          NeurIPS, 2019.
+    SGD: Training ImageNet in 1 hour. arXiv:1706.02677, 2017.      [32] Shaoqing Ren, Kaiming He, Ross Girshick, and Jian Sun.
+[15] Jean-Bastien Grill, Florian Strub, Florent Altch´e, Corentin            Faster R-CNN: Towards real-time object detection with re-
+      Tallec, Pierre H. Richemond, Elena Buchatskaya, Carl Do-           gion proposal networks. In NeurIPS, 2015.
+      ersch, Bernardo Avila Pires, Zhaohan Daniel Guo, Moham-      [33] Tim Salimans and Diederik P Kingma. Weight normaliza-
+    mad Gheshlaghi Azar, Bilal Piot, Koray Kavukcuoglu, R´emi             tion: A simple reparameterization to accelerate training of
+    Munos, and Michal Valko. Bootstrap your own latent: A new          deep neural networks. In NeurIPS, 2016.
+     approach to self-supervised learning. arXiv:2006.07733v1,      [34] Yaniv Taigman, Ming Yang, MarcAurelio Ranzato, and Lior
+     2020.                                                            Wolf.  DeepFace: Closing the gap to human-level perfor-
+[16] Raia Hadsell, Sumit Chopra, and Yann LeCun. Dimension-         mance in face veriﬁcation. In CVPR, 2014.
+      ality reduction by learning an invariant mapping. In CVPR,      [35] Yonglong Tian, Dilip Krishnan, and Phillip Isola.  Con-
+     2006.                                                                         trastive multiview coding. arXiv:1906.05849, 2019.
+[17] Kaiming He, Haoqi Fan, Yuxin Wu, Saining Xie, and Ross      [36] Zhirong Wu, Yuanjun Xiong, Stella Yu, and Dahua Lin.
+     Girshick. Momentum contrast for unsupervised visual rep-          Unsupervised feature learning via non-parametric instance
+      resentation learning. arXiv:1911.05722, 2019.                          discrimination. In CVPR, 2018.
+[18] Kaiming He, Georgia Gkioxari, Piotr Doll´ar, and Ross Gir-      [37] Mang Ye, Xu Zhang, Pong C Yuen, and Shih-Fu Chang.
+      shick. Mask R-CNN. In ICCV, 2017.                              Unsupervised embedding learning via invariant and spread-
+                                                                         ing instance feature. In CVPR, 2019.[19] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+                                                                     [38] Yang You, Igor Gitman, and Boris Ginsburg.  Large batch    Deep residual learning for image recognition.  In CVPR,
+                                                                                training of convolutional networks. arXiv:1708.03888, 2017.     2016.
+
+
+                                                 9
+
+======================== PDF 第 10 页 ========================
+A. Implementation Details                                    SimCLR     MoCo v2      BYOL     SwAV
+                                                                     epoch   200  800  1000   200  800   300  800  1000   400
+Unsupervised pre-training. Our implementation follows        origin  66.6  68.3   69.3  67.5  71.1  72.5       -   74.3   70.1
+the practice of existing works [36, 17, 8, 9, 15].                        repro.  68.3  70.4        -  69.9  72.2  72.4  74.3        -   70.7
+  Data augmentation.  We describe data augmentation                                                                  Table C.1. Our reproduction vs. original papers’ results. All
+using the PyTorch [31] notations.  Geometric augmen-      are based on ResNet-50 pre-trained with two 224×224 crops.
+tation is RandomResizedCrop with scale in [0.2, 1.0]
+[36] and RandomHorizontalFlip.  Color augmenta-
+                                                         behaves like an auto-encoder, can force the predictor to di-
+tion is ColorJitter with {brightness, contrast, satura-
+                                                                gest the information. We recommend to use this bottleneck
+tion, hue} strength of {0.4, 0.4, 0.4, 0.1} with an applying
+                                                                   structure for our method.
+probability of 0.8, and RandomGrayscale with an ap-
+plying probability of 0.2. Blurring augmentation [8] has a
+                                             C. Reproducing Related Methods
+Gaussian kernel with std in [0.1, 2.0].
+   Initialization. The convolution and fc layers follow the       Our comparison in Table 4 is based on our reproduction
+default PyTorch initializers. Note that by default PyTorch     of the related methods. We re-implement the related meth-
+initializes           fc layers’                  weight and bias by a uniform distribu-     ods as faithfully as possible following each individual paper.       √     √
+tion U(−  k,  k) where k= in channels.1     Models with sub-     In addition, we are able to improve SimCLR, MoCo v2, and
+stantially different fc initializers (e.g., a ﬁxed std of 0.01)   SwAV by small and straightforward modiﬁcations: specif-
+may not converge. Moreover, similar to the implementation       ically, we use 3 layers in the projection MLP in SimCLR
+of [8], we initialize the scale parameters as 0 [14] in the last     and SwAV (vs. originally 2), and use symmetrized loss for
+BN layer for every residual block.                   MoCo v2 (vs. originally asymmetric). Table C.1 compares
+   Weight decay. We use a weight decay of 0.0001 for all     our reproduction of these methods with the original papers’
+parameter layers, including the BN scales and biases, in the      results (if available). Our reproduction has better results for
+SGD optimizer. This is in contrast to the implementation    SimCLR, MoCo v2, and SwAV (denoted as “+” in Table 4),
+of [8, 15] that excludes BN scales and biases from weight     and has at least comparable results for BYOL.
+decay in their LARS optimizer.
+                                             D. CIFAR ExperimentsLinear evaluation. Given the pre-trained network, we
+train a supervised linear classiﬁer on frozen features, which     We have observed similar behaviors of SimSiam in the
+are from ResNet’s global average pooling layer (pool5).    CIFAR-10 dataset [24]. The implementation is similar to
+The linear classiﬁer training uses base lr = 0.02 with a      that in ImageNet. We use SGD with base lr = 0.03 and
+cosine decay schedule for 90 epochs, weight decay = 0,     a cosine decay schedule for 800 epochs, weight decay =
+momentum=0.9, batch size=4096 with a LARS optimizer     0.0005, momentum= 0.9, and batch size= 512. The input
+[38]. We have also tried the SGD optimizer following [17]     image size is 32×32. We do not use blur augmentation. The
+with base lr = 30.0, weight decay = 0, momentum = 0.9,     backbone is the CIFAR variant of ResNet-18 [19], followed
+and batch size=256, which gives ∼1% lower accuracy. Af-     by a 2-layer projection MLP. The outputs are 2048-d.
+ter training the linear classiﬁer, we evaluate it on the center        Figure D.1 shows the kNN classiﬁcation accuracy (left)
+224×224 crop in the validation set.                         and the linear evaluation (right). Similar to the ImageNet
+                                                                observations, SimSiam achieves a reasonable result and
+B. Additional Ablations on ImageNet               does not collapse. We compare with SimCLR [8] trained
+                                                          with the same setting. Interestingly, the training curves are
+  The following table reports the SimSiam results vs. the
+                                                                 similar between SimSiam and SimCLR. SimSiam is slightly
+output dimension d:
+                                                                    better by 0.7% under this setting.
+             output d     256     512    1024    2048
+              acc. (%)      65.3     67.2     67.5     68.1                         90
+It beneﬁts from a larger d and gets saturated at d = 2048.          80                                                          acc. (%)
+This is unlike existing methods [36, 17, 8, 15] whose accu-                                                                                        SimCLR     91.1
+racy is saturated when d is 256 or 512.                                       70                        SimSiam                                                                                                    SimSiam    91.8
+   In this table, the prediction MLP’s hidden layer dimen-                              SimCLR
+sion is always 1/4 of the output dimension. We ﬁnd that this          60 0                  epochs                 800
+bottleneck structure is more robust.  If we set the hidden                                                                  Figure D.1. CIFAR-10 experiments. Left: validation accuracy of
+dimension to be equal to the output dimension, the train-                                             kNN classiﬁcation as a monitor during pre-training. Right: linear
+ing can be less stable or fail in some variants of our explo-      evaluation accuracy. The backbone is ResNet-18.
+ration. We hypothesize that this bottleneck structure, which
+
+
+                                                 10

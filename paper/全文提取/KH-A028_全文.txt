@@ -1,0 +1,606 @@
+KH-A028 | Data Distillation: Towards Omni-Supervised Learning
+来源：https://arxiv.org/abs/1712.04440
+本地PDF：专题文献/何恺明/KH-A028_Data_Distillation_Towards_Omni_Supervised_Learning_CVPR2018.pdf
+SHA-256：0e721f8beb5e4a84ffc2f7c653ebafca4e7982f12f4cf16663c941f83a22a011
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                Data Distillation: Towards Omni-Supervised Learning
+
+
+                     Ilija Radosavovic   Piotr Doll´ar   Ross Girshick   Georgia Gkioxari  Kaiming He
+
+                                     Facebook AI Research (FAIR)
+
+                        Abstract                                                         model A
+
+         We  investigate  omni-supervised  learning,  a  special        image                   model B                   ensemble
+         regime of semi-supervised learning in which the learner ex-
+           ploits all available labeled data plus internet-scale sources                                model C2017
+          of unlabeled data.  Omni-supervised learning is lower-
+        bounded by performance on existing labeled datasets, of-                                                                                                                      student model                       predict
+          fering the potential to surpass state-of-the-art fully super-Dec          vised methods. To exploit the omni-supervised setting, we                      Model Distillation
+                             a method that                                             ensembles                                                             predic-                  data                           distillation,12   propose          tions from                    multiple                            transformations                                                of unlabeled                                                           data,                                                                 us-                             transform A     model A
+         ing a single model, to automatically generate new training
+                                                                                image              transform B     model A            ensemble
+         annotations. We argue that visual recognition models have
+          recently become accurate enough that it is now possible to                             transform C     model A
+         apply classic ideas about self-training to challenging real-
+        world data. Our experimental results show that in the cases
+                                                                                                                      student model                       predict[cs.CV]   of human keypoint detection and general object detection,
+          state-of-the-art models trained with data distillation sur-                        Data Distillation
+         pass the performance of using labeled data from the COCO                                                                            Figure 1. Model Distillation [18] vs. Data Distillation. In data
+          dataset alone.                                                                 distillation, ensembled predictions from a single model applied to
+                                                                                multiple transformations of an unlabeled image are used as auto-
+         1. Introduction                                                 matically annotated data for training a student model.
+
+            This paper  investigates omni-supervised  learning,  a     by ensembling the results of a single model run on different
+        paradigm in which the learner exploits as much well-     transformations (e.g., ﬂipping and scaling) of an unlabeled
+         annotated data as possible (e.g., ImageNet [6], COCO [24])     image. Such transformations are widely known to improve
+        and is also provided with potentially unlimited unlabeled     single-model accuracy [20] when applied at test time, indi-
+         data (e.g., from internet-scale sources). It is a special regime      cating that they can provide nontrivial knowledge that is not
+         of semi-supervised learning.  However, most research on     captured by a single prediction. In other words, in compar-
+         semi-supervised learning has simulated labeled/unlabeled     ison with [18], which distills knowledge from the predic-
+         data by splitting a fully annotated dataset and is there-      tions of multiple models, we distill the knowledge of a sin-arXiv:1712.04440v1
+          fore likely to be upper-bounded by fully supervised learn-      gle model run on multiple transformed copies of unlabeled
+         ing with all annotations. On the contrary, omni-supervised     data (see Figure 1).
+          learning is lower-bounded by the accuracy of training on       Data distillation is a simple and natural approach based
+            all annotated data, and its success can be evaluated by how     on “self-training”  (i.e., making predictions on unlabeled
+       much it surpasses the fully supervised baseline.                 data and using them to update the model), related to which
+          To tackle omni-supervised learning, we propose to per-      there have been continuous efforts [36, 48, 43, 33, 22, 46,
+        form knowledge distillation from data, inspired by [3, 18]      5, 21] dating back to the 1960s, if not earlier. However,
+        which performed knowledge distillation from models. Our     our simple data distillation approach can become realistic
+         idea is to generate annotations on unlabeled data using a      largely thanks to the rapid improvement of fully-supervised
+        model trained on large amounts of labeled data, and then     models [20, 39, 41, 16, 12, 11, 30, 28, 25, 15] in the past
+           retrain the model using the extra generated annotations.     few years. In particular, we are now equipped with accu-
+        However, training a model on its own predictions often pro-      rate models that may make fewer errors than correct pre-
+         vides no meaningful information. We address this problem      dictions. This allows us to trust their predictions on unseen
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+data and reduces the requirement for developing data clean-        Multiple views or perturbations of the data can pro-
+ing heuristics. As a result, data distillation does not require     vide useful signal for semi-supervised learning. In the co-
+one to change the underlying recognition model (e.g., no      training framework [2], different views of the data are used
+modiﬁcation on the loss deﬁnitions), and is a scalable solu-      to learn two distinct classiﬁers that are then used to train
+tion for processing large-scale unlabeled data sources.         one another over unlabeled data. Reed et al. [29] use a re-
+  To test data distillation for omni-supervised learning, we     construction consistency term for training classiﬁcation and
+evaluate  it on the human keypoint detection task of the      detection models. Bachman et al. [1] employ the pseudo-
+COCO dataset [24]. We demonstrate promising signals     ensemble regularization term to train models robust on in-
+on this real-world, large-scale application. Speciﬁcally, we     put perturbations.  Sajjadi et al. [35] enforce consistency
+train a Mask R-CNN model [15] using data distillation ap-     between outputs computed for different transformations of
+plied on the original labeled COCO set and another large     input examples. Simon et al. [38] utilize multi-view geom-
+unlabeled set (e.g., static frames from Sports-1M [19]). Us-      etry to generate hand keypoint labels from multiple cameras
+ing the distilled annotations on the unlabeled set, we have     and retrain the detector. In an auto-encoder scenario, Hinton
+observed improvement of accuracy on the held-out valida-      et al. [17] propose to use multiple “capsules” to model mul-
+tion set: e.g., we show an up to 2 points AP improvement      tiple geometric transformations. Our method is also based
+over the strong Mask R-CNN baseline. As a reference, this     on multiple geometric transformations, but it does not re-
+improvement compares favorably to the ∼3 points AP im-     quire to modify network structures or impose consistency
+provement gained from training on a similar amount of extra     by adding any extra loss terms.
+manually labeled data in [27] (using private annotations).        Regarding the large-scale regime, Fergus et al. [9] inves-
+We further explore our method on COCO object detection      tigate semi-supervised learning on 80 millions tiny images.
+and show gains over fully-supervised baselines.          A Never Ending Image Learner (NEIL) [5] employs self-
+                                                                   training to perform semi-supervised learning from web-
+2. Related Work                                            scale image data. These methods were developed before the
+                                                                recent renaissance of deep learning. In contrast, our method
+   Ensembling [14] multiple models has been a successful
+                                                                              is evaluated with strong deep neural network baselines, and
+method for improving accuracy. Model compression [3] is
+                                                        can be applied to structured prediction problems beyond
+proposed to improve test-time efﬁciency of ensembling by
+                                                             image-level classiﬁcation (e.g., keypoints and boxes).
+compressing an ensemble of models into a single student
+model. This method is extended in knowledge distillation
+[18], which uses soft predictions as the student’s target.         3. Data Distillation
+  The idea of distillation has been adopted in various sce-
+                                          We propose data distillation, a general method for omni-narios. FitNet [32] adopts a shallow and wide teacher mod-
+                                                             supervised learning that distills knowledge from unlabeledels to train a deep and thin student model.  Cross modal
+                                                              data without the requirement of training a large set of mod-distillation [13] is proposed to address the problem of lim-
+                                                                            els.  Data distillation involves four steps:  (1) training aited labels in a certain modality. In [26] distillation is uni-
+                                                    model on manually labeled data (just as in normal super-ﬁed with privileged information [44]. To avoid explicitly
+                                                              vised learning); (2) applying the trained model to multipletraining multiple models, Laine and Aila [21] exploit mul-
+                                                              transformations of unlabeled data; (3) converting the pre-tiple checkpoints during training to generate the ensemble
+                                                                  dictions on the unlabeled data into labels by ensembling thepredictions. Following the success of these existing works,
+                                                              multiple predictions; and (4) retraining the model on theour approach distills knowledge from a lightweight ensem-
+                                                         union of the manually labeled data and automatically la-ble formed by multiple data transformations.
+                                                            beled data. We describe steps 2-4 in more detail below.   There is a great volume of work on semi-supervised
+learning, and comprehensive surveys can be found in [49,
+4, 50]. Among semi-supervised methods, our method is     Multi-transform inference. A common strategy for boost-
+most related to self-training, a strategy in which a model’s     ing the accuracy of a visual recognition model is to apply
+predictions on unlabeled data are used to train itself [36,      the same model to multiple transformations of the input and
+48, 43, 33, 22, 46, 5, 21].  Closely related to our work     then to aggregate the results. Examples of this strategy in-
+on keypoint/object detection, Rosenberg et al. [33] demon-     clude using multiple crops of an input image (e.g., [20, 42])
+strate that self-training can be used for training object detec-     or applying a detection model to multiple image scales and
+tors. Compared to prior efforts, our method is substantially     merging the detections (e.g., [45, 8, 7, 37]). We refer to
+simpler. Once the predicted annotations are generated, our      the general application of inference to multiple transforma-
+method leverages them as if they were true labels; it does      tions of a data point with a single model as multi-transform
+not require any modiﬁcations to the optimization problem      inference. In data distillation, we apply multi-transform in-
+or model structure.                                            ference to a potentially massive set of unlabeled data.
+
+======================== PDF 第 3 页 ========================
+           transform A                 transform B                 transform C                  ensemble
+Figure 2. Ensembling keypoint predictions from multiple data transformations can yield a single superior (automatic) annotation.
+For visualization purposes all images and keypoint predictions are transformed back to their original coordinate frame.
+
+Generating labels on unlabeled data. By aggregating the     no change to the loss function. However, we do take two
+results of multi-transform inference, it is often possible to      factors into considerations. First, we ensure that each train-
+obtain a single prediction that is superior to any of the     ing minibatch contains a mixture of manually labeled data
+model’s predictions under a single transform (e.g., see Fig-     and automatically labeled data.  This ensures that every
+ure 2). Our observation is that the aggregated prediction     minibatch has a certain percentage of ground-truth labels,
+generates new knowledge and in principle the model can use     which results in better gradient estimates.  Second, since
+this information to learn from itself by generating labels.      more data is available, the training schedule must be length-
+  Given an unlabeled image and a set of predictions from     ened to take full advantage of it. We discuss these issues in
+multi-transform inference,  there are multiple ways one    more detail in the context of the experiments.
+could automatically generate labels on the image. For ex-
+ample, in the case of a classiﬁcation problem the image     4. Data Distillation for Keypoint Detection
+could be labeled with the average of the class probabilities                                                             This section describes an instantiation of data distillation
+[18].  This strategy, however, has two problems.  First, it                                                                   for the application of multi-person keypoint detection.
+generates a “soft” label (a probability vector, not a cate-
+                                           Mask R-CNN. Our teacher and student models are thegorical label) that may not be straightforward to use when
+                                               Mask R-CNN [15] keypoint detection variant. Mask R-retraining the model. The training loss, for example, may
+                                     CNN is a two-stage model. The ﬁrst stage is a Region Pro-need to be altered such that its compatible with soft labels.
+                                                              posal Network (RPN) [30]. The second stage consists ofSecond, for problems with structured output spaces, like ob-
+                                                                 three heads for bounding box classiﬁcation, regression, andject detection or human pose estimation, it does not make
+                                                            keypoint prediction on each Region of Interest (RoI). Thesense to average the output as care must be taken to respect
+                                                            keypoint head outputs a heatmap that is trained to predict athe structure of the output space.
+                                                            one-hot mask for each keypoint type. We use ResNet [16]  Given these considerations, we simply ensemble (or ag-
+                                                      and ResNeXt [47] with Feature Pyramid Networks (FPN)gregate) the predictions from multi-transform inference in a
+                                                              [23] as backbones for Mask R-CNN. All implementationsway that generates “hard” labels of the same structure and
+                                                            follow [15], unless speciﬁed.type of those found in the manually annotated data. Gener-
+ating hard labels typically requires a small amount of task-    Data transformations. This paper  opts  for geometric
+speciﬁc logic that addresses the structure of the problem     transformations for multi-transform inference, though other
+(e.g., merging multiple sets of boxes by non-maximum sup-     transformations such as color jittering [20] are possible.
+pression). Once such labels are generated, they can be used    The only requirement is that it must be possible to ensemble
+to retrain the model in a simple plug-and-play fashion, as if      the resulting predictions. For geometric transformations, if
+they were authentic ground-truth labels.                         the prediction is a geometric quantity (e.g., coordinates of a
+   Finally, we note that while this procedure requires run-      keypoint), then the inverse transformation must be applied
+ning inference multiple times,  it is actually efﬁcient be-      to each prediction before they are merged.
+cause it is generally substantially less expensive than train-     We use two popular transformations: scaling and hor-
+ing multiple models from scratch, as is required by model      izontal ﬂipping. We resize the unlabeled image to a pre-
+distillation [3, 18].                                      deﬁned set of scales (denoted by the shorter side of an
+                                                            image): [400, 1200] pixels with a stepsize of 100, which
+Knowledge distillation. The new knowledge generated    was selected by measuring the keypoint AP for the teacher
+from unlabeled data can be used to improve the model. To     model when applying these transformations on the vali-
+do this, a student model (which can be the same as the orig-     dation set. The selected transformations can improve the
+inal model or different) is trained on the union set of the     model by a good margin, e.g. for ResNet-50 from 65.1 to
+original supervised data and the unlabeled data with auto-     67.8 AP, which is then used as the teacher. Note that unless
+matically generated labels.                                         stated, we do not apply these transformation at test time for
+   Training on the union set is straightforward and requires       all baseline/distilled models.
+
+======================== PDF 第 4 页 ========================
+Figure 3. Random examples of annotations generated on static Sports-1M [19] frames using a ResNet-50 teacher. The generated
+annotations have reasonably high quality, though as expected there are mistakes like inverted keypoints (top right).
+
+
+   Figure 3 shows some examples of the generated annota-     gions from the extra data for training detectors, and have
+tions on Sport-1M. They have reasonably high quality.         observed no difference in accuracy. For simplicity, in all
+                                                           experiments we view the generated data as complete, so the
+Ensembling. One could ensemble the multi-transform in-
+                                                                 extra data are simply treated as if all annotations are correct.
+ference results from each stage and each head of Mask
+R-CNN. In our experiments, however, for simplicity we     Generating keypoint annotations. Each of the selected
+only apply multi-transform inference to the keypoint head;      predictions consists of K individual keypoints (e.g., left ear,
+the outputs from the other stage  (i.e., RPN) and heads     nose, etc.).  Since many of the object views do not show
+(i.e., bounding box classiﬁcation and regression) are from       all of the keypoint types, the predicted keypoints are likely
+a single-scale without any transformations.                       to contain false positives as well. As above, we choose a
+  Thanks to the above simpliﬁcation, it is easy for us to     threshold such that the average numbers of keypoints are
+have a consistent set of detection boxes serving as the RoIs     approximately equal in the supervised and generated sets.
+for all transformations (scales/ﬂipping). On a single RoI,
+                                                           Retraining. We train a student model on the union set ofwe extract the keypoint heatmaps from all transformations,
+                                                                the original supervised images and the images with auto-and although they are from different geometric transforma-
+                                                               matically generated annotations. To maintain supervisiontions, these heatmaps are with reference to the local coor-
+                                                                 quality at the minibatch level, we use a ﬁxed sampling ratiodinate system of the same RoI. So we can directly average
+                                                                   for the two kinds of data. Speciﬁcally, we randomly samplethe output (probability) of these heatmaps for ensembling.
+                                                       images for each minibatch such that the expected ratio ofWe take the argmax position in this ensembling result and
+                                                                   original images to generated labeled images is 6:4, unlessgenerate the predicted keypoint location.
+                                                                   stated otherwise.
+Selecting predictions. We expect the predicted boxes and                                          We adopt the learning rate schedule similar to [15] and
+keypoints to be reliable enough for generating good train-                                                               increase the total number of iterations to account for extra
+ing labels. Nevertheless, the predictions will contain false                                                           images. The learning rate starts from 0.02 and is divided by
+positives that we hope to identify and discard. We use the     10 after 70% and 90% of the total number of iterations. The
+predicted detection score as a proxy for prediction quality                                                         impact of the total number of iterations will be discussed in
+and generate annotations only from the predictions that are                                                                the next section in context of Table 2.
+above a certain score threshold. In practice, we found that a                                          We use a student model with the same architecture as
+score threshold works well if it makes “the average number                                                                the teacher. The student can either be ﬁne-tuned starting
+of annotated instances per unlabeled image” roughly equal                                                     from the teacher model or retrained from the initial weights
+to “the average number of instances per labeled image”. Al-                                                                                      (i.e., those pre-trained on ImageNet [34]). We found that
+though this heuristic assumes that the unlabeled and labeled                                                                 retraining consistently results in better performance, sug-
+images follow similar distributions, we found that it is ro-                                                               gesting that the teacher model could have been in a poor
+bust and works well even in cases where the assumption                                                                   local optimum. We opt for retraining in all experiments.
+does not hold.
+  As a dual consideration to false positives above, there     5. Experiments on Keypoint Detection
+may be false negatives (i.e., missing detections) in the extra
+data, and the annotations generated should not necessarily     We evaluate data distillation on the keypoint detection
+be viewed as complete (i.e., absence of an annotation does      task of the COCO dataset [24]. We report keypoint Av-
+not imply true background). However, in our practice we     erage Precision following the COCO deﬁnitions, including
+have tried either to sample or not sample background re-    AP (COCO’s default, averaged over different IoU thresh-
+
+======================== PDF 第 5 页 ========================
+fully-supervised
+distillation
+data
+
+ Figure 4. Selected results of fully-supervised learning in the original co-115 set (top) vs. data distillation in the co-115 plus
+ s1m-180 sets (bottom). The results are on the held-out data from COCO test-dev.
+
+
+ olds), AP50, AP75, APM (medium), and APL (large).  In     Small-scale data. As a sanity-check, we evaluate our ap-
+ all experiments we report results on the 2017 validation set     proach in the classic semi-supervised setting by simulating
+ that contains 5k images (called val2017, formerly known     labeled and unlabeled splits from all labeled images.
+ as minival).                                                   In Table 1a, we show results of data distillation per-
+                                                       formed on co-35 as the labeled data and co-80 treated
+ 5.1. Data Splits                                             as unlabeled data. As a comparison, we report supervised
+                                                                learning results using either co-35 or co-115. This com-   Our experiments involve several splits of data:
+                                                               parison shows that data distillation is a successful semi-
+COCO labeled images. These are the original labeled     supervised learning method:  it surpasses the co-35-only
+COCO images that contain ground-truth person and key-     counterpart by 5.3 points of AP by using unlabeled data
+ point annotations. In this paper, we refer to the 80k training     (60.2 vs. 54.9). On the other hand, as expected, the semi-
+ images as co-80, a 35k subset of the 2014 validation im-     supervised learning result is lower than fully-supervised
+ ages as co-35, and their union as co-115 (in the 2017      learning on co-115 (60.2 vs. 65.1).
+ version of COCO, co-115 is the train2017 set). We        This phenomenon on small-scale data has been widely
+ do not use the original train/val nomenclature because their     observed for many semi-supervised learning methods and
+ roles may change in different experiments.                       datasets: if labels were available for all training data, then
+                                                                 the accuracy of semi-supervised learning would be upper-
+COCO unlabeled images. The 2017 version of COCO
+                                                     bounded by using all labels. In addition, as the simulated
+ provides a collection of 120k unlabeled images, which we
+                                                                           splits are often at smaller scales, there is a relatively large call un-120. These images are expected to have a similar
+                                                       gap for the semi-supervised method to improve in (e.g.,
+ distribution as the labeled COCO images.
+                                                      from 54.9 to 65.1).
+ Sports-1M static frames. We will show that our method     We argue that omni-supervised learning is a real-world
+ can be robust to a dissimilar distribution of unlabeled data.     scenario unlike the above simulated semi-supervised set-
+ We collect these images by using static frames from the      ting.  Even though one could label many images, there
+ Sports-1M [19] video dataset. We randomly sample 180k      are always more unlabeled data available (e.g., at internet-
+ videos from this dataset. Then we randomly sample 1 frame      scale).  We can thus pursue an accuracy that is lower-
+ from each video, noting that we do not exploit any tempo-     bounded. In addition, when trained with a larger dataset, the
+ ral information even if it is possible. This strategy gives us     supervised baseline would be much higher (e.g., 65.1), leav-
+ 180k static images. We call this set s1m-180. We do not     ing less room for models to gain from the unlabeled data.
+ use any available labels from this static image set.                 Therefore, we argue that the large-scale, high-accuracy
+                                                         regime is more challenging and of more interest in practice.
+ 5.2. Main Results                           We investigate it in the following experiments.
+  We investigate data distillation in three cases:               Large-scale, similar-distribution data. Table 1b shows
+ (i) Small-scale data as a sanity check: we use co-35 as the      the scenario of a real-world omni-supervised learning ap-
+ labeled data and treat co-80 as unlabeled.                       plication: we have a large-scale source of 120k COCO
+ (ii) Large-scale data with similar distribution:  we use    (un-120) images on hand, but we do not have labels for
+ co-115 as the labeled data and un-120 as unlabeled.         them. Can we improve over our best baseline results using
+ (iii) Large-scale data with dissimilar distribution: we use     these unlabeled data?
+ co-115 as the labeled data and s1m-180 as unlabeled.          Table 1b shows the data distillation results on co-115
+ The results are in Table 1, discussed as follows:                 plus un-120, comparing with the fully-supervised coun-
+
+======================== PDF 第 6 页 ========================
+      labeled   unlabeled   AP   AP50  AP75  APM  APL                                     #iter   AP   AP50  AP75  APM  APL
+    co-35               54.9    80.5    59.0    50.1    62.8               fully-supervised   90k   64.2    86.4    69.2    59.1    72.6
+    co-35   co-80    60.2    83.8    65.4    55.2    68.4                           130k   65.1    86.6    70.9    59.9    73.6
+    co-115              65.1    86.6    70.9    59.9    73.6                           270k   64.7    86.6    70.4    59.7    73.0
+(a) Small-scale data. Data distillation is performed on co-35 with la-         data distillation   90k   63.6    85.9    69.2    58.8    71.7
+bels and co-80 without labels, vs. fully-supervised learning performed on                       180k   65.8    87.3    71.6    60.8    74.2
+co-35 and co-115 respectively. The backbone is ResNet-50.                                270k   66.5    88.0    72.2    61.5    74.6
+                                                                                   360k   66.6    87.3    72.6    61.6    75.0
+
+    backbone       DD  AP  AP50  AP75 APM  APL                                                                  Table 2. Ablation on numbers of training iterations. The models
+    ResNet-50                 65.1   86.6   70.9   59.9   73.6
+                                                                       are trained on co-115 (and plus s1m-180 for data distillation).    ResNet-50      ✓    67.1   87.9   73.4   62.2   75.1
+                                                        The backbone is ResNet-50. In all case, the learning rate is re-
+    ResNet-101                66.1   87.7   71.7   60.5   75.0
+    ResNet-101     ✓    67.8   88.2   73.8   62.8   76.0        duced by 10 at 70% and 90% of the total number of iterations.
+    ResNeXt-101-32×4        66.8   87.5   73.0   61.6   75.2
+    ResNeXt-101-32×4 ✓    68.7   88.9   75.1   63.9   76.7           Table 1c shows data distillation results on co-115
+    ResNeXt-101-64×4        67.3   88.0   73.3   62.2   75.6        plus s1m-180. Comparing with the supervised baselines
+    ResNeXt-101-64×4 ✓    69.1   88.9   75.3   64.1   77.1
+                                                                 trained on co-115, our method shows consistent improve-
+(b) Large-scale, similar-distribution data. Data distillation (DD) is per-    ment with different backbones, achieving 1.2 to 1.5 points
+formed on co-115 with labels and un-120 without labels, comparing
+with the supervised counterparts trained on co-115.                     of AP increase. Moreover, the improvements in this case
+                                                                are reasonably close to those in Table 1b, even though the
+    backbone       DD  AP  AP50  AP75 APM  APL        data distribution in Sport-1M is different. This experiment
+    ResNet-50                 65.1   86.6   70.9   59.9   73.6       shows that our method, in the application of keypoint detec-
+    ResNet-50      ✓    66.6   87.3   72.6   61.6   75.0                                                                        tion, is robust to the misaligned distribution of data. This is
+    ResNet-101                66.1   87.7   71.7   60.5   75.0
+                                                          a promising signal for real-world omni-supervised learning.    ResNet-101     ✓    67.5   87.9   73.9   62.4   75.9
+    ResNeXt-101-32×4        66.8   87.5   73.0   61.6   75.2           Figure 4 shows some examples of the fully-supervised
+    ResNeXt-101-32×4 ✓    68.0   88.1   74.2   63.1   76.2         results trained in co-115 and the data distillation results
+    ResNeXt-101-64×4        67.3   88.0   73.3   62.2   75.6         trained in co-115 plus s1m-180.
+    ResNeXt-101-64×4 ✓    68.5   88.8   74.9   63.7   76.5
+                                                               5.3. Ablation Experiments(c) Large-scale, dissimilar-distribution data. Data distillation (DD) is
+performed on co-115 with labels and s1m-180 without labels, compar-
+                                                                 In addition to the above main results, we conduct several
+ing with the supervised counterparts trained on co-115.
+                                                                ablation experiments as analyzed in the following:
+Table 1. Data distillation for COCO keypoint detection. Keypoint
+AP is reported on COCO val2017.                     Number of iterations.  It is necessary to train for more iter-
+                                                                 ations when given more (labeled or distilled) data. To show
+                                                                     that our method does not simply take advantage of longer
+terpart on co-115, the largest available annotated set on
+                                                                      training, we conduct a careful ablation experiment on the
+hand. Our method is able to improve over the strong base-
+                                                   number of iterations in Table 2.
+lines by 1.7 to 2.0 points AP. Our improvement is observed
+                                                           For the fully-supervised baseline, we investigated a total
+regardless of the depth/capacity of the backbone models, in-
+                                                   number of iterations of 90k (as done in [15]), 130k (∼1.5×
+cluding ResNet-50/101 and ResNeXt-101.
+                                                                  longer), and 270k (3× longer).  Table 2 (top) shows that
+  We argue that these are non-trivial results. Because the
+                                                       an appropriately long training indeed leads to better results,
+baselines are very high due to using large amounts of su-
+                                                      and the original schedule of 90k in [15] is suboptimal. How-
+pervised data (115k images in co-115), they might leave
+                                                                     ever, without increasing the dataset size, training longer
+less room for further improvement, in contrast to the simu-
+                                                               gives diminishing return and becomes prone to overﬁtting.
+lated semi-supervised setting. Actually, in recent work [27]
+                                                  The optimal number of 130k iterations is chosen and used
+that exploited an extra 1.5× fully-annotated human key-
+                                                                   in Tables 1 for the fully-supervised baselines.
+point skeletons (contributed by in-house annotators), the
+                                                                 In contrast, our data distillation method continuously im-
+improvement is ∼3 points AP over their baseline. Given
+                                                           proves when the number of iterations is increased from 90k
+this context, our increase of ∼2 points AP, contributed by a
+                                                                   to 360k as shown in Table 2 (bottom). With a short train-
+similar amount of extra unlabeled data, is very promising.
+                                                             ing of 90k, our method is inferior to its fully-supervised
+Large-scale, dissimilar-distribution data. Even though     counterpart (63.6 vs. 64.2), which is understandable: the
+COCO data are images “in the wild”, the co-115 and     generated labels in the extra data have lower quality than
+un-120 sets are subject to similar data distributions. As      the ground-truth labels, and the model may not beneﬁt from
+one further step toward omni-supervision in real cases, we     them unless ground-truth labels have been sufﬁciently ex-
+investigate a scenario where the unlabeled images are from      ploited.  On the other hand, our method starts to show
+a different distribution.                                      a healthy gain with sufﬁcient training and surpasses  its
+
+======================== PDF 第 7 页 ========================
+                        data distillation                                             backbone              test aug.?  AP  AP50  AP75 APM  APL
+          67
+                           fully-supervised                                             ResNet-50                      67.1   87.9   73.4   62.2   75.1
+                                                                      ResNet-50       ✓      68.9   88.8   75.8   64.4   76.4
+                                                                      ResNet-101                     67.8   88.2   73.8   62.8   76.0
+                                                                      ResNet-101       ✓      69.8   89.1   76.0   65.3   77.5
+      AP66                                                                 ResNeXt-101-32×4             68.7   88.9   75.1   63.9   76.7
+                                                                 ResNeXt-101-32×4   ✓      70.6   89.3   77.2   65.7   78.4
+                                                                 ResNeXt-101-64×4             69.1   88.9   75.3   64.1   77.1
+                                                                 ResNeXt-101-64×4   ✓      70.4   89.3   76.8   65.8   78.1
+          65
+                          .2           .4           .6           .8         1                Table 3. Ablation on test-time augmentation. A data distillation
+                     fraction of unlabeled images used in un-120                  model is trained on co-115 + un-120, tested without and with
+Figure 5. Data distillation applied to co-115 with labels and dif-      test-time augmentations.
+ferent fractions of un-120 images without labels, comparing
+with the co-115 fully-supervised baseline, using ResNet-50.         Actually, as can be expected, the supervised baseline be-
+                                                   comes a lower-bound of accuracy in omni-supervised learn-
+          68        data                                       distillation                                           ing: the extra unlabeled data, when exploited appropriately                           fully-supervised
+                                                         such as in data distillation, should always provide extra in-
+          67                                                     formation. Moreover, Figure 5 shows that there is a gen-
+      AP
+                                                                     eral trend of better results when using more unlabeled data.
+                                    A similar trend, in the context of fully-annotated data, has                    student66
+                                                       been observed recently in [40]. However, our trend is ob-
+                                                            served in unlabeled data and can be more encouraging for
+          65                                                      the future study in computer vision.
+               65       66       67       68       69       70
+                                  teacher AP                        Impact of teacher quality. To understand the impact of
+Figure 6. Impact of teacher quality on data distillation. Student      the teacher quality on data distillation, we produce differ-
+ResNet-50 model is trained using data distillation on co-115 plus      ent teacher models with different AP (see Figure 6 caption).
+un-120 and compared to its fully-supervised counterpart trained                                                   Then we train the same student model on each teacher. Fig-
+on co-115. Each data point is from a different teacher whose AP                                                             ure 6 shows the student AP vs. the teacher AP.
+can vary because of different backbones, number of supervised
+                                                 As  expected,   all  student  models  trained  by  data
+training iterations, and transform settings (e.g., scales used).
+                                                                         distillation surpass the fully-supervised baseline. In addi-
+                                                                        tion, a higher-quality teacher in general results in a bet-
+fully-supervised counterpart.  Actually, our method’s per-                                                                          ter student. This demonstrates a nice property of the data
+formance has not saturated and is likely to improve when                                                                         distillation method: one could expect a bigger improvement
+using more iterations. To have manageable experiments,                                                                                     if a better teacher will be developed.
+for all other data distillation results in the paper, our method
+                                                           Test-time augmentations. Our data distillation method ex-uses 360k iterations.
+                                                                      ploits multi-transform inference to generate labels. Multi-
+Amount of unlabeled data. To better understand the im-     transform inference can also be applied at test-time to
+portance of the amount of unlabeled data, in Figure 5 we      further improve results, a strategy typically called test-
+investigate using a subset of the un-120 unlabeled data     time augmentation.  Table 3 shows the results of apply-
+for data distillation (the labeled data is co-115).              ing test-time augmentations on a data distillation model.
+  To have a simpler uniﬁed rule for handling the various    The augmentations are the same as those used to generate
+sizes of the unlabeled set, for this ablation, we adopt a mini-      distillation labels. It shows that test-time augmentations can
+batching and iteration strategy different from the above sec-        still improve the results over our data distillation model.
+tions. Given a fraction ρ of un-120 images used, we sam-         Interestingly, the student model’s 68.9 AP (ResNet-50,
+ple each minibatch with on average 1:ρ examples from the      in Table 3) is higher than its corresponding (test-time aug-
+labeled and unlabeled data. The iteration number is adap-     mented) teacher’s 67.8 AP. We believe that this is a signal
+tively set as 1+ρ times of that of the supervised baseline      of our approach being able to learn new knowledge from
+(130k in this ﬁgure). As such, the total number of sampled      the extra unlabeled data, instead of simply learning to be
+images from the labeled set is roughly the same regardless     robust to the transforms. Even though we use multiple data-
+of the fraction ρ. We note that this strategy is suboptimal     agnostic transforms, the distilled labels are data-dependent
+comparing with the setting in other tables, but it is a simpli-     and may convey knowledge from the extra data.
+ﬁed setting that can apply to all fractions investigated.             This result also suggests that performing data distillation
+   Figure 5 shows that for all fractions of unlabeled data,      in an iterative fashion may improve the results further. We
+our method is able to improve over the supervised baseline.     leave this direction for future work.
+
+======================== PDF 第 8 页 ========================
+                                                                                  labeled   unlabeled  AP   AP50  AP75  APS  APM  APL
+                                                                                                                                 bird
+                        person                                                                                                             bird                     co-35              30.5    51.9    31.9    15.2    33.0    40.6
+                              personpersonperson     person                                           co-35   co-80    32.3    53.8    33.9    16.8    35.5    43.7
+                                 skis
+                                                        co-115                                                                                                   37.1                                                                                                          59.1                                                                                                                  39.6                                                                                                                          20.0                                                                                                                                 40.0                                                                                                                                         49.4                                                                                                                                    bird                                                                                                                                                                             bird
+                                                                                                                 bird                                                                                                                                                                  birdbirdbird                                                                                                                                            bird     bird
+                                         skis
+                                                                                                                                                                             bird                                                                                                                                                     bird         bird                                                                                                                        bird
+                                                            skis                                                                                                                                                                                    bird   bird              (a)                                                                             Small-scale data. Data                                                                                                                            distillation                                                                                                                                                   is                                                                                                            performed                                                                                                             on co-35                                                                                                                                     with                                                                                                                                                                              la-
+                                                                                 bels and co-80 without labels, vs. fully-supervised learning performed on
+                                                      co-35 and co-115. The backbone is ResNet-50.
+                 person      person
+                                        person      person        person                  couch
+                                                                                                              person               person
+                                     tie           tie          tie              tie               tie                                            backbone       DD  AP  AP50  AP75  APS APM  APL
+                                                                                                                                                         chair         tie                     ResNet-50                 37.1   59.1   39.6   20.0   40.0   49.4
+
+                                                                                                  dining tablewinebottleglasscupcup
+                                                                                                   cup                                                                                                     bowl          knife   cup cupspoon      forkwine glassbottle                ResNet-50      ✓   37.9   60.1   40.8   20.3   41.6   50.8                                                                      ResNet-101                                                                                                       39.2                                                                                                              61.0                                                                                                                     42.3                                                                                                                           21.7                                                                                                                                  42.9                                                                                                                                         52.3
+
+                                                                                                          spoon                                                                                                                    cupcup          cup    wine glass                                                                                                       40.1                                                                                                              62.1                                                                                                                     43.5                                                                                                                           21.7                                                                                                                                  44.3                                                                                                                                         53.7                                                                      ResNet-101     ✓
+                                                                                  bookknife
+                                                                 ResNeXt-101-32×4        40.1   62.4   43.2   22.6   43.7   53.7
+                                                                                                                               person    person                           pers          ResNeXt-101-32×4 ✓   41.0   63.3   44.4   22.9   45.5   54.8
+
+                                                                                                                      person
+                                                                                    (b) Large-scale data. Data distillation (DD) is performed on co-115 with
+                           bus                                                                                                      baseball glove
+                                                                                                     person                                       labels and un-120 without labels, comparing with the supervised counter-
+
+                                                                                                                                     person
+                                                                                                                baseball glove                                                                                                                                                                     baseball glove  sports ball           parts trained on co-115.
+
+                                                                          person
+                                                                               person                                                                                    person                                    Table 4. Data distillation for COCO object detection. Box AP is           carperson car  car                  person           personpersonpersonpersonperson
+                                                                          handbag                                                                  handbag                                                                      handbag
+                                                                     reported on COCO val2017.
+
+Figure 7. Object detection annotations generated on un-120.                                                                                   (i) Small-scale data: we use co-35 as the labeled data and
+                                                                         treat co-80 as unlabeled.6. Experiments on Object Detection
+                                                                                     (ii) Large-scale data: we use co-115 as the labeled data
+  We investigate the generality of our approach by apply-     and un-120 as unlabeled.
+ing it to another task with minimal modiﬁcation. We per-
+                                                           Small-scale data. Similar to the keypoint case, the semi-form data distillation for object detection on the COCO
+dataset [24]. Here our data splits involve co-35/80/115     supervised learning result of data distillation (Table 4a) is
+                                                             higher than that of fully-supervised training in co-35, butas deﬁned above. We test on minival.
+                                                        upper-bounded by that in co-115. However, in this case,
+6.1. Implementation                                         the data distillation is closer to the lower bound (32.3 vs.
+                                                              30.5) and farther away from the upper bound. This result  Our object detector is Faster R-CNN [30] with the FPN
+                                                                 requires further exploration, which we leave to future work.backbone [23] and the RoIAlign improvement [15]. We
+adopt the joint end-to-end training as described in [31].                                                          Large-scale data. Table 4b shows the data distillation re-
+Note that this is unlike in our keypoint experiments where                                                                        sult using co-115 as labeled and un-120 as unlabeled
+we froze the RPN stage (which created the same set of                                                                    data,  comparing  with  the  fully-supervised  result  in
+boxes for keypoint ensembling). To produce the ensem-                                               co-115. Our method is able to improve over the fully-
+ble results, we simply take the union set of the boxes pre-                                                             supervised baselines. Although the gains may appear small
+dicted under different transformations, and combine them                                                                  (0.8-0.9 points in AP and 0.9-1.1 points in AP50), the signal
+using bounding box voting [10] (a process similar to non-                                                                              is consistently observed for all network backbones and for
+maximum suppression that merges the suppressed boxes).                                                                          all metrics. The biggest improvement is seen in the APM
+This ensembling strategy on the union set of boxes shows                                                                 metric, with an increase of up to 1.8 points (from 43.7 to
+the ﬂexibility of our method:  it is agnostic to how the re-                                                           45.5 in ResNeXt-101-32×4).
+sults from multiple transformations are aggregated.                                                    The results in Table 4a and 4b suggest that object de-
+  The object detection task involves multiple categories. A                                                                   tection with unlabeled data is a more challenging task, but
+single threshold of score for generating labels may lead to                                                            unlabeled data with data distillation can still help.
+strong biases. To address this issue, we set a per-category
+threshold of score conﬁdence for annotating objects in the
+                                                          7. Conclusion
+unlabeled data. We choose a threshold for each category
+such that its average number of annotated instances per im-     We show that it is possible to surpass large-scale super-
+age in the unlabeled dataset matches the average number of     vised learning with omni-supervised learning,  i.e., using
+instances in the labeled dataset. Figure 7 shows some ex-       all available supervised data together with large amounts
+amples of the generated annotations on un-120.               of unlabeled data.  We achieve  this by applying data
+                                                                        distillation to the challenging problems of COCO object
+6.2. Object Detection Results
+                                                      and keypoint detection. We hope our work will attract more
+  We investigate data distillation in two cases (Table 4):        attention to this practical, large-scale setting.
+
+======================== PDF 第 9 页 ========================
+Acknowledgements                                           [19] A. Karpathy, G. Toderici, S. Shetty, T. Leung, R. Sukthankar,
+                                                                 and L. Fei-Fei. Large-scale video classiﬁcation with convo-
+  We would like to thank Daniel Rueckert for his support            lutional neural networks.  In Computer Vision and Pattern
+and guidance during the initial stages of the project.                  Recognition (CVPR), 2014. 2, 4, 5
+                                                                     [20] A. Krizhevsky, I. Sutskever, and G. Hinton. Imagenet classi-
+References                                                          ﬁcation with deep convolutional neural networks. In Neural
+                                                                        Information Processing Systems (NIPS), 2012. 1, 2, 3
+ [1]  P. Bachman, O. Alsharif, and D. Precup.  Learning with
+                                                                     [21] S. Laine and T. Aila.   Temporal ensembling for semi-     pseudo-ensembles.  In Neural Information Processing Sys-
+                                                                         supervised learning. In International Conference on Learn-     tems (NIPS), 2014. 2
+                                                                         ing Representations (ICLR), 2017. 1, 2
+ [2] A. Blum and T. Mitchell. Combining labeled and unlabeled
+                                                                     [22]  L.-j. Li, G. Wang, and L. Fei-fei. Optimol: automatic online     data with co-training. In Proceedings of the eleventh annual
+                                                                              picture collection via incremental model learning. In Com-     conference on Computational learning theory, 1998. 2
+                                                                          puter Vision and Pattern Recognition (CVPR), 2007. 1, 2 [3] C. Bucilu, R. Caruana, and A. Niculescu-Mizil. Model com-
+                                                                     [23] T.-Y. Lin, P. Doll´ar, R. Girshick, K. He, B. Hariharan, and      pression. In SIGKDD, 2006. 1, 2, 3
+                                                                             S. Belongie. Feature pyramid networks for object detection. [4] O. Chapelle, B. Scholkopf, and A. Zien.  Semi-supervised
+                                                                           In Computer Vision and Pattern Recognition (CVPR), 2017.     learning. MIT Press, 2006. 2
+                                                                                   3, 8 [5] X. Chen, A. Shrivastava, and A. Gupta. Neil: Extracting vi-
+      sual knowledge from web data. In International Conference      [24] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ra-
+    on Computer Vision (ICCV), 2013. 1, 2                           manan, P. Doll´ar, and C. L. Zitnick. Microsoft COCO: Com-
+                                                    mon objects in context.  In European Conference on Com- [6]  J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li, and L. Fei-
+                                                                          puter Vision (ECCV). 2014. 1, 2, 4, 8      Fei. Imagenet: A large-scale hierarchical image database. In
+    Computer Vision and Pattern Recognition (CVPR), 2009. 1       [25]  J. Long, E. Shelhamer, and T. Darrell. Fully convolutional
+                                                                    networks for semantic segmentation.  In Computer Vision [7]  P. Doll´ar, R. Appel, S. Belongie, and P. Perona.  Fast fea-
+                                                              and Pattern Recognition (CVPR), 2015. 1      ture pyramids for object detection. Transactions on Pattern
+     Analysis and Machine Intelligence (TPAMI), 2014. 2             [26] D. Lopez-Paz, L. Bottou, B. Sch¨olkopf, and V. Vapnik. Uni-
+ [8]  P. F. Felzenszwalb, R. B. Girshick, D. McAllester, and D. Ra-           fying distillation and privileged information. In International
+     manan. Object detection with discriminatively trained part-          Conference on Learning Representations (ICLR), 2016. 2
+     based models.  Transactions on Pattern Analysis and Ma-      [27] G. Papandreou, T. Zhu, N. Kanazawa, A. Toshev, J. Tomp-
+     chine Intelligence (TPAMI), 2010. 2                                   son, C. Bregler, and K. Murphy.  Towards accurate multi-
+ [9] R. Fergus, Y. Weiss, and A. Torralba. Semi-supervised learn-           person pose estimation in the wild. In Computer Vision and
+     ing in gigantic image collections. In Neural Information Pro-           Pattern Recognition (CVPR), 2017. 2, 6
+     cessing Systems (NIPS), 2009. 2                                 [28]  P. O. Pinheiro, R. Collobert, and P. Dollar. Learning to seg-
+[10] S. Gidaris and N. Komodakis. Object detection via a multi-         ment object candidates.  In Neural Information Processing
+     region & semantic segmentation-aware cnn model. In Inter-          Systems (NIPS), 2015. 1
+     national Conference on Computer Vision (ICCV), 2015. 8        [29] S. Reed, H. Lee, D. Anguelov, C. Szegedy, D. Erhan, and
+[11] R. Girshick. Fast R-CNN. In International Conference on          A. Rabinovich. Training deep neural networks on noisy la-
+    Computer Vision (ICCV), 2015. 1                                      bels with bootstrapping. arXiv:1412.6596, 2014. 2
+[12] R. Girshick, J. Donahue, T. Darrell, and J. Malik. Rich fea-      [30] S. Ren, K. He, R. Girshick, and J. Sun. Faster R-CNN: To-
+      ture hierarchies for accurate object detection and semantic          wards real-time object detection with region proposal net-
+     segmentation. In Computer Vision and Pattern Recognition           works.  In Neural Information Processing Systems (NIPS),
+     (CVPR), 2014. 1                                                 2015. 1, 3, 8
+[13] S. Gupta, J. Hoffman, and J. Malik. Cross modal distillation      [31] S. Ren, K. He, R. Girshick, and J. Sun. Faster R-CNN: To-
+      for supervision transfer.  In Computer Vision and Pattern          wards real-time object detection with region proposal net-
+     Recognition (CVPR), 2016. 2                                      works. Transactions on Pattern Analysis and Machine Intel-
+[14] L. K. Hansen and P. Salamon. Neural network ensembles.            ligence (TPAMI), 2017. 8
+     Transactions on Pattern Analysis and Machine Intelligence      [32] A. Romero, N. Ballas, S. E. Kahou, A. Chassang, C. Gatta,
+     (TPAMI), 1990. 2                                             and Y. Bengio.  Fitnets: Hints for thin deep nets. In Inter-
+[15] K. He, G. Gkioxari,  P. Doll´ar, and R. Girshick.  Mask           national Conference on Learning Representations (ICLR),
+    R-CNN.  In International Conference on Computer Vision           2015. 2
+     (ICCV), 2017. 1, 2, 3, 4, 6, 8                                    [33] C. Rosenberg, M. Hebert, and H. Schneiderman.  Semi-
+[16] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learn-           supervised self-training of object detection models.  2005.
+     ing for image recognition. In Computer Vision and Pattern             1, 2
+     Recognition (CVPR), 2016. 1, 3                                 [34] O. Russakovsky, J. Deng, H. Su, J. Krause, S. Satheesh,
+[17] G. Hinton, A. Krizhevsky, and S. Wang. Transforming auto-            S. Ma, Z. Huang, A. Karpathy, A. Khosla, M. Bernstein,
+     encoders. Technical report, 2006. 2                              A. C. Berg, and L. Fei-Fei. ImageNet Large Scale Visual
+[18] G. Hinton, O. Vinyals, and J. Dean. Distilling the knowledge           Recognition Challenge. International Journal of Computer
+      in a neural network. arXiv:1503.02531, 2015. 1, 2, 3                  Vision (IJCV), 2015. 4
+
+======================== PDF 第 10 页 ========================
+[35] M. Sajjadi, M. Javanmardi, and T. Tasdizen. Regularization
+     with stochastic transformations and perturbations for deep
+     semi-supervised learning. In Neural Information Processing
+     Systems (NIPS), 2016. 2
+[36] H. Scudder.  Probability of error of some adaptive pattern-
+     recognition machines.  IEEE Transactions on Information
+     Theory, 1965. 1, 2
+[37]  P. Sermanet, D. Eigen, X. Zhang, M. Mathieu, R. Fergus,
+     and Y. LeCun. Overfeat: Integrated recognition, localization
+     and detection using convolutional networks. In International
+     Conference on Learning Representations (ICLR), 2014. 2
+[38] T. Simon, H. Joo, I. Matthews, and Y. Sheikh. Hand keypoint
+     detection in single images using multiview bootstrapping. In
+    Computer Vision and Pattern Recognition (CVPR), 2017. 2
+[39] K. Simonyan and A. Zisserman.  Very deep convolutional
+     networks for large-scale image recognition. In International
+     Conference on Learning Representations (ICLR), 2015. 1
+[40] C. Sun, A. Shrivastava, S. Singh, and A. Gupta. Revisiting
+     unreasonable effectiveness of data in deep learning era. In
+     International Conference on Computer Vision (ICCV), 2017.
+    7
+[41] C.  Szegedy,  W.  Liu,  Y.  Jia,  P.  Sermanet,  S.  Reed,
+     D. Anguelov, D. Erhan, V. Vanhoucke, and A. Rabinovich.
+    Going deeper with convolutions.  In Computer Vision and
+     Pattern Recognition (CVPR), 2015. 1
+[42] C. Szegedy, S. Reed, D. Erhan, D. Anguelov, and S. Ioffe.
+     Scalable, high-quality object detection.  arXiv:1412.1441,
+     2014. 2
+[43] V. Vapnik.  Statistical learning theory.  Wiley New York,
+     1998. 1, 2
+[44] V. Vapnik and R. Izmailov. Learning using privileged infor-
+     mation: similarity control and knowledge transfer. JMLR,
+     2015. 2
+[45]  P. Viola and M. Jones. Rapid object detection using a boosted
+     cascade of simple features. In Computer Vision and Pattern
+     Recognition (CVPR), 2001. 2
+[46]  J. Weston.  Large-scale semi-supervised learning.  In Pro-
+     ceedings of NATO Advanced Study Institute on Mining Mas-
+      sive Data Sets for Security, 2008. 1, 2
+[47] S. Xie, R. Girshick, P. Doll´ar, Z. Tu, and K. He. Aggregated
+      residual transformations for deep neural networks. In Com-
+     puter Vision and Pattern Recognition (CVPR), 2017. 3
+[48] D. Yarowsky. Unsupervised word sense disambiguation ri-
+     valing supervised methods. In Proceedings of the 33rd an-
+     nual meeting on Association for Computational Linguistics,
+     1995. 1, 2
+[49] X. Zhu. Semi-supervised learning literature survey. Tech-
+      nical report, Computer Sciences, University of Wisconsin-
+     Madison, 2005. 2
+[50] X. Zhu and A. B. Goldberg. Introduction to semi-supervised
+      learning. Synthesis lectures on artiﬁcial intelligence and ma-
+     chine learning, 2009. 2

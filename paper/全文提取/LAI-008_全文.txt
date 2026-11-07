@@ -1,0 +1,1188 @@
+LAI-008 | Motion-guided Visual Tracking
+来源：https://www.mi-research.net/article/doi/10.1007/s11633-023-1477-x
+本地PDF：专题文献/赖思邈/LAI-008_Motion-guided_Tracking.pdf
+SHA-256：97b61bee94760fec2793056750e68b13c04219d20dcabfb3604d88404c6cb3ec
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+Machine Intelligence Research                                                                             22(5), October 2025, 983-998
+www.mi-research.net                                                                 DOI: 10.1007/s11633-023-1477-x
+
+
+
+            Motion-guided Visual Tracking
+
+               Pengyu Zhang     Simiao Lai    Dong Wang    Huchuan Lu
+
+               School of Information and Communication Engineering, Dalian University of Technology, Dalian 116024, China
+
+
+
+
+Abstract: Motion information is a crucial cue to build a robust tracker, especially in handling object occlusion and fast drift caused by
+cameras and objects. However, it has not been fully exploited. In this study, we attempt to exploit motion cues to guide visual trackers
+without bells and whistles. First, we decouple motion into two types: camera motion and object motion. Then, we predict them individu-
+ally via the proposed camera motion modeling and object trajectory prediction. Each module contains a motion detector and a verifier.
+As for camera motion, we apply the off-the-shelf keypoint matching method to detect camera movement and propose a novel self-super-
+vised camera motion verifier to validate its confidence. Given the previous object trajectory, object trajectory prediction aims to predict
+the future location of the target and select a reliable trajectory to handle fast object motion and occlusion. Numerous experiments on
+several mainstream tracking datasets, including OTB100, DTB70, TC128, UAV123, VOT2018 and GOT10k, demonstrate the effective-
+ness and generalization ability of our module, with real-time speed.
+
+Keywords:  Visual tracking, motion embedding, camera motion modeling, self-supervised learning, trajectory prediction.
+
+Citation: P. Zhang, S. Lai, D. Wang, H. Lu. Motion-guided visual tracking. Machine Intelligence Research, vol.22, no.5, pp.983–998,
+2025. http://doi.org/10.1007/s11633-023-1477-x
+
+
+1 Introduction                                      appearance-based trackers, which can be generalized to
+                                                     most recent tracking frameworks. Our contributions can
+   Given the target position in the initial frame, visual     be summarized as follows:
+object tracking aims to estimate the target location dur-         1) We propose a camera motion modeling module,
+ing the whole sequence. In the early stage, several track-     which consists of a camera motion detector and a camera
+ing frameworks, including Kalman  filter[1, 2] and particle     motion  verifier. We  apply  an  off-the-shelf  keypoint
+filter[3, 4], utilize motion information to track the target.     matching method to detect camera motion and propose a
+These approaches locate the target position via the tar-      novel camera motion verifier via a self-supervised frame-
+get′s previous trajectory and velocity. Recently, with the     work to obtain the confidence of camera motion.
+emergence  of powerful hand-crafted and deep features,                                                                   2) We design an object trajectory prediction module,
+appearance-based trackers have achieved significant ac-                                                               including an object trajectory detector and an object tra-
+curacy. These trackers search  for the target candidate                                                                  jectory verifier. As for the object trajectory detector, we
+with the maximum response within a predefined search
+                                                                          utilize the Conv-LSTM to predict the target′s future loca-
+region.  Several  popular  appearance-based  frameworks
+                                                                 tion and velocity by using the previous motion informa-
+have been presented, including correlation filters[5, 6], Sia-
+                                                                      tion. Then, the predicted results are sent to a classifica-
+mese networks[7, 8], and multi-domain networks[9, 10], all of
+                                                                 tion network to evaluate its confidence.
+which  exhibit  excellent tracking performance and  fast
+                                                                   3) We formulate both camera and object motions in a
+speed. While appearance is often more reliable and mean-
+                                                                  unified framework to achieve a powerful supplement to
+ingful than motion cues, its performance can be limited
+                                                           appearance-based trackers without bells and whistles.
+when the appearance information for tracking  is unreli-
+                                                                   4)  Comparison  results  on  six  datasets,  includingable, as described in Fig. 1. On the other hand, motion
+                                                 OTB100,  DTB70,  TC128,  UAV123,  VOT2018  andcues are insensitive to dramatic scene variations, making
+                                                GOT10k, validate the effectiveness of our motion module.them an important supplement to the tracking of appear-
+                                                            Notably, our method can be equipped with most of theance information.
+                                                                       latest tracking frameworks to further increase their accur-   Based on the aforementioned observations, we pro-
+                                                         acy with negligible cost.pose an effective module to embed motion cues to assist
+
+ Research Article                             2 Related works Manuscript received on June 26, 2023; accepted on September 14,
+2023; published online on August 19, 2025
+ Recommended by Associate Editor Jordi Gonzalez
+ Colored figures are available in the online version at https://link.     2.1 Visual object tracking
+springer.com/journal/11633
+ ©  Institute  of Automation, Chinese Academy  of Sciences and
+Springer-Verlag GmbH Germany, part of Springer Nature 2025              In the last decade, visual object tracking has been de-
+
+======================== PDF 第 2 页 ========================
+984                                                                 Machine Intelligence Research 22(5), October 2025
+
+
+                    #0018                       #0019                        #0023
+
+
+
+
+
+                    #0020                       #0032                        #0035
+
+
+
+
+
+                                                  Motion result       Appearance result
+
+Fig. 1  Comparison between motion-based and appearance-based trackers. Taking DIMP[11] and our motion-guided module as
+appearance and motion trackers, we find that motion cue has superior performance in handling occlusion, dramatic movement and tiny
+object capturing, which acts as a supplement to the appearance tracker. (Colored figures are available in the online version at
+https://link.springer.com/journal/11633)
+
+veloped rapidly via both motion and appearance cues.      the AT algorithms.
+According to the adopted information, tracking methods
+can be categorized into motion-based trackers (MT) and     2.2 Contrastive self-supervised learning
+appearance-based  trackers (AT). MT methods aim  to
+predict the target location via motion information,  in-         Contrastive self-supervised learning (CSL), as a main-
+cluding the previous trajectory velocity and optical flow.     stream of self-supervised learning, was first proposed by
+The typical MT frameworks are based on Kalman  fil-      Hadsell et  al.[27] and has been widely applied in many
+ter[1, 12–14], particle filter[4, 15–17], and optical flow[18–20]. Mo-     computer vision tasks[28–31]. The CSL algorithms attempt
+tion information is insensitive to target variation and of-      to learn the feature representation by optimizing a pre-
+ten achieves robust performance in challenging scenes,      text task, which can provide supervised label information
+such as illumination variation, target occlusion and back-      to exploit the potential characteristic of numerous un-
+ground clustering. However, depending on previous tar-      labeled data and contrast triplet training pairs that con-
+get′s state, motion cues are not always reliable due to the      tain anchor, positive and negative samples. Several pre-
+arbitrariness of target motion.                                  text tasks, including image colorization[32], in-painting[33],
+  On the other hand, appearance-based trackers learn a     and image transformation[34] are adopted. Recently, re-
+target model, which is used for localization via template      searchers have focused on designing loss functions[35, 36]
+matching  or  tracking-by-detection approach. The  per-     and  similarity  metrics[30,  33]. Mnih and Kavukcuoglu[35]
+formance mainly depends on the discriminability of fea-      design a novel negative contrastive estimation  loss  for
+tures used for target modeling. With the emergence of     CSL. A simple framework for CSL[37] is proposed without
+powerful hand-crafted and deep features, AT has domin-      requiring  specialized  architectures  or a memory bank.
+ated this field with high performance and speed. Several      Schroff  et  al.[36]  utilize CSL  for  facial  recognition  via
+frameworks, such as correlation  filter[5, 6, 21–23], Siamese       triplet  loss, thereby obtaining  state-of-the-art perform-
+network[7, 8, 24], and multi-domain network[9, 10] have been     ance among supervised competitors. In this work, we ad-
+proposed, whose performance are significantly superior to     opt the idea of CSL to study the camera motion problem,
+MT. Compared with MT, AT suffers from target draft      since this problem naturally lacks supervised information.
+caused by dramatic appearance variation. Though the on-
+line  updating  strategy  learns  target  variation  during     2.3 Object trajectory prediction
+tracking,  trackers cannot perform  well under extreme
+conditions.                                                   Object trajectory prediction is a sequence-based pre-
+   Recently,  motion-assisted appearance  trackers have      diction task, that predicts the location of interest via past
+attracted increasing attention. Li and Yeung[25] predict      observations. Traditionally, object trajectory prediction
+camera  motion  to  handle  tracking  with  drones.  Liu      focuses on the target in a specific category, including ped-
+et al.[26] aim to model background motion and target tra-       estrian[38–40],  vehicle[41–43], to name a few. Although the
+jectory using a spatial-temporal network. Those trackers      target can move arbitrarily, the object′s behavior can be
+combine both appearance and motion cues, which can be      driven by its motivation, scene condition, and interaction
+used to build a more robust model. In this work, we for-     with other objects. According to these available priors,
+mulate both camera and  object motions  in a  unified      object trajectory prediction methods can be mainly cat-
+framework, to further improve the tracking accuracy of      egorized  into  three  types:  interaction-aware[38,  39,  42],
+
+======================== PDF 第 3 页 ========================
+P. Zhang et al. / Motion-guided Visual Tracking                                                              985
+
+scene-aware[40, 43], and hybrid[41] methods. Zhang et al.[38]      cent frames It−1, It ∈RW ×H×3 are extracted using exist-
+propose state-refinement LSTM to model the interaction      ing methods, such as scale-invariant feature transform
+between the object and its neighbors. Liang et al.[40] en-      (SIFT)[45], speeded-up robust features (SURF)[46], and the
+code scene data into a grid map and adopt ConvRNN for       latest deep-based features with GPU  acceleration[47, 48].
+location prediction. Tang and Salakhutdinov[41] introduce     The symbols W  and H  denote the image width and
+a probabilistic framework to learn latent variables using      height, respectively. Then, the keypoints are matched ac-
+both scene and  interaction information. Motivated by      cording to their distance of descriptors. The transforma-
+these discussions, we present a novel method to predict                                                                 tion matrix1 M ∈R2×3 can be obtained by solving (1).
+the object trajectory and verify the prediction result, to
+construct an effective motion-guided module.
+                                  M = M(It−1, It).                (1)
+3 Proposed approach                                                    The function M(·, ·) denotes the keypoint extraction
+                                                    and matching operation between two images. Then, the   In this section, we detail our approach in Fig. 2. First,
+                                                                        offset OCM caused by camera motion is defined aswe decouple the overall offset into two aspects: 1) cam-
+era motion offset and 2) object motion offset. To estim-                         
+ate those offsets effectively, our method consists of two                                c
+                                                                                                     c′ = M   main components: camera motion modeling and object
+                                                                                    1
+trajectory prediction. Each module contains a motion de-
+tector and verifier. The motion detector aims to estimate                 OCM = c′ −c                  (2)
+the corresponding offset, and then the verifier evaluates
+the confidence of detectors to filter out unreliable motion     where c ∈R2×1 denotes the coordinate of target center in
+features. After that, the offset predicted by the motion      It−1 and c′ is the warped coordinate.
+cue  is embedded to provide a reliable search region for      3.1.2 Camera motion verifier (CMV)
+the appearance model to capture the target. Compared        During tracking, complex scene variations, such as il-
+with the popular tracking algorithms, our proposed mo-     lumination variation and motion blur, may lead to mis-
+tion-guided visual tracker fully exploits motion cues to     alignment  of  keypoints,  and  the  accumulative  error
+assist the appearance model, especially in severe motion     caused by camera motion cannot be omitted, which leads
+and occlusion cases.                                            to tracking drift. To this end, we propose a CMV net-
+                                                     work to evaluate the performance of CMD and output a
+3.1 Camera motion modeling (CMM)             confidence score SCM .
+                                                            Inference. As shown in Fig. 3, taking the warped im-
+   Camera motion, accompanied by large object  offset                                                          age  I′t−1 (transformed from It−1 using matrix M ) and
+and motion blur, often occurs when a video is captured
+                                                              current image It with their keypoint map K as input, the
+by handheld and wearable devices and becomes a well-
+                                   CMV with the Siamese architecture consists of 5 convolu-
+known challenge in visual tracking. Existing appearance
+                                                                    tional (Conv) layers for feature extraction and 3 fully-
+tracking paradigms  solve  this  issue  in the  brute-force
+                                                          connected (FC) layers for confidence regression, which is
+method, which searches the candidate using discriminat-
+                                                               followed by a sigmoid function. Note that the keypoint
+ive features and enlarges the search region when the tar-               ×H×1                                             map K ∈RW      aims to encode the extracted keypo-
+get is not found. Although few efforts have been made,
+                                                                          ints, which can be expressed in (3). The detailed imple-
+the problem has not been solved fundamentally. This sec-
+                                                         mentation of the CMV can be found in the supplement-tion aims to obtain accurate camera movement via a
+                                                            ary file.camera motion detector and camera motion verifier.
+3.1.1 Camera motion detector (CMD)                       {
+                                                                                                  1,    if (x, y) is a keypoint   The CMD module aims to model the camera pose                                                             K(x, y) =                                  (3)
+variation that can be formulated as ⟨R, t⟩ . R ∈ SO(3) is                                0,  otherwise.
+a rotation matrix and t ∈R1×3  is the translation vector
+representing the translation in the 3D Cartesian coordin-        Training. Learning CMV needs  to overcome two
+                                                                           realistic difficulties: 1) The ground truth of camera poseate system. However, in RGB tracking, camera paramet-
+                                                                 variation is not provided in tracking datasets; and 2) theer and depth information are not provided for precise
+                                                      camera motion is often accompanied by target movementcamera pose estimation. One suboptimal solution is to es-
+                                                    and interference, including motion blur, illumination vari-timate the camera movement in image plane by calculat-
+                                                                    ation, to name a few, affects the evaluation performance.
+ing the transformation matrix between adjacent fram-
+                                                To solve these difficulties, we generate much training
+es[25, 44]. Following this idea, we apply off-the-shelf keypo-
+int extraction and matching to obtain the transformation        1 Our method takes affine transformation as an example and can
+matrix. First, the keypoints and descriptors of the adja-      be applied to all other camera models.
+
+======================== PDF 第 4 页 ========================
+986                                                                 Machine Intelligence Research 22(5), October 2025
+
+
+
+
+                                                                                    Camera motion modeling
+                                                                                                  Object trajectory prediction                                                                                                                                              detector  veriﬁer      (OCM, SCM)
+                                   CM CM
+             It − 1                                                                                                                                                                              offset                                                                                                                                                       crop                  It                                                                                                                                                                                                                           embedding
+                                                                                                                                                                                                           Motion                 Center                                                                                                                                                                                    Motion
+                                                                                                                                              detector  veriﬁer     (OOM, SOM)                               Motion guided        Raw
+                                   OT OT                                                     search region        search region
+
+
+              Previous trajectory
+
+Fig. 2   Overall workflow of the proposed motion-guided trackers (Colored figures are available in the online version at https://link.
+springer.com/journal/11633)
+
+
+                                                                                                   Feature triplet loss
+                                                                                             Score contrastive loss
+                                                                            Fpos
+                                                                                             Score classification loss
+                                                       Ipos                                                 Spos                                                                                                                                                                                   Concat
+                                                                                                                                               It − 1                                                   Warp     Ianc                    It − 1                                                                          Fanc               FCs  SGT                                                                                                                                              generation                                Training                                                                                                                                                  Backbone                                                                                                                                                                                                                     detector
+                                                         Data    Ianc
+                                                                                                  Sneg                                                                                                                                                                                   Concat                                It                          Augmentation              Ipos    CM    SGT                                                                                                                                                                                     Warp
+                                                                          Fneg                                                                                    Ineg
+                    It                                                      Ineg                                                           Data generation
+
+                                                                                                          Tracking result
+
+                                                                     Warp
+
+                                                                                            I′t − 1                                                                                                     Reliable                    It − 1                                                           detector                                                  FCs                                                                                          motion?                                                                                                                                                                               Concat                                    Inference                                                                                                                                                                          Backbone                            CM
+
+
+                                                                        It
+                    It                                                                      Box with CMM        Prev. box
+
+
+Fig. 3  Workflow of the proposed CMV. The CMV employs a contrastive self-supervised learning framework to exploit the potential
+features using unlabelled data. Our CMV is capable of measuring the confidence of the camera motion output and is robust under
+extreme conditions such as motion blur and severe illumination. (Colored figures are available in the online version at https://
+link.springer.com/journal/11633)
+
+data to simulate camera movement and other challenges      function T (·; M) denotes the image transformation opera-
+and employ  contrastive  self-supervised  learning to  ex-      tion using matrix M . Mpos is randomly generated. Simil-
+ploit useful information using unsupervised data.               ar to positive samples, negative samples are generated by
+  Data generation. Following the pipeline of CSL, the      Ineg = T (A(It); Mneg) . Finally, the anchor image is ob-
+data generation process aims to generate anchor, positive      tained by  Ianc = T (A(It−1); Mres) where Mres  is ob-
+and negative samples used for contrastive representation      tained by matching It−1 and Ipos via the camera motion
+learning. To simulate tracking scenes, we select adjacent      detector, which can be  expressed  as Mres = M(It−1,
+frames to construct training pairs. The positive samples      Ipos) . During training, we evaluate the confidence of cam-
+are obtained by Ipos = T (A(It); Mpos) ( A  is the stoch-      era motion by measuring the distance between the out-
+astic data augmentation operation), which applies bright-     put transformation matrix Mres and the ground truth
+ness adjustment, motion blur and Gaussian blur to the     Mpos via L1-norm. Finally, the ground truth of confid-
+given image to eliminate the influence of difficulty 2. The      ence, SGT  is defined as
+
+======================== PDF 第 5 页 ========================
+P. Zhang et al. / Motion-guided Visual Tracking                                                              987
+
+         {
+                     1,    if ||Mres −Mpos||1 < tCM               degraded, since the target appearance is not reliable for
+       SGT =                                     (4)                                                             accurate tracking. Furthermore, when the target moves                     0,  otherwise.
+                                                                           fast, trackers may fail to locate the target with the lim-
+   Loss function. We propose a  loss function at the      ited search region. Based on this observation, we aim to
+score and feature levels, which contains score classifica-      exploit object motion information to assist tracking via
+tion loss, score contrastive loss and feature triplet loss.         the proposed OTP module, which consists of an object
+   1) Score classification loss: This loss aims to minimize      trajectory detector (OTD) and an object trajectory verifi-
+the distance between the predicted score SCM and label      er (OTV). OTD aims to predict the target′s location and
+SGT , which is defined as                                         velocity in the following frames with the guidance of the
+                                                              previous trajectory. Then, OTV aims to evaluate wheth-
+                  Lcls = ||SCM −SGT ||2.              (5)      er the prediction is a target or not and outputs its confid-
+                                                                 ence. Different from the trajectory prediction network in
+   2) Score contrastive loss: Followed by CSL, we form a       [26], which produces the future location of the target us-
+score contrastive loss to enlarge the distance between pos-      ing both target previous trajectory and scene information,
+itive and negative samples.                            we model this problem solely depending on the motion
+                                                          cue and achieve a scene-independent motion predictor,
+          Lcon = max(SnegCM −SposCM + Ccon, 0).       (6)      thereby building a more general motion tracker.
+                                                             3.2.1 Object trajectory detector (OTD)
+   3) Feature triplet loss: The image distance is often re-       As shown in Fig. 4, given the motion vectors xt =
+                                                                    [            ]
+lated to the performance of the CMD. Thus, we employ a        ctx, cty, vtx, vty    ( t ∈[T −s, · · · , T −1] )   in  previous  s
+hard-negative mining strategy to obtain a better embed-      frames, OTD aims to learn temporal dependency by the
+ding space for distinguishing whether CMD  is  reliable.                                                               recurrent neural network, where (cx, cy) denotes the co-
+Specifically, we adopt a triplet loss concerning the fea-
+                                                              ordinate of the target center and (vx, vy) represents the
+tures as
+                                                                 target velocity. The  initial position and various image
+                                                                        sizes lead to a strong bias in learning specific scenes. To
+ Ltri = max(||Fanc−Fpos||2−||Fanc−Fneg||2+Ctri, 0). (7)                                                            avoid this issue, we first normalize x and embed it via a
+                                                                 position encoder, providing a fixed-size motion map Gt ∈
+   Finally, the overall loss is expressed as                                                              × ctx  g × cty                                                     Rg×g based on the motion cue (Gt ∼N(g        ,           ,
+                                                   W   H
+          LCMV = Lcls + Lcon + Ltri.           (8)      g × vtx , g × vt                                                                                   y , 0)) . The predicted motion vector  is ob-
+                               W   H
+                                                              tained by
+3.2 Object trajectory prediction (OTP)
+                                                                         xt+1 = d(h(LSTM(f(Gt))))           (9)
+  When the target is heavily occluded or in low resolu-
+tion, the discriminability of appearance-based trackers is     where f(·) denotes two Conv layers whose kernel size is
+
+
+               LSTM    LSTM       ...   LSTM        LSTM      LSTM
+                                                                                                                                                           Reliable
+                                                                                                                                          motion?
+
+                                                               FCs
+
+                                                                                 FC
+                                                                            Position decoder                                                     detector                Convs                                                  FC                               verifier
+                                                                                              xt                 xt + 1
+                                                                                 FC
+                                                     #0078                      Observation                                                                  trajectory                                               ...                                             Prediction                                                                                                                    trajectory
+                                                                                    ROI pool
+                                        Object                                               GT                                                                                      Object                                                                                          Conv
+                                  Position encoder
+                                                                                          Conv
+
+                               xt − s          xt − s + 1        ...       xt − 1                                             Conv
+
+
+Fig. 4   Architecture of object trajectory prediction module, which contains an OTD and OTV. The OTD aims to predict the future
+location via Conv-LSTM to handle temporal information and the OTV submodule evaluates the results of OTD. Our OTP makes a self-
+aware trajectory predictor without extra appearance information. (Colored figure is available in the online version at https://link.springer.
+com/journal/11633)
+
+======================== PDF 第 6 页 ========================
+988                                                                 Machine Intelligence Research 22(5), October 2025
+
+
+5 × 5, and h(·) represents two FC layers for regressing      use it to correct the search region.
+the Conv-LSTM′s  outputs  to  the  normalized  motion
+vector. Finally, the motion vector is mapped to the raw        O = r(SCM) × OCM + r(SOM) × OOM     (12)
+image size via the position decoder d(·) .
+   The network is optimized by minimizing the L2-norm     where r(·) is the step function defined as
+between the prediction motion vector and ground truth                 {
+as                                                                                                    1,    if x > t
+                                                                               r(x) =                           (13)
+                                                                                                      0,  otherwise.
+                        Tpred∑
+           L =       ||xt −xtGT ||2.            (10)       The threshold  t controls the reliability of each mo-
+                       t=1                                       tion type. In object motion module, we record the object
+                                                                  trajectory to eliminate the effect of camera movement.
+   Then, the offset caused by object motion OOM  is ob-
+                                                             Furthermore, to make a powerful supplement to ap-
+tained by calculating the distance between the prediction
+                                                           pearance cues, motion information  is used for tracking
+and the last observation.
+                                                 when the appearance tracker  is not reliable. We follow
+                                                             the setting in discriminative model prediction (DIMP)[11].
+        OOM = [cTx −cT−1x    , cTy −cT−1y   ]T.        (11)
+                                                                                    If the appearance tracker is confused with the target loca-
+                                                                      tion, we resort to motion to obtain the final result.3.2.2 Object trajectory verifier (OTV)
+   The tracked object moves arbitrarily in the tracking
+                                                3.4 Implementation detailstask, which increases the prediction difficulty. The track-
+ing error will be accumulated when OTD gives biased res-
+                                                    As for CMD, we employ SURF with GPU accelera-
+ults. We aim to filter out the unreliable predicted loca-
+                                                                 tion as our feature extractor and model the camera mo-
+tion via the proposed OTV module. We model this pro-
+                                                                 tion via affine transformation. For training CMV, we se-
+cess as a classification task, which aims to distinguish
+                                                                        lect   large-scale   single   object   tracking  benchmark
+whether the predicted candidate is the object in the first
+                                                          (LASOT)[50] as our training data. Since the camera mo-
+frame or not. The architecture of OTV is shown in Fig. 4,                                                                 tion in the raw dataset cannot be measured, which leads
+which consists of 3 Conv layers for feature extraction. To                                                               to biased learning, we select 122 sequences with still cam-
+adapt the target to various sizes, we introduce a precise                                                                 eras for training. The training pairs are first resized to a
+region of interest (ROI) pooling layer[49] to embed a fixed-                                                                      fixed-size patch with a size of 300 × 300. Our network is
+size representation. Then, three FC layers are utilized to     optimized via stochastic gradient descent (SGD) with a
+predict the similarity between the prediction and initial      total of 32 pairs per mini-batch. The learning rate and
+target. In the offline training process, the OTV aims to     weight decay are 0.000 1 and 0.000 5, respectively. The
+learn a general representation. We draw positive and neg-      trade-off weights for contrastive loss and triplet loss are
+ative samples from the frame in the same sequence, whose       all set to 0.5. The margins Ccon and Ctri in CMV loss
+interaction over union (IoU) are larger than 0.7 and lower      are 0.2 and 1.0. The threshold tCM for SGT  is set to 60.
+than 0.3, respectively. The network is optimized via min-     During  tracking,  camera  motion  and  object  motion,
+imizing the binary  classification  loss. During  tracking,     whose confidence SCM and SOM are larger than 0.8 and
+with the guidance of target appearance in the first frame,       0.6, are adopted to correct the search region.
+the FC layers are further fine-tuned to embed target-spe-      We utilize the same training set, 122 still sequences in
+cific representation and fixed in the whole tracking pro-    LASOT, for training OTP, to reduce the effects caused
+cess. In the following frames, the predicted target ob-     by  camera  motion. The  network  is  optimized  with
+tained by OTD is sent to the overall network to generate      Adam[51] and the learning rate is set to 0.000 1. The size
+the confidence SOM .                                               of motion map g  is set to 63. We utilize the previous 5
+                                                           frames as object trajectory and predict 3 steps of the mo-
+3.3 Motion embedding                                 tion vector in the future. As for fine-tuning the OTV net-
+                                                          work, we draw 500 positive and 5 000 negative samples
+   The proposed motion module aims  to  correct  the      following the metric described in Section 3.2.2 in the ini-
+search region and provide tracking results when the ap-       tial frame of each sequence. The OTV  is trained with
+pearance model is not reliable. When motion occurs, our    SGD with learning rate of 0.000 1. The fine-tuning pro-
+camera and object motion modules decouple the motion      cess contains 50 epochs and is efficient with neglectable
+and work individually. In the tracking step, the camera      cost in tracking speed.
+motion is first detected and then the offset caused by ob-       Our method  is implemented by the PyTorch deep
+ject motion  is predicted by the object motion module.      learning library, on a PC machine with an Intel-i9 9900k
+After that, we calculate the overall offset O via (12) and    CPU  (64 G RAM)  and  an RTX  Titan GPU  (24 G
+
+======================== PDF 第 7 页 ========================
+P. Zhang et al. / Motion-guided Visual Tracking                                                              989
+
+memory). Both training and test codes will be publicly      era and object motion2 and form a new dataset, namely
+available.                                          MD200. The basic statistics of the MD200 are depicted in
+                                                        Table 1. We apply SR and PR to evaluate tested track-
+4 Experiments                                             ers on MD200.  Fig. 5 shows some  representative  ex-
+                                                        amples in MD200. More details can be found in the sup-
+                                                         plementary material.
+4.1 Dataset and metrics
+
+                                                                     Table 1  Basic statistics of the MD200 dataset
+   OTB100[52]. OTB100 is a popular benchmark, which
+contains 100 video sequences annotated with 11 attrib-          Datasets     Num.     Min.    Max.    Avg.    Med.
+                                                                                           seq     frame    frame    frame    frame
+utes. Two evaluation metrics including success rate (SR)
+and precision rate (PR) are used for analysis. SR calcu-           OTB[52]       100       71      3 872     590      393
+lates the percentage of frames whose IoU is larger than a          TC128[53]      200       71      3 872     429      365
+threshold. PR measures the percentage of success frames          DTB70[25]       70       68      699      225      202
+where the distance between the bounding box and ground
+                                                                     VOT2018[55]      60       41      1 500     356      302
+truth is lower than a threshold.
+   DTB70[25]. In recent years, tracking with drones has        MD200       200       22      2 063     287      250
+received increasing attention. To this end, DTB70 con-
+sists  of 70 videos captured by drone cameras. In  this
+dataset, large movements often occur caused by camera     4.2 Comparison with state-of-the-art trac-
+motion, which requires the tracker to handle large view-         kers
+point variation well. SR and PR are used to evaluate the
+trackers.                                                 Overall performance on OTB100. As shown in
+   TC128[53]. TC128 collects 128 color sequences to ex-     Table 2, compared with all competitors, DIMP with our
+ploit the importance of color information  for tracking.     motion-guided module, MG-DIMP, achieves the top per-
+TC128 labels all the sequences with 11 attributes, which     formance with respect to the success rate. Furthermore,
+is the same as OTB100 and adopts the same evaluation    DIMP obtains 2.2% and 2.6% promotion in SR and PR,
+metrics to measure trackers′ performance.                        respectively.
+   UAV123[54]. UAV123  dataset  contains  123  video        Overall performance on DTB70. We conduct ana-
+clips, which are captured by unmanned  aerial vehicles       lysis on this dataset captured by unmanned aerial vehicle
+(UAVs). The camera often moves dramatically, requiring     (UAV),  in which  large camera motion and viewpoint
+motion compensation to correct the camera movement.     change need to be handled. MG-DIMP obtains the best
+We evaluate the trackers via SR and PR metrics.                results and performs better than the baseline  tracker,
+   VOT2018[55]. VOT2018 has 60 short-term video se-      achieving SR and PR scores of 64.9% and 84.9%, respect-
+quences, containing nearly 21 k frames.  Different from       ively.
+other datasets, VOT evaluates the tracker in terms of ac-                                                        Overall performance on TC128. Our tracker also
+curacy (A) and robustness (R), which focus on IoU and                                                               achieves satisfactory performance on TC128, which  fo-
+failure time, respectively. The overall expected average                                                               cuses on encoding color information for tracking. Table 2
+overlap (EAO) combines both metrics in a unified pro-                                                       shows the SR and PR scores for 128 sequences in the
+tocol. More descriptions of VOT2018 can be referred to                                                                 dataset. MG-DIMP is superior to all the previous meth-
+[56].                                                          ods  in terms  of both SR and PR. Compared to the
+   GOT10k[57]. GOT10k is a large-scale dataset contain-                                                                 baseline tracker, our MG-DIMP achieves 1.8% and 2.1%
+ing over 10 k video clips, 180 of which are used for test-                                                       improvements in SR and PR, respectively, which demon-
+ing. Two metrics are used for evaluation including aver-                                                                    strates the effectiveness of our proposed module.
+age overlap (AO) and the popular success rate (SR) with                                                        Overall performance on UAV123. The proposed
+different thresholds (i.e., 0.5 and 0.75). To guarantee fair
+                                                          motion-guided tracker shows potential in handling the
+evaluation, we  use  the  appearance  tracker  which  is
+                                                     UAV-captured dataset, where large viewpoint change oc-
+trained only on the internal training data.
+                                                               curs frequently. As shown in Table 2, MG-DIMP is su-
+  Motion dataset 200 (MD200). The above data-
+                                                                  perior to the baseline, DIMP, with 1.7% promotion in
+sets focus on constructing comprehensive scenes to evalu-
+                                                        both SR and PR evaluations.
+ate the overall tracker performance. However, in real ap-
+                                                        Overall performance on VOT2018. We evaluate
+plications, dramatic motion handling is critical for track-
+                                                          our approach on VOT2018 and report the performance in
+er construction. To highlight the importance of motion
+                                                        Table 3. MG-DIMP, which achieves a very competitive
+information and evaluate trackers′ motion handling cap-
+                                                            performance, performs better than the baseline with 3.0%
+ability, we collect 200 videos from public datasets (74
+videos are from ALOV300[58], 22 videos are from NfS[59]        2 The targets in the selected videos move dramatically, which is
+and 104 videos belong to NUS-PRO[60]), with large cam-      caused by either camera motion or object motion or both.
+
+======================== PDF 第 8 页 ========================
+990                                                                 Machine Intelligence Research 22(5), October 2025
+
+
+                         #0001                      #0056                      #0141
+
+
+
+
+
+                           12 MovingCamera11
+
+                         #0003                      #0004                      #0005                                                                          ALOV300
+
+
+
+
+
+                           12 MovingCamera18
+
+                         #0038                      #0056                      #0086
+
+
+
+                                NfS        Basketball_6
+                         #0001                      #0057                      #0136
+
+
+
+
+
+                                 Gymnastics
+
+                         #0001                      #0131                      #0174
+
+
+
+
+
+                                Racing_010
+
+                         #0001                      #0087                      #0234                                                                          NUS_PRO
+
+
+
+
+
+                                 Tennis_009
+
+Fig. 5  Examples of our constructed motion dataset 200 (MD200) (Colored figures are available in the online version at https://link.
+springer.com/journal/11633)
+
+
+       Table 2  The success and precision rate of state-of-the-art trackers on several mainstream and our constructed datasets
+
+                   OTB100       DTB70        TC128        UAV123           GOT10k           MD200
+                 SR/PR (%)     SR/PR (%)     SR/PR (%)     SR/PR (%)      AO/SR0.5/SR0.75 (%)     SR/PR (%)
+
+       ECO[6]            66.4/90.4         55.3/81.9         58.2/80.8         53.6/76.9           39.5/40.7/17.0           55.6/65.4
+
+    RTMDNet[10]         61.7/84.5         45.2/69.3         57.2/78.8         48.6/72.1           40.4/42.4/14.7           50.1/57.0
+
+    SiamRPN[24]         66.6/87.6         57.2/79.2         55.5/75.7         57.6/76.7           44.0/52.2/20.7           52.7/60.8
+
+   LADCFHC [61]        65.9/85.5         42.5/61.9         55.1/73.9         49.4/70.2           28.0/27.6/10.3           51.5/60.1
+
+   SiamRPN++ [62]        69.5/90.5         59.1/79.3         57.6/77.6         61.1/80.4           51.8/61.8/32.5           53.7/62.7
+
+      DIMP[11]           68.1/88.0         64.1/83.6         60.6/80.2         65.0/86.0           59.5/70.8/46.2           58.8/68.5
+
+    MG-DIMP          69.6/90.3         64.9/84.9         61.7/81.9         66.1/87.5           60.6/72.5/46.9           62.5/73.6
+
+
+promotion and 3.9% decrease in both EAO and robust-     motion-guided module can achieve more robust tracking
+ness, respectively. The results show that motion cues can       results.
+be effective supplements to appearance trackers and our        Overall performance on GOT10k. We evaluate
+
+======================== PDF 第 9 页 ========================
+P. Zhang et al. / Motion-guided Visual Tracking                                                              991
+
+
+     Table 3  The expected average overlap, accuracy and           Table 4  Attribute-based comparison on OTB100 with baseline
+    robustness of state-of-the-art trackers on VOT2018. Top             trackers. MG-DIMP achieves superior performance among all
+             performance is labeled in red font.                     the attributes, especially in occlusion, fast motion, out of view,
+                                                                       background clutter and low resolution.
+                   EAO( ↑ )       A( ↑ )       R( ↓ )
+                                                                                  DIMP[11] SR/PR (%)    MG-DIMP SR/PR (%)
+        ECO[6]              0.280          0.484        0.276
+                                                               IV             69.1/89.7                  70.5/91.9
+     SiamRPN[24]           0.383          0.586        0.276
+                                               OPR            65.9/87.1                  67.8/89.9
+      LADCF[61]            0.389          0.503        0.159
+                                                     SV             68.1/87.0                  70.1/90.0
+   SiamRPN++ [62]          0.414          0.600        0.234
+                                              OCC            65.2/84.5                  67.0/87.3
+       DIMP[11]             0.439          0.615        0.180
+                                                 DEF            67.2/90.5                  68.3/92.1
+       PG-Net[63]            0.447          0.618        0.192
+                                           MB            68.9/85.4                  71.6/89.1
+    MG-DIMP            0.452          0.610        0.173
+                                            FM            66.8/84.5                  68.9/87.4
+
+                                                          IPR            67.6/89.5                  69.0/91.6
+our method on a large-scale dataset, GOT10k and the
+                                              OV            61.1/80.4                  63.9/84.0
+performance is listed in Table 2. Compared with all the
+competitors,  our  method  achieves  the  highest  score       BC             63.0/81.1                  67.3/87.5
+among  those  three  metrics.  In  specific, MG-DIMP       LR             52.5/71.3                  62.3/84.9
+achieves a 1.8% and 2.4% improvement over the baseline           All             68.1/88.0                  69.6/90.3
+(DIMP),  which  demonstrates  that  our  motion-guided
+module can provide a more accurate target position and
+                                                                 baseline method without motion information; 2) DIMP+
+precise scale estimation.
+                                          CMD: The baseline tracker with the CMD submodule de-
+   Overall performance on MD200. In our construc-
+                                                                scribed in Section 3.1.1; 3) DIMP+CMD+CMV: The cam-ted MD200 dataset, which aims to emphasize the import-
+                                                               era motion  is estimated by CMD and then selected byance of motion cues, all the competitors based on appear-
+ance model result in a significant decrease in tracking    CMV;  4) DIMP+CMM+OTD: The  baseline  tracker  is
+performance. Thus, the necessity to fully exploit motion     equipped with CMM, consisting of CMD and CMV. Fur-
+information should be paid more  attention. Our MG-      thermore, the object motion  is estimated by the OTD
+DIMP obtains impressive results of 62.5% and 73.6% in     network; 5) DIMP+CMM+OTD+OTV: The final method,
+SR and PR, which outperforms the baseline tracker by a     where both camera motion and object motion are pre-
+large margin. The results show that our motion-guided      dicted and measured using motion detectors and verifiers.
+module, modeling both camera and object motion as sup-     Then, the motion results are embedded to provide a reli-
+plement cues  to the appearance model,  is capable  of      able search region for the appearance tracker. The res-
+handling dramatic motion and appearance variation.             ults on OTB100 and MD200 are shown in Table 5. Com-
+   Attribute-based performance on OTB100. As                                                         pared  with  the  baseline  tracker, DIMP+CMD+CMV
+shown in Table 4, we compare attribute-based perform-                                                               achieves 1.8% and 2.2% promotion in OTB in terms of
+ance with and without the motion-guided module on
+                                            SR and PR, respectively. OTP module further contrib-
+DIMP. Two attributes, including motion blur (MB) and
+                                                               utes to  final results in OTB and MD200, respectively.
+fast motion (FM), are related to camera motion. MG-
+                                                 The  results demonstrate that motion  exploitation has
+DIMP achieves 3.9% and 3.1% promotion according to
+                                                               great potential in building an accurate tracker, which can
+SR in MB and FM, respectively. The performance im-
+                                                        be applied to real scenes. However, trackers solely usedprovement mainly stems from the  effectiveness  of our
+                                                       motion detectors achieve decreasing results. The reason isCMM module. Our OTP module is capable of providing
+reliable guidance when the target appearance is not reli-      that the complex tracking scenes, such as background
+able for tracking, especially in occlusion (OCC), low resol-      hollowness and aimless movement of the target, signific-
+ution (LR). The tracker with our motion-guided module      antly influence the performance of our motion detectors.
+performs better than the baseline in those two attributes     The verifiers aim to evaluate the results of these detect-
+with a large margin. The improvements on LR and OCC      ors and filter out unreliable information, thereby leading
+are 18.7% and 2.8% in terms of SR, respectively. All the      to better results.
+results demonstrate the effectiveness of our model.              Generality analysis. Our method can be general-
+                                                                 ized to most of tracking frameworks, such as correlation
+4.3 Ablation study                                                 filter, Siamese network, multi-domain network and trans-
+                                                            former-based tracker. To show the generalization ability
+   Analysis on different components. In this section,      of the proposed method, we adopt three additional popu-
+we detail the effectiveness of each component in MGVT.       lar trackers with various frameworks, including RTMD-
+Taking DIMP as our appearance tracker, we compare       Net[10],  SiamRPN[24]  and  TransT[64].  Specifically,  the
+several variants of MG-DIMP, including 1) DIMP: The      search region is provided by the proposed motion-guided
+
+======================== PDF 第 10 页 ========================
+992                                                                 Machine Intelligence Research 22(5), October 2025
+
+
+modules, which predict the camera and object motion.   CMM SR, OTP SR, respectively. Due to camera motion
+Then, the trackers search the target  in the corrected     and object motion, the target is at the boundary of the
+search region. We conduct analysis on OTB100 dataset.     raw SR without our motion-guided module, our module
+All the results in Table 6 show that trackers with our     can provide a prior for target location via motion detect-
+                                                                  ors and select robust results to correct the search regionmotion-guided module can achieve better performance.
+                                                              using  our  verifier.  Notably,  our motion  verifiers can
+                                                             provide accurate confidence, which  is robust to appear-
+   Table 5  Ablation analysis of our method on OTB100 and        ance interference, including motion blur and illumination
+ MD200. Both motion modules make positive contributions to        variation.
+    the final results with reasonable time cost. Thanks to the
+                                                          Qualitative comparison with baseline trackers.
+     motion verifiers, reliable motion cues are extracted to
+         assist the appearance tracker, thereby achieving             In  this  section, we  depict  qualitative  results between
+         better results. Our final model is superior to the         DIMP and MG-DIMP in Fig. 7. DIMP with the proposed
+                baseline and maintains its speed.                  motion module can capture the object accurately, espe-
+                     OTB100    MD200                       cially in fast motion, occlusion, and illumination. In se-
+         Trackers                                Speed (fps)
+                    SR/PR (%) SR/PR (%)                quence “deer”, the target jumps continuously and mo-
+       DIMP            68.1/88.0    58.8/68.5      48.0          tion blur occurs. The baseline tracker  is confused with
+                                                                 distinguishing the target against the similar distractors,
+     DIMP+CMD         66.7/86.4    59.0/69.1      39.0
+                                                                 therefore leading to drift. Our motion-guided module util-
+   DIMP+CMD+CMV      69.3/89.9    60.0/70.0      32.3           izes motion cues to supplement the appearance model ef-
+   DIMP+CMM+OTD      57.2/73.0    48.0/54.2      29.8           fectively and can achieve a more robust tracker. In se-
+ DIMP+CMM+OTD+OTV   69.6/90.3    62.5/73.6      25.7         quence “Girl2”, the  girl  is occluded by the pedestrian,
+                                                    and DIMP fails to relocate the target when the girl re-
+ Table 6  Generality analysis for our motion-guided module on       appears, while MG-DIMP succeeds in finding the target
+   OTB100 dataset. Three additional popular frameworks        by predicting its trajectory. In sequence “Skating1”, the
+           are utilized to show the effectiveness of the                target appearance changes dramatically due to the  illu-
+              proposed motion-guided module.                   mination, DIMP mistakes the surroundings as the target
+     RTMD MG-RTMD         MG-         MG-       while motion cues can help track the target when appear-
+                     SiamRPN         TransT
+         Net      Net           SiamRPN        TransT      ance is not reliable for tracking. Furthermore, we provide
+SR (%)   61.7      63.4        66.6       67.0     69.4    70.1      some cases in MD200 to validate that our motion-guided
+                                                     module can boost the tracking accuracy and build a ro-
+PR (%)  84.5      86.7        87.6       88.0     89.9    90.3
+                                                           bust tracker, shown in Fig. 8. We state that our method
+                                                       shows great potential  in handling large camera move-
+   Analysis of the impact of loss in CMV. We ana-                                                   ment and partial occlusion. All the results highlight the
+lyze the influence of our designed loss for CMV. We test                                                          importance of motion embedding and validate the effect-
+three  versions  of DIMP+CMM on OTB100. Table 7      iveness of our motion-guided module.
+presents the results. Each type of loss makes a positive       Parameter robustness  analysis. We  discuss the
+contribution to the final performance.                       parameter robustness of our method. In the motion em-
+                                                         bedding process, reliable motion  is selected by the step
+    Table 7  Impact of various losses on OTB100. Each loss          function, which  contains two  hyper-parameters.  Fig. 9
+       makes a positive contribution to the final result.            shows that our method  is robust to parameter disturb-
+                                                          ance and can perform well in a wide range of applica-    Trackers      Lcls    Lcon     Ltri   SR (%)   PR (%)
+                                                                       tions.
+ DIMP+CMM   ✓                         67.6       87.7
+ DIMP+CMM   ✓    ✓                68.0       88.4      5 Speed analysis
+ DIMP+CMM   ✓    ✓    ✓       68.5       89.0
+                                                                 In this section, we report the speed of different vari-
+                                                             ants in Table 5. We note that each submodule is efficient
+                                                                       for motion detection. Our  final tracker (DIMP+CMM+
+4.4 Qualitative analysis
+                                            OTD+OTV), with real-time speed, can achieve a more ro-
+                                                           bust performance by combining both appearance and mo-
+   Effectiveness of motion verifiers. We argue that
+                                                                 tion cues.
+our motion verifiers,  i.e., the proposed CMV and OTV,
+can measure the quality of motion detectors. As shown in
+                                       6 Conclusions
+Fig. 6, the scores SOM and SCM  are used to consider
+whether the motion results are reliable or not. Further-         In this study, we emphasize the potential of motion
+more, we report the motion results with the search re-      cues and design a general and  effective motion-guided
+gion provided by CMD and OTD, which are denoted as     module to fully exploit motion cues and guide appear-
+
+======================== PDF 第 11 页 ========================
+P. Zhang et al. / Motion-guided Visual Tracking                                                              993
+
+            Raw SR CMM SR    Raw SR CMM SR    Raw SR CMM SR    Raw SR CMM SR    Raw SR CMM SR
+             #0011                #0024                #0233                #0595                #0713
+
+
+                               sCM: 0.08                   sCM: 0.87                  sCM: 0.97                  sCM: 0.82                  sCM: 0.93
+          1.0
+          0.8
+          0.6
+      sCM 0.4
+          0.2
+          0
+           0            100           200           300           400           500           600           700
+                                                             Frame
+
+
+            Raw SR  OTP SR    Raw SR  OTP SR    Raw SR  OTP SR    Raw SR  OTP SR    Raw SR  OTP SR
+             #0101                #0104                #0127                #0291                #0385
+
+
+                               sOM: 0.99                  sOM: 0.98                  sOM: 6e−5                  sOM: 0.99                  sOM: 0.83
+          1.0
+          0.8
+      sOM 0.60.4
+          0.2
+          0
+           0                100               200               300               400               500               600
+                                                             Frame
+
+
+Fig. 6   Analysis of our proposed verifiers. We depict the original search region (Raw SR) and the search region corrected by CMM and
+OTP. Tracker with our motion verifier can distinguish whether the motion cue is reliable and robust to inference. (Colored figures are
+available in the online version at https://link.springer.com/journal/11633)
+
+
+                    #0002                        #0033                        #0039
+
+
+
+
+
+                        Deer
+
+                    #0053                       #0108                        #0125
+
+
+
+
+
+                           Girl2
+
+                    #0272                       #0278                       #0281
+
+
+
+
+
+                        Skating1
+
+                                            DIMP       MG-DIMP
+
+Fig. 7   Qualitative comparison between DIMP and MG-DIMP. The tracker with our motion-guided module is capable of fast motion,
+occlusion, and illumination variation. (Colored figures are available in the online version at https://link.springer.com/journal/11633)
+
+ance-based models. The motion cues are separated as       ize off-the-shelf keypoint matching to model camera mo-
+camera motion and object motion. Two corresponding      tion and evaluate the confidence of the detector via the
+components are designed to handle them  individually,     proposed  verifier, which  is learned with numerous un-
+namely camera motion modeling and object trajectory      labeled data in a self-supervised learning paradigm. As for
+prediction. Each component consists of a motion detect-      object trajectory prediction, we adopt a Conv-LSTM as
+or and a verifier. As for camera motion modeling, we util-     our motion detector to handle sequential information and
+
+======================== PDF 第 12 页 ========================
+994                                                                 Machine Intelligence Research 22(5), October 2025
+
+
+                     #0891                       #0911                       #0921
+
+
+
+
+
+                       14 LongDuration1
+
+                     #0001                       #0126                       #0171
+
+
+
+
+
+                        09 Confusion2
+
+                     #0026                       #0081                       #0094
+
+
+
+
+
+                           Basketball_009
+
+                     #0122                       #0132                       #0142
+
+
+
+
+
+                          Handball_007
+
+                     #0208                       #0221                       #0292
+
+
+
+
+
+                            Pedestrian_023
+
+                                      MG-DIMP       DIMP      GT
+
+Fig. 8   Qualitative comparison on MD200. Compared with DIMP, MG-DIMP achieves substantial results in challenging cases, such as
+occlusion, fast motion, etc. (Colored figures are available in the online version at https://link.springer.com/journal/11633)
+
+                        0.685  DIMP
+                        0.680
+                                   rate  0.675
+                        0.670
+                        0.665                                                             Success  0.660
+                        0.655
+                        0.650
+                           0                0.2               0.4               0.6               0.8               1.0
+                                                                                     tCM
+
+
+                        0.700
+                        0.675  DIMP + CMM
+                        0.650
+                                   rate  0.625
+                        0.600
+                        0.575                                                             Success  0.550
+                        0.525
+                        0.500
+                           0                0.2               0.4               0.6               0.8               1.0
+                                                                                   tOM
+
+
+       Fig. 9  Robustness analysis of our method. Both modules are parameter-insensitive and robust to parameter disturbance.
+
+======================== PDF 第 13 页 ========================
+P. Zhang et al. / Motion-guided Visual Tracking                                                              995
+
+
+the results are measured by the proposed object traject-              ject tracking. In Proceedings of European Conference on
+ory verifier, which determines whether the predicted res-          Computer Vision, Amsterdam, The Netherlands, pp. 850–
+                                                                           865, 2016. DOI: 10.1007/978-3-319-48881-3_56.
+ult  is the target or not. Furthermore, we reconstruct a
+motion dataset, namely MD200, using the public track-            [8] Q. Wang, L. Zhang, L. Bertinetto, W. Hu, P. H. S. Torr.
+ing dataset to emphasize the importance of motion in-           Fast online object tracking and segmentation: A unifying
+                                                                      approach. In Proceedings of IEEE/CVF Conference on
+formation. Numerous results on six popular datasets and
+                                                           Computer Vision and Pattern Recognition, Long Beach,
+MD200 demonstrate the effectiveness and generality of         USA,  pp. 1328–1338,  2019. DOI: 10.1109/CVPR.2019.
+our method with a reasonable time cost.                              00142.
+
+                                                                                                   [9] H. Nam, B. Han. Learning multi-domain convolutional
+Acknowledgements                                            neural networks for visual tracking. In Proceedings of
+                                                    IEEE Conference on Computer Vision and Pattern Recog-
+   The paper was supported in part by National Natural             nition, Las Vegas, USA, pp. 4293–4302, 2016. DOI: 10.
+Science  Foundation  of  China  (Nos.  62293542  and           1109/CVPR.2016.465.
+62022021), in part by Central Guidance on Local Science         [10]  I. Jung, J. Son, M. Baek, B. Han. Real-time MDNet. In
+and Technology Development Fund of Liaoning Province,           Proceedings of the 15th European Conference on Com-
+China (No. 2022JH6/100100026), in part by the National           puter  Vision,  Munich,  Germany,  pp. 89–104,  2018.
+Defense Basic Scientific Research Program (No. WDZC202          DOI: 10.1007/978-3-030-01225-0_6.
+15250205), and in part by Fundamental Research Funds         [11] G. Bhat, M. Danelljan, L. Van Gool, R. Timofte. Learning
+for the Central Universities, China (No. DUT22QN228).              discriminative model prediction for tracking. In Proceed-
+                                                                       ings of IEEE/CVF International Conference on Computer
+                                                                             Vision, Seoul, Republic of Korea, pp. 6182–6191, 2019.
+Declarations of conflict of interest                   DOI: 10.1109/ICCV.2019.00628.
+
+   The authors declared that they have no conflicts of in-         [12]  S. Wei, L. Zhang, H. Liu. Integrated tracking and ISAR
+terest to this work.                                                 imaging using an integrated Kalman filter with wideband
+                                                                            radar. IEEE Transactions on Aerospace and Electronic
+                                                                      Systems, vol. 58, no. 5, pp. 4639–4655, 2022. DOI: 10.1109/
+References                                                   TAES.2022.3165006.
+
+   [1] G. Welch, G. Bishop. An Introduction to the Kalman Fil-         [13] W. Zhang, X. Zhao, Z. Liu, K. Liu, B. Chen. Converted
+       ter, Technical Report TR 95-041, Department of Com-             state equation Kalman filter for nonlinear maneuvering
+      puter Science, University of North Carolina at Chapel Hill,            target tracking. Signal Processing, vol. 202, Article num-
+    USA, 2002.                                                        ber 108741, 2023. DOI: 10.1016/j.sigpro.2022.108741.
+
+   [2]  S. K. Weng, C. M. Kuo, S. K. Tu. Video object tracking         [14] G. Guo, S. Zhao. 3D multi-object tracking with adaptive
+      using adaptive Kalman filter. Journal of Visual Commu-           cubature kalman  filter  for autonomous  driving. IEEE
+      nication  and  Image  Representation,   vol. 17,  no. 6,           Transactions on Intelligent Vehicles, vol. 8, no. 1, pp. 512–
+      pp. 1190–1208, 2006. DOI: 10.1016/j.jvcir.2006.03.004.                519, 2023. DOI: 10.1109/TIV.2022.3158419.
+   [3]  J. Kwon, H. S. Lee, F. C. Park, K. M. Lee. A geometric         [15] D. Kim, Y. Han, H. Lee, Y. Kim, H. H. Kwon, C. Kim, W.
+      particle  filter for template-based visual tracking. IEEE           Choi. Accelerated particle filter with GPU for real-time
+     Transactions on Pattern Analysis and Machine Intelli-              ballistic target tracking. IEEE Access, vol. 11, pp. 12139–
+      gence,  vol. 36, no. 4, pp. 625–643, 2014. DOI: 10.1109/            12149, 2023. DOI: 10.1109/ACCESS.2023.3238873.
+     TPAMI.2013.170.                                                           [16] M. K. Yılmaz, H. Bayram. Particle filter-based  aerial
+   [4] Y. Li, H. Ai, T. Yamashita, S. Lao, M. Kawade. Tracking            tracking for moving targets. Journal of Field Robotics,
+                                                                                    vol. 40, no. 2, pp. 368–392, 2023. DOI: 10.1002/rob.22134.      in low frame rate video: A cascade particle filter with dis-
+      criminative observers of different life spans. IEEE Trans-         [17] E. A. Olson, J. Pavlasek, J. A. Berry, O. C. Jenkins.
+      actions on Pattern Analysis and Machine Intelligence,            Counter-hypothetical particle filters for single object pose
+       vol. 30, no. 10, pp. 1728–1740, 2008. DOI: 10.1109/TPAMI.             tracking. In Proceedings of IEEE International Confer-
+      2008.73.                                                     ence on Robotics and Automation, London, UK, pp. 3853–
+                                                                         3859, 2023. DOI: 10.1109/ICRA48891.2023.10160625.   [5] D. S. Bolme, J. R. Beveridge, B. A. Draper, Y. M. Lui.
+      Visual object tracking using adaptive correlation filters. In         [18]  J. Shin, S. Kim, S. Kang, S. W. Lee, J. Paik, B. Abidi, M.
+     Proceedings of IEEE Computer Society Conference on            Abidi. Optical flow-based real-time object tracking using
+     Computer Vision and Pattern Recognition, San Francisco,            non-prior training active feature model. Real-Time Ima-
+    USA,  pp. 2544–2550,  2010.  DOI: 10.1109/CVPR.2010.             ging, vol. 11, no. 3, pp. 204–218, 2005. DOI: 10.1016/j.rti.
+     5539960.                                                            2005.03.006.
+
+   [6] M. Danelljan, G. Bhat, F. S. Khan, M. Felsberg. ECO: Ef-         [19]  J. F. Cohn, A. J. Zlochower, J. J. Lien, T. Kanade. Fast
+       ficient convolution operators for tracking. In Proceedings            online object tracking and segmentation: A unifying ap-
+     of IEEE Conference on Computer Vision and Pattern Re-           proach. In Proceedings of International Conference on
+      cognition, Honolulu, USA, pp. 6931–6939, 2017. DOI: 10.          Automatic Face and Gesture Recognition, pp. 1328–1338,
+     1109/CVPR.2017.733.                                              1998.
+
+   [7]  L. Bertinetto, J. Valmadre, J. F. Henriques, A. Vedaldi, P.         [20]  J. Š erých, J. Matas. Planar object tracking via weighted
+     H. S. Torr. Fully-convolutional Siamese networks for ob-             optical flow. In Proceedings of IEEE/CVF Winter Confer-
+
+======================== PDF 第 14 页 ========================
+996                                                                 Machine Intelligence Research 22(5), October 2025
+
+
+     ence on Applications of Computer Vision, Waikoloa, USA,            666, 2016. DOI: 10.1007/978-3-319-46487-9_40.
+     pp. 1593–1602,  2023.  DOI: 10.1109/WACV56688.2023.
+                                                                                        [33] D. Pathak, P. Krahenbuhl, J. Donahue, T. Darrell, A. A.
+     00164.
+                                                                              Efros. Context encoders: Feature learning by inpainting.
+ [21]  J. F. Henriques, R. Caseiro, P. Martins, J. Batista. High-            In Proceedings of IEEE Conference on Computer Vision
+     speed tracking with kernelized correlation filters. IEEE         and Pattern Recognition, Las Vegas, USA, pp. 2536–2544,
+     Transactions on Pattern Analysis and Machine Intelli-            2016. DOI: 10.1109/CVPR.2016.278.
+     gence,  vol. 37, no. 3, pp. 583–596, 2015. DOI: 10.1109/
+                                                                                        [34] P. Agrawal, J. Carreira, J. Malik. Learning to see by mov-
+     TPAMI.2014.2345390.
+                                                                                  ing. In Proceedings of IEEE International Conference on
+ [22] D. Yuan, X. Chang, Z. Li, Z. He. Learning adaptive spa-          Computer  Vision,  Santiago,  Chile,  pp. 37–45,  2015.
+     tial-temporal context-aware correlation  filters for UAV          DOI: 10.1109/ICCV.2015.13.
+     tracking. ACM Transactions on Multimedia Computing
+                                                                                        [35] A. Mnih, K. Kavukcuoglu. Learning word embeddings effi-
+     Communications, and Applications, vol. 18, no. 3, Article
+                                                                               ciently with noise-contrastive estimation. In Proceedings
+    number 70, 2022. DOI: 10.1145/3486678.
+                                                                      of the 27th International Conference on Neural Informa-
+ [23] D. Yuan, X. Chang, Q. Liu, Y. Yang, D. Wang, M. Shu, Z.            tion Processing Systems, Lake Tahoe, USA, pp. 2265–
+     He, G. Shi. Active learning for deep visual tracking. IEEE            2273, 2013.
+     Transactions on Neural Networks and Learning Systems,
+                                                                                        [36]  F. Schroff, D. Kalenichenko, J. Philbin. FaceNet: A uni-
+      vol. 35,  no. 10,  pp. 13284–13296,  2024. DOI:  10.1109/
+                                                                                   fied embedding for face recognition and clustering. In Pro-
+     TNNLS.2023.3266837.
+                                                                      ceedings of IEEE Conference on Computer Vision and
+ [24] B. Li, J. Yan, W. Wu, Z. Zhu, X. Hu. High performance           Pattern Recognition, Boston, USA, pp. 815–823, 2015.
+     visual tracking with siamese region proposal network. In          DOI: 10.1109/CVPR.2015.7298682.
+     Proceedings of IEEE/CVF Conference on Computer Vis-
+                                                                                        [37] T. Chen, S. Kornblith, M. Norouzi, G. Hinton. A simple
+     ion and Pattern Recognition,  Salt Lake  City, USA,
+                                                                framework for contrastive learning of visual representa-
+     pp. 8971–8980, 2018. DOI: 10.1109/CVPR.2018.00935.
+                                                                                   tions. In Proceedings of the 37th International Conference
+ [25]  S. Li, D. Y. Yeung. Visual object tracking for unmanned         on Machine Learning, Article number 149, 2020.
+      aerial vehicles: A benchmark and new motion models. In
+                                                                                        [38] P. Zhang, W. Ouyang, P. Zhang, J. Xue, N. Zheng. SR-
+     Proceedings of the 31st AAAI Conference on Artificial In-
+                                                     LSTM: State refinement for LSTM towards pedestrian
+      telligence, San Francisco, USA, pp. 4140–4146, 2017. DOI:
+                                                                             trajectory prediction. In Proceedings of IEEE/CVF Con-
+     10.1609/aaai.v31i1.11205.
+                                                                         ference on Computer Vision and Pattern Recognition,
+ [26] Y. Liu, R. Li, Y. Cheng, R. T. Tan, X. Sui. Object track-          Long Beach, USA, pp. 12077–12086, 2019. DOI: 10.1109/
+     ing using spatio-temporal networks for future prediction           CVPR.2019.01236.
+      location. In Proceedings of the 16th European Conference
+                                                                                        [39] A. Mohamed, K. Qian, M. Elhoseiny, C. Claudel. Social-
+    on Computer Vision, Glasgow, UK, 2020. DOI: 10.1007/
+                                                   STGCNN: A social spatio-temporal graph convolutional
+     978-3-030-58542-6_1.
+                                                                         neural network for human trajectory prediction. In Pro-
+ [27] R. Hadsell, S. Chopra, Y. LeCun. Dimensionality reduc-            ceedings of IEEE/CVF Conference on Computer Vision
+     tion by learning an invariant mapping. In Proceedings of         and Pattern Recognition, Seattle, USA, pp. 14412–14420,
+    IEEE Computer Society Conference on Computer Vision            2020. DOI: 10.1109/CVPR42600.2020.01443.
+    and Pattern Recognition, New York, USA, pp. 1735–1742,
+                                                                                        [40]  J. Liang, L. Jiang, K. Murphy, T. Yu, A. Hauptmann. The
+     2006. DOI: 10.1109/CVPR.2006.100.
+                                                                   garden of forking paths: Towards multi-future trajectory
+ [28] E. Jang, C. Devin, V. Vanhoucke, S. Levine. Grasp2Vec:             prediction. In Proceedings of IEEE/CVF Conference on
+     Learning  object  representations  from  self-supervised          Computer Vision and Pattern Recognition, Seattle, USA,
+     grasping. In Proceedings of the 2nd Conference on Robot           pp. 10505–10515, 2020. DOI: 10.1109/CVPR42600.2020.
+     Learning, Zürich, Switzerland, pp. 99–112, 2018.                      01052.
+
+ [29]  L. Tao, X. Wang, T. Yamasaki. Self-supervised video rep-         [41] Y. C. Tang, R. Salakhutdinov. Multiple futures prediction.
+     resentation learning using inter-intra contrastive frame-            In Proceedings of the 33rd International Conference on
+     work. In Proceedings of the 28th ACM International Con-          Neural  Information  Processing  Systems,  Vancouver,
+     ference on Multimedia, Seattle, USA, pp. 2193–2201, 2020.          Canada, Article number 1382, 2019.
+    DOI: 10.1145/3394171.3413694.
+                                                                                        [42] R. Chandra, U. Bhattacharya, A. Bera, D. Manocha.
+ [30] O. J. Henaff, A. Srinivas, J. De Fauw, A. Razavi, C. Doer-           TraPHic: Trajectory prediction in dense and heterogen-
+      sch, S. M. A. Eslami, A. Van Den Oord. Data-efficient im-           eous traffic using weighted interactions. In Proceedings of
+     age recognition with contrastive predictive coding. In Pro-        IEEE/CVF Conference on Computer Vision and Pattern
+     ceedings of the 37th International Conference on Machine            Recognition, Long  Beach, USA,  pp. 8475–8484,  2019.
+     Learning, Article number 391, 2020.                            DOI: 10.1109/CVPR.2019.00868.
+
+ [31] X. Zhai, A. Oliver, A. Kolesnikov, L. Beyer. S4L: Self-su-         [43] N. Mohajerin, M. Rohani. Multi-step prediction of occu-
+     pervised  semi-supervised  learning.  In  Proceedings of          pancy grid maps with recurrent neural networks. In Pro-
+    IEEE/CVF International Conference on Computer Vision,            ceedings of IEEE/CVF Conference on Computer Vision
+     Seoul, Republic of Korea, pp. 1476–1485, 2019. DOI: 10.         and Pattern Recognition, Long Beach, USA, pp. 10592–
+     1109/ICCV.2019.00156.                                            10600, 2019. DOI: 10.1109/CVPR.2019.01085.
+
+ [32] R. Zhang, P. Isola, A. A. Efros. Colorful image coloriza-         [44] P. Zhang, J. Zhao, C. Bo, D. Wang, H. Lu, X. Yang.
+      tion. In Proceedings of the 14th European Conference on            Jointly modeling motion and appearance cues for robust
+    Computer Vision, Amsterdam, The Netherlands, pp. 649–        RGB-T tracking. IEEE Transactions on Image Processing,
+
+======================== PDF 第 15 页 ========================
+P. Zhang et al. / Motion-guided Visual Tracking                                                              997
+
+
+       vol. 30,  pp. 3335–3347,  2021.  DOI:  10.1109/TIP.2021.           de Weijer, J. R. Herranz, J. M. Martínez, J. Kittler, J.
+     3060862.                                                     Zhuang, J. Gao, K. Grm, L. Zhang, L. Wang, L. Yang, L.
+                                                                    Rout, L. Si, L. Bertinetto, L. Chu, M. Che, M. E. Maresca,
+ [45] H. Bay, T. Tuytelaars, L. Van Gool. SURF: Speeded up
+                                                        M. Danelljan, M. H. Yang, M. Abdelpakey, M. Shehata,
+      robust features. In Proceedings of the 9th European Con-
+                                                        M. Kang, N. Lee, N. Wang, O. Miksik, P. Moallem, P. Vi-
+      ference on Computer Vision, Graz, Austria, pp. 404–417,
+                                                                        cente-Moñivar, P. Senna, P. Li, P. Torr, P. M. Raju, R.
+      2006. DOI: 10.1007/11744023_32.
+                                                                     Qian, Q. Wang, Q. Zhou, Q. Guo, R. Martín-Nieto, R. K.
+ [46] D. G. Lowe. Distinctive image features from scale-invari-            Gorthi, R. Tao, R. Bowden, R. Everson, R. Wang, S. Yun,
+     ant keypoints. International Journal of Computer Vision,             S. Choi, S. Vivas, S. Bai, S. Huang, S. Wu, S. Hadfield, S.
+       vol. 60,  no. 2,  pp. 91–110,  2004. DOI:  10.1023/B:VISI.         Wang, S. Golodetz, T. Ming, T. Xu, T. Zhang, T. Fischer,
+      0000029664.99615.94.                                         V. Santopietro, V. Štruc, W. Wei, W. Zuo, W. Feng, W.
+                                                      Wu, W. Zou, W. Hu, W. Zhou, W. Zeng, X. Zhang, X.
+ [47] Y. Ono, E. Trulls, P. Fua, K. M. Yi. LF-Net: Learning loc-
+                                                      Wu, X. J. Wu, X. Tian, Y. Li, Y. Lu, Y. W. Law, Y. Wu,
+       al features from images. In Proceedings of the 32nd Inter-
+                                                                 Y. Demiris, Y. Yang, Y. Jiao, Y. Li, Y. Zhang, Y. Sun, Z.
+      national Conference on Neural Information Processing
+                                                                  Zhang, Z. Zhu, Z. H. Feng, Z. Wang, Z. He. The sixth visu-
+     Systems, Montreal, Canada, pp. 6237–6247, 2018.
+                                                                                     al object tracking VOT2018 challenge results. In Proceed-
+ [48]  J. Revaud, P. Weinzaepfel, C. De Souza, M. Humenberger.            ings of European Conference on Computer Vision, Mu-
+     R2D2: Repeatable and reliable detector and descriptor. In             nich, Germany, pp. 3–53, 2018. DOI: 10.1007/978-3-030-
+     Proceedings of the 33rd International Conference on Neur-            11009-3_1.
+      al Information Processing Systems, Vancouver, Canada,
+                                                                                        [56] M. Kristan, J. Matas, A. Leonardis, T. Vojir, R. Pflugfeld-
+      Article number 1113, 2019.
+                                                                                          er, G. Fernandez, G. Nebehay, F. Porikli, L. Cehovin. A
+ [49] B. Jiang, R. Luo, J. Mao, T. Xiao, Y. Jiang. Acquisition of            novel performance evaluation methodology for single-tar-
+      localization confidence for accurate object detection. In            get trackers. IEEE Transactions on Pattern Analysis and
+     Proceedings of the 15th European Conference on Com-          Machine Intelligence, vol. 38, no. 11, pp. 2137–2155, 2016.
+     puter Vision, Munich, Germany, pp. 816–832, 2018. DOI:          DOI: 10.1109/TPAMI.2016.2516982.
+      10.1007/978-3-030-01264-9_48.
+                                                                                        [57]  L. Huang, X. Zhao, K. Huang. GOT-10k: A large high-di-
+ [50] H. Fan, L. Lin, F. Yang, P. Chu, G. Deng, S. Yu, H. Bai,             versity benchmark for generic object tracking in the wild.
+     Y. Xu, C. Liao, H. Ling. LaSOT: A high-quality bench-         IEEE Transactions on Pattern Analysis and Machine In-
+     mark for large-scale single object tracking. In Proceedings             telligence,  vol. 43, no. 5, pp. 1562–1577, 2021. DOI: 10.
+     of IEEE/CVF Conference on Computer Vision and Pat-          1109/TPAMI.2019.2957464.
+     tern Recognition, Long Beach, USA, pp. 5369–5378, 2019.
+                                                                                        [58] A. W. M. Smeulders, D. M. Chu, R. Cucchiara, S. Calder-
+     DOI: 10.1109/CVPR.2019.00552.
+                                                                                ara, A. Dehghan, M. Shah. Visual tracking: An experi-
+ [51] D. P. Kingma, J. Ba. Adam: A method for stochastic op-           mental survey. IEEE Transactions on Pattern Analysis
+      timization. In Proceedings of the 3rd International Confer-         and Machine Intelligence,  vol. 36, no. 7, pp. 1442–1468,
+     ence on Learning Representations, San Diego, USA, 2015.             2014. DOI: 10.1109/TPAMI.2013.230.
+
+ [52] Y. Wu, J. Lim, M. H. Yang. Object tracking benchmark.         [59] H. K. Galoogahi, A. Fagg, C. Huang, D. Ramanan, S.
+    IEEE Transactions on Pattern Analysis and Machine In-           Lucey. Need for speed: A benchmark for higher frame rate
+       telligence,  vol. 37, no. 9, pp. 1834–1848, 2015. DOI: 10.            object tracking. In Proceedings of IEEE International
+     1109/TPAMI.2014.2388226.                                     Conference on Computer Vision, Venice, Italy, pp. 1134–
+                                                                         1143, 2017. DOI: 10.1109/ICCV.2017.128.
+ [53] P. Liang, E. Blasch, H. Ling. Encoding color information
+      for visual tracking: Algorithms and benchmark. IEEE         [60] A. Li, M. Lin, Y. Wu, M. H. Yang, S. Yan. NUS-PRO: A
+     Transactions  on  Image  Processing,   vol. 24,  no. 12,         new visual tracking challenge. IEEE Transactions on Pat-
+      pp. 5630–5644, 2015. DOI: 10.1109/TIP.2015.2482905.               tern Analysis and Machine Intelligence,  vol. 38, no. 2,
+                                                                        pp. 335–349, 2016. DOI: 10.1109/TPAMI.2015.2417577.
+ [54] M. Mueller, N. Smith, B. Ghanem. A benchmark and sim-
+      ulator  for UAV tracking. In Proceedings of the 14th         [61] T. Xu, Z. H. Feng, X. J. Wu, J. Kittler. Learning adaptive
+     European Conference on Computer Vision, Amsterdam,            discriminative correlation filters via temporal consistency
+     The Netherlands, pp. 445–461, 2016. DOI: 10.1007/978-3-            preserving spatial feature selection for robust visual object
+      319-46448-0_27.                                                       tracking. IEEE Transactions on Image Processing, vol. 28,
+                                                                           no. 11,  pp. 5596–5609,  2019.  DOI:  10.1109/TIP.2019.
+ [55] M. Kristan, A. Leonardis, J. Matas, M. Felsberg, R. Pflug-
+                                                                      2919201.
+       felder, L. Č . Zajc, T.  Vojír̃, G. Bhat, A. Lukežič, A.
+      Eldesokey, G. Fernández, Á . García-Martín, Á . Iglesias-         [62] B. Li, W. Wu, Q. Wang, F. Zhang, J. Xing, J. Yan. Siam-
+      Arias, A. A. Alatan, A. González-García, A. Petrosino, A.         RPN++: Evolution of Siamese visual tracking with very
+    Memarmoghadam, A.  Vedaldi, A. Muhič, A. He, A.           deep networks. In Proceedings of IEEE/CVF Conference
+     Smeulders, A. G. Perera, B. Li, B. Chen, C. Kim, C. Xu,         on Computer Vision and Pattern Recognition, Long
+     C. Xiong, C. Tian, C. Luo, C. Sun, C. Hao, D. Kim, D.           Beach, USA, pp. 4277–4286, 2019. DOI: 10.1109/CVPR.
+     Mishra, D. Chen, D. Wang, D. Wee, E. Gavves, E. Gundo-            2019.00441.
+     gdu, E. Velasco-Salido, F. S. Khan, F. Yang, F. Zhao, F.
+                                                                                        [63] B. Liao, C. Wang, Y. Wang, Y. Wang, J. Yin. PG-Net:
+       Li, F. Battistone, G. De Ath, G. R. K. S. Subrahmanyam,
+                                                                           Pixel to global matching network for visual tracking. In
+     G. Bastos, H. Ling, H. K. Galoogahi, H. Lee, H. Li, H.
+                                                                     Proceedings of the 16th European Conference on Com-
+     Zhao, H. Fan, H. Zhang, H. Possegger, H. Li, H. Lu, H.
+                                                                   puter Vision, Glasgow, UK, pp. 429–444, 2020. DOI: 10.
+      Zhi, H. Li, H. Lee, H. J. Chang, I. Drummond, J. Val-
+                                                                       1007/978-3-030-58542-6_26.
+     madre, J. S. Martin, J. Chahl, J. Y. Choi, J. Li, J. Wang,
+       J. Qi, J. Sung, J. Johnander, J. Henriques, J. Choi, J. van         [64] X. Chen, B. Yan, J. Zhu, D. Wang, X. Yang, H. Lu. Trans-
+
+======================== PDF 第 16 页 ========================
+998                                                                 Machine Intelligence Research 22(5), October 2025
+
+     former tracking. In Proceedings of IEEE/CVF Conference                   Dong Wang received the B. Eng. degree
+    on Computer Vision and Pattern Recognition, Nashville,                             in electronic information engineering and
+                                                                                      the Ph. D. degree in signal and informa-    USA, pp. 8122–8131, 2021. DOI: 10.1109/CVPR46437.
+                                                                                            tion processing from the Dalian University     2021.00803.
+                                                                                                   of Technology (DUT), China in 2008 and
+                                                                                       2013, respectively. He is currently a pro-
+                                                                                                  fessor with the School of Information and               Pengyu Zhang received the B. Eng. de-
+                                                                          Communication    Engineering,   DUT,                    gree  in  information  engineering  from
+                                                                                  China.
+                  Chang′an University, China in 2016. He is
+                     currently a Ph. D. degree candidate with        His research interest is object detection and tracking.
+                    the Faculty of Electronic Information and         E-mail: wdice@dlut.edu.cn (Corresponding author)
+                      Electrical Engineering, Dalian University      ORCID iD: 0000-0002-6976-4004
+                       of Technology (DUT), China.
+                      His research interests include visual ob-                   Huchuan Lu received the M. Sc. degree in
+                       ject tracking and multiple modality fusion.                              signal and information processing and the
+  E-mail: pyzhang@mail.dlut.edu.cn                                               Ph. D. degree in system engineering from
+ ORCID iD: 0000-0003-0102-8630                                                     the  Dalian  University  of  Technology
+                                                                        (DUT), China in 1998 and 2008, respect-
+                                                                                                      ively. He joined the faculty in 1998 and is
+                 Simiao Lai received the B. Eng. degree in                            currently a professor with the School of In-
+                  automation from the Northeastern Uni-                          formation and Communication Engineer-
+                      versity, China in 2020. He is currently a                              ing, DUT, China. In recent years, he fo-
+                  Ph. D. degree candidate at the School of      cuses on visual tracking and segmentation. He currently serves
+                   Information and Communication Engin-      as an Associate Editor for IEEE Transactions on Cybernetics
+                      eering, Dalian University of Technology     and IEEE Transactions on Circuits and Systems for Video Tech-
+                 (DUT), China under the supervision of      nology.
+                     Prof. Huchuan Lu.                               His research interests include computer vision and pattern re-
+                      His research interest is object tracking.        cognition.
+  E-mail: laisimiao@mail.dlut.edu.cn                                  E-mail: lhchuan@dlut.edu.cn
+
+======================== PDF 第 17 页 ========================
+Citation: P. Zhang, S. Lai, D. Wang, H. Lu. Motion-guided visual tracking. Machine Intelligence Research, vol.22, no.5,
+pp.983-998, 2025. https://doi.org/10.1007/s11633-023-1477-x
+
+
+
+
+Articles may interest you
+
+
+Self-supervised vision-driven trajectory planning for intelligent robotic deburring. Machine Intelligence Research, vol.22, no.4,
+pp.655-676, 2025.
+
+DOI: 10.1007/s11633-025-1560-6
+
+Audio mixing inversion via embodied self-supervised learning. Machine Intelligence Research, vol.21, no.1, pp.55-62, 2024.
+
+DOI: 10.1007/s11633-023-1441-9
+
+Rolling shutter camera: modeling, optimization and learning. Machine Intelligence Research, vol.20, no.6, pp.783-798, 2023.
+
+DOI: 10.1007/s11633-022-1399-z
+
+Impact of autotuned fully connected layers on performance of self-supervised models for image classification. Machine Intelligence
+Research, vol.21, no.6, pp.1201-1213, 2024.
+
+DOI: 10.1007/s11633-023-1435-7
+
+On robust cross-view consistency in self-supervised monocular depth estimation. Machine Intelligence Research, vol.21, no.3,
+pp.495-513, 2024.
+
+DOI: 10.1007/s11633-023-1474-0
+
+Dynamic movement primitives based robot skills learning. Machine Intelligence Research, vol.20, no.3, pp.396-407, 2023.
+
+DOI: 10.1007/s11633-022-1346-z
+
+Mitigating spurious correlations for self-supervised recommendation. Machine Intelligence Research, vol.20, no.2, pp.263-275, 2023.
+
+DOI: 10.1007/s11633-022-1374-8
+
+
+
+
+
+                                        WeChat: MIR             Twitter: MIR_Journal

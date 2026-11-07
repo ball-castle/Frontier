@@ -1,0 +1,608 @@
+KH-A020 | Instance-aware Semantic Segmentation via Multi-task Network Cascades
+来源：https://arxiv.org/abs/1512.04412
+本地PDF：专题文献/何恺明/KH-A020_Instance_aware_Semantic_Segmentation_via_Multi_task_Network_Cascades_CVPR2016.pdf
+SHA-256：94c4f7ae62ee767f6222e0b046fbf952dc032c0a343edc0fd461271114608cc6
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+         Instance-aware Semantic Segmentation via Multi-task Network Cascades
+
+
+                                 Jifeng Dai        Kaiming He           Jian Sun
+
+                                              Microsoft Research
+                                    {jifdai,kahe,jiansun}@microsoft.com
+
+
+
+                        Abstract                                                    task 1                           task 12015     Semantic segmentation research has recently witnessed                                                                                                                                                                                                                                                                 shared                                                                           shared
+         rapid progress, but many leading methods are unable to                    task 2                                  task 2
+          identify object instances. In this paper, we present Multi-Dec   task Network Cascades for instance-aware semantic seg-                                         features                                                                                                    features                                                                                                               task 3                                          task 3
+         mentation. Our model consists of three networks, respec-
+                                                                            Figure 1. Illustrations of common multi-task learning (left) and our14   tively differentiating instances, estimating masks, and cat-
+         egorizing objects. These networks form a cascaded struc-      multi-task cascade (right).
+           ture, and are designed to share their convolutional features.
+                                                                               tional neural networks (CNNs) [21, 20]. These methods all       We develop an algorithm for the nontrivial end-to-end train-
+                                                                          require mask proposal methods [29, 3, 1] that are slow at         ing of this causal, cascaded structure. Our solution is a
+                                                                        inference time. In addition, these mask proposal methods          clean, single-step training framework and can be general-
+                                                                        take no advantage of deeply learned features or large-scale          ized to cascades that have more stages. We demonstrate[cs.CV]                                                                             training data, and may become a bottleneck for segmenta-          state-of-the-art instance-aware semantic segmentation ac-
+                                                                             tion accuracy.         curacy on PASCAL VOC. Meanwhile, our method takes only
+        360ms testing an image using VGG-16, which is two orders        In this work, we address instance-aware semantic seg-
+          of magnitude faster than previous systems for this challeng-     mentation solely based on CNNs, without using external
+         ing problem. As a by product, our method also achieves     modules (e.g., [1]). We observe that the instance-aware se-
+         compelling object detection results which surpass the com-     mantic segmentation task can be decomposed into three dif-
+           petitive Fast/Faster R-CNN systems.                              ferent and related sub-tasks. 1) Differentiating instances. In
+                                                                                   this sub-task, the instances can be represented by bounding          The method described in this paper is the foundation of
+                                                                 boxes that are class-agnostic. 2) Estimating masks. In this        our submissions to the MS COCO 2015 segmentation com-
+                                                                           sub-task, a pixel-level mask is predicted for each instance.           petition, where we won the 1st place.
+                                                                        3) Categorizing objects. In this sub-task, the category-wise
+                                                                             label is predicted for each mask-level instance. We expect
+                                                                                that each sub-task is simpler than the original instance seg-         1. Introduction
+                                                                   mentation task, and is more easily addressed by convolu-
+                                                                               tional networks.arXiv:1512.04412v1      Since the development of fully convolutional networks
+        (FCNs) [23], the accuracy of semantic segmentation has        Driven by this decomposition, we propose Multi-task
+        been improved rapidly [5, 24, 6, 31] thanks to deeply     Network Cascades (MNCs) for accurate and fast instance-
+         learned features [20, 27], large-scale annotations [22], and     aware semantic segmentation. Our network cascades have
+        advanced reasoning over graphical models [5, 31]. Nev-      three stages, each of which addresses one sub-task. The
+          ertheless, FCNs [23] and improvements [5, 24, 6, 31] are      three stages share their features, as in traditional multi-task
+         designed to predict a category label for each pixel, but are      learning [4]. Feature sharing greatly reduces the test-time
+        unaware of individual object instances. Accurate and fast     computation, and may also improve feature learning thanks
+         instance-aware semantic segmentation is still a challenging      to the underlying commonality among the tasks. But unlike
+         problem. To encourage the research on this problem, the re-    many multi-task learning applications, in our method a later
+          cently established COCO [22] dataset and competition only     stage depends on the outputs of an earlier stage, forming
+         accept instance-aware semantic segmentation results.           a causal cascade (see Fig. 1). So we call our structures
+           There have been a few methods [10, 13, 7, 14] address-      “multi-task cascades”.
+         ing instance-aware semantic segmentation using convolu-        Training a multi-task cascade is nontrivial because of the
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+                                                                             box instances (RoIs)                                                 B
+                                                                                                                                                                        stage 1                         L1
+
+                                                         CONVs
+                                                                                                                                                                                                                                                                                                                                                                                                                           shared             M
+                                                                                                    mask instances                                                                           features              stage 2                 L2
+                                    CONVs                                                                                           C
+                                                                                   FCs                                                                         stage 3         L3
+
+
+
+
+                                                                     RoI warping,
+                                                                                                                                                          categorized instances
+                                                                         pooling
+                                                                                                                                                    for each RoI                     FCs
+
+                                                                                                                                                                                                                                               person
+                                                                                                                                                                                                                                                         person    person
+                                      conv feature map
+                                                                                                                                                                                                                                                                 horse
+
+                                                                                           masking
+
+                                                                                                                                                                                                    for each RoI
+
+Figure 2. Multi-task Network Cascades for instance-aware semantic segmentation. At the top right corner is a simpliﬁed illustration.
+
+
+causal relations among the multiple outputs. For example,   CNN [10] adopts region proposal methods (e.g., [29, 32])
+our mask estimating layer takes convolutional features and      for producing multiple instance proposals, which are used
+predicted box instances as inputs, both of which are out-      for CNN-based classiﬁcation. In SPPnet [15] and Fast R-
+puts of other layers. According to the chain rule of back-   CNN [9], the convolutional layers of CNNs are shared on
+propagation [21], the gradients involve those with respect      the entire image for fast computation. Faster R-CNN [26]
+to the convolution responses and also those with respect      exploits the shared convolutional features to extract region
+to the spatial coordinates of predicted boxes. To achieve     proposals used by the detector. Sharing convolutional fea-
+theoretically valid backpropagation, we develop a layer that      tures leads to substantially faster speed for object detection
+is differentiable with respect to the spatial coordinates, so     systems [15, 9, 26].
+the gradient terms can be computed.                           Using mask-level region proposals, instance-aware se-
+  Our cascade model can thus be trained end-to-end via a     mantic segmentation can be addressed based on the R-CNN
+clean, single-step framework. This single-step training al-     philosophy, as in R-CNN [10], SDS [13], and Hypercol-
+gorithm naturally produces convolutional features that are    umn [14].  Sharing convolutional features among mask-
+shared among the three sub-tasks, which are beneﬁcial to      level proposals is enabled by using masking layers [7]. All
+both accuracy and speed. Meanwhile, under this training     these methods [10, 13, 14, 7] rely on computationally ex-
+framework, our cascade model can be extended to more     pensive mask proposal methods. For example, the widely
+stages, leading to improvements on accuracy.                 used MCG [1] takes 30 seconds processing an image, which
+  We comprehensively evaluate our method on the PAS-     becomes a bottleneck at inference time. DeepMask [25]
+CAL VOC dataset. Our method results in 63.5% mean Av-       is recently developed for learning segmentation candidates
+erage Precision (mAPr), about 3.0% higher than the previ-     using convolutional networks, taking over 1 second per im-
+ous best results [14, 7] using the same VGG network [27].      age. Its accuracy for instance-aware semantic segmentation
+Remarkably, this result is obtained at a test-time speed of       is yet to be evaluated.
+360ms per image, which is two orders of magnitudes faster        Category-wise semantic segmentation is elegantly tack-
+than previous systems [14, 7].                                  led by end-to-end training FCNs [23]. The output of an
+  Thanks to the end-to-end training and the independence   FCN consists of multiple score maps, each of which is for
+of external modules, the three sub-tasks and the entire     one category. This formulation enables per-pixel regression
+system easily beneﬁt from stronger features learned by      in a fully-convolutional form, but is not able to distinguish
+deeper models. We demonstrate excellent accuracy on the      instances of the same category. The FCN framework has
+challenging MS COCO segmentation dataset using an ex-     been further improved in many papers (e.g., [5, 31]), but
+tremely deep 101-layer residual net (ResNet-101) [16], and     these methods also have the limitations of not being able to
+also report our 1st-place result in the COCO segmentation      predict instances.
+track in ILSVRC & COCO 2015 competitions.
+                                                          3. Multi-task Network Cascades
+2. Related Work
+                                                                 In our MNC model, the network takes an image of arbi-
+   Object detection methods [10, 15, 9, 26] involve predict-      trary size as the input, and outputs instance-aware semantic
+ing object bounding boxes and categories. The work of R-     segmentation results. The cascade has three stages: propos-
+
+======================== PDF 第 3 页 ========================
+ing box-level instances, regressing mask-level instances,     has m2 outputs, each performing binary logistic regression
+and categorizing each instance. These three stages are de-      to the ground truth mask.
+signed to share convolutional features (e.g., the 13 convolu-       With these deﬁnitions, the loss term L2 of stage 2 for
+tional layers in VGG-16 [27]). Each stage involves a loss      regressing masks exhibits the following form:
+term, but a later stage’s loss relies on the output of an ear-
+                                                            L2 = L2(M(Θ) | B(Θ)).              (2)lier stage, so the three loss terms are not independent. We
+train the entire network cascade end-to-end with a uniﬁed     Here M is the network outputs of this stage, representing
+loss function. Fig. 2 illustrates our cascade model.             a list of masks: M = {Mi} and Mi is an m2-dimensional
+   In this section we describe the deﬁnition for each stage.      logistic regression output (via sigmoid) taking continuous
+In the next section we introduce an end-to-end training al-     values in [0, 1]. Eqn.(2) indicates that the mask regression
+gorithm to address the causal dependency.                       loss L2 is dependent on M but also on B.
+                                                 As a related method, DeepMask [25] also regresses dis-3.1. Regressing Box-level Instances
+                                                                  cretized masks.  DeepMask applies the regression layers
+   In the ﬁrst stage, the network proposes object instances      to dense sliding windows (fully-convolutionally), but our
+in the form of bounding boxes. These bounding boxes are     method only regresses masks from a few proposed boxes
+class-agnostic, and are predicted with an objectness score.      and so reduces computational cost. Moreover, mask regres-
+  The network structure and loss function of this stage fol-     sion is only one stage in our network cascade that shares
+low the work of Region Proposal Networks (RPNs) [26],      features among multiple stages, so the marginal cost of the
+which we brieﬂy describe as follows for completeness. An    mask regression layers is very small.
+RPN predicts bounding box locations and objectness scores
+                                                               3.3. Categorizing Instancesin a fully-convolutional form. On top of the shared fea-
+tures, a 3×3 convolutional layer is used for reducing di-       The third stage takes the shared convolutional features,
+mensions, followed by two sibling 1×1 convolutional lay-     stage-1 boxes, and stage-2 masks as input. It outputs cate-
+ers for regressing box locations and classifying object/non-     gory scores for each instance.
+object. The box regression is with reference to a series of       Given a box predicted by stage 1, we also extract a fea-
+pre-deﬁned boxes (called “anchors” [26]) at each location.       ture by RoI pooling. This feature map is then “masked” by
+  We use the RPN loss function given in [26]. This loss      the stage-2 mask prediction, inspired by the feature mask-
+function serves as the loss term L1 of our stage 1. It has a     ing strategy in [7]. This leads to a feature focused on the
+form of:                                                   foreground of the prediction mask. The masked feature is
+               L1 = L1(B(Θ)).                  (1)     given by element-wise product:
+Here Θ represents all network parameters to be optimized.             FMaski    (Θ) = FRoIi  (Θ) · Mi(Θ).          (3)
+B is the network output of this stage, representing a list of
+boxes: B = {Bi} and Bi = {xi, yi, wi, hi, pi}, where Bi     Here FRoIi     is the feature after RoI pooling, Mi(Θ) is a
+is a box indexed by i. The box Bi is centered at (xi, yi) with    mask prediction from stage 2 (resized to the RoI resolu-
+width wi and height hi, and pi is the objectness probability.      tion), and · represents element-wise product. The masked
+The notations in Eqn.(1) indicate that the box predictions      feature FMaski       is dependent on Mi(Θ). Two 4096-d fc lay-
+are functions of the network parameters Θ.                       ers are applied on the masked feature FMaski        .  This is a
+                                                       mask-based pathway. Following [13], we also use another
+3.2. Regressing Mask-level Instances                                                         box-based pathway, where the RoI pooled features directly
+  The second stage takes the shared convolutional features     fed into two 4096-d fc layers (this pathway is not illustrated
+and stage-1 boxes as input. It outputs a pixel-level segmen-      in Fig. 2). The mask-based and box-based pathways are
+tation mask for each box proposal. In this stage, a mask-     concatenated. On top of the concatenation, a softmax clas-
+level instance is still class-agnostic.                             siﬁer of N+1 ways is used for predicting N categories plus
+  Given a box predicted by stage 1, we extract a feature of     one background category. The box-level pathway may ad-
+this box by Region-of-Interest (RoI) pooling [15, 9]. The     dress the cases when the feature is mostly masked out by
+purpose of RoI pooling is for producing a ﬁxed-size feature      the mask-level pathway (e.g., on background).
+from an arbitrary box, which is set as 14×14 at this stage.       The loss term L3 of stage 3 exhibits the following form:
+We append two extra fully-connected (fc) layers to this fea-
+                                                          L3 = L3(C(Θ) | B(Θ), M(Θ)).           (4)
+ture for each box. The ﬁrst fc layer (with ReLU) reduces
+the dimension to 256, followed by the second fc layer that     Here C is the network outputs of this stage, representing
+regresses a pixel-wise mask. This mask, of a pre-deﬁned     a list of category predictions for all instances: C = {Ci}.
+spatial resolution of m × m (we use m = 28), is parame-     This loss term is dependent on B(Θ) and M(Θ) (where
+terized by an m2-dimensional vector. The second fc layer    B(Θ) is used for generating the RoI feature).
+
+======================== PDF 第 4 页 ========================
+4. End-to-End Training                             The computation in Eqn.(6) has this form:
+
+  We deﬁne the loss function of the entire cascade as:                 W ×H
+                                                     FRoIi    (u′,v′) = X G(u, v; u′, v′|Bi)F(u,v),    (7)
+       L(Θ) =L1(B(Θ)) + L2(M(Θ) | B(Θ))                                          (u,v)
+                                                          (5)
+         + L3(C(Θ) | B(Θ), M(Θ)),
+                                                     where the notations Θ in Eqn.(6) are omitted for simplifying
+                                                                  presentation. Here (u′, v′) represent a spatial position in the
+where balance weights of 1 are implicitly used among the                          ′                                                                     target W × H′ feature map, and (u, v) run over the full-
+three terms. L(Θ) is minimized w.r.t. the network param-
+                                                     image feature map F.
+eters Θ. This loss function is unlike traditional multi-task
+                                                    The function G(u, v; u′, v′|Bi) represents transforming
+learning, because the loss term of a later stage depends on
+                                                          a proposed box Bi from a size of [xi −wi/2, xi + wi/2) ×
+the output of the earlier ones. For example, based on the
+                                                        [yi−hi/2, yi+hi/2) into another size of [−W ′/2, W ′/2)×
+chain rule of backpropagation, the gradient of L2 involves                                                    [−H′/2, H′/2).  Using bilinear interpolation, G is sep-
+the gradients w.r.t. B.
+                                                                   arable: G(u, v; u′, v′|Bi) = g(u, u′|xi, wi)g(v, v′|yi, hi)
+  The main technical challenge of applying the chain rule                                                         where:
+to Eqn.(5) lies on the spatial transform of a predicted box
+                                                                                                      u′
+Bi(Θ) that determines RoI pooling. For the RoI pooling               g(u, u′|xi, wi) = κ(xi +      ′ wi −u),        (8)                                           Wlayer, its inputs are a predicted box Bi(Θ) and the convolu-
+tional feature map F(Θ), both being functions of Θ. In Fast                                                     where κ(·) =  max(0, 1 −|  · |)  is the bilinear inter-
+R-CNN [9], the box proposals are pre-computed and ﬁxed,                                          u′
+                                                               polation function, and xi + W ′ wi maps the position ofand the backpropagation of RoI pooling layer in [9] only in-                                                                 u′ ∈[−W ′/2, W ′/2) to the full-image feature map do-
+volves F(Θ). However, this is not the case in the presence                                                          main. g(v, v′|yi, hi) is deﬁned similarly. We note that be-
+of B(Θ). Gradients of both terms need to be considered in                                                          cause κ is non-zero in a small interval, the actual computa-
+a theoretically sound end-to-end training solution.
+                                                                   tion of Eqn.(7) involves a very few terms.
+   In this section, we develop a differentiable RoI warping                                                          According to the chain rule, for backpropagation involv-
+layer to account for the gradient w.r.t. predicted box posi-                                                             ing Eqn.(6) we need to compute:
+tions and address the dependency on B(Θ). The depen-
+dency on M(Θ) is also tackled accordingly.                            ∂L2    ∂L2 ∂G
+                                              =       F                (9)
+                                                              ∂Bi   ∂FRoIi   ∂BiDifferentiable RoI Warping Layers.  The RoI pooling
+layer [9, 15] performs max pooling on a discrete grid based
+                                                     where we use ∂Bi to denote ∂xi, ∂yi, ∂wi, and ∂hi for
+on a box. To derive a form that is differentiable w.r.t. the                     ∂G                                                                    simplicity. The term      in Eqn.(9) can be derived from
+box position, we perform RoI pooling by a differentiable                         ∂Bi
+                                                               Eqn.(8). As such, the RoI warping layer can be trained with
+RoI warping layer followed by standard max pooling.
+                                                       any preceding/succeding layers.  If the boxes are constant
+  The RoI warping layer crops a feature map region and                                                                             (e.g., given by Selective Search [29]), Eqn.(9) is not needed,
+warps it into a target size by interpolation. We use F(Θ) to                                                     which becomes the case of the existing RoI pooling in [9].
+denote the full-image convolutional feature map. Given a                                                                After the differentiable RoI warping layer, we append a
+predicted box Bi(Θ) centered at (xi(Θ), yi(Θ)) with width                                             max pooling layer to perform the RoI max pooling behavior.
+wi(Θ) and height hi(Θ), an RoI warping layer interpolates                                        We expect the RoI warping layer to produce a sufﬁciently
+the features inside the box and outputs a feature of a ﬁxed                                                                     ′                                                    ﬁne resolution, which is set as W × H′ = 28 × 28 in this
+spatial resolution. This operation can be written as linear                                                                 paper. A max pooling layer is then applied to produce a
+transform on the feature map F(Θ):                                                               lower-resolution output, e.g., 7×7 for VGG-16.
+                                                    The RoI warping layer shares similar motivations with
+           FRoIi  (Θ) = G(Bi(Θ))F(Θ).            (6)      the recent work of Spatial Transformer Networks [18]. In
+                                                                    [18], a spatial transformation of the entire image is learned,
+Here F(Θ) is reshaped as an n-dimensional vector, with     which is done by feature interpolation that is differentiable
+n = WH for a full-image feature map of a spatial size       w.r.t. the transformation parameters. The networks in [18]
+W × H. G represents the cropping and warping opera-      are used for image classiﬁcation. Our RoI warping layer
+tions, and is an n′-by-n matrix where n′ = W ′H′ cor-       is also driven by the differentiable property of interpolating
+responds to the pre-deﬁned RoI warping output resolution      features. But the RoI warping layer is applied to multiple
+W ′ × H′. FRoIi  (Θ) is an n′-dimensional vector represent-     proposed boxes that are of interest, instead of the entire im-
+ing the RoI warping output. We note that these operations      age. The RoI warping layer has a pre-deﬁned output size
+are performed for each channel independently.               and arbitrary input sizes, in contrast to [18].
+
+======================== PDF 第 5 页 ========================
+                  B              stage 1                                            inference-time structure, which improves accuracy as will
+                                                       be shown by experiments.  It is possible to train a cascade
+                      stage 2                                   with even more stages in this way. But due to concerns on                shared             M                                       C, B'                           fast inference, we only present MNCs with up to 5 stages.
+
+                                         M'                6. Implementation Details                     features                      stage 3 stage 4
+                                                        C'         Non-maximum suppression. On stage 1, the network pro-                                              stage 5
+                                                         duces ∼104 regressed boxes.  For generating the propos-
+Figure 3. A 5-stage cascade. On stage 3, bounding boxes updated      als for stage 2, we use non-maximum suppression (NMS)
+by the box regression layer are used as the input to stage 4.                                                                   to reduce redundant candidates.  The threshold of the
+                                                              Intersection-over-Union (IoU) ratio for this NMS is 0.7 as
+                                                                   in [26]. After that, the top-ranked 300 boxes [26] will beMasking Layers. We also compute the gradients involved
+                                                         used for stage 2.  During training, the forward/backwardin L3(C(Θ)  | B(Θ), M(Θ)), where the dependency on
+                                                           propagated signals of stages 2 and 3 only go through theB(Θ) and M(Θ)  is determined by Eqn.(3).  With the
+                                                        “pathways” determined by these 300 boxes. NMS is sim-differentiable RoI warping module (FRoIi    ), the operations
+                                                                              ilar to max pooling, maxout [11], or other local compet-in Eqn.(3) can be simply implemented by an element-wise
+                                                             ing layers [28], which are implemented as routers of for-product module.
+                                                       ward/backward pathways.  During inference, we use the
+   In summary, given the differentiable RoI warping mod-    same NMS strategy to produce 300 proposals for stage 2.
+ule, we have all the necessary components for backpropa-      Positive/negative samples.  (i) On stage 1, their deﬁnitions
+gation (other components are either standard, or trivial to     follow [26]. (ii) On stage 2, for each proposed box we ﬁnd
+implement). We train the model by stochastic gradient de-       its highest overlapping ground truth mask.  If the overlap-
+scent (SGD), implemented in the Caffe library [19].            ping ratio (IoU) is greater than 0.5, this proposed box is con-
+                                                               sidered as positive and contributes to the mask regression
+5. Cascades with More Stages                              loss; otherwise is ignored in the regression loss. The mask
+                                                               regression target is the intersection between the proposed
+  Next we extend the cascade model to more stages within
+                                                    box and the ground truth mask, resized to m × m pixels.
+the above MNC framework.
+                                                                                       (iii) On stage 3, we consider two sets of positive/negative
+   In Fast R-CNN [9], the (N+1)-way classiﬁer is trained
+                                                            samples.  In the ﬁrst set, the positive samples are the in-
+jointly with class-wise bounding box regression. Inspired
+                                                               stances that overlap with ground truth boxes by box-level
+by this practice, on stage 3, we add a 4(N+1)-d fc layer for
+                                                  IoU ≥0.5 (the negative samples are the rest). In the sec-
+regression class-wise bounding boxes [9], which is a sibling
+                                                    ond set, the positive samples are the instances that overlap
+layer with the classiﬁer layer. The entire 3-stage network
+                                                          with ground truth instances by box-level IoU ≥0.5 and
+cascade is trained as in Sec. 4.
+                                                            mask-level IoU ≥0.5. The loss function of stage 3 involves
+  The inference step with box regression, however,  is
+                                                    two (N+1)-way classiﬁers, one for classifying mask-level
+not as straightforward as in object detection, because our
+                                                                instances and the other for classifying box-level instances
+ultimate outputs are masks instead of boxes. So during in-
+                                                      (whose scores are not used for inference). The reason for
+ference, we ﬁrst run the entire 3-stage network and obtain
+                                                             considering both box-level and mask-level IoU is that when
+the regressed boxes on stage 3. These boxes are then con-
+                                                                the proposed box is not a real instance (e.g., on the back-
+sidered as new proposals1. Stages 2 and 3 are performed
+                                                       ground or poorly overlapping with ground truth), the re-
+for the second time on these proposals. This is in fact 5-
+                                                             gressed mask might be less reliable and thus the box-level
+stage inference. Its inference-time structure is illustrated in
+                                                  IoU is more conﬁdent.
+Fig. 3. The new stages 4 and 5 share the same structures
+as stages 2 and 3, except that they use the regressed boxes     Hyper-parameters for training. We use the ImageNet pre-
+from stage 3 as the new proposals. This inference process      trained models (e.g., VGG-16 [27]) to initialize the shared
+can be iterated, but we have observed negligible gains.          convolutional layers and the corresponding 4096-d fc lay-
+  Given the above 5-stage cascade structure (Fig. 3), it is      ers. The extra layers are initialized randomly as in [17].
+easy to adopt our algorithm in Sec. 4 to train this cascade   We adopt an image-centric training framework [9]:  the
+end-to-end by backpropagation. Training the model in this     shared convolutional layers are computed on the entire im-
+way makes the training-time structure consistent with the      age, while the RoIs are randomly sampled for computing
+                                                                   loss functions. In our system, each mini-batch involves 1
+   1To avoid multiplying the number of proposals by the number of cat-     image, 256 sampled anchors for stage 1 as in [26]2, and 64
+egories, for each box we only use the highest scored category’s bounding
+box regressor.                                                        2Though we sample 256 anchors on stage 1 for computing the loss
+
+======================== PDF 第 6 页 ========================
+                                            ZF net                VGG-16 net
+                            training strategies          (a)      (b)      (c)      (d)      (a)      (b)      (c)      (d)
+                          shared features?         ✓   ✓   ✓       ✓   ✓   ✓
+                        end-to-end training?            ✓   ✓           ✓   ✓
+                        training 5-stage cascades?              ✓               ✓
+                   mAPr@0.5 (%)        51.8    52.2    53.5    54.0    60.2    60.5    62.6    63.5
+
+Table 1. Ablation experiments on PASCAL VOC 2012 validation. For (a), (b), and (c), the cascade structures for training have 3 stages.
+The inference process (5-stage, see 5) is the same for all cases; the models are only different in the training methods. The pre-trained
+models are ZF net [30] (left) and VGG-16 net [27] (right).
+
+
+sampled RoIs for stages 2 and 3. We train the model using a      via 5-stage inference, so the differences are contributed by
+learning rate of 0.001 for 32k iterations, and 0.0001 for the      the training strategies. We show results using ZF net [30]
+next 8k. We train the model in 8 GPUs, each GPU holding      that has 5 convolutional layers and 3 fc layers, and VGG-16
+1 mini-batch (so the effective mini-batch size is ×8). The      net [27] that has 13 convolutional layers and 3 fc layers.
+images are resized such that the shorter side has 600 pixels      As a simple baseline (Table 1, a), we train the three
+[9]. We do not adopt multi-scale training/testing [15, 9], as      stages step-by-step without sharing their features.  Three
+it provides no good trade-off on speed vs. accuracy [9].          separate networks are trained, and a network of a later stage
+                                                                takes the outputs from the trained networks of the earlierInference. We use 5-stage inference for both 3-stage and
+                                                                   stages. The three separate networks are all initialized by the5-stage trained structures. The inference process gives us a
+                                                            ImageNet-pre-trained model. This baseline has an mAPr oflist of 600 instances with masks and category scores (300
+                                                  60.2% using VGG-16. We note that this baseline result isfrom the stage 3 outputs, and 300 from the stage 5 outputs).
+                                                              competitive (see also Table 2), suggesting that decomposingWe post-process this list to reduce similar predictions. We
+                                                                the task into three sub-tasks is an effective solution.ﬁrst apply NMS (using box-level IoU 0.3 [10]) on the list
+                                                     To achieve feature sharing, one may follow the step-by-of 600 instances based on their category scores. After that,
+                                                                step training in [26]. Given the above model (a), the sharedfor each not-suppressed instance, we ﬁnd its “similar” in-
+                                                              convolutional layers are kept unchanged by using the laststances which are deﬁned as the suppressed instances that
+                                                                   stage’s weights, and the three separate networks are trainedoverlap with it by IoU ≥0.5. The prediction masks of the
+                                                                step-by-step again with the shared layers not tuned, follow-not-suppressed instance and its similar instances are merged
+                                                             ing [26]. Doing so leads to an mAPr of 60.5%, just on partogether by weighted averaging, pixel-by-pixel, using the
+                                                          with the baseline that does not share features. This suggestsclassiﬁcation scores as their averaging weights. This “mask
+                                                                     that sharing features does not directly improve accuracy.voting” scheme is inspired by the box voting in [8]. The av-
+                                                        Next we experiment with the single-step, end-to-enderaged masks, taking continuous values in [0, 1], are bina-
+                                                                   training algorithm developed in Sec. 4. Table 1 (c) showsrized to form the ﬁnal output masks. The averaging step im-
+                                                                the result of end-to-end training a 3-stage cascade.  Theproves accuracy by ∼1% over the NMS outcome. This post-
+                                           mAPr is increased to 62.6%. We note that in Table 1 (a),processing is performed for each category independently.
+                                                                         (b), and (c), the models have the same structure for train-
+                                                                    ing. So the improvement of (c) is contributed by end-to-end7. Experiments
+                                                                   training this cascade structure. This improvement is simi-
+7.1. Experiments on PASCAL VOC 2012                    lar to other gains observed in many practices of multi-task
+                                                               learning [4]. By developing training algorithm as in Sec. 4,
+  We follow the protocols used in recent papers [13, 7, 14]
+                                             we are able to train the network by backpropagation in a
+for evaluating instance-aware semantic segmentation. The
+                                                                    theoretically sound way. The features are naturally shared
+models are trained on the PASCAL VOC 2012 training set,
+                                                    by optimizing a uniﬁed loss function, and the beneﬁts of
+and evaluated on the validation set. We use the segmenta-
+                                                                multi-task learning are witnessed.
+tion annotations in [12] for training and evaluation, follow-
+                                                              Table 1 (d) shows the result of end-to-end training a 5-
+ing [13, 7, 14]. We evaluate the mean Average Precision,
+                                                               stage cascade. The mAPr is further improved to 63.5%.which is referred to as mean APr [13] or simply mAPr. We
+                                        We note that all results in Table 1 are based on the sameevaluate mAPr using IoU thresholds at 0.5 and 0.7.
+                                                               5-stage inference strategy. So the accuracy gap between (d)
+Ablation Experiments on Training Strategies.  Table     and (c) is contributed by training a 5-stage structure that is
+1 compares the results of different training strategies for      consistent with its inference-time usage.
+MNCs. We remark that in this table all results are obtained       The series of comparisons are also observed when using
+function, the network of stage 1 is still computed fully-convolutionally on      the ZF net as the pre-trained model (Table 1, left), showing
+the entire image and produces all proposals that are used by later stages.       the generality of our ﬁndings.
+
+======================== PDF 第 7 页 ========================
+ method          mAPr@0.5 (%) mAPr@0.7 (%) time/img (s)            system                 training data    mAPb (%)
+ O2P [2]                 25.2                -                -            R-CNN [10]      VOC 12            62.4
+ SDS (AlexNet) [13]      49.7          25.3        48                  Fast R-CNN [9]    VOC 12            65.7
+ Hypercolumn [14]       60.0          40.4      >80                 Fast R-CNN [9]    VOC 07++12       68.4
+ CFM [7]                60.7          39.6        32                  Faster R-CNN [26]   VOC 12            67.0
+ MNC [ours]             63.5          41.5         0.36                 Faster R-CNN [26]   VOC 07++12       70.4
+                                          MNC [ours]       VOC 12            70.9Table 2. Comparisons of instance-aware semantic segmentation on
+                                                      MNCbox [ours]     VOC 12            73.5the PASCAL VOC 2012 validation set. The testing time per image
+(including all steps) is evaluated in a single Nvidia K40 GPU, ex-         MNCbox [ours]†    VOC 07++12       75.9
+cept that the MCG [1] proposal time is evaluated on a CPU. MCG      Table 4. Evaluation of (box-level) object detection mAP on the
+is used by [13, 14, 7] and its running time is about 30s. The run-    PASCAL VOC 2012 test set. “12” denotes VOC 2012 trainval, and
+ning time of [14] is our estimation based on the description from     “07++12” denotes VOC 2007 trainval+test and 2012 trainval. The
+the paper. The pre-trained model is VGG-16 for [14, 7] and ours.      pre-trained model is VGG-16 for all methods.†: http://host.
+O2P is not based on deep CNNs, and its result is reported by [13].    robots.ox.ac.uk:8080/anonymous/NUWDYX.html
+
+ conv   stage 2   stage 3   stage 4   stage 5   others    total             network        mAP@[.5:.95] (%)    mAP@.5 (%)
+  0.15    0.01     0.08     0.01     0.08     0.03    0.36         VGG-16 [27]           19.5               39.7
+Table 3. Detailed testing time (seconds) per image of our method         ResNet-101 [16]          24.6               44.3
+using 5-stage inference. The model is VGG-16. “Others” include      Table 5. Our baseline segmentation result (%) on the MS COCO
+post-processing and communications among stages.                     test-dev set. The training set is the trainval set.
+
+
+Comparisons with State-of-the-art Methods. In Table 2                                                                annotations. This experiment shows the effectiveness of our
+we compare with SDS [13], Hypercolumn [14], and CFM                                                            algorithm for detecting both box- and mask-level instances.
+[7], which are existing CNN-based semantic segmentation                                                    The above detection result is solely based on the mask-
+methods that are able to identify instances. These papers re-                                                                    level outputs. But our method also has box-level outputs
+ported their mAPr under the same protocol used by our ex-                                                     from the box regression layers in stage 3/5. Using these
+periments. Our MNC has ∼3% higher mAPr@0.5 than pre-                                                    box layers’ outputs (box coordinates and scores) in place of
+vious best results. Our method also has higher mAPr@0.7                                                                the mask-level outputs, we obtain an mAPb of 73.5% (Ta-
+than previous methods.                                                                ble 4). Finally, we train the MNC model on the union set
+   Fig 4 shows some examples of our results on the valida-                                                              of 2007 trainval+test and 2012 trainval. As the 2007 set has
+tion set. Our method can handle challenging cases where                                                    no mask-level annotation, when a sample image from the
+multiple instances of the same category are spatially con-                                                    2007 set is used, its mask regression loss is ignored (but the
+nected to each other (e.g., Fig 4, ﬁrst row).                                                 mask is generated for the later stages) and its mask-level
+Running Time. Our method has an inference-time speed    IoU measure for determining positive/negative samples is
+of 360ms per image (Table 2), evaluated on an Nvidia K40     ignored. These samples can still impact the box proposal
+GPU. Table 3 shows the details. Our method does not re-     stage and the categorizing stage. Under this setting, we ob-
+quire any external region proposal method, whereas the re-      tain an mAPb of 75.9% (Table 4), substantially better than
+gion proposal step in SDS, Hypercolumn, and CFM costs      Fast/Faster R-CNN [9, 26].
+30s using MCG. Furthermore, our method uses the shared
+convolutional features for the three sub-tasks and avoids re-     7.2. Experiments on MS COCO Segmentation
+dundant computation. Our system is about two orders of                                          We further evaluate on the MS COCO dataset [22]. This
+magnitude faster than previous systems.                                                                 dataset consists of 80 object categories for instance-aware
+Object Detection Evaluations. We are also interested in     semantic segmentation. Following the COCO guidelines,
+the box-level object detection performance (mAPb), so that    we use the 80k+40k trainval images to train, and report the
+we can compare with more systems that are designed for      results on the test-dev set. We evaluate the standard COCO
+object detection. We train our model on the PASCAL VOC     metric (mAPr@IoU=[0.5:0.95]) and also the PASCAL met-
+2012 trainval set, and evaluate on the PASCAL VOC 2012      rics (mAPr@IoU=0.5).  Table 5 shows our method using
+test set for object detection.  Given mask-level instances    VGG-16 has a result of 19.5%/39.7%.
+generated by our model, we simply assign a tight bounding       The end-to-end training behavior and the independence
+box to each instance. Table 4 shows that our result (70.9%)      of external models make our method easily enjoy gains
+compares favorably to the recent Fast/Faster R-CNN sys-     from deeper representations. By replacing VGG-16 with an
+tems [9, 26]. We note that our result is obtained with fewer     extremely deep 101-layer network (ResNet-101) [16], we
+training images (without the 2007 set), but with mask-level     achieve 24.6%/44.3% on the MS COCO test-dev set (Ta-
+
+======================== PDF 第 8 页 ========================
+                                                                                                                                                                                                          person                                                                                                                                                                                            person
+                                                                                                                                                                                                    person                                                                                                                                                                                                                person           potted plant                                                                                                                                                                         person     person
+
+
+
+                                                                                                                                                                                                  person
+                                                                                                                                                                               person      person                                 chair
+
+                                                                                                                                                                           person                            person
+
+
+
+
+
+                                                                                                                                                                                         sheep
+
+
+                                                                                                                                                                                                       sheep   sheep
+                                                                                                                                                        sheep        sheep
+                                                                                                                                            sheep
+
+
+
+
+
+                                                                                                                                                                                     car
+                                                                                                                                        car          car                 car
+
+
+
+
+
+                                                                                                                                                                                     car
+
+
+
+
+
+                                                                                                                                              person                       person
+                                                                                                                                                                                                                                                         potted plant
+
+
+
+                                                                                                                                                                                                                              potted plant
+
+
+
+                                                                                                                                            motobike
+
+
+
+
+
+                                                                                                                         person              person              person
+
+
+
+
+
+                                                                                                                                                                     table
+
+
+                                                            input                                  our result                             ground truth
+
+
+
+
+
+                                                                                              chair
+
+
+
+                                                                                                        table                                                                                               dog
+                                                                                                                                                                                  dog
+                                                                                             chair
+
+                                                                                                                     chair
+
+
+
+                                        input                 our result             ground truth                 input                  our result             ground truth
+
+Figure 4. Our instance-aware semantic segmentation results on the PASCAL VOC 2012 validation set. One color denotes one instance.
+
+ble 5). It is noteworthy that ResNet-101 leads to a relative     8. Conclusion
+improvement of 26% (on mAPr@[.5:.95]) over VGG-16,                                          We have presented Multi-task Network Cascades for fast
+which is consistent to the relative improvement of COCO                                                      and accurate instance segmentation. We believe that the
+object detection in [16].  This baseline result is close to                                                              idea of exploiting network cascades in a multi-task learn-
+the 2nd-place winner’s ensemble result (25.1%/45.8% by                                                             ing framework is general. This idea, if further developed,
+FAIRCNN). On our baseline result, we further adopt global                                             may be useful for other recognition tasks.
+context modeling and multi-scale testing as in [16], and
+                                                    Our method is designed with fast inference in mind, and
+ensembling.  Our ﬁnal result on the test-challenge set is
+                                                                              is orthogonal to some other successful strategies developed
+28.2%/51.5%, which won the 1st place in the COCO seg-
+                                                              previously for semantic segmentation.  For example, one
+mentation track3 of ILSVRC & COCO 2015 competitions.
+                                             may consider exploiting a CRF [5] to reﬁne the boundaries
+Fig. 5 shows some examples.
+                                                              of the instance masks. This is beyond the scope of this paper
+   3http://mscoco.org/dataset/#detections-challenge2015      and will be investigated in the future.
+
+======================== PDF 第 9 页 ========================
+           Figure 5. Our instance-aware semantic segmentation results on the MS COCO test-dev set using ResNet-101 [16].
+
+References                                                       2014.
+
+                                                                            [2]  J. Carreira, R. Caseiro, J. Batista, and C. Sminchisescu. Se-
+ [1]  P. Arbel´aez, J. Pont-Tuset, J. T. Barron, F. Marques, and          mantic segmentation with second-order pooling. In ECCV.
+       J. Malik.  Multiscale combinatorial grouping.  In CVPR,           2012.
+
+======================== PDF 第 10 页 ========================
+ [3]  J. Carreira and C. Sminchisescu.  Cpmc: Automatic ob-      [24] G. Papandreou, L.-C. Chen, K. Murphy, and A. L. Yuille.
+      ject segmentation using constrained parametric min-cuts.          Weakly- and semi-supervised learning of a dcnn for semantic
+    TPAMI, 2012.                                                image segmentation. In ICCV, 2015.
+ [4] R. Caruana.    Multitask  learning.   Machine  learning,      [25]  P. O. Pinheiro, R. Collobert, and P. Dollar. Learning to seg-
+     28(1):41–75, 1997.                                          ment object candidates. In NIPS, 2015.
+ [5] L.-C. Chen, G. Papandreou, I. Kokkinos, K. Murphy, and      [26] S. Ren, K. He, R. Girshick, and J. Sun. Faster R-CNN: To-
+     A. L. Yuille. Semantic image segmentation with deep con-          wards real-time object detection with region proposal net-
+      volutional nets and fully connected crfs. In ICLR, 2015.              works. In NIPS, 2015.
+ [6]  J. Dai, K. He, and J. Sun.  Boxsup: Exploiting bounding      [27] K. Simonyan and A. Zisserman.  Very deep convolutional
+     boxes to supervise convolutional networks for semantic seg-          networks for large-scale image recognition. In ICLR, 2015.
+     mentation. In ICCV, 2015.                                      [28] R. K. Srivastava, J. Masci, S. Kazerounian, F. Gomez, and
+ [7]  J. Dai, K. He, and J. Sun. Convolutional feature masking for               J. Schmidhuber. Compete to compute. In NIPS, 2013.
+      joint object and stuff segmentation. In CVPR, 2015.              [29]  J. R. Uijlings, K. E. van de Sande, T. Gevers, and A. W.
+ [8] S. Gidaris and N. Komodakis. Object detection via a multi-           Smeulders.  Selective search for object recognition. IJCV,
+     region & semantic segmentation-aware cnn model. In ICCV,           2013.
+     2015.                                                           [30] M. D. Zeiler and R. Fergus. Visualizing and understanding
+ [9] R. Girshick. Fast R-CNN. In ICCV, 2015.                            convolutional neural networks. In ECCV, 2014.
+[10] R. Girshick, J. Donahue, T. Darrell, and J. Malik. Rich fea-      [31] S. Zheng, S. Jayasumana, B. Romera-Paredes, V. Vineet,
+      ture hierarchies for accurate object detection and semantic           Z. Su, D. Du, C. Huang, and P. Torr.  Conditional random
+     segmentation. In CVPR, 2014.                                      ﬁelds as recurrent neural networks. In ICCV, 2015.
+[11]  I. J. Goodfellow, D. Warde-Farley, M. Mirza, A. Courville,      [32] C. L. Zitnick and P. Doll´ar. Edge boxes: Locating object
+     and Y. Bengio. Maxout networks. arXiv:1302.4389, 2013.             proposals from edges. In ECCV, 2014.
+[12] B. Hariharan, P. Arbel´aez, L. Bourdev, S. Maji, and J. Malik.
+     Semantic contours from inverse detectors. In ICCV, 2011.
+[13] B. Hariharan, P. Arbel´aez, R. Girshick, and J. Malik. Simul-
+     taneous detection and segmentation. In ECCV. 2014.
+[14] B. Hariharan, P. Arbel´aez, R. Girshick, and J. Malik. Hyper-
+     columns for object segmentation and ﬁne-grained localiza-
+      tion. In CVPR, 2015.
+[15] K. He, X. Zhang, S. Ren, and J. Sun. Spatial pyramid pooling
+      in deep convolutional networks for visual recognition.  In
+    ECCV, 2014.
+[16] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning
+      for image recognition. arXiv:1512.03385, 2015.
+[17] K. He, X. Zhang, S. Ren, and J. Sun.  Delving deep into
+      rectiﬁers: Surpassing human-level performance on imagenet
+      classiﬁcation. In ICCV, 2015.
+[18] M.   Jaderberg,   K.  Simonyan,   A.  Zisserman,   and
+     K. Kavukcuoglu.    Spatial  transformer  networks.    In
+     NIPS, 2015.
+[19] Y. Jia, E. Shelhamer, J. Donahue, S. Karayev, J. Long, R. Gir-
+      shick, S. Guadarrama, and T. Darrell.   Caffe:  Convolu-
+      tional architecture for fast feature embedding. arXiv preprint
+     arXiv:1408.5093, 2014.
+[20] A. Krizhevsky, I. Sutskever, and G. E. Hinton.  Imagenet
+      classiﬁcation with deep convolutional neural networks.  In
+     NIPS, 2012.
+[21] Y. LeCun, B. Boser,  J. S. Denker, D. Henderson, R. E.
+     Howard, W. Hubbard, and L. D. Jackel.  Backpropagation
+     applied to handwritten zip code recognition. Neural compu-
+      tation, 1989.
+[22] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ra-
+     manan, P. Doll´ar, and C. L. Zitnick. Microsoft COCO: Com-
+    mon objects in context. In ECCV. 2014.
+[23]  J. Long, E. Shelhamer, and T. Darrell. Fully convolutional
+     networks for semantic segmentation. In CVPR, 2015.

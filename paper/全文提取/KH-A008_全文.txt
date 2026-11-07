@@ -1,0 +1,510 @@
+KH-A008 | K-Means Hashing: An Affinity-Preserving Quantization Method for Learning Binary Compact Codes
+来源：https://openaccess.thecvf.com/content_cvpr_2013/html/He_K-Means_Hashing_An_2013_CVPR_paper.html
+本地PDF：专题文献/何恺明/KH-A008_K_Means_Hashing_An_Affinity_Preserving_Quantization_Method_for_Learning_Binary_Compact_Cod_CVPR2013.pdf
+SHA-256：c307b9fa48a74e89fb0ac7447131105ac5c86ff46db391999e9752f817cf0c5d
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+       K-means Hashing: an Afﬁnity-Preserving Quantization Method
+                       for Learning Binary Compact Codes
+
+
+                      Kaiming He       Fang Wen        Jian Sun
+                                    Microsoft Research Asia
+
+
+                 Abstract                                                                                                                           c00             c01        c00             c01
+                                                                        00
+                                                                                01   In computer vision there has been increasing interest
+in learning hashing codes whose Hamming distance ap-         10                                       c11                        c11                                                                                                                          c10                        c10
+proximates the data similarity. The hashing functions play                 11
+roles in both quantizing the vector space and generating      x                     x                   x
+                                                                                          y                       y                     y
+similarity-preserving codes. Most existing hashing methods
+                                                                      d(x, y) ≈ dh(10, 11)   d(x, y) ≈ d(c10, c11)  d(x, y) ≈ dh(10, 11)use hyper-planes (or kernelized hyper-planes) to quantize
+and encode.  In this paper, we present a hashing method          (a) hashing           (b) k-means        (c) our method
+adopting the k-means quantization. We propose a novel
+Afﬁnity-Preserving K-means algorithm which simultane-     Figure 1: Compact encoding methods. A black line denotes
+ously performs k-means clustering and learns the binary     a partition boundary, a circle denotes a k-means center, and
+indices of the quantized cells.  The distance between the     a cross denotes a sample vector. Here d denotes Euclidean
+cells is approximated by the Hamming distance of the cell      distance, and dh denotes Hamming-based distance. The in-
+indices. We further generalize our algorithm to a produc-     dices are denoted in binary forms.
+t space for learning longer codes. Experiments show our
+method, named as K-means Hashing (KMH), outperforms
+various state-of-the-art hashing encoding methods.           and is often determined by the sign of one hashing function.
+                                                  The distance between two samples is approximated by the
+                                             Hamming distance between their indices (Fig. 1(a)):  this
+1. Introduction                                        computation can be extremely fast in modern CPUs with
+                                                        merely two instructions1.
+  Approximate nearest neighbors (ANN) search is wide-
+                                            On the other hand, lookup-based methods [7, 10, 11, 3]
+ly applied in image/video retrieval [27, 11], recognition
+                                                             quantize the space into cells via k-means [18]. K-means is[28], image classiﬁcation [23, 2], pose estimation [25], and
+                                                          a more adaptive quantization method than those using hy-
+many other computer vision problems. An issue of partic-
+                                                               perplanes, and is optimal in the sense of minimizing quan-
+ular interest in ANN search is to use compact representa-
+                                                                     tization error [7]. The distance between two samples is ap-tions to approximate the data distances (or their ranking
+                                                         proximated by the distance between the k-means centers
+orders). Studies on compact encoding are roughly in two
+                                                                   (Fig. 1(b)), which can be read from pre-computed lookupstreams, categorized by their ways of distance computa-
+                                                                   tables given the center indices. The product quantizationtion: Hamming-based methods like locality sensitive hash-
+                                                                        [7, 10] is a way of applying k-means-based quantization for
+ing (LSH) [9, 1, 28] and others [31, 14, 29, 5, 19, 16, 15],
+                                                          a larger number of bits (e.g., 64 or 128).and lookup-based methods like vector quantization [7] and
+                                                        Both Hamming-based methods and lookup-based meth-product quantization [10, 11, 3].
+                                                        ods are of growing interest recently, and each category has  We observe these compact encoding methods common-
+                                                                                   its beneﬁts depending on the scenarios. The lookup-basedly involve two stages:  (i) quantization - the feature space
+                                                     methods like [3, 10] has been shown more accurate thanis partitioned into a number of non-overlapping cells with a
+                                                 some Hamming methods with the same code-length, thanksunique index (code) for each cell; and (ii) distance com-
+putation based on the indices.  Existing Hamming-based
+                                                                    1The Hamming distance is deﬁned as the number of different bits be-
+methods (mostly termed as hashing) quantize the space us-
+                                                                    tween two binary codes.  Given two codes i and j,  it is computed by
+ing hyperplanes [1, 13, 29, 5, 19] or kernelized hyperplanes      popcnt(i ˆ j) in C++, where ˆ is bitwise xor and  popcnt is the in-
+[31, 14, 15]. One hyperplane encodes one bit of the code       struction counting non-zero bits. This commend takes about 10−9 s.
+
+
+                                                 1
+
+======================== PDF 第 2 页 ========================
+to the adaptive k-means quantization and the more ﬂexi-      at most k = 2b codewords. VQ assigns any vector to its
+ble distance lookup. However, the lookup-based distance      nearest codeword in the codebook. Usually the codewords
+computation is slower than the Hamming distance compu-     are given by the k-means centers, as they provide minimal
+tation2. Hamming methods also have the advantage that the     quantization error [7].
+distance computation is problem-independent: they involve     VQ approximates the distance between any two vectors
+only an encoding stage but no decoding stage (i.e., index-    x and y by the distance of their codewords:
+based lookup). This property is particularly favored, e.g., in
+                                                               d(x, y) ≃d(q(x), q(y)) = d(ci(x), ci(y)),        (1)mobile product search [8] and built-in-hardware systems.
+   In this paper, we focus on learning binary compact codes                                                     Here we use d(x, y) = ∥x −y∥to denote the Euclidean
+with Hamming distance computation. We propose a novel                                                               distance between two vectors , and i(x) denotes the index of
+scheme: we partition the feature space by k-means-based
+                                                               the cell containing x. The above notation highlights that the
+quantization, but approximate the distance by the Hamming
+                                                               distance computation solely depends on the indices: it can
+distance between the cell indices (Fig. 1(c)). We desire                                                       be read from a k-by-k pre-computed lookup table d(·, ·).
+the Hamming distances to preserve the Euclidean distances
+                                                     To get rid of the lookup tables and take advantage of
+between the k-means centers. A naive solution would be
+                                                                        fast Hamming distance computation, we approximate the
+ﬁrst to quantize the space using k-means and then assign
+                                                         lookup-based distance using the Hamming distance:
+distance-preserving indices to the cells. But this two-step
+solution can only achieve suboptimal results, and the as-                 d(ci(x), ci(y)) ≃dh(i(x), i(y))              (2)
+signment problem is not feasible in practice.
+  To this end, we propose a novel quantization algorith-     where dh is deﬁned as a Hamming-based distance between
+m called Afﬁnity-Preserving K-means which simultaneous-     any two indices i and j:
+ly takes both quantization and distance approximation into                                            1
+                                                                                                                 2 (i, j).                  (3)account. This algorithm explicitly preserves the similari-                     dh(i, j) ≜s · h
+ty between Euclidean and Hamming distances during the                                                     Here s is a constant scale, h denotes the Hamming distance,
+k-means clustering stage. This algorithm can be naturally                                                      and h 21 is its square root. The square root is essential: it re-
+generalized to a product space for learning longer codes.
+                                                                       lates our method to orthogonal hashing methods (Sec. 2.4),
+Our method, named as K-means Hashing (KMH), enjoys
+                                                      and it enables to generalize this approximation to longer
+the beneﬁts of adaptive k-means quantization and fast Ham-                                                         codes (Sec. 3.1). The usage of s is because the Euclidean
+ming distance computation.                                                               distance d can be in arbitrary range, while the Hamming dis-
+  We notice a method called “k-means locality sensitive                                                             tance h is constrained in [0, b] given b bits. We will discuss
+hashing” [22] has been proposed as an inverted ﬁle system                                              how to determine s in Sec. 2.4.
+[27]. We point out that the terminology “hashing” in [22]                                                                 In sum, given a codebook C we approximate the distance
+refers to the classical hashing strategy of distributing data     d(x, y) through dh(i(x), i(y)) (see Fig. 1(c)). It is obvious
+into buckets so that similar data would collide in the same
+                                                                     that the indexing of the codewords affects the approximate
+bucket. In this paper we follow the terminology in many
+                                                                  distance.
+other recent papers [1, 31, 14, 29, 19, 15] where “hash-
+ing” refers to compact binary encoding with Hamming dis-     2.2. A Naive Two-step Method
+tance computation. A discussion on the two terminologies
+                                      A naive two-step solution to the above model would be:
+of “hashing” can be found in [24].
+                                                                   ﬁrst quantize via k-means with k = 2b codewords, and then
+                                                              assign optimal indices to the codewords. We term an index-
+2. Afﬁnity-Preserving K-means                                                         assignment I = {i0, i1, ..., ik−1} is a permutation of the in-
+2.1. Basic Model                                              tegers {0, 1, ..., k−1}. Given a ﬁxed sequence of codewords
+                                                         {ci} leaned from k-means, we consider an optimal index-
+  Our basic model is to quantize the feature space in a k-                                                         assignment as the one minimizing the error introduced by
+means fashion and compute the approximate distance via                                                               the Hamming approximation in Eqn.(2):
+the Hamming distance of the cell indices.
+   Following the classical vector quantization (VQ) [7],                k−1 k−1
+we map a d-dimensional vector x ∈Rd to another vector           min        (d(cia, cib) −dh(ia, ib))2 .       (4)
+                                                                  a=0 b=0q(x) ∈C = {ci | ci ∈Rd, 0 ≤i ≤k −1}. The set C               I
+is known as a codebook [7], ci is a codeword, and k is the                                                          This equation minimizes the difference between two k-by-k
+number of codewords. Given b bits for indexing, there are                                                                 afﬁnity matrices d(·, ·) and dh(·, ·).
+   2In our experiments, it is 10-20 times slower per distance computation          If we optimize (4) by exhausting all possible assignments
+in product quantization than in hashing methods.                        I, the problem is combinatorially complex: there are (2b)!
+
+======================== PDF 第 3 页 ========================
+possibilities with “!” denoting factorial3. Only when b ≤3     Assignment step: ﬁx {ci} and optimize i(x). This step is
+bits this problem is feasible. When b = 4 it takes over one      the same as the classical k-means algorithm: each sample x
+day for exhausting, and if b > 4 it is highly intractable.            is assigned to its nearest codeword in the codebook {ci}.
+  More importantly, even with the above exhaustive opti-
+                                                  Update step: ﬁx i(x) and optimize {ci}. Unlike the classi-mization we ﬁnd this two-step method does not work well
+                                                                  cal k-means algorithm, the update of any codeword depends(evidenced in Sec. 4). This is because the k-means quanti-
+                                                    on all the others due to the pairwise afﬁnity d(ci, cj) in (6).zation would generate an afﬁnity matrix d(·, ·) of arbitrary
+                                                 So we sequentially optimize each individual codeword cjrange. Even optimally ﬁtting such a matrix would possi-
+                                                          with other {ci}i̸=j ﬁxed:bly lead to large error, because the Hamming distance only
+takes a few discrete values in a limited range.                                    1
+                                                                        cj = arg min(        ∥x −cj∥2                                                                                                   cj  n
+2.3. Afﬁnity-Preserving K-means                                                         x;i(x)=j
+  The above discussion indicates a two-step method could         +2λ     wij (d(ci, cj) −dh(i, j))2).          (8)
+only achieve a suboptimal solution. The afﬁnity ﬁtting error                          i;i̸=j
+as in (4) is a quantity not concerned in the ﬁrst-step k-means                                                          This problem can be solved by the quasi-Newton method
+quantization. This motivates us to simultaneously minimize                                                              [26] (we use the Matlab commend fminunc for simplici-
+the quantization error and the afﬁnity error.                                                                            ty). We update each codeword once in this step.
+  The classical k-means algorithm [18] minimizes the av-
+erage quantization error Equan of the training samples:           Initialization. The above iterative algorithm needs to ini-
+                                                                          tialize the indices i(x), codebook C, and scale s in (3).
+                   1                                      In practice we initialize the indices using the binary codes              Equan =     ∥x −ci(x)∥2,            (5)                n                                                             learned by PCA-hashing [29, 5]. To obtain the correspond-                     x∈S
+                                                             ing codebook C and the scale s, we need to build a relation
+where S is the training set with n samples.  In the clas-     between existing hashing methods and our method. We dis-
+sical k-means this error is minimized by an Expectation-     cuss this problem in Sec. 2.4.
+Maximization (EM) alike algorithm:  alternatively assign
+the sample indices i(x) and update the codewords {ci}.       We name the above algorithm as Afﬁnity-Preserving K-
+                                                       means. A pseudo-code is in Algorithm 1. Empirically the  We also want to minimize the error due to the distance
+                                                            algorithm converges in 50-200 iterations.approximation in Eqn.(2). We consider the afﬁnity error
+Eaff between all sample pairs:
+                                                    Algorithm 1 Afﬁnity-Preserving K-means.
+        1                                            2        Input: a training set S = {x}, the bit number b
+  Eaff =                       d(ci(x), ci(y)) −dh(i(x), i(y))    .       n2                                                     Output: an ordered set C = {ci | i = 0, 1, ..., 2b −1}
+          x∈S y∈S
+                                                                                      1: Initialize i(x), C, s.
+The computation is infeasible because it has n2 terms. For-         2: repeat
+tunately, it is easy to show that Eaff can be written as:                 3:   Assignment: for ∀x ∈S update i(x) by x’s nearest
+                                                              codeword’s index.
+             k−1 k−1
+                     wij (d(ci, cj) −dh(i, j))2 ,     (6)         4:   Update: for j = 0 to 2b−1, update cj using (8).         Eaff =
+                                                                                      5: until convergence
+              i=0 j=0
+
+Here wij = ninj/n2, and ni and nj are the number of sam-
+                                                               2.4. Relation to Existing Methodsples having index i and j. Intuitively, Eaff is the weighted
+difference between two k-by-k afﬁnity matrices d(·, ·) and       Our method would become classical vector quantization
+dh(·, ·).                                               methods or hashing methods if we relax or strengthen some
+   Putting the quantization error and afﬁnity error together,      constraints. Actually, our method trades off these two kinds
+we minimize the following objective function:                  of methods.
+
+           E = Equan + λEaff,                 (7)     Vector Quantization [7].
+                                                                                 If we allow to use pre-computed lookup tables d(·, ·),
+where λ is a ﬁxed weight (in this paper we use 10). We                                            we can remove the afﬁnity error term Eaff in (7) by setting
+minimize this function in an alternating fashion:           λ = 0. As a result, the update step in (8) is simply solved by
+    3If only considering distinct afﬁnity matrices, we can prove there are      the sample mean. Thus our method degrades to the classical
+(2b-1)!/b! possibilities.                                      k-means algorithm.
+
+======================== PDF 第 4 页 ========================
+                                                                   PCAH  ITQ   Ours
+                                                                                             Equan (×103)    28.7     8.6     8.2
+                                                                                                                Edist (×103)    29.4    16.2   16.1
+
+
+
+
+
+                                                                   PCAH  ITQ   Ours
+                                                                                             Equan (×103)    7.72    4.51   4.31
+                                                                                                                Edist (×103)    8.11    7.35   7.14
+            (a) PCAH                       (b) ITQ                         (c) Ours
+
+Figure 3: A geometric view of Hamming distance: (a) PCAH, (b) ITQ, (c) ours. A circle denotes a codeword, and a line
+linking two circles means their Hamming distance is 1. A dot denotes a data point, with different colors indicating different
+encoded indices. Two synthetic datasets are shown here. Each database consists of 3 randomly selected principal components
+from the SIFT1M datasets [10]. This ﬁgure is best viewed in color version.
+
+
+                                                         {rt} are b-dimensional orthogonal bases (Fig. 2). It is easy
+                   c00         c01                           to see that the partition boundaries of the resulting cells are
+                                                           orthogonal hyperplanes (e.g., the two orthogonal lines in
+                            r0                               the 2-d example in Fig. 2). The Euclidean distance between
+              s                                       any two codewords equals to the Hamming-based distance:                              r1                                                               d2(ci, cj) = s2 ·h(i, j) = d2h(i, j). It is easy to see this fact
+                                                                   in Fig. 2. The above equivalence was noticed by [5].
+                   c10         c11                        Suppose the data have been zero-centered.  The only
+                                                      freedom in (9) is a rotational matrix R whose columns are
+                  d(ci, cj) ≡ dh(i, j)                        {rt}. As a result, minimizing the objective function in (7)                                                          with λ = ∞is equivalent to minimizing the quantization
+                                                                  error w.r.t. a rotational matrix R. This is exactly the sameFigure 2: Relation between vector quantization and orthog-
+                                                                cost function as ITQ [5].onal hashing.  The vertexes of a hyper-cube are used as
+                                                             This relation suggests a way of determining s in Eqn.(3).codewords. In this 2-d example the hyper-cube is a square.
+                                        We initialize the codebook by Ccube, using the PCA bases asThe partition boundaries of the cells are orthogonal hyper-
+                                                              {rt}. Putting (9) into (5), it is easy to show that Equan is aplanes (lines in 2-d).
+                                                              quadratic function on s. We initial s by minimizing Equan
+                                                          with respect to s. We ﬁx s after initialization.  Theoreti-
+Orthogonal Hashing and Iterative Quantization [5].          cally we can update s after each iteration, but we observe
+    If we set λ = ∞in (7) so d(·, ·) and dh(·, ·) must be i-     marginal inﬂuence in practice.
+dentical, minimizing (7) is equivalent to the hashing method
+                                                               2.5. A Geometric View
+called Iterative Quantization (ITQ) [5].
+   For  simplicity we  suppose  that  the  data  are  b-      As discussed above, any orthogonal hashing method
+dimensional (e.g., via PCA as in [5]).  If the two lookup       (e.g., ITQ [5] and PCAH [29, 5]) can be considered as a
+tables d(·, ·) and dh(·, ·) are identical, the k = 2b code-     vector quantization method using the vertexes of a rotated
+words must be taken from the vertexes of a b-dimensional     hyper-cube as the codewords. Fig. 3 (a) and (b) show the
+hyper-cube. The 2b-word codebook is given by:               geometric view when b = 3 bits.
+                                                    Our method allows to “stretch” the hyper-cube while ro-
+ Ccube = {c | c ∈Rb, c·rt = ±1  ∀t = 0, 1,                            2s,                ..., b−1}, (9)      tating it, as in Fig. 3 (c). The stretching distortion is con-                                                                     trolled by Eaff. Although ITQ has the minimal quantization
+where s is the side-length of the hyper-cube, and the vectors      error Equan among orthogonal hashing methods, our method
+
+======================== PDF 第 5 页 ========================
+achieves smaller Equan thanks to the stretching, as shown in      As in VQ (c.f. Eqn.(1)), PQ approximates the distance
+the tables in Fig. 3. We also evaluate the empirical mean     between two vectors by the distance between codewords4:
+distance error Edist:
+                                                                d(x, y) ≃  d(q(x), q(y))
+         1
+   Edist =            (d(x, y) −dh(i(x), i(y)))2 .   (10)                M         n2
+           x∈S y∈S                              =         (d(qm(ˆxm), qm(ˆym)))2,  (11)
+
+                                                             m=1
+The tables in Fig. 3 show our method has the smallest Edist.
+   Notice the scale s impacts in measures in the tables in     where qm denotes the quantizer in the m-th subspace. In
+Fig. 3.  Here for each dataset we use the same s among    PQ the distance in (11) is computed through M separate
+all methods, with s computed as in Sec. 2.4 using the PCA     k-by-k lookup tables .
+bases. We observe similar comparisons if we initialize the        Driven by the same motivation as Eqn.(2) in Sec. 2.1,
+s using the bases of ITQ.                           we approximate the lookup-based distance in Eqn.(11) by
+  Each dataset in Fig. 3 consists of 3 randomly selected    Hamming distance:
+principal components in the SIFT1M dataset [10].  Inter-
+estingly, we notice that in the ﬁrst dataset (Fig. 3 top, con-               M                           2
+                                                             d(q(x), q(y)) ≃         dh(ˆim(ˆxm),ˆim(ˆym))    ,  (12)taining the largest principal component of SIFT) there are
+roughly two clusters. Though the methods are given 3 bits                   m=1
+and at most 23=8 clusters, both ITQ and our method divide
+                                                     where the notation ˆim indicates this index is from the m-ththe data into roughly two clusters (colored in Fig. 3 top).
+                                                       sub-codebook ˆCm. Putting Eqn.(2) into (11), we have:The codewords of these two clusters are on the diagonal of
+the hyper-cube, having the max possible Hamming distance
+(=3 here). Although it seems inefﬁcient to use 3 bits to en-                 M
+                                                               d(q(x), q(y)) ≃         s2 · h(ˆim(ˆxm),ˆim(ˆym))code two clusters, it is worthwhile if preserving distance is
+the concern. On the contrary, though PCAH divides the da-                      m=1
+ta into 8 more balanced clusters, the Euclidean distance is             =  s ·   h(i(x), i(y)).           (13)
+harder to be preserved by the Hamming distance. The table
+in Fig. 3 (top) shows it has the largest Edist.                 The equality holds if the index i(x) is a concatenation of M
+                                                                 sub-indices.
+3. Generalization to a Product Space                   This equation means that we can apply Algorithm 1 in-
+                                                          dependently to each subspace, and use the concatenation
+   Like classical k-means, the Afﬁnity-Preserving K-means     of the M sub-indices as the ﬁnal index i(x). In this case
+is not practical if the bit number b is large, because the algo-     the Hamming distance still approximates the Euclidean dis-
+rithm needs to compute and store 2b codewords. The prod-      tance.  If the ranking of the distances is the only concern,
+uct quantization (PQ) method [10] addresses this issue by      the scale s and the square root in (13) are ignorable as they                                                   √
+separately training k-means in the subspaces of a product     are monotonic operations (i.e., ranking s· h is equivalent
+space. We show that our algorithm can be naturally gener-      to ranking h).
+alized to a product space.                                      Notice that Eqn.(13) requires the scale s to remain the
+                                                   same across all subspaces. We can initial s via PCAH in
+3.1. From Product Quantization to Hamming Dis-      the full space (this is well tractable). But in practice we ﬁnd
+     tance Approximation                                                 it performs as good when s is independently initialized for
+  The PQ method in [10] decomposes the space RD in-     each subspace.
+to a Cartesian product of subspaces.  Speciﬁcally, a vec-                                                               3.2. Decomposing the Product Space
+tor x ∈RD is represented as a concatenation of M sub-
+vectors: x =  [ˆx1, ...ˆxm, ..., ˆxM], where the superscrip-       To decompose the space RD into a product of M sub-
+t m in ˆxm denotes the m-th subvector. A sub-codebook     spaces, we adopt the simple criteria as below.
+ˆCm with k=2b sub-codewords is independently trained in        Following the common criterion in [31, 29, 3, 5] that the
+the m-th subspace. Any codeword c in the product space      bits should be independent, we expect the subspaces in our
+RD is a concatenation of M sub-codewords drawn from    method to be independent. To this end, we preprocess the
+the M sub-codebooks.  In this way, there are essentially
+K = kM = 2Mb distinct codewords in RD, indexed by        4More precisely, Eqn.(11) is the Symmetric Distance Computation (S-
+                                                         DC) in [10]. SDC is solely index-dependent.  [10] further proposes the
+B = Mb bits. But the algorithm only needs to compute and      Asymmetric Distance Computation (ADC). ADC depends on the query
+store M·2b sub-codewords.                                              vector as a real-number vector.
+
+======================== PDF 第 6 页 ========================
+data by PCA projection (without dimension reduction). Fol-                    1              SIFT1M 64-bit
+lowing another common criterion in PQ methods [11, 12],
+we expect the variance of each subspace to be balanced. We
+deﬁne variance as the product of the eigenvalues of a sub-
+space. We adopt a simple greedy algorithm to achieve bal-                                                                                                         0.8
+ance: we sort all the principal components in the descend-
+ing order of their eigenvalues, and sequentially assign each                                                      recall
+of them to one out of M buckets that has the smallest vari-
+ance. The principal components in the a bucket will form a
+                                                                                                         0.6
+subspace.
+   This decomposing method is called Eigenvalue Alloca-
+tion, with its theoretical foundation in [4].
+                                                                                                                                                     Affinity-Preserving KM
+3.3. Algorithm Summary                                                                0.40                  5000 Naive Two-step   10000
+  With the above subspaces decomposition, we separately                     N (# of top Hamming neighbors)
+apply Afﬁnity-Preserving K-means to each subspace. This                                                           Figure 4: Comparison with the naive two-step method in
+step generates M sub-codebooks, and each sub-codebook
+    D                                       SIFT1M with 64 bits.
+has 2b M -dimensional codewords.
+  To encode any vector, we ﬁrst divide  it into M sub-
+vectors. Each sub-vector will ﬁnd the nearest sub-codeword     We use cross-validation to choose the parameter b (bit
+in its sub-codebook. These M sub-indices are concatenated    number per subspace) from {2, 4, 8}. The subspace num-
+into a binary code with B=M·b bits. On-line, the complex-                                          B         ber M is then given by Bb with the code length B. Off-line,
+ity of encoding a query is O(D2 + 2bD) = O(D2 + 2 M D)      the training time of our method when B = 64 bits is about
+where D2 is due to the PCA projection. In practice we use     3 minutes in SIFT1M (b = 4) and 20 minutes in GIST1M
+b ≤8 and the encoding cost is ignorable.                         (b = 8), using an unoptimized Matlab code. On-line, the
+  We publish the Matlab codes of our algorithm for the     query encoding time (< 0.01ms) is comparable with other
+ease of understanding the details5.                            hyperplane-based hashing methods, and is ignorable com-
+                                                          pared with the Hamming ranking time (1.5ms for one mil-
+4. Experimental Results                                                                   lion data).
+
+  We evaluate the ANN search performances on two public                                                  Comparisons with the naive two-step method
+datasets. The ﬁrst dataset is SIFT1M from [10], containing
+                                                    The naive two-step method in Sec. 2.2 can also be ap-
+1 million 128-d SIFT features [17] and 10,000 independent
+                                                                 plied to the same product space as our method. We have
+queries. The second dataset is GIST1M, containing 1 mil-                                                      implemented this two-step method in Sec. 2.2 for b=4, and
+lion 384-d GIST features [21] we randomly sample from
+                                                                                              it takes more than one day to train. Fig. 4 shows the com-
+the 80M dataset [28] with extra 10,000 randomly sampled
+                                                             parison between this method and our method, in SIFT1M
+queries. We considered the groundtruth as each query’s K                                                           with 64 bits (M = 16 subspaces).
+Euclidean nearest neighbors. We set K=10 in the experi-
+                                                                    Fig. 4 shows that the naive method is inferior even it ex-
+ments. We will have a discussion on K later.
+                                                               haustively ﬁts the two afﬁnity matrices. This implies that
+  We follow the search strategy of Hamming ranking com-
+                                                               the two-step method could only achieve sub-optimality. The
+monly adopted in many hashing methods [1, 31, 29, 19,
+                                                               afﬁnity error can be large when ﬁtting an Hamming afﬁnity
+5, 6]. Hamming ranking is to sort the data according to
+                                                           matrix to an arbitrary matrix.
+their Hamming distances to the query. The ﬁrst N sam-
+ples will be retrieved. Hamming ranking is an exhaustive    Comparisons with state-of-the-arts hashing methods
+linear search method, but very fast in practice:   it takes     We compare our k-means hashing (KMH) method with
+about 1.5ms to scan 1 million 64-bit codes in a single-core     the follow state-of-the-arts unsupervised hashing method-
+C++ implementation (Intel Core i7 2.93GHz CPU and 8GB      s - locality sensitive hashing (LSH) [1], spectral hashing
+RAM). Hamming ranking can be further sped up by a recent     (SH) [31], principal component analysis hashing (PCAH)
+method [20]. We evaluate the recall at the ﬁrst N Hamming      [29, 5], and iterative quantization (ITQ) [5]. We also com-
+neighbors. The recall is deﬁned as the fraction of retrieved     pare with a semi-supervised method - minimal loss hashing
+true nearest neighbors to the total number of true nearest    (MLH) [19], for which we use 10,000 samples to gener-
+neighbors.                                                        ate the pseudo-labels. All methods have publicly available
+  5http://research.microsoft.com/en-us/um/people/     codes and we use their default settings.
+kahe/                                                              Fig. 5 and Fig. 6 show the comparisons in the two
+
+======================== PDF 第 7 页 ========================
+                     (a) SIFT1M 32-bit                                        (b) SIFT1M 64-bit                                           (c) SIFT1M 128-bit
+  1                                              1                                              1
+
+
+
+
+
+0.8                                                     0.8                                                     0.8
+
+ recall                                                                                                                                  recall                                                                                                                                  recall
+
+
+
+0.6                                                     0.6                                                     0.6
+                             KMH                                KMH                                KMH
+                                       ITQ                                            ITQ                                            ITQ
+                              MLH                                 MLH                                 MLH
+                               SH                                   SH                                   SH
+                               PCAH                                  PCAH                                  PCAH
+                                 LSH                                     LSH                                     LSH
+0.4                                                     0.4                                                     0.4
+  0                  5000                10000  0                  5000                10000  0                  5000                10000
+       N (# of top Hamming neighbors)               N (# of top Hamming neighbors)               N (# of top Hamming neighbors)
+
+Figure 5: ANN search performance of six hashing methods on SIFT1M using 32, 64, and 128-bit codes. In this ﬁgure, K=10
+Euclidean nearest neighbors are considered as the ground truth. Our method uses b=2 in the 32-bit case, and b=4 in the
+64/128-bit cases.
+
+                    (a) GIST1M 32-bit                                        (b) GIST1M 64-bit                                           (c) GIST1M 128-bit
+  1                                                   1                                                    1
+
+
+
+
+0.8                                                           0.8                                                            0.8
+
+
+
+
+0.6                                                           0.6                                                            0.6
+recall                                                                                                                                  recall                                                                                                                                  recall
+
+0.4                                                           0.4                                                            0.4
+
+
+
+                               KMH                                   KMH                                   KMH
+0.2                                          ITQ       0.2                                          ITQ       0.2                                          ITQ
+                                   MLH                                        MLH                                        MLH
+                                   SH                                        SH                                        SH
+                                    PCAH                                       PCAH                                       PCAH
+                                     LSH                                          LSH                                          LSH
+  0                                                   0                                                    0
+   0         5000       10000       15000       20000   0         5000       10000       15000       20000   0         5000       10000       15000       20000
+       N (# of top Hamming neighbors)               N (# of top Hamming neighbors)               N (# of top Hamming neighbors)
+
+Figure 6: ANN search performance of six hashing methods on GIST1M using 32, 64, and 128-bit codes. In this ﬁgure, K=10
+Euclidean nearest neighbors are considered as the ground truth. Our method uses b=8 in all cases.
+
+
+datasets. We have tested B=32, 64, and 128 bits.  Our      nearest neighbors can be of particular impact. In Fig. 7 we
+method consistently outperforms all competitors in all bit    show the evaluation in a wide range of different K (1 to
+numbers in both datasets. We also notice that besides our     1000). Due to the limited space we only show ITQ and
+method, there is no method that outperforms the remaining    MLH, because we ﬁnd them superior among the competi-
+competitors. ITQ is competitive in most settings, typically      tors for larger K. In Fig. 7 we see that in a wide range of
+using 64 and 128 bits. This implies that reducing the quanti-   K our method consistently performs better. This shows the
+zation error is a reasonable objective. PCAH performs sur-     robustness of our method.
+prisingly well in SIFT1M with 32 bits, but it is inferior in
+other cases.
+                                                          5. Discussion and Conclusion
+Performance under various K
+   In a recent paper [30] it has been noticed that when eval-     We have proposed a k-means-based binary compact en-
+uating hashing methods, the threshold (like K nearest neigh-     coding method. Unlike most hashing methods using hyper-
+bors in our experiment setting) determining the ground truth     planes to quantize, our method enjoys the adaptivity of k-
+
+======================== PDF 第 8 页 ========================
+                    GIST1M 64-bit                                  [9]  P. Indyk and R. Motwani. Approximate nearest neighbors:
+        1
+                                                                      towards removing the curse of dimensionality.  In STOC,
+                                                                     pages 604–613, 1998.
+                                                                      [10] H. Jegou, M. Douze, and C. Schmid. Product quantization
+        0.8    K=1                                                                                for nearest neighbor search. TPAMI, 33, 2011.
+                                                                      [11] H. Jegou, M. Douze, C. Schmid, and P. Perez. Aggregating
+                    K=100                                                    local descriptors into a compact image representation.  In
+        0.6                                                 CVPR, pages 3304–3311, 2010.
+                 recall                     K=1000                                 [12] H. Jegou, R. Tavenard, M. Douze, and L. Amsaleg. Search-                                                                         ing in one billion vectors: re-rank with source coding.  In
+        0.4                                                       ICASSP, pages 861–864, 2011.
+                                                                      [13] B. Kulis and T. Darrell.  Learning to hash with binary re-
+                                                                             constructive embeddings.  Advances in neural information
+        0.2                                                                processing systems, 22:1042–1050, 2009.
+                                                                      [14] B. Kulis and K. Grauman.   Kernelized locality-sensitive
+                                     KMH
+                                                    ITQ                     hashing for scalable image search. In ICCV, 2009.
+                                         MLH                [15] W. Liu, J. Wang, R. Ji, Y.-G. Jiang, and S.-F. Chang. Super-
+        0
+         0         5000       10000       15000       20000                  vised hashing with kernels. In CVPR, 2012.
+            N (# of top Hamming neighbors)                       [16] W. Liu, J. Wang, S. Kumar, and S.-F. Chang. Hashing with
+                                                                           graphs. In ICML, 2011.
+Figure 7: Comparisons in GIST1M with 64 bits under dif-      [17] D. G. Lowe. Distinctive image features from scale-invariant
+ferent metric of ground truth nearest neighbors (K=1, 100,            keypoints. IJCV, 60:91–110, 2004.
+1000). The result of K=10 is in Fig. 6.                            [18]  J. B. MacQueen. Some methods for classiﬁcation and analy-
+                                                                                        sis of multivariate observations. In Proceedings of 5th Berke-
+                                                                                  ley Symposium on Mathematical Statistics and Probability,
+means. Our Afﬁnity-Preserving K-means algorithm allows          pages 281–297. University of California Press, 1967.
+to approximate the Euclidean distance between codewords      [19] M. E. Norouzi and D. J. Fleet.  Minimal loss hashing for
+                                                                 compact binary codes. In ICML, pages 353–360, 2011.without lookup tables, so our method also enjoys the advan-
+                                                                      [20] M. E. Norouzi, A. Punjani, and D. J. Fleet. Fast search intages of Hamming distance computation. Experiments have
+                                                          hamming space with multi-index hashing. In CVPR, 2012.
+shown that our method outperforms many hashing methods.
+                                                                      [21] A. Oliva and A. Torralba. Modeling the shape of the scene: a
+                                                                                    holistic representation of the spatial envelope. IJCV, 42:145–
+References                                                         175, 2001.
+                                                                      [22] L. Paulev´e, H. J´egou, and L. Amsaleg.  Locality sensitive
+ [1] A. Andoni and P. Indyk. Near-optimal hashing algorithms for                                                                          hashing: a comparison of hash function types and querying
+     approximate nearest neighbor in high dimensions. In FOCS,                                                                  mechanisms. PR Letters, 2010.
+     pages 459–468. IEEE, 2006.
+                                                                      [23]  F. Perronnin and C. Dance. Fisher kernels on visual vocabu-
+ [2] O. Boiman, E. Shechtman, and M. Irani.  In defense of             laries for image categorization. In CVPR, 2007.
+     nearest-neighbor based image classiﬁcation. In CVPR, pages                                                                      [24]  F. Perronnin and H. Jegou.  Large-scale visual recognition.
+     1–8, 2008.                                                                          In CVPR tutorial, 2012.
+ [3]  J. Brandt.  Transform coding for fast approximate nearest      [25] G. Shakhnarovich,  T. Darrell, and  P. Indyk.   Nearest-
+     neighbor search in high dimensions. In CVPR, pages 1815–           neighbor methods in learning and vision: theory and prac-
+     1822, 2010.                                                                       tice. The MIT Press, 2006.
+ [4] T. Ge, K. He, Q. Ke, and J. Sun. Optimized product quan-      [26] D. Shanno et al.  Conditioning of quasi-newton method-
+      tization for approximate nearest neighbor search. In CVPR,            s for function minimization. Mathematics of computation,
+     2013.                                                            24(111):647–656, 1970.
+ [5] Y. Gong and S. Lazebnik.  Iterative quantization: A pro-      [27]  J. Sivic and A. Zisserman.  Video google: a text retrieval
+     crustean approach to learning binary codes. In CVPR, pages          approach to object matching in videos. In ICCV, 2003.
+     817–824, 2011.                                                 [28] A. B. Torralba, R. Fergus, and W. T. Freeman. 80 million
+                                                                                 tiny images: A large data set for nonparametric object and [6] K. Grauman and R. Fergus. Learning binary hash codes for
+                                                                      scene recognition. TPAMI, 30:1958–1970, 2008.      large-scale image search. Machine Learning for Computer
+      Vision, pages 49–87, 2013.                                      [29]  J. Wang, S. Kumar, and S.-F. Chang. Semi-supervised hash-
+                                                                         ing for scalable image retrieval. In CVPR, 2010.
+ [7] R. Gray. Vector quantization. ASSP Magazine, IEEE, 1(2):4–
+                                                                      [30] Y. Weiss, R. Fergus, and A. Torralba.  Multidimensional
+     29, 1984.
+                                                                                spectral hashing. In ECCV, 2012.
+ [8]  J. He, J. Feng, X. Liu, T. Cheng, T.-H. Lin, H. Chung, and
+                                                                     [31] Y. Weiss, A. Torralba, and R. Fergus. Spectral hashing. In
+      S.-F. Chang. Mobile product search with bag of hash bits and
+                                                                  NIPS, pages 1753–1760, 2008.
+     boundary reranking. In CVPR, pages 3005–3012, 2012.

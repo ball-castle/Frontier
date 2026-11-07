@@ -1,0 +1,851 @@
+KH-A033 | Deep Hough Voting for 3D Object Detection in Point Clouds
+来源：https://arxiv.org/abs/1904.09664
+本地PDF：专题文献/何恺明/KH-A033_Deep_Hough_Voting_for_3D_Object_Detection_in_Point_Clouds_ICCV2019.pdf
+SHA-256：6126264daa6e6cc023b17bea55490fa5e6c5e6f32e33d04d1948c1635c4fce1d
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+             Deep Hough Voting for 3D Object Detection in Point Clouds
+
+
+                        Charles R. Qi1  Or Litany1  Kaiming He1  Leonidas J. Guibas1,2
+                               1Facebook AI Research  2Stanford University
+
+
+                        Abstract                                 Voting from input point cloud    3D detection output
+
+           Current 3D object detection methods are heavily inﬂu-2019
+        enced by 2D detectors. In order to leverage architectures
+          in 2D detectors, they often convert 3D point clouds to regu-
+          lar grids (i.e., to voxel grids or to bird’s eye view images),Aug         or rely on detection in 2D images to propose 3D boxes.
+22  Fewclouds.worksIn havethis work,attemptedwe returnto directlyto ﬁrstdetectprinciplesobjects into pointcon-
+          struct a 3D detection pipeline for point cloud data and as      Figure 1. 3D object detection in point clouds with a deep
+         generic as possible. However, due to the sparse nature of    Hough voting model. Given a point cloud of a 3D scene, our
+          the data – samples from 2D manifolds in 3D space – we face     VoteNet votes to object centers and then groups and aggregates
+        a major challenge when directly predicting bounding box      the votes to predict 3D bounding boxes and semantic classes of
+         parameters from scene points: a 3D object centroid can be       objects. Our code is open sourced at https://github.com/
+                                                       facebookresearch/votenet[cs.CV]   far from any surface point thus hard to regress accurately in
+        one step. To address the challenge, we propose VoteNet, an
+         end-to-end 3D object detection network based on a synergy                                                                         points to regular 2D bird’s eye view images and then apply
+          of deep point set networks and Hough voting. Our model                                                 2D detectors to localize objects. This, however, sacriﬁces
+         achieves state-of-the-art 3D detection on two large datasets                                                                   geometric details which may be critical in cluttered indoor
+          of real 3D scans, ScanNet and SUN RGB-D with a simple                                                                     environments. More recently, [20, 34] proposed a cascaded
+          design, compact model size and high efﬁciency. Remark-                                                                      two-step pipeline by ﬁrstly detecting objects in front-view
+          ably, VoteNet outperforms previous methods by using purely                                                               images and then localizing objects in frustum point clouds
+         geometric information without relying on color images.                                                                     extruded from the 2D boxes, which however is strictly de-
+                                                                  pendent on the 2D detector and will miss an object entirely
+                                                                                                  if it is not detected in 2D.
+         1. Introduction
+                                                                           In this work we introduce a point cloud focused 3D de-
+          The goal of 3D object detection is to localize and recog-      tection framework that directly processes raw data and does
+         nize objects in a 3D scene. More speciﬁcally, in this work,     not depend on any 2D detectors neither in architecture norarXiv:1904.09664v2  we aim to estimate oriented 3D bounding boxes as well as      in object proposal. Our detection network, VoteNet, is based
+         semantic classes of objects from point clouds.               on recent advances in 3D deep learning models for point
+          Compared to images, 3D point clouds provide accurate      clouds, and is inspired by the generalized Hough voting pro-
+        geometry and robustness to illumination changes. On the     cess for object detection [23].
+          other hand, point clouds are irregular. thus typical CNNs     We leverage PointNet++ [36], a hierarchical deep net-
+          are not well suited to process them directly.                 work for point cloud learning, to mitigates the need to con-
+          To avoid processing irregular point clouds, current 3D      vert point clouds to regular structures. By directly process-
+          detection methods heavily rely on 2D-based detectors in     ing point clouds not only do we avoid information loss by a
+         various aspects. For example, [42, 12] extend 2D detection     quantization process, but we also take advantage of the spar-
+        frameworks such as the Faster/Mask R-CNN [37, 11] to 3D.      sity in point clouds by only computing on sensed points.
+        They voxelize the irregular point clouds to regular 3D grids       While PointNet++ has shown success in object classiﬁ-
+        and apply 3D CNN detectors, which fails to leverage spar-      cation and semantic segmentation [36], few research study
+           sity in the data and suffer from high computation cost due    how to detect 3D objects in point clouds with such architec-
+          to expensive 3D convolutions. Alternatively, [4, 55] project      tures. A na¨ıve solution would be to follow common practice
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+in 2D detectors and perform dense object proposal [29, 37],     based methods [26, 32, 28]; Sliding-shapes [41] and its deep
+i.e. to propose 3D bounding boxes directly from the sensed     learning-based successor [42]; Clouds of Oriented Gradi-
+points (with their learned features). However, the inherent      ents (COG) [38]; and the recent 3D-SIS [12].
+sparsity of point clouds makes this approach unfavorable.      Due to the complexity of directly working in 3D, espe-
+In images there often exists a pixel near the object center,      cially in large scenes, many methods resort to some type of
+but it is often not the case in point clouds. As depth sensors      projection. For example in MV3D [4] and VoxelNet [55],
+only capture surfaces of objects, 3D object centers are likely      the 3D data is ﬁrst reduced to a bird’s-eye view before pro-
+to be in empty space, far away from any point. As a result,     ceeding to the rest of the pipeline. A reduction in search
+point based networks have difﬁculty aggregating scene con-     space by ﬁrst processing a 2D input was demonstrated in
+text in the vicinity of object centers. Simply increasing the     both Frustum PointNets [34] and [20]. Similarly, in [16] a
+receptive ﬁeld does not solve the problem because as the     segmentation hypothesis is veriﬁed using the 3D map. More
+network captures larger context, it also causes more inclu-      recently, deep networks on point clouds are used to exploit
+sion of nearby objects and clutter.                                sparsity of the data by GSPN [54] and PointRCNN [39].
+  To this end, we propose to endow point cloud deep net-
+works with a voting mechanism similar to the classical                                             Hough voting for object detection.  Originally  intro-
+Hough voting. By voting we essentially generate new points                                                      duced in the late 1950s, the Hough transform [13] trans-
+that lie close to objects centers, which can be grouped and                                                                       lates the problem of detecting simple patterns in point sam-
+aggregated to generate box proposals.                                                                ples to detecting peaks in a parametric space. The Gener-
+   In contrast to traditional Hough voting with multiple sep-                                                                 alized Hough Transform [2] further extends this technique
+arate modules that are difﬁcult to optimize jointly, VoteNet                                                                   to image patches as indicators for the existence of a com-
+is end-to-end optimizable. Speciﬁcally, after passing the in-                                                             plex object. Examples of using Hough voting include the
+put point cloud through a backbone network, we sample a                                                          seminal work of [24] which introduced the implicit shape
+set of seed points and generate votes from their features.                                                         model, planes extraction from 3D point clouds [3], and 6D
+Votes are targeted to reach object centers. As a result, vote                                                         pose estimation [44] to name a few.
+clusters emerge near object centers and in turn can be aggre-                                                  Hough voting has also been previously combined with
+gated through a learned module to generate box proposals.                                                       advanced learning techniques.  In  [30] the votes were
+The result is a powerful 3D object detector that is purely                                                            assigned with weights indicating their importance, which
+geometric and can be applied directly to point clouds.                                                     were learned using a max-margin framework.  Hough
+  We evaluate our approach on two challenging 3D object                                                                    forests for object detection were introduced in [8, 7]. More
+detection datasets: SUN RGB-D [40] and ScanNet [5]. On                                                                     recently, [15] demonstrated improved voting-based 6D pose
+both datasets VoteNet, using geometry only, signiﬁcantly                                                              estimation by using deep features extracted to build a code-
+outperforms prior arts that use both RGB and geometry or                                                          book. Similarly [31] learned deep features to build code-
+even multi-view RGB images. Our study shows that the                                                      books for segmentation in MRI and ultrasiounds images.
+voting scheme supports more effective context aggregation,                                                              In [14] the classical Hough algorithm was used to extract
+and veriﬁes that VoteNet offers the largest improvements                                                                    circular patterns in car logos, which were then input to
+when object centers are far from the object surface (e.g. ta-                                                          a deep classiﬁcation network.  [33] proposed the semi-
+bles, bathtubs, etc.).                                                              convolutional operator for 2D instance segmentation in im-
+   In summary, the contributions of our work are:                                                                ages, which is also related to Hough voting.
+                                                          There have also been works using Hough voting for 3D  • A reformulation of Hough voting in the context of deep
+                                                                object detection [50, 18, 47, 19], which adopted a similar     learning through an end-to-end differentiable architec-
+                                                                pipeline as in 2D detectors.      ture, which we dub VoteNet.
+
+  • State-of-the-art 3D object detection performance on
+                                                Deep learning on point clouds.  Recently we see a surge   SUN RGB-D and ScanNet.
+                                                              of interest in designing deep network architectures suited
+  • An in-depth analysis of the importance of voting for      for point clouds [35, 36, 43, 1, 25, 9, 48, 45, 46, 22, 17,
+   3D object detection in point clouds.                       53, 52, 49, 51], which showed remarkable performance in
+                                           3D object classiﬁcation, object part segmentation, as well as
+                                                          scene segmentation. In the context of 3D object detection,2. Related Work
+                                                       VoxelNet [55] learn voxel feature embeddings from points
+3D object detection.  Many previous methods were pro-      in voxels, while in [34] PointNets are used to localize ob-
+posed to detect 3D bounding boxes of objects. Examples      jects in a frustum point cloud extruded from a 2D bounding
+include:  [27] where a pair-wise semantic context poten-     box. However, few methods studied how to directly propose
+tial helps guide the proposals objectness score; template-     and detect 3D objects in raw point cloud representation.
+
+======================== PDF 第 3 页 ========================
+                                                    VoteNet
+                                  Voting in Point Clouds                      Object Proposal and Classification from Votes
+
+
+                                                        K clusters
+                                                                         Vote
+                                                                                                                                       Propose & Classify
+
+                                                                         Vote          &
+                                                                                                                                       Propose & Classify                            Point cloud feature                                                                                                                                            NMS
+                             learning backbone                   shared                                                                       3D                                                                                                                                                                                                                                                                                                                                      Grouping                              shared                                                                                                                                                                                                                                                                                                                             Sampling
+
+                                                                                                                                       Propose & Classify
+                                                                         Vote
+
+
+            Input:                       Seeds                 Votes                 Vote clusters                  Output:
+          point cloud                    (XYZ + feature)            (XYZ + feature)                               3D bounding boxes
+
+                                                                                                                                                                                 table
+                                                                                                                                                                            chair
+
+
+
+
+
+Figure 2. Illustration of the VoteNet architecture for 3D object detection in point clouds. Given an input point cloud of N points with
+XYZ coordinates, a backbone network (implemented with PointNet++ [36] layers) subsamples and learns deep features on the points and
+outputs a subset of M points but extended by C-dim features. This subset of points are considered as seed points. Each seed independently
+generates a vote through a voting module. Then the votes are grouped into clusters and processed by the proposal module to generate the
+ﬁnal proposals. The classiﬁed and NMSed proposals become the ﬁnal 3D bounding boxes output. Image best viewed in color.
+
+
+3. Deep Hough Voting                                    Interest points are described and selected by deep neural
+                                                         networks instead of depending on hand-crafted features.
+  A traditional Hough voting 2D detector [24] comprises                                                       Vote generation is learned by a network instead of using a
+an ofﬂine and an online step. First, given a collection of im-                                                        codebook. Levaraging larger receptive ﬁelds, voting can be
+ages with annotated object bounding boxes, a codebook is                                                made less ambiguous and thus more effective. In addition,
+constructed with stored mappings between image patches                                                          a vote location can be augmented with a feature vector al-
+(or their features) and their offsets to the corresponding                                                         lowing for better aggregation.
+object centers.  At inference time, interest points are se-
+                                                       Vote aggregation is realized through point cloud process-lected from the image to extract patches around them. These
+                                                             ing layers with trainable parameters. Utilizing the vote fea-patches are then compared against patches in the codebook
+                                                                       tures, the network can potentially ﬁlter out low quality votesto retrieve offsets and compute votes. As object patches
+                                                      and generate improved proposals.will tend to vote in agreement, clusters will form near ob-
+ject centers. Finally, the object boundaries are retrieved by     Object proposals in the form of: location, dimensions, ori-
+tracing cluster votes back to their generating patches.            entation and even semantic classes can be directly generated
+                                                     from the aggregated features, mitigating the need to trace
+  We identify two ways in which this technique is well
+                                                       back votes’ origins.
+suited to our problem of interest.  First, voting-based de-
+                                                                 In what follows, we describe how to combine all the
+tection is more compatible with sparse sets than region-
+                                                          aforementioned ingredients into a single end-to-end train-
+proposal networks (RPN) [37] is. For the latter, the RPN
+                                                              able network named as VoteNet.
+has to generate a proposal near an object center which is
+likely to be in an empty space, causing extra computation.
+                                                          4. VoteNet Architecture
+Second, it is based on a bottom-up principle where small
+bits of partial information are accumulated to form a conﬁ-         Fig. 2  illustrates our  end-to-end  detection network
+dent detection. Even though neural networks can potentially      (VoteNet). The entire network can be split into two parts:
+aggregate context from a large receptive ﬁeld, it may be still     one that processes existing points to generate votes; and the
+beneﬁcial to aggregate in the vote space.                        other part that operates on virtual points – the votes – to
+   However, as traditional Hough voting comprises mul-     propose and classify objects.
+tiple separated modules, integrating it into state-of-the-art
+                                                               4.1. Learning to Vote in Point Clouds
+point cloud networks is an open research topic.  To this
+end, we propose the following adaptations to the different      From an input point cloud of size N ×3, with a 3D coor-
+pipeline ingredients.                                            dinate for each of the N points, we aim to generate M votes,
+
+======================== PDF 第 4 页 ========================
+where each vote has both a 3D coordinate and a high dimen-      this semantic-aware locality to aggregate vote features for
+sional feature vector. There are two major steps: point cloud      object proposal.
+feature learning through a backbone network and learned
+                                                               4.2. Object Proposal and Classiﬁcation from Votes
+Hough voting from seed points.
+Point cloud feature learning. Generating an accurate vote       The votes create canonical “meeting points” for context
+requires geometric reasoning and contexts.  Instead of re-     aggregation from different parts of the objects. After clus-
+lying on hand-crafted features, we leverage recently pro-      tering these votes we aggregate their features to generate
+posed deep networks [36, 9, 43, 25] on point clouds for      object proposals and classify them.
+point feature learning. While our method is not restricted to     Vote clustering through sampling and grouping. While
+any point cloud network, we adopt PointNet++ [36] as our      there can be many ways to cluster the votes, we opt for a
+backbone due to its simplicity and demonstrated success on     simple strategy of uniform sampling and grouping accord-
+tasks ranging from normal estimation [10], semantic seg-     ing to spatial proximity.  Speciﬁcally, from a set of votes
+mentation [21] to 3D object localization [34].                  {vi = [yi; gi] ∈R3+C}Mi=1, we sample a subset of K votes
+  The backbone network has several set-abstraction layers     using farthest point sampling based on {yi} in 3D Euclidean
+and feature propagation (upsampling) layers with skip con-     space, to get {vik} with k = 1, ..., K. Then we form K
+nections, which outputs a subset of the input points with      clusters by ﬁnding neighboring votes to each of the vik’s
+XYZ and an enriched C-dimensional feature vector. The    3D location: Ck = {v(k)i  |∥vi −vik∥≤r} for k = 1, ..., K.
+results are M seed points of dimension (3 + C). Each seed    Though simple, this clustering technique is easy to integrate
+point generates one vote1.                                        into an end-to-end pipeline and works well in practice.
+Hough voting with deep networks. Compared to tradi-     Proposal and classiﬁcation from vote clusters. As a vote
+tional Hough voting where the votes (offsets from local key-      cluster is in essence a set of high-dim points, we can lever-
+points) are determined by look ups in a pre-computed code-     age a generic point set learning network to aggregate the
+book, we generate votes with a deep network based voting     votes in order to generate object proposals. Compared to
+module, which is both more efﬁcient (without kNN look      the back-tracing step of traditional Hough voting for identi-
+ups) and more accurate as it is trained jointly with the rest     fying the object boundary, this procedure allows to propose
+of the pipeline.                                        amodal boundaries even from partial observations, as well
+  Given a set of seed points {si}Mi=1 where si = [xi; fi]     as predicting other parameters like orientation, class, etc.
+with xi ∈R3 and fi ∈RC, a shared voting module gen-        In our implementation, we use a shared PointNet [35]
+erates votes from each seed independently.  Speciﬁcally,      for vote aggregation and proposal in clusters. Given a vote
+the voting module is realized with a multi-layer percep-      cluster C = {wi} with i = 1, ..., n and its cluster center wj,
+tron (MLP) network with fully connected layers, ReLU and     where wi = [zi; hi] with zi ∈R3 as the vote location and
+batch normalization. The MLP takes seed feature fi and     hi ∈RC as the vote feature. To enable usage of local vote
+outputs the Euclidean space offset ∆xi ∈R3 and a feature     geometry, we transform vote locations to a local normalized
+offset ∆fi ∈RC such that the vote vi = [yi; gi] generated     coordinate system by z′i = (zi −zj)/r. Then an object
+from the seed si has yi = xi + ∆xi and gi = fi + ∆fi.        proposal for this cluster p(C) is generated by passing the set
+  The predicted 3D offset ∆xi is explicitly supervised by     input through a PointNet-like module:
+a regression loss
+
+             1
+   Lvote-reg =  X ∥∆xi −∆x∗i ∥1[si on object],   (1)           p(C) = MLP2   i=1,...,nmax  {MLP1([z′i; hi])}       (2)           Mpos                              i
+                                                     where votes from each cluster are independently processed
+where 1[si on object] indicates whether a seed point si is on     by a MLP1 before being max-pooled (channel-wise) to a
+an object surface and Mpos is the count of total number of      single feature vector and passed to MLP2 where informa-
+seeds on object surface. ∆x∗i is the ground truth displace-      tion from different votes are further combined. We repre-
+ment from the seed position xi to the bounding box center      sent the proposal p as a multidimensional vector with an
+of the object it belongs to.                                                              objectness score, bounding box parameters (center, heading
+   Votes are the same as seeds in tensor representation but                                                      and scale parameterized as in [34]) and semantic classiﬁca-
+are no longer grounded on object surfaces. A more essential                                                                   tion scores.
+difference though is their position – votes generated from
+                                                     Loss function. The loss functions in the proposal and clas-
+seeds on the same object are now closer to each other than
+                                                                siﬁcation stage consist of objectness, bounding box estima-
+the seeds are, which makes it easier to combine cues from
+                                                                        tion, and semantic classiﬁcation losses.
+different parts of the object. Next we will take advantage of
+                                          We supervise the objectness scores for votes that are lo-
+   1The case of more than one vote is discussed in the appendix.            cated either close to a ground truth object center (within
+
+======================== PDF 第 5 页 ========================
+0.3 meters) or far from any center (by more than 0.6 me-     decreased by 10× after 80 epochs and then decreased by
+ters). We consider proposals generated from those votes as     another 10× after 120 epochs. Training the model to con-
+positive and negative proposals, respectively.  Objectness     vergence on one Volta Quadro GP100 GPU takes around 10
+predictions for other proposals are not penalized. Object-     hours on SUN RGB-D and less than 4 hours on ScanNetV2.
+ness is supervised via a cross entropy loss normalized by the                                                             Inference. Our VoteNet is able to take point clouds of the
+number of non-ignored proposals in the batch. For positive                                                                    entire scenes and generate proposals in one forward pass.
+proposals we further supervise the bounding box estimation                                                  The proposals are post-processed by a 3D NMS module
+and class prediction according to the closest ground truth                                                          with an IoU threshold of 0.25. The evaluation follows the
+bounding box. Speciﬁcally, we follow [34] which decou-                                                   same protocol as in [42] using mean average precision.
+ples the box loss to center regression, heading angle esti-
+mation and box size estimation. For semantic classiﬁcation                                                          5. Experiments
+we use the standard cross entropy loss. In all regression in
+the detection loss we use the Huber (smooth-L1 [37]) loss.        In this section, we ﬁrstly compare our Hough voting
+Further details are provided in the appendix.                  based detector with previous state-of-the-art methods on
+                                                    two large 3D indoor object detection benchmarks (Sec. 5.1).
+4.3. Implementation Details
+                                        We then provide analysis experiments to understand the im-
+Input and data augmentation. Input to our detection net-     portance of voting, the effects of different vote aggregation
+work is a point cloud of N points randomly sub-sampled     approaches and show our method’s advantages in its com-
+from either a popped-up depth image (N = 20k) or a 3D     pactness and efﬁciency (Sec. 5.2). Finally we show quali-
+scan (mesh vertices, N = 40k). In addition to XY Z co-      tative results of our detector (Sec. 5.3). More analysis and
+ordinates, we also include a height feature for each point      visualizations are provided in the appendix.
+indicating its distance to the ﬂoor. The ﬂoor height is esti-
+                                                               5.1. Comparing with State-of-the-art Methods
+mated as the 1% percentile of all points’ heights. To aug-
+ment the training data, we randomly sub-sample the points     Dataset. SUN RGB-D [40] is a single-view RGB-D dataset
+from the scene points on-the-ﬂy. We also randomly ﬂip the      for 3D scene understanding.  It consists of ∼5K RGB-D
+point cloud in both horizontal direction, randomly rotate the      training images annotated with amodal oriented 3D bound-
+scene points by Uniform[−5◦, 5◦] around the upright-axis,     ing boxes for 37 object categories. To feed the data to our
+and randomly scale the points by Uniform[0.9, 1.1].            network, we ﬁrstly convert the depth images to point clouds
+Network architecture  details.   The backbone feature     using the provided camera parameters. We follow a stan-
+learning network is based on PointNet++ [36], which has     dard evaluation protocol and report performance on the 10
+four set abstraction (SA) layers and two feature propaga-     most common categories.
+tion/upsamplng (FP) layers, where the SA layers have in-       ScanNetV2 [5] is a richly annotated dataset of 3D recon-
+creasing receptive radius of 0.2, 0.4, 0.8 and 1.2 in meters      structed meshes of indoor scenes. It contains ∼1.2K train-
+while they sub-sample the input to 2048, 1024, 512 and 256     ing examples collected from hundreds of different rooms,
+points respectively. The two FP layers up-sample the 4th     and annotated with semantic and instance segmentation for
+SA layer’s output back to 1024 points with 256-dim fea-     18 object categories. Compared to partial scans in SUN
+tures and 3D coordinates (more details in the appendix).      RGB-D, scenes in ScanNetV2 are more complete and cover
+  The voting layer is realized through a multi-layer per-      larger areas with more objects on average. We sample
+ceptron with FC output sizes of 256, 256, 259, where the      vertices from the reconstructed meshes as our input point
+last FC layer outputs XYZ offset and feature residuals.          clouds. Since ScanNetV2 does not provide amodal or ori-
+  The proposal module is implemented as a set abstraction     ented bounding box annotation, we aim to predict axis-
+layer with a post processing MLP2 to generate proposals     aligned bounding boxes instead, as in [12].
+after the max-pooling. The SA uses radius 0.3 and MLP1    Methods in comparison. We compare with a wide range
+with output sizes of 128, 128, 128. The max-pooled fea-     of prior art methods. Deep sliding shapes (DSS) [42] and
+tures are further processed by MLP2 with output sizes of     3D-SIS [12] are both 3D CNN based detectors that combine
+128, 128, 5+2NH +4NS +NC where the output consists     geometry and RGB cues in object proposal and classiﬁca-
+of 2 objectness scores, 3 center regression values, 2NH      tion, based on the Faster R-CNN [37] pipeline. Compared
+numbers for heading regression (NH heading bins) and     with DSS, 3D-SIS introduces a more sophisticated sensor
+4NS numbers for box size regression (NS box anchors)     fusion scheme (back-projecting RGB features to 3D voxels)
+and NC numbers for semantic classiﬁcation.                 and therefore is able to use multiple RGB views to improve
+Training the network. We train the entire network end-to-     performance. 2D-driven [20] and F-PointNet [34] are 2D-
+end and from scratch with an Adam optimizer, batch size     based 3D detectors that rely on object detection in 2D im-
+8 and an initial learning rate of 0.001. The learning rate is     ages to reduce the 3D detection search space. Cloud of gra-
+
+======================== PDF 第 6 页 ========================
+                      Input      bathtub   bed    bookshelf chair    desk    dresser  nightstand sofa     table     toilet  mAP
+
+ DSS [42]       Geo + RGB    44.2     78.8     11.9     61.2     20.5      6.4     15.4     53.5     50.3     78.9    42.1
+ COG [38]      Geo + RGB    58.3     63.7     31.8     62.2     45.2     15.5     27.4     51.0     51.3     70.1    47.6
+ 2D-driven [20]   Geo + RGB    43.5     64.5     31.4     48.3     27.9     25.9     41.9     50.4     37.0     80.4    45.1
+ F-PointNet [34]  Geo + RGB    43.3     81.1     33.3     64.2     24.7     32.0     58.1     61.1     51.1     90.9    54.0
+
+ VoteNet (ours)    Geo only     74.4     83.0     28.8     75.3     22.0     29.8     62.2     64.0     47.3     90.1    57.7
+
+
+Table 1. 3D object detection results on SUN RGB-D val set. Evaluation metric is average precision with 3D IoU threshold 0.25 as
+proposed by [40]. Note that both COG [38] and 2D-driven [20] use room layout context to boost performance. To have fair comparison
+with previous methods, the evaluation is on the SUN RGB-D V1 data.
+
+
+                               Input    mAP@0.25 mAP@0.5              Method         mAP@0.25
+ DSS [42, 12]           Geo + RGB      15.2         6.8                      SUN RGB-D   ScanNet
+MRCNN 2D-3D [11, 12]  Geo + RGB      17.3        10.5                                                                BoxNet (ours)       53.0         45.4
+ F-PointNet [34, 12]      Geo + RGB      19.8        10.8
+ GSPN [54]            Geo + RGB      30.6        17.7               VoteNet (ours)       57.7         58.6
+
+ 3D-SIS [12]           Geo + 1 view      35.1        18.7
+                                                                  Table 3. Comparing VoteNet with a no-vote baseline. Metric is
+ 3D-SIS [12]           Geo + 3 views     36.6        19.0
+                                               3D object detection mAP. VoteNet estimate object bounding boxes
+ 3D-SIS [12]           Geo + 5 views     40.2        22.5
+                                                           from vote clusters. BoxNet  proposes boxes directly from seed
+ 3D-SIS [12]             Geo only        25.4        14.6       points on object surfaces without voting.
+ VoteNet (ours)           Geo only        58.6        33.5
+
+Table 2. 3D object detection results on ScanNetV2 val set. DSS     pled scene points. Such a baseline – which we refer to as
+and F-PointNet results are from [12]. Mask R-CNN 2D-3D results     BoxNet – is essential to distill the improvement due to vot-
+are from [54]. GSPN and 3D-SIS results are up-to-date numbers      ing. The BoxNet has the same backbone as the VoteNet
+provided by the original authors.                                                              but instead of voting, it directly generates boxes from the
+                                                          seed points (more details in appendix). Table 3 shows vot-
+                                                             ing boosts the performance by a signiﬁcant margin of ∼5
+dients [38] is a sliding window based detector using a newly
+                                      mAP on SUN RGB-D and >13 mAP on ScanNet.
+designed 3D HoG-like feature. MRCNN 2D-3D is a na¨ıve
+                                                                 In what ways, then, does voting help? We argue thatbaseline that directly projects Mask-RCNN [11] instance
+                                                               since in sparse 3D point clouds, existing scene points aresegmentation results into 3D to get a bounding box estima-
+                                                               often far from object centroids, a direct proposal may havetion. GSPN [54] is a recent instance segmentation method
+                                                          lower conﬁdence and inaccurate amodal boxes. Voting, in-using a generative model to propose object instances, which
+                                                                    stead, brings closer together these lower conﬁdence pointsis also based on a PointNet++ backbone.
+                                                      and allows to reinforce their hypothesis though aggrega-
+Results are summarized in Table 1 and 2. VoteNet outper-                                                                        tion. We demonstrate this phenomenon in Fig. 3 on a typ-
+forms all previous methods by at least 3.7 and 18.4 mAP in-                                                                        ical ScanNetV2 scene. We overlay the scene with only
+crease in SUN RGB-D and ScanNet respectively. Notably,                                                              those seed points which, if sampled, would generate an ac-
+we achieve such improvements when we use geometric in-                                                                curate proposal. As can be seen, VoteNet (right) offers a
+put (point clouds) only while they used both geometry and                                               much broader coverage of “good” seed points compared to
+RGB images. Table 1 shows that in the category “chair”                                                  BoxNet (left), showing its robustness brought by voting.
+with the most training samples, our method improves upon
+                                          We proceed with a second analysis in Fig. 4 showing on
+previous state of the art by more than 11 AP. Table 2 shows
+                                                                the same plot (in separate scales), for each SUN RGB-D
+that when taking geometric input only, our method outper-
+                                                               category: (in blue dots) gains in mAP between VoteNet and
+forms 3D CNN based method 3D-SIS by more than 33
+                                                      BoxNet, and (in red squares) closest distances between ob-
+AP. A per-category evaluation for ScanNet is provided in
+                                                                        ject points (on their surfaces) and their amodal box centers,
+the appendix. Importantly, the same set of network hyper-
+                                                          averaged per category and normalized by the mean class
+parameters was used in both datasets.
+                                                                   size (a large distance means the object center is usually far
+                                                     from its surface).  Sorting the categories according to the5.2. Analysis Experiments
+                                                              former, we see a strong correlation. Namely, when object
+To Vote or Not To Vote? A straightforward baseline to      points tend to be further from the amodal box center, voting
+VoteNet is a network that directly proposes boxes from sam-     helps much more.
+
+======================== PDF 第 7 页 ========================
+        BoxNet (no voting)         VoteNet
+                                                                                         60
+                                                                                         58                                 Aggregation method  mAP
+                                                                                                                    (%) 56
+                                                                                         54                                      Feature avg.        47.2
+                                                                              AP 52                                      Feature max        47.8
+                                                                                         50                                    Feature RBF avg.     49.0                                                                                                                                                           mean 48
+                                                                                         46                                      Pointnet (avg.)       56.5
+                                                                                               0     0.1    0.2    0.3    0.4    0.5
+                                                                                            Vote aggregation radius            Pointnet (max)      57.7
+
+
+                                                                  Figure 5. Vote aggregation analysis. Left: mAP@0.25 on SUN
+                                              RGB-D for varying aggregation radii when aggregating via Point-
+                                                                       net (max). Right: Comparisons of different aggregation methods
+                                                                         (radius = 0.3 for all methods). Using a learned vote aggregation
+                                                                                       is far more effective than manually pooling the features in a local
+Figure 3. Voting helps increase detection contexts. Seed points      neighborhood.
+that generate good boxes (BoxNet), or good votes (VoteNet) which
+in turn generate good boxes, are overlaid (in blue) on top of a rep-
+resentative ScanNet scene. As the voting step effectively increases     though introduces more clutter votes thus contaminating the
+context, VoteNet demonstrates a much denser cover of the scene,                                                    good votes and results in decreased performance.
+therefore increasing the likelihood of accurate detection.
+
+                                                Model Size and Speed  Our proposed model is very efﬁ-
+                                                                    40
+          14                                                          cient since it leverages sparsity in point clouds and avoids                                                                    35
+          12                                                             search in empty space. Compared to previous best meth-
+                                                                    30dist          10                                                        ods (Table 4), our model is more than 4× smaller than F-
+           gain 8                                                        25mean
+                                                                    20            PointNet (the prior art on SUN RGB-D) in size and more
+           6                     accuracy                                                          15            than 20× times faster than 3D-SIS (the prior art on Scan-           4                                                                    10normalized         NetV2) in speed. Note that the ScanNetV2 processing time           2
+                                                                    5           by 3D-SIS is computed as averaged time in ofﬂine batch           0
+                                                                    0          mode while ours is measured with sequential processing
+                bed         bookshelf      toilet    sofa     chair    desk     table       bathtub       dresser           night_stand             which can be realized in online applications.
+                                                               5.3. Qualitative Results and Discussion
+Figure 4. Voting helps more in cases where object points are far
+                                                                     Fig. 6 and Fig. 7 show several representative examplesfrom object centers. We show for each category: voting accuracy
+gain (in blue dots) of VoteNet w.r.t our direct proposal baseline     of VoteNet detection results on ScanNet and SUN RGB-D
+BoxNet; and (in red squares) average object-center distance, nor-      scenes, respectively. As can be seen, the scenes are quite
+malized by the mean class size.                                    diverse and pose multiple challenges including clutter, par-
+                                                                                  tiality, scanning artifacts, etc. Despite these challenges, our
+                                                        network demonstrates quite robust results. See for exam-
+Effect of Vote Aggregation  Aggregation of votes is an      ple in Fig. 6, how the vast majority of chairs were correctly
+important component in VoteNet as it allows communica-     detected in the top scene. Our method was able to nicely
+tion between votes. Hence, it is useful to analyze how dif-      distinguish between the attached sofa-chairs and the sofa in
+ferent aggregation schemes inﬂuence performance.              the bottom left scene; and predicted the complete bound-
+   In Fig. 5 (right), we show that vote aggregation with a     ing box of the much fragmented and cluttered desk at the
+learned Pointnet and max pooling achieves far better results     bottom right scene.
+than manually aggregating the vote features in the local re-       There are still limitations in our method though. Com-
+gions due to the existence of clutter votes (i.e. votes from
+non-object seeds). We test 3 types of those aggregations
+(ﬁrst three rows): max, average, and RBF weighting (based      Method         Model size  SUN RGB-D   ScanNetV2
+on vote distance to the cluster center). In contrast to aggre-       F-PointNet [34]   47.0MB       0.09s               -
+gation with Pointnet (Eq. 2), the vote features are directly      3D-SIS [12]      19.7MB             -           2.85s
+pooled, e.g. for avg. pooling: p = MLP2 {AVG{hi}}).           VoteNet (ours)    11.2MB        0.10s         0.14s
+   In Fig. 5 (left), we show how vote aggregation radius
+affects detection (tested with Pointent using max pooling).      Table 4. Model size and processing time (per frame or scan).
+As the aggregation radius increases, VoteNet improves until     Our method is more than 4× more compact in model size than [34]
+it peaks at around 0.2 radius. Attending to a larger region     and more than 20× faster than [12].
+
+======================== PDF 第 8 页 ========================
+                        VoteNet prediction                                    Ground truth
+
+
+
+
+
+Figure 6. Qualitative results of 3D object detection in ScanNetV2. Left: our VoteNet, Right: ground-truth. See Section 5.3 for details.
+
+
+
+
+
+Figure 7. Qualitative results on SUN RGB-D. Both left and right panels show (from left to right): an image of the scene (not used by our
+network), 3D object detection by VoteNet, and ground-truth annotations. See Section 5.3 for details.
+
+
+mon failure cases include misses on very thin objects like     from point clouds and learns to aggregate votes through
+doors, windows and pictures denoted in black bounding      their features and local geometry to generate high-quality
+boxes in the top scene (Fig. 6). As we do not make use of      object proposals. Using only 3D point clouds, the model
+RGB information, detecting these categories is almost im-    showed signiﬁcant improvements over previous methods
+possible. Fig. 7 on SUN RGB-D also reveals the strengths      that utilize both depth and colored images.
+of our method in partial scans with single-view depth im-        In future work we intend to explore how to incorporate
+ages. For example, it detected more chairs in the top-left   RGB images into our detection framework and to utilize
+scene than were provided by the ground-truth. In the top-     our detector in downstream application such as 3D instance
+right scene we can see how VoteNet can nicely hallucinate     segmentation. We believe that the synergy of Hough voting
+the amodal bounding box despite seeing only part of the     and deep learning can be generalized to more applications
+sofa. A less successful amodal prediction is shown in the     such as 6D pose estimation, template based detection etc.
+bottom right scene where an extremely partial observation     and expect to see more future research along this line.
+of a very large table is given.
+
+                                                    Ackownledgements.  This work was supported in part6. Conclusion
+                                                    by ONR MURI grant N00014-13-1-0341, NSF grant IIS-
+   In this work we have introduced VoteNet: a simple, yet     1763268 and a Vannevar Bush Faculty Fellowship. We
+powerful 3D object detection model inspired by Hough vot-     thank Daniel Huber, Justin Johnson, Georgia Gkioxari and
+ing. The network learns to vote to object centroids directly      Jitendra Malik for valuable discussions and feedback.
+
+======================== PDF 第 9 页 ========================
+References                                                                for 3d object detection and 6d pose estimation. In European
+                                                                    Conference on Computer Vision, pages 205–220. Springer,
+ [1] Matan Atzmon, Haggai Maron, and Yaron Lipman.  Point                                                                     2016. 2
+     convolutional neural networks by extension operators. arXiv                                                                     [16] Byung-soo Kim, Shili Xu, and Silvio Savarese.  Accurate
+     preprint arXiv:1803.10091, 2018. 2                                                                                localization of 3d objects from rgb-d data using segmenta-
+ [2] Dana H Ballard. Generalizing the hough transform to detect            tion hypotheses.  In Proceedings of the IEEE Conference
+      arbitrary shapes. Pattern recognition, 13(2):111–122, 1981.         on Computer Vision and Pattern Recognition, pages 3182–
+    2                                                               3189, 2013. 2
+ [3] Dorit Borrmann, Jan Elseberg, Kai Lingemann, and Andreas      [17] Roman Klokov and Victor Lempitsky.  Escape from cells:
+      N¨uchter. The 3d hough transform for plane detection in point         Deep kd-networks for the recognition of 3d point cloud mod-
+     clouds: A review and a new accumulator design. 3D Re-              els. In Proceedings of the IEEE International Conference on
+     search, 2(2):3, 2011. 2                                       Computer Vision, pages 863–872, 2017. 2
+ [4] Xiaozhi Chen, Huimin Ma, Ji Wan, Bo Li, and Tian Xia.      [18] Jan Knopp, Mukta Prasad, and Luc Van Gool. Orientation in-
+     Multi-view 3d object detection network for autonomous            variant 3d object classiﬁcation using hough transform based
+      driving. In IEEE CVPR, 2017. 1, 2                                methods. In Proceedings of the ACM workshop on 3D object
+ [5] Angela Dai, Angel X Chang, Manolis Savva, Maciej Hal-             retrieval, pages 15–20. ACM, 2010. 2
+      ber, Thomas Funkhouser, and Matthias Nießner.  Scannet:      [19] Jan Knopp, Mukta Prasad, and Luc Van Gool.   Scene
+     Richly-annotated 3d reconstructions of indoor scenes.  In             cut: Class-speciﬁc object detection and segmentation in 3d
+     Proceedings of the IEEE Conference on Computer Vision            scenes.   In 2011 International Conference on 3D Imag-
+    and Pattern Recognition, pages 5828–5839, 2017. 2, 5                  ing, Modeling, Processing, Visualization and Transmission,
+ [6] Haoqiang Fan, Hao Su, and Leonidas J Guibas. A point set          pages 180–187. IEEE, 2011. 2
+     generation network for 3d object reconstruction from a single      [20] Jean Lahoud and Bernard Ghanem. 2d-driven 3d object de-
+     image. In Proceedings of the IEEE conference on computer            tection in rgb-d images.  In Proceedings of the IEEE Con-
+      vision and pattern recognition, pages 605–613, 2017. 11               ference on Computer Vision and Pattern Recognition, pages
+ [7] Juergen Gall and Victor Lempitsky.  Class-speciﬁc hough          4622–4630, 2017. 1, 2, 5, 6
+      forests for object detection. In Decision forests for computer      [21] Loic Landrieu and Martin Simonovsky.  Large-scale point
+      vision and medical image analysis, pages 143–157. Springer,           cloud semantic segmentation with superpoint graphs. In Pro-
+     2013. 2                                                           ceedings of the IEEE Conference on Computer Vision and
+                                                                           Pattern Recognition, pages 4558–4567, 2018. 4 [8] Juergen Gall, Angela Yao, Nima Razavi, Luc Van Gool, and
+                                                                     [22] Truc Le and Ye Duan.  Pointgrid: A deep network for 3d     Victor Lempitsky. Hough forests for object detection, track-
+                                                                    shape understanding. In Proceedings of the IEEE conference      ing, and action recognition. IEEE transactions on pattern
+                                                              on computer vision and pattern recognition, pages 9204–     analysis and machine intelligence, 33(11):2188–2202, 2011.
+                                                                     9214, 2018. 2    2
+                                                                     [23] Bastian Leibe, Ales Leonardis, and Bernt Schiele.  Com-
+ [9] Benjamin Graham, Martin Engelcke, and Laurens van der
+                                                                      bined object categorization and segmentation with an im-
+     Maaten. 3d semantic segmentation with submanifold sparse
+                                                                                           plicit shape model.  In Workshop on statistical learning in
+     convolutional networks.  In Proceedings of the IEEE Con-
+                                                                  computer vision, ECCV, volume 2, page 7, 2004. 1
+     ference on Computer Vision and Pattern Recognition, pages
+                                                                     [24] Bastian Leibe, Aleˇs Leonardis, and Bernt Schiele.  Ro-     9224–9232, 2018. 2, 4
+                                                                           bust object detection with interleaved categorization and seg-
+[10] Paul  Guerrero,  Yanir Kleiman, Maks Ovsjanikov,  and
+                                                                         mentation.  International journal of computer vision, 77(1-
+     Niloy J Mitra. Pcpnet learning local shape properties from
+                                                                      3):259–289, 2008. 2, 3
+    raw point clouds. In Computer Graphics Forum, volume 37,
+                                                                     [25] Yangyan Li, Rui Bu, Mingchao Sun, Wei Wu, Xinhan Di,
+     pages 75–85. Wiley Online Library, 2018. 4
+                                                                 and Baoquan Chen. Pointcnn: Convolution on x-transformed
+[11] Kaiming He, Georgia Gkioxari, Piotr Doll´ar, and Ross Gir-                                                                                 points. In Advances in Neural Information Processing Sys-
+      shick.  Mask R-CNN.  arXiv preprint arXiv:1703.06870,                                                                           tems, pages 828–838, 2018. 2, 4
+     2017. 1, 6                                                                     [26] Yangyan Li, Angela Dai, Leonidas Guibas, and Matthias
+[12]  Ji Hou, Angela Dai, and Matthias Nießner. 3D-SIS: 3d se-                                                                         Nießner. Database-assisted object retrieval for real-time 3d
+     mantic instance segmentation of rgb-d scans. arXiv preprint                                                                              reconstruction.  In Computer Graphics Forum, volume 34.
+     arXiv:1812.07003, 2018. 1, 2, 5, 6, 7, 13                                                                 Wiley Online Library, 2015. 2
+[13] Paul VC Hough. Machine analysis of bubble chamber pic-      [27] Dahua Lin, Sanja Fidler, and Raquel Urtasun. Holistic scene
+      tures. In Conf. Proc., volume 590914, pages 554–558, 1959.           understanding for 3d object detection with rgbd cameras. In
+    2                                                               Proceedings of the IEEE International Conference on Com-
+[14] Li Huan, Qin Yujian, and Wang Li.  Vehicle logo retrieval           puter Vision, pages 1417–1424, 2013. 2
+     based on hough transform and deep learning. In Proceedings      [28] Or Litany, Tal Remez, Daniel Freedman, Lior Shapira, Alex
+      of the IEEE International Conference on Computer Vision,           Bronstein, and Ran Gal.  Asist: automatic semantically in-
+     pages 967–973, 2017. 2                                                 variant scene transformation. CVIU, 157:284–299, 2017. 2
+[15] Wadim Kehl, Fausto Milletari, Federico Tombari, Slobodan      [29] Wei Liu, Dragomir Anguelov, Dumitru Erhan, Christian
+       Ilic, and Nassir Navab. Deep learning of local rgb-d patches           Szegedy, Scott Reed, Cheng-Yang Fu, and Alexander C
+
+======================== PDF 第 10 页 ========================
+     Berg. Ssd: Single shot multibox detector. In European con-           In Proceedings of the IEEE Conference on Computer Vision
+     ference on computer vision, pages 21–37. Springer, 2016. 2          and Pattern Recognition, pages 2530–2539, 2018. 2, 4
+[30] Subhransu Maji and Jitendra Malik. Object detection using      [44] Min Sun, Gary Bradski, Bing-Xin Xu, and Silvio Savarese.
+     a max-margin hough transform. 2009. 2                           Depth-encoded hough voting for joint object detection and
+[31] Fausto Milletari, Seyed-Ahmad Ahmadi, Christine Kroll,          shape recovery.  In European Conference on Computer Vi-
+     Annika Plate, Verena Rozanski, Juliana Maiostre, Johannes            sion, pages 658–671. Springer, 2010. 2
+     Levin, Olaf Dietrich, Birgit Ertl-Wagner, Kai B¨otzel, et al.      [45] Maxim Tatarchenko, Alexey Dosovitskiy, and Thomas Brox.
+     Hough-cnn: deep learning for segmentation of deep brain           Octree generating networks: Efﬁcient convolutional archi-
+     regions in mri and ultrasound. Computer Vision and Image            tectures for high-resolution 3d outputs.   arXiv preprint
+     Understanding, 164:92–102, 2017. 2                               arXiv:1703.09438, 2017. 2
+[32] Liangliang Nan, Ke Xie, and Andrei Sharf. A search-classify      [46] Maxim Tatarchenko, Jaesik Park, Vladlen Koltun, and Qian-
+     approach for cluttered indoor scene understanding. ACM          Yi Zhou. Tangent convolutions for dense prediction in 3d.
+     Transactions on Graphics (Proceedings of SIGGRAPH Asia           In Proceedings of the IEEE Conference on Computer Vision
+     2012), 31(6), 2012. 2                                        and Pattern Recognition, pages 3887–3896, 2018. 2
+[33] David Novotny, Samuel Albanie, Diane Larlus, and Andrea      [47] Alexander  Velizhev,  Roman  Shapovalov,  and  Konrad
+     Vedaldi. Semi-convolutional operators for instance segmen-            Schindler. Implicit shape models for object detection in 3d
+      tation. In Proceedings of the European Conference on Com-            point clouds.  In International Society of Photogrammetry
+     puter Vision (ECCV), pages 86–102, 2018. 2                      and Remote Sensing Congress, volume 2, 2012. 2
+[34] Charles R Qi, Wei Liu, Chenxia Wu, Hao Su, and Leonidas J      [48] Peng-Shuai Wang, Yang Liu, Yu-Xiao Guo, Chun-Yu Sun,
+     Guibas. Frustum pointnets for 3d object detection from rgb-          and Xin Tong.  O-cnn:  Octree-based convolutional neu-
+    d data. In Proceedings of the IEEE Conference on Computer             ral networks for 3d shape analysis. ACM Transactions on
+     Vision and Pattern Recognition, pages 918–927, 2018. 1, 2,          Graphics (TOG), 36(4):72, 2017. 2
+      4, 5, 6, 7, 11                                                    [49] Yue Wang, Yongbin Sun, Ziwei Liu, Sanjay E Sarma,
+[35] Charles R Qi, Hao Su, Kaichun Mo, and Leonidas J Guibas.          Michael M Bronstein, and Justin M Solomon.  Dynamic
+      Pointnet:  Deep learning on point sets for 3d classiﬁca-          graph cnn for learning on point clouds.   arXiv preprint
+      tion and segmentation. Proc. Computer Vision and Pattern           arXiv:1801.07829, 2018. 2
+     Recognition (CVPR), IEEE, 2017. 2, 4                           [50] Oliver J Woodford, Minh-Tri Pham, Atsuto Maki, Frank Per-
+[36] Charles R Qi, Li Yi, Hao Su, and Leonidas J Guibas. Point-             bet, and Bj¨orn Stenger. Demisting the hough transform for
+     net++: Deep hierarchical feature learning on point sets in a         3d shape recognition and registration. International Journal
+     metric space. arXiv preprint arXiv:1706.02413, 2017. 1, 2,            of Computer Vision, 106(3):332–341, 2014. 2
+      3, 4, 5, 11                                                      [51] Saining Xie, Sainan Liu, Zeyu Chen, and Zhuowen Tu. At-
+[37] Shaoqing Ren, Kaiming He, Ross Girshick, and Jian Sun.            tentional shapecontextnet for point cloud recognition.  In
+     Faster R-CNN: Towards real-time object detection with re-           Proceedings of the IEEE Conference on Computer Vision
+     gion proposal networks. In Advances in neural information         and Pattern Recognition, pages 4606–4615, 2018. 2
+     processing systems, pages 91–99, 2015. 1, 2, 3, 5                 [52] Yifan Xu, Tianqi Fan, Mingye Xu, Long Zeng, and Yu Qiao.
+[38] Zhile Ren and Erik B Sudderth. Three-dimensional object           Spidercnn: Deep learning on point sets with parameterized
+     detection and layout prediction using clouds of oriented gra-           convolutional ﬁlters. In Proceedings of the European Con-
+      dients. In Proceedings of the IEEE Conference on Computer           ference on Computer Vision (ECCV), pages 87–102, 2018.
+     Vision and Pattern Recognition, pages 1525–1533, 2016. 2,         2
+    6                                                               [53] Yaoqing Yang, Chen Feng, Yiru Shen, and Dong Tian. Fold-
+[39] Shaoshuai Shi, Xiaogang Wang, and Hongsheng Li. Pointr-            ingnet: Point cloud auto-encoder via deep grid deformation.
+     cnn: 3d object proposal generation and detection from point           In Proceedings of the IEEE Conference on Computer Vision
+     cloud. arXiv preprint arXiv:1812.04244, 2018. 2                  and Pattern Recognition, pages 206–215, 2018. 2
+[40] Shuran Song, Samuel P Lichtenberg, and Jianxiong Xiao.      [54] Li Yi, Wang Zhao, He Wang, Minhyuk Sung, and Leonidas
+    Sun rgb-d: A rgb-d scene understanding benchmark suite.           Guibas.   Gspn:  Generative shape proposal network for
+     In Proceedings of the IEEE Conference on Computer Vision         3d instance segmentation in point cloud.  arXiv preprint
+    and Pattern Recognition, pages 567–576, 2015. 2, 5, 6                arXiv:1812.03320, 2018. 2, 6
+[41] Shuran Song and Jianxiong Xiao. Sliding shapes for 3d ob-      [55] Yin Zhou and Oncel Tuzel. Voxelnet: End-to-end learning
+      ject detection in depth images. In Computer Vision–ECCV            for point cloud based 3d object detection.  In Proceedings
+     2014, pages 634–651. Springer, 2014. 2                                 of the IEEE Conference on Computer Vision and Pattern
+[42] Shuran Song and Jianxiong Xiao. Deep sliding shapes for           Recognition, pages 4490–4499, 2018. 1, 2
+     amodal 3d object detection in rgb-d images.  In Proceed-
+     ings of the IEEE Conference on Computer Vision and Pattern
+     Recognition, pages 808–816, 2016. 1, 2, 5, 6
+[43] Hang Su, Varun Jampani, Deqing Sun, Subhransu Maji,
+     Evangelos Kalogerakis, Ming-Hsuan Yang, and Jan Kautz.
+      Splatnet: Sparse lattice networks for point cloud processing.
+
+======================== PDF 第 11 页 ========================
+A. Appendix                                        VoteNet loss function details.  The network is trained
+                                                            end-to-end with a multi-task loss including a voting loss,
+   This appendix provides additional details on the network                                                       an objectness loss, a 3D bounding box estimation loss and
+architectures and loss functions (Sec. A.1), more analysis                                                          a semantic classiﬁcation loss. We weight the losses such
+experiment results (Sec. A.2), per-category results on Scan-
+                                                                     that they are in similar scales with λ1 = 0.5, λ2 = 1 and
+Net (Sec. A.3), and ﬁnally more visualizations (Sec. A.4).
+                                                     λ3 = 0.1.
+A.1. Details on Architectures and Loss Functions
+
+VoteNet architecture details.  As mentioned in the main                                                                        LVoteNet = Lvote-reg + λ1Lobj-cls + λ2Lbox + λ3Lsem-cls  (3)
+paper, the VoteNet architecture composes of a backbone
+point feature learning network, a voting module and a pro-      Among the losses, the vote regression loss is as deﬁned
+posal module.                                                    in the main paper (with L1 distance). For ScanNet we com-
+  The backbone network, based on the PointNet++ archi-     pute the ground truth votes as offset from the mesh ver-
+tecture [36], has four set abstraction layers and two fea-      tices of an instances to the centers of the axis-aligned tight
+ture up-sampling layers. The detailed layer parameters are     bounding boxes of the instances. Note that since the bound-
+shown in Table 5. Each set abstraction (SA) layer has a     ing box is not amodal, they can vary in sizes due to scan
+receptive ﬁeld speciﬁed by a ball-region radius r, a MLP     completeness (e.g.  a chair may have a ﬂoating bounding
+network for point feature transform MLP[c1, ..., ck] where     box if its leg is not recovered from the reconstruction). For
+ci is output channel number of the i-th layer in the MLP.   SUN RGB-D since the dataset does not provide instance
+The SA layer also subsamples the input point cloud with     segmentation annotations but only amodal bounding boxes,
+farthest point sampling to n points. Each SA layer is speci-    we cannot compute a ground truth vote directly (as we don’t
+ﬁed by (n, r, [c1, ..., ck]) as shown in the Table 5. Compared    know which points are on objects). Instead, we consider any
+to [36], we also normalize the XYZ scale of points in each     point inside an annotated bounding box as an object point
+local region by the region radius.                               (required to vote) and compute its offset to the box center as
+  Each set feature propagation (FP) layer upsamples the      the ground truth. In cases that a point is in multiple ground
+point features by interpolating the features on input points      truth boxes, we keep a set of up to three ground truth votes,
+to output points (each output point’s feature is weighted av-     and consider the minimum distance between the predicted
+erage of its three nearest input points’ features). It also com-     vote and any ground truth vote in the set during vote regres-
+bines the skip-linked features through a MLP (interpolated     sion on this point.
+features and skip-linked features are concatenated before       The objectness loss is just a cross-entropy loss for two
+fed into the MLP). Each FP layer is speciﬁed by [c1, ..., ck]      classes and the semantic classiﬁcation loss is also a cross-
+where ci is the output of the i-th layer in the MLP.             entropy loss of NC classes.
+  The voting module as mentioned in the main paper is       The box loss follows [34] (but without the corner loss
+a MLP that transforms seeds’ features to votes including a      regularization for simplicity) and is composed of center re-
+XYZ offset and a feature offset. The seed points are outputs      gression, heading estimation and size estimation sub-losses.
+of the fp2 layer. The voting module MLP has output sizes     In all regression in the box loss we use the robust L1-
+of 256, 256, 259 for its fully connected layers. The last fully     smooth loss.  Both the box and semantic losses are only
+connected layer does not have ReLU or BatchNorm.          computed on positive vote clusters and normalized by the
+  The proposal module as mentioned in the main paper is    number of positive clusters. We refer readers to [34] for
+a SA layer followed by another MLP after the max-pooling    more details.
+in each local region. We follow [34] on how to parameter-
+ize the oriented 3D bounding boxes. The layer’s output has
+5+2NH +4NS +NC channels where NH is the number             Lbox = Lcenter-reg + 0.1Langle-cls + Langle-reg
+                                                                                                                             (4)
+of heading bins (we predict a classiﬁcation score for each          + 0.1Lsize-cls + Lsize-reg
+heading bin and a regression offset for each bin – relative
+to the bin center and normalized by the bin size), NS is the      One difference though is that, instead of a naive regres-
+number of size templates (we predict a classiﬁcation score     sion loss, we use a Chamfer loss [6] for Lcenter-reg (between
+for each size template and 3 scale regression offsets for     regressed centers and ground truth box centers). It requires
+height, width and length) and NC is the number of seman-      that each positive proposal is close to a ground truth ob-
+tic classes. In SUN RGB-D: NH = 12, NS = NC = 10,      ject and each ground truth object center has a proposal near
+in ScanNet: NH = 12, NS = NC = 18. In the ﬁrst 5        it. The latter part also inﬂuences the voting in the sense
+channels, the ﬁrst two are for objectness classiﬁcation and      that it encourages non-object seed points near the object to
+the rest three are for center regression (relative to the vote      also vote for the center of the object, which helps further
+cluster center).                                                 increase contexts in detection.
+
+======================== PDF 第 12 页 ========================
+                     layer name     input layer     type    output size           layer params
+                      sa1      raw point cloud  SA   (2048,3+128)    (2048,0.2,[64,64,128])
+                      sa2            sa1      SA   (1024,3+256)   (1024,0.4,[128,128,256])
+                      sa3            sa2      SA    (512,3+256)    (512,0.8,[128,128,256])
+                      sa4            sa3      SA    (256,3+256)    (256,1.2,[128,128,256])
+                      fp1           sa3, sa4      FP    (512,3+256)           [256,256]
+                      fp2           sa2, sa3      FP   (1024,3+256)          [256,256]
+
+                                   Table 5. Backbone network architecture: layer speciﬁcations.
+
+
+
+
+
+                                                                                                                                                                      1
+BoxNet architecture details.  Our baseline network with-               0.7
+                                                                                                                                      0.6                                                        0.9
+out voting, BoxNet, shares most parts with the VoteNet.                                                                          0.8
+                                                                                                                                      0.5                                                        0.7
+They share the same backbone architecture. But instead of               0.4                                                        0.6
+voting from seeds, the BoxNet directly proposes bounding         AP 0.3                                         AR 0.50.4
+boxes and classiﬁes object classes from seed points’ fea-               0.2                                                        0.3
+tures. To make the BoxNet and VoteNet have similar capac-               0.1                                   JointPer-classproposalproposal            0.20.1                                        JointPer-classproposalproposal
+ity we also include a SA layer for the proposal in BoxNet.              0 1            10           100          1000      0 1             10            100          1000
+However this SA layer takes seed clusters instead of vote               NUMBER OF PROPOSALS                NUMBER OF PROPOSALS
+clusters i.e. it samples seed points and then combines neigh-      Figure 8. Number of proposals per scene v.s. Average Precision
+boring seeds with MLP and max-pooling. This SA layer has     (AP) and Average Recall (AR) on SUN RGB-D. The AP and AR
+                                                                       are averaged across the 10 classes. The recall is maximum recallexactly the same layer parameters with that in the VoteNet,
+                                                                  given a ﬁxed number of detection per scene. The “joint proposal”
+followed by the same MLP2.
+                                                        means that we assign each proposal to a single class (the class with
+                                                                       the highest classiﬁcation score); The “per-class proposal” means
+BoxNet loss function details.  BoxNet has the same loss       that we assign each proposal to all the 10 classes (the objectness
+function as VoteNet, except it is not supervised by vote re-      score is multipled by the semantic classiﬁcation probability).
+gression. There is also a slight difference in how objectness
+labels (used to supervise objectness classiﬁcation) are com-
+                                          We see that with as few as 10 proposals our VoteNet can
+puted. As seed points (on object surfaces) are often far from
+                                                            achieve a decent AP of around 45% while having 100 pro-
+object centroids, it no longer works well to use the distances
+                                                              posals already pushes the AP to above 57%. With a thou-
+between seed points and object centroids to compute the ob-
+                                                         sand proposals, our network can achieve around 78.7% re-
+jectness labels.  In BoxNet, we assign positive objectness
+                                                                        call with joint proposal and around 87.7% recall with per-
+labels to seed points that are on objects (those belonging to
+                                                                   class proposal.
+the semantic categories we consider) and negative labels to
+all the other seed points on clutter (e.g. walls, ﬂoors).
+                                                      Context of voting  One difference of a deep Hough vot-
+                                                             ing scheme with the traditional Hough voting is that we can        LBoxNet = λ1Lobj-cls + λ2Lbox + λ3Lsem-cls      (5)
+                                                               take advantage of deep features, which can provide more
+                                                              context knowledge for voting. In Table 8 we show how fea-
+A.2. More Analysis Experiments                                                                   tures from different levels of the PointNet++ affects detec-
+Average precision and recall plots   Fig. 8 shows how av-      tion performance (from SA2 to FP3, the network has in-
+erage precision (AP) and average recall (AR) change as we     creasing contexts for voting). FP3 layer is extended from
+increase the number of proposals. The AP and AR are both      the FP2 with a MLP of output sizes 256 and 256 with 2048
+averaged across 10 categories on SUN RGB-D. We report     output points (the same set of XYZ as that output by SA1).
+two ways of using the proposals: joint and per-class. For           It is surprising to ﬁnd that voting from even SA2 can
+the joint proposal we propose K objects’ bounding boxes     achieve reasonable detection results (mAP 51.2%) while
+for all the 10 categories, where we consider each proposal     voting from FP2 achieves the best performance.  Having
+as the semantic class it has the largest conﬁdence in, and      larger context (e.g. FP3) than FP2 does not show further
+use their objectness scores to rank them. For the per-class     improvements on the performance.
+proposal we duplicate the K proposal 10 times thus have
+K proposals per class where we use the multiplication of     Multiple votes per seed  In default we just generate one
+semantic probability for that class and the objectness prob-     vote per seed since we ﬁnd that with large enough context
+ability to rank them. The latter way of using proposals gives      there is little need to generate more than one vote to resolve
+us a slight improvement on AP and a big boost on AR.        ambiguous cases. However, it is still possible to generate
+
+======================== PDF 第 13 页 ========================
+                    cab   bed   chair   sofa    tabl   door  wind  bkshf   pic    cntr   desk   curt   fridg  showr    toil    sink   bath  ofurn mAP
+
+ 3DSIS 5views [12]  19.76  69.71  66.15  71.81  36.06  30.64  10.88  27.34  0.00  10.00  46.93  14.06  53.76  35.96  87.60  42.98  84.30  16.20  40.23
+ 3DSIS Geo [12]    12.75  63.14  65.98  46.33  26.91  7.95   2.79   2.30  0.00  6.92  33.34  2.47  10.42  12.17  74.51  22.87  58.66  7.05  25.36
+ VoteNet ours       36.27  87.92  88.71  89.62  58.77  47.32  38.10  44.62  7.83  56.13  71.69  47.23  45.37  57.13  94.94  54.70  92.11  37.20  58.65
+
+
+              Table 6. 3D object detection scores per category on the ScanNetV2 dataset, evaluated with mAP@0.25 IoU.
+
+
+                    cab   bed   chair   sofa    tabl   door  wind  bkshf   pic   cntr  desk   curt   fridg  showr    toil    sink   bath   ofurn mAP
+
+ 3DSIS 5views [12]  5.73  50.28  52.59  55.43  21.96  10.88  0.00  13.18  0.00  0.00  23.62  2.61  24.54   0.82   71.79  8.94  56.40  6.87  22.53
+ 3DSIS Geo [12]     5.06  42.19  50.11  31.75  15.12  1.38   0.00   1.44  0.00  0.00  13.66  0.00   2.63   3.00   56.75  8.68  28.52  2.55  14.60
+ VoteNet (ours)      8.07  76.06  67.23  68.82  42.36  15.34  6.43  28.00  1.25  9.52  37.52  11.55  27.80   9.96   86.53  16.76  78.87  11.69  33.54
+
+
+              Table 7. 3D object detection scores per category on the ScanNetV2 dataset, evaluated with mAP@0.5 IoU.
+
+
+  Seed layer  SA2  SA3  SA4  FP1  FP2  FP3
+
+ mAP        51.2   56.3   55.1   56.6   57.7   57.1
+
+
+Table 8. Effects of seed context for 3D detection.  Evaluation
+metric is mAP@0.25 on SUN RGB-D.
+
+
+           Vote factor      1     3     3
+       Random number  N   N   Y
+         mAP        57.7   55.8   55.8
+
+
+Table 9. Effects of number of votes per seed. Evaluation metric
+is mAP@0.25 on SUN RGB-D. If random number is on, we con-
+catenate a random number to the seed feature before voting, which
+helps break symmetry in the case of multiple votes per seed.
+
+
+more than one vote with our network architecture. Yet to      Figure 9. Vote meeting point.  Left: ScanNet scene with votes
+                                                          coming from object points. Right: vote offsets from source seed-break the symmetry in multiple vote generation, one has to
+                                                                       points to target-votes. Object votes are colored green, and non-
+introduce some bias to different votes to prevent then from
+                                                                       object ones are colored red. See how object points from all-parts of
+pointing to the same place.                                                                       the object vote to form a cluster near the center. Non-object points,
+   In experiments, we ﬁnd that one vote per seed achieves      however, either vote “nowhere” and therefore lack structure, or are
+the best results, as shown in Table 9. We ablate by using a      near object and have gathered enough context to also vote properly.
+vote factor of 3, where the voting module generates 3 votes
+per seed with a MLP layer spec: [256, 256, 259 ∗3]).  In
+computing the vote regression loss on a seed point, we con-                                                                    vote). In Table 10, we report mAP results on SUN RGB-D
+sider the minimum distance between any predicted votes to                                                          with 256 proposals (joint proposal) using cluster sampling
+the ground truth vote (in case of SUN RGB-D where we                                                                     strategies of vote FPS, seed FPS and random sampling,
+may have a set of ground truth votes for a seed, we compute                                                     where FPS means farthest point sampling. From 1024 vote
+the minimum distance among any pair of predicted vote and                                                                       clusters, vote FPS samples K clusters based on votes’ XYZ.
+ground truth vote).                                                     Seed FPS ﬁrstly samples on seed XYZ and then ﬁnds the
+  To break symmetry, we generate 3 random numbers and                                                              votes corresponding to the sampled seeds – it enables a di-
+inject them to the second last features from the MLP layer.                                                                     rect comparison with BoxNet as it uses the same sampling
+We show results both with and without this procedure which                                                        scheme, making the two techniques similar up to the space
+shows no observable difference.                                                                   in which the points are grouped: VoteNet groups votes ac-
+                                                            cording to vote XYZ, while BoxNet groups seeds according
+On proposal sampling  In the proposal step, to generate      to seed XYZ. Random sampling simply selects a random set
+K proposals from the votes, we need to select K vote clus-     of K votes and take their neighborhoods for proposal gen-
+ters. How to select those clusters is a design choice we study      eration. Note that the results from Table 10 are from the
+here (each cluster is simply a group of votes near a center    same model trained with vote FPS to select proposals.
+
+======================== PDF 第 14 页 ========================
+        Proposal sampling          mAP
+
+      Random sampling                57.5
+         Farthest point sampling on votes   57.2
+         Farthest point sampling on seeds   57.7
+
+
+Table 10. Effects of proposal sampling.  Evaluation metric is
+mAP@0.25 on SUN RGB-D. 256 proposals are used for all eval-
+uations. Our method is not sensitive to how we choose centers for
+vote groups/clusters.
+
+
+      Dataset        with height   without height
+
+    SUN RGB-D      57.7           57.0
+      ScanNet           58.6           58.1
+Table 11. Effects of the height feature.  Evaluation metric is
+mAP@0.25 on both datasets.
+
+
+  We can see that while seed FPS gets the best number in
+mAP, the difference caused by different sampling strategies
+is small, showing the robustness of our method.
+
+
+Effects of the height feature  In point clouds from indoor
+scans, point height is a useful feature in recognition. As
+mentioned in the main paper, we can use 1% of the Z val-
+ues (Z-axis is up-right) of all points from a scan as an ap-
+proximate as the ﬂoor height zﬂoor, and then compute the a
+point (x, y, z)’s height as z −zﬂoor. In Table 11 we show
+how this extra height feature affect detection performance.
+We see that adding the height feature consistently improves
+performance in both SUN RGB-D and ScanNet.
+
+A.3. ScanNet Per-class Evaluation
+
+   Table 6 and Table 7 report per-class average precision
+on 18 classes of ScanNetV2 with 0.25 and 0.5 box IoU
+thresholds respectively. Relying on purely geonetric data,
+our method excels (esp. with mAP@0.25) in detecting ob-
+jects like bed, chair, table, desk etc. where geometry is a
+strong cue for recognition; and struggles with objects best
+recognized by texture and color like pictures.
+
+A.4. Visualization of Votes
+
+   Fig. 9 shows (a subset of) votes predicted from our
+VoteNet in a typical ScanNet scene. We clearly see that
+seed points on objects (bed, sofa etc.) vote to object centers
+while clutter points vote either to object center as well (if
+the clutter point is close to the object) or to nowhere due to
+lack of structure in the clutter area (e.g. a wall).

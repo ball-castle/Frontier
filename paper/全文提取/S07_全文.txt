@@ -1,0 +1,788 @@
+S07 | REVEAL: A Rubric-Guided Agent for Explicit Evidence Sufficiency Verification in Long-Video Question Answering
+来源：https://arxiv.org/abs/2608.08612
+本地PDF：补充对照论文/S07_REVEAL_2608.08612.pdf
+SHA-256：69a0188db72407c488903adcf7d23d1fbceca4ad89a994f92954ecd7cad29eae
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+     REVEAL: A Rubric-Guided Agent for Explicit Evidence Sufficiency Verification
+                               in Long-Video Question Answering
+
+       Caijun Yan1∗, Yang Zhou1∗, Meixing Shi1, Haoran Sun2, Yichen Li2, Yuxiang Cai1†, Yankai Jiang2†
+                                            1Zhejiang University  2Shanghai AI Laboratory
+                                              yancaijun@zju.edu.cn, caiyuxiang@zju.edu.cn
+
+
+
+
+                              Abstract                           and retrieve query-relevant subsets during inference (Lewis
+                                                                                     et  al. 2020; Luo  et  al. 2025) (Figure  1(a)). Memory-             Recently, retrieval-augmented and memory-augmented meth-
+            ods have emerged as two promising paradigms for long-video        augmented approaches go a step further by constructing
+             question answering. However, existing methods typically rely         multi-granularity memory banks to support multi-round re-
+           on rigid, fixed-length temporal chunking (e.g., 10s) and static          trieval and reasoning (Song et al. 2024; He et al. 2024;
+               offline memory banks, which not only fragment coherent con-        Fan et al. 2024; Yeo et al. 2025b; Tian et al. 2025; Chen
+             tinuous events but also fail to adapt during real-time rea-          et al. 2025; Wang et al. 2025b) (Figure 1(b)). Despite their
+             soning. Moreover, whether using multi-scale summaries or         progress, these paradigms exhibit clear structural and op-
+            multimodal knowledge graphs, current approaches prioritize          erational limitations. Structurally, many existing RAG and2026       retrieval relevance while overlooking evidence sufficiency, of-       memory frameworks rely on rigid, fixed-duration tempo-
+             ten stopping to answer once only semantically relevant clues
+                                                                                       ral chunking (e.g., 10s, 30s, or 1min) to index videos or
+             are retrieved, even when key temporal, causal, or fine-grained
+                                                                          build hierarchical abstractions. This arbitrary slicing frag-             action evidence is still missing. To tackle these challenges,
+                                                                ments coherent, variable-length event units across segmentAug    we propose REVEAL, a rubric-guided agent framework. As a
+             foundation, we introduce an adaptive visual-similarity-based         boundaries. Operationally, retrieval and stopping are driven
+9      preprocessing pipeline that groups visually coherent adjacent        by semantic relevance rather than evidence sufficiency, fre-
+            frames into natural event units to construct an offline-online         quently leading agents to answer based on segments that
+            video memory—capturing global video context offline while         are topically related to the question but lack decisive causal,
+            dynamically maintaining question-conditioned memory on-         temporal, or fine-grained action details. Furthermore, during
+                line. Built upon this structured memory, REVEAL uses an         multi-turn retrieval, existing frameworks rarely track past re-
+             automatically constructed rubric library to explicitly verify                                                                                     trieval quality or explicit missing clues, often trapping the
+            whether retrieved evidence satisfies sufficiency criteria, pin-
+                                                                       agent in redundant, unguided searches.[cs.CV]      points missing clues upon verification failure, and directs
+              targeted re-retrieval for complementary information. With-          Driven by these limitations, we propose REVEAL, a novel
+             out any extra training, REVEAL consistently outperforms         agentic MLLM framework. REVEAL replaces fixed tem-
+            both closed-source and open-source state-of-the-art methods         poral units with visually coherent, variable-length L1 seg-
+             across extensive experiments. These results show that ex-        ments and summarizes them into L2 event timelines and L3
+                plicitly verifying evidence sufficiency, rather than stopping         global narratives (Figure 1(c)). This reusable offline mem-
+               at semantic relevance, retrieves the decisive clues that prior        ory preserves local evidence and long-range context, while
+           methods miss and yields more reliable long-video reasoning.                                                                     a question-conditioned online memory tracks admitted ev-
+                                                                           idence, attempted queries, retrieval quality, and the veri-
+                    1  Introduction                                fier’s latest evidence gap. Compared with a static memory
+         Unlike short-video question answering, where the relevant      bank, this separation lets inference retain and update the
+         context is confined to several minutes, long-video QA must       state needed for targeted repair retrieval.
+          locate and reason over evidence sparsely distributed across         Additionally, REVEAL replaces implicit stopping with
+         hours of video (Fu et al. 2024; Wang et al. 2024b; Zhou et al.      rubric-guided evidence-sufficiency verification. An automat-
+         2024; Wu et al. 2024; Tian et al. 2025; Chen et al. 2024a;       ically constructed rubric library is induced from contrastive
+        Kurpath et al. 2025). Direct video LLMs expand the tempo-       pairs of decisive and misleading evidence. At inference time,
+           ral context window by employing sparse frame sampling or       the verifier selects criteria relevant to the question and scoresarXiv:2608.08612v1
+          visual token compression (Maaz et al. 2023; Lin et al. 2023;      whether the accumulated evidence is sufficient to judge the
+        Shen et al. 2024). While effective at capturing global con-      answer options. If the threshold is met, the verifier triggers the
+           text, compressing hours of video into a limited token budget      answerer to generate the final answer; otherwise, the verifier
+          discards the fine-grained actions, state transitions, and small      produces a concrete missing-evidence analysis. The planner
+          textual clues crucial for reasoning.                              uses this diagnosis, search history, and retrieval-quality feed-
+          To circumvent encoding  full-length  videos,  retrieval-      back to issue focused queries or switch to uniform timeline
+        augmented methods index sampled clips or text transcripts      sampling when targeted directions are exhausted. Thus, re-
+            ∗These authors contributed equally.
+             †Corresponding author.
+
+======================== PDF 第 2 页 ========================
+Figure 1: Comparison of retrieval-augmented, memory-augmented, and REVEAL paradigms for long-video QA. REVEAL
+adds adaptive video memory and explicit evidence-sufficiency verification to the inference loop.
+
+
+trieval is controlled by what is still needed, rather than by      and context-length constraints. Existing approaches therefore
+semantic similarity alone.                                     reduce video input through sparse frame sampling, keyframe
+  Our contributions are summarized as follows:                   selection, or visual-token compression (Maaz et al. 2023; Lin
+                                                                          et al. 2023; Shen et al. 2024; Wang et al. 2024a), or avoid • We are the first to explore rubric-based criteria as an
+                                                                    full-video encoding by indexing videos into external mem-   inference-time mechanism for long-video QA agents.
+                                                                    ories and retrieving a small set of relevant clips or memory   Rather than using rubrics only to assess model outputs
+                                                             items for each query (Lewis et al. 2020; Luo et al. 2025;   or optimize training objectives, we show that they can
+                                                       Fan et al. 2024; Yeo et al. 2025b; Tian et al. 2025). Recent   serve as interpretable criteria that guide agent decision-
+                                                      memory-based systems further organize videos into struc-   making during inference.
+                                                                 tured representations, such as captions, hierarchical multi-
+ • We design REVEAL, a rubric-guided long-video QA                                                                   scale summaries, and entity knowledge graphs, while agentic
+   agent that realizes this paradigm by integrating an offline-                                                           approaches incorporate planning, tool use, and multi-round
+   online video memory built from similarity-grouped scene                                                                         retrieval (Song et al. 2024; He et al. 2024; Wang et al. 2024c;
+   segments with a verifier that evaluates evidence suffi-                                                    Yang et al. 2024; Chen et al. 2025; Wang et al. 2025b; Yao
+   ciency, diagnoses missing evidence, and guides targeted                                                                          et al. 2023; Liu et al. 2025b; Yeo et al. 2025a). These methods
+    retrieval. We further introduce an automatic rubric con-                                                                     substantially improve access to relevant video information,
+   struction pipeline that derives rubrics from contrastive                                                               but relevance alone does not guarantee sufficient evidence
+   evidence pairs rather than manual authoring.                                                                       for answering a question. Moreover, decisions about whether
+ • REVEAL is training-free and, with an open backbone,      enough evidence has been collected are typically based on
+   achieves  state-of-the-art performance across multiple       implicit model judgments (Asai et al. 2024; Jiang et al. 2023;
+   long-video QA benchmarks, surpassing strong open-     Yan et al. 2024).
+   source and commercial baselines.
+                                                          2.2  Rubric-Based Methods
+             2  Related Work
+                                                            Rubrics decompose subjective assessments into explicit, ver-
+2.1  Long Video Understanding                                                                          ifiablecriteria, separatingevaluationstandards fromthejudg-
+Long-video understanding requires reasoning over sparse ev-      ing model. This makes LLM-as-a-judge evaluations more
+idence distributed across extended temporal contexts, which       interpretable and has been widely applied to open-ended
+is difficult to feed directly into MLLMs under visual-token       tasks (Liu et al. 2023; Zheng et al. 2023; Kim et al. 2023;
+
+======================== PDF 第 3 页 ========================
+Arora et al. 2025; Waheed et al. 2025; Yang et al. 2026),       narrative, yielding
+with recent studies exploring automatic rubric construction at       M = ML1 ∪ML2 ∪ML3.             (1)
+scale (Liu et al. 2026; Li et al. 2026; Fan et al. 2025; Gao et al.
+                                                   The three levels expose complementary retrieval units: L1
+2026; Qi et al. 2026). Beyond evaluation, rubrics have also
+                                                                preserves local actions and appearances, L2 captures event
+been adopted as reward signals in reinforcement learning,
+                                                                 progression, and L3 supplies video-level context. BGE-
+where LLM-based graders provide fine-grained feedback for
+                                      M3 (Chen et al. 2024b) encodes the narrative at every level
+tasks without explicit ground-truth answers (Schulman et al.
+2017; Liu et al. 2025a; Zhou et al. 2025; Zhang et al. 2026).       into h(ℓ)i   for text retrieval, while L1 additionally retains vi
+However, existing applications primarily use rubrics after       for access to the underlying perceptual evidence. A query can
+an answer is produced, either to evaluate outputs or opti-       thus retrieve a precise moment, a temporally extended event,
+mize training objectives. We instead move rubrics into the       or a global narrative through the same memory interface,
+inference loop of a long-video agent, where they serve as in-      which prevents global questions from being answered from
+terpretable criteria for assessing whether retrieved evidence       isolated local matches. Construction and indexing details are
+is sufficient and identifying unmet criteria that guide subse-      provided in the supplementary material.
+quent retrieval.                                           Online memory. Offline retrieval alone has no notion of
+                                                          whether a returned item is new, redundant, or useful for re-
+                                                                solving the remaining uncertainty. The online memory sup-
+             3  Methodology                                                                       plies this missing query-level state. At round t, it is defined
+As illustrated in Figure 2, REVEAL introduces rubric-guided       as
+evidence-sufficiency verification into long-video QA, re-                 Ot = (Et, Vt, Ht, Nt, At),              (2)
+trieving additional information whenever the current evi-      where Et is the deduplicated evidence cache, Vt contains vis-
+dence does not meet the question’s requirements. It com-       ited memory IDs, Ht records attempted history queries, Nt
+prises  three components:  (1) an  offline-online memory       indicates whether each attempt contributed new evidence,
+framework separating reusable video representations from      and At is the verifier’s latest analysis of the missing evi-
+question-dependent evidence accumulation (Section 3.1); (2)      dence. These fields jointly encode three complementary sig-
+a rubric construction pipeline that derives sufficiency crite-       nals: the current knowledge state, the explored search space,
+ria from decisive and misleading evidence (Section 3.2);      and the unresolved information need. The planner observes
+and (3) a rubric-guided retrieve–verify–answer loop that it-       the compact feedback tuple (Ht, Nt, At) instead of verbose
+eratively retrieves and verifies evidence before answering       criterion-level scores, so verification results guide retrieval
+(Section 3.3). A shared VLM serves as planner, verifier, and      and unproductive searches are recognized explicitly. The up-
+answerer through role-specific prompts, without supervised       date contract is detailed in the supplementary material.
+fine-tuning or reinforcement learning.
+                                                          3.2  Rubric Construction Pipeline
+3.1  Offline-Online Memory Framework                Semantic relevance is an inadequate stopping criterion: a re-
+                                                                    trieved clip may mention the correct entities yet omit the
+Long-video QA involves two distinct forms of memory: a                                                            temporal order, state change, or discriminative detail re-
+stable representation of what happened in the video and a                                                               quired by the question. We instead formulate stopping as
+transient reasoning state that records what has been estab-                                                        an evidence-sufficiency judgment governed by an explicit
+lished for the current question. Conflating them either re-                                                                      rubric. Manually authoring effective rubrics presents a fun-
+peats expensive video processing for every query or leaves                                                          damental trade-off: high-level, generic criteria fail to capture
+the retrieval process unaware of its previous attempts. RE-                                                                 the subtle failure modes that alter an answer, whereas ex-
+VEAL therefore factorizes memory into a persistent offline                                                                  haustively crafting fine-grained rules for specific error cases
+memory M and a question-conditioned online memory Ot.                                                         imposes prohibitive expert annotation costs. Our key obser-
+The former is constructed once and shared by all questions                                                                 vation is that sufficiency can be learned from the bound-
+about the same video; the latter is instantiated per question                                                              ary between decisive and deceptively relevant evidence. RE-
+and evolves with the evidence-acquisition process.                                        VEAL therefore constructs a reusable rubric library offline
+Offline memory. To preserve fine visual detail without forc-      from contrastive evidence pairs, following the pipeline in Fig-
+ing every query to search an hour-scale sequence at frame      ure 3. This grounds each criterion in the decision boundary
+level, we construct a three-level temporal hierarchy that bal-      between sufficient evidence that leads to correct predictions
+ances local fidelity and long-range abstraction. At its finest      and deceptive, insufficient evidence that misleads the model
+level, adjacent 1-fps frames are grouped by visual similar-       into incorrect answers. The rubric library is constructed ex-
+ity into coherent, variable-length L1 segments, avoiding the       clusively from the training set, with no exposure to the test
+splitting of a continuous event across the arbitrary fixed        set.
+windows used by prior work. An L1 item is represented        Given a question q with ground-truth answer y, a teacher
+as m(1)i = (tsi, tei, x(1)i   , h(1)i   , vi), where (tsi, tei) anchors the       identifies a decisive evidence set E+ and a topically relevant
+event in time, x(1)i   describes its multimodal content, h(1)i         yet non-decisive set E−. To ensure each pair exposes a gen-
+is its textual embedding, and vi preserves a representative      uine sufficiency boundary, we keep a candidate only when
+visual embedding. Consecutive L1 narratives are then sum-       the answer model A satisfies:
+marized bottom-up into L2 event timelines and an L3 global         A(q, E−) ̸= y,  A(q, ∅) ̸= y,  A(q, E+) = y.    (3)
+
+======================== PDF 第 4 页 ========================
+Figure 2: Overview of REVEAL. A hierarchical offline memory supports multi-scale retrieval; the online memory tracks
+evidence gaps and search history; and the planner and rubric-guided verifier iteratively retrieve and validate evidence before
+answering.
+
+
+                                                             proposer abstracts these properties into reusable, weighted
+                                                                          criteria with operational score boundaries (0 for missing
+                                                               evidence, 0.5 for partially sufficient, and 1 for sufficient).
+                                                            Rather than relying on single-pass generation, we iteratively
+                                                                      refine these criteria against held-out contrastive cases using
+                                                                   validation error feedback. The refined criteria are consoli-
+                                                              dated offline into a single unified rubric pool; at inference,
+                                                                 the verifier selects a question-specific subset from this fixed
+                                                            pool rather than authoring new rules per question, convert-
+                                                               ing recurring retrieval failure modes into an explicit and in-
+                                                                spectable sufficiency test. Complete algorithmic details and
+                                                        example rubrics are provided in the supplementary material.
+
+Figure 3: Contrastive rubric construction pipeline. A teacher      3.3  Rubric-Guided Retrieve–Verify–Answer Loop
+labels sufficient and misleading evidence; answer-dependent      Given the offline memory M and the unified rubric pool,
+filtering yields contrastive pairs; a proposer refines criteria;    REVEAL alternates between evidence acquisition and suffi-
+and held-out errors form the next working set.                   ciency verification. The planner translates the current infor-
+                                                          mation gap into a retrieval action, while the verifier deter-
+                                                        mines whether the accumulated evidence can discriminate
+                                                 among the answer options.
+These conditions guarantee the validity of each evidence
+pair: A(q, ∅) ̸= y prevents the model from answering via      Planner.  The planner serves two different roles over the
+blind guessing or background memory without visual con-      course of inference. In the initial round, it decomposes the
+text; A(q, E+) = y confirms that E+ is genuinely sufficient;      question and options into 2–4 short, self-contained queries,
+and A(q, E−) ̸= y ensures that E−lacks the key detail rather      improving recall when the answer depends on multiple enti-
+than accidentally leaking the answer. The retained pairs iso-        ties or events. In each subsequent repair round, it conditions
+late the fine-grained discriminative properties that transition     on the accumulated evidence and online state to choose a tar-
+an answer from unsupported to correct. Next, an LLM-based      geted retrieval action that addresses the diagnosed evidence
+
+======================== PDF 第 5 页 ========================
+gap.                                                       4  Experiments
+  At round t, the planner policy generates a retrieval action                                                          4.1  Experimental Setup
+at based on the current online memory state:
+                                                              Datasets.  We evaluate REVEAL on five public long-video
+                                     QA benchmarks using multiple-choice accuracy. Video-                    at = P(q, Ot−1).                   (4)
+                                        MME-L and LVBench test long-form third-person video
+   Specifically, at specifies the retrieval strategy over the       reasoning, while LongVideoBench evaluates referring and
+offline memory hierarchy. On one hand, targeted retrieval      temporal reasoning on its public validation split. EgoLifeQA
+leverages the verifier’s latest analysis At−1 to generate fo-      and Ego-R1 Bench focus on egocentric videos, where answer
+cused queries across all three levels (ML1, ML2, ML3). On      evidence is sparse and often tied to fine-grained daily activ-
+the other hand, exploratory retrieval directly samples un-        ities. Together, these datasets cover both viewpoint regimes
+visited segments (ML1 \ Vt−1) when a question requires      and a broad range of video durations and reasoning demands.
+broader coverage or targeted searches prove insufficient. By      Per-benchmark statistics, splits, and evaluation protocols are
+conditioning on the feedback tuple (Ht−1, Nt−1, At−1), the      provided in the supplementary material.
+planner explicitly learns what is currently missing (At−1)
+and what has previously failed (Ht−1, Nt−1), turning each      Baselines.  Following the grouping in Table 1, we compare
+reasoning step into a directed repair of the evidence cache       against three families of systems. Direct video MLLMs an-
+Et−1. Implementation details and prompt templates are pro-      swer from frames sampled over the video without an explicit
+vided in the supplementary material.                                 retrieval or memory module, spanning both open-source
+                                                       models (Video-RTS and Qwen3-VL-32B-Instruct) and com-
+Rubric-Guided Verification.   Crucially, REVEAL does      mercial models (Gemini 2.5 Pro and GPT-5). Retrieval-
+not generate a new rubric for each question. It maintains a      augmented methods, which fetch question-specific evidence
+single unified rubric pool built once offline, and at inference        at inference time, include Video-RAG, HippoRAG 2, and
+the verifier dynamically selects the subset of criteria relevant      Vgent. Memory-augmented methods, which build a persistent
+to the question q. Judging against this shared, pre-validated      video memory before answering, include M3-Agent, Vide-
+pool, rather than authoring ad hoc per-question rules, keeps      oLucy, and WorldMM. Together these families span direct
+criteria reusable and prevents irrelevant rules from affecting       perception, external retrieval, and long-term memory, cover-
+the verdict. For each selected criterion k, the verifier eval-      ing the dominant design choices for long-video QA.
+uates the accumulated evidence and assigns a satisfaction
+score zt,k ∈{0, 0.5, 1}. The overall verification confidence      Implementation Details.  We instantiate REVEAL with a
+for the question is computed as the weighted aggregation:         single Qwen3.5-27B model, denoted REVEAL-27B, which
+                                                                 builds the offline memory and also acts as planner, veri-
+          Pk wkzt,k                                      fier, and answerer, at temperature zero and without any fine-                     ρt =                  .                   (5)
+           Pk wk                              tuning; its standalone accuracy appears among the direct
+                                                            video MLLMs in Table 1 as a backbone reference. Frames
+The loop terminates when ρt ≥τ, indicating that the accu-       are encoded with SigLIP-Large (Zhai et al. 2023), a CLIP-
+mulated evidence is sufficient to decide among the options.                                                                        style (Radford et al. 2021) contrastive vision-language en-
+We emphasize that this certifies evidence sufficiency, not                                                                  coder, and text with BGE-M3 (Chen et al. 2024b). We use
+answer correctness: it asserts that the decisive information                                                            a single configuration for all five benchmarks, and each re-
+has been gathered, not that the resulting prediction is neces-                                                              ported result is computed from a single evaluation run. For
+sarily right. Otherwise, the verifier produces At, a concrete        fair comparison, each modular baseline is run with the same
+description of the missing facts still needed to satisfy the                                                    Qwen3.5-27B backbone, except M3-Agent, which keeps its
+remaining criteria. This design separates two decisions often                                                                 released task-trained checkpoint. Further implementation de-
+entangled in agentic retrieval: the scalar score ρt controls        tails, together with an efficiency analysis of runtime, token
+whether to continue, whereas At specifies what to retrieve      consumption, average number of retrieval rounds, and LLM
+next. In contrast to unconstrained self-reflection (Shinn et al.                                                                          call cost, are provided in the supplementary material.
+2023), both are grounded in reusable, inspectable criteria.
+Prompt schemas and deterministic aggregation details are      4.2  Main Results
+provided in the supplementary material.
+                                                             Table 1 compares REVEAL with recent long-video sys-
+Answer Generation.  Once the verifier accepts the evi-      tems. REVEAL-27B ranks  first on  all five benchmarks,
+dence or the retrieval budget is reached, the deduplicated ev-      reaching 64.4 on EgoLifeQA, 66.7 on Ego-R1 Bench,
+idence accumulated across rounds is passed to the answerer      65.9 on LVBench, 79.1 on Video-MME-L, and 75.7 on
+together with the question and options. The answerer is de-      LongVideoBench. On the two challenging egocentric bench-
+liberately isolated from retrieval control: it predicts from the      marks, it exceeds the strongest competitor by 10.9 and 14.7
+final evidence set, while the planner and verifier determine       points, respectively.
+how that set is acquired. All three roles use the same VLM. If       With the same Qwen3.5-27B backbone, REVEAL raises
+the budget is exhausted below the sufficiency threshold, the       the direct MLLM average from 57.2 to 70.4 and consistently
+answerer returns the best-supported prediction for bench-      outperforms the reimplemented modular frameworks. This
+mark compatibility, and the final missing-evidence analysis       controlled comparison attributes the gain to the framework
+is retained for diagnosis.                                           rather than model scale. With an open backbone, REVEAL
+
+======================== PDF 第 6 页 ========================
+       Method                                 Size EgoLifeQA Ego-R1 LVBench Video-MME LVB Avg.
+
+                                               Direct Video MLLMs
+
+       Video-RTS (Wang et al. 2025a)         7B      48.2      47.4     39.8        47.9      56.6  48.0
+       Qwen3-VL-32B-Instruct (Bai et al. 2025)  32B     32.2      32.3     39.4        53.1      53.5  42.1
+       Qwen3.5-27B (Qwen Team 2026)       27B     37.0      41.3     64.0        70.0      73.5  57.2
+       Gemini 2.5 Pro (Google DeepMind 2025) −      46.4      46.7     57.0        55.7    −  −
+       GPT-5 (OpenAI 2025)           −      48.6      46.3     60.4        74.3      64.5  58.8
+
+                                        Retrieval-augmented Methods
+
+      Video-RAG (Luo et al. 2025)          27B     46.6      47.3     47.5        66.4      52.0  52.0
+      HippoRAG 2 (Gutiérrez et al. 2025)     27B     43.3      42.4     51.2        68.3      57.9  52.6
+       Vgent (Shen et al. 2025)              27B     48.7      45.7     51.9        77.0      59.6  56.6
+
+                                   Memory-augmented Methods
+
+       M3-Agent (Long et al. 2025)           32B     53.5      52.0     49.3        55.3      47.6  51.5
+       VideoLucy (Zuo et al. 2025)           27B     42.5      51.2     50.4        68.7      52.7  53.1
+      WorldMM (Yeo et al. 2025b)          27B     49.2      50.7     48.7        58.7      57.7  53.0
+
+                                             Ours
+
+      REVEAL-27B                    27B     64.4      66.7     65.9        79.1      75.7  70.4
+
+Table 1: Main performance comparison on five public long-video reasoning benchmarks. The Video-MME column reports the
+Long split, and LVB denotes the LongVideoBench validation split; averages are reported only when all five results are available.
+
+
+               Components            Datasets              the loop still cannot tell which evidence is missing and of-
+Method                                                         ten re-searches the same region. Hierarchical offline mem-
+                 Offline Online Rubric  Video-                                                           ory (+1.7/ + 2.2) replaces fixed-length chunking with visu-
+                Iter. Mem. Mem.  Suff. MME(long)LVBench
+                                                                        ally coherent variable-length segments and multi-scale sum-
+Mbase   −  −   −   −      66.5      51.6         maries, so each retrieved unit spans a complete event rather
+M+iter   ✓  −   −   −      68.2      52.2         than a fragment, while the L2/L3 summaries expose the
+M+OffMem ✓  ✓   −   −      69.9      54.4         global context that isolated local segments lack; the larger
+                                                  LVBench gain reflects its stronger reliance on long-range
+M+OnMem ✓  ✓  ✓   −      71.3      55.0                                                            temporal structure. Online memory (+1.4/ + 0.6) tracks ad-
+Ours    ✓  ✓  ✓  ✓      79.1      65.9                                                               mitted evidence, prior queries, and per-round retrieval qual-
+                                                                                      ity, which suppresses redundant searches and preserves the
+  Table 2: Ablation on Video-MME(long) and LVBench.          state needed to steer the next query toward genuinely new
+                                                               evidence. These three components broaden and organize the
+                                                            evidence pool, but each still stops on relevance, which caps
+is also competitive with, and on the egocentric benchmarks       their combined effect. Rubric-guided sufficiency verification
+ahead of, strong commercial systems such as GPT-5; since      adds by far the largest jump (+7.8/ + 10.9): by scoring
+these systems differ substantially in scale, training, and ac-      whether the accumulated evidence actually meets the ques-
+cess, we treat such comparisons as indicative rather than       tion’s criteria, it stops only once the decisive evidence is
+strictly controlled. Overall, long-video reasoning depends       present and, on failure, names the specific missing clue to
+not only on model capacity, but on distinguishing decisive       drive a targeted repair query. This confirms that the decisive
+evidence from merely relevant content.                             factor is not broader memory coverage but explicitly identi-
+                                                               fying and repairing unmet evidence requirements, which is
+4.3  Ablation Study                                           exactly where relevance-based stopping fails.
+
+To isolate each component’s contribution, we start from a
+                                                          4.4  Analysis
+single-round retrieval baseline (66.5/51.6 on Video-MME-
+L/LVBench) and add one component at a time (Table 2).     One Rubric Pool Across All Benchmarks.  Throughout
+Iterative retrieval (+1.7/ + 0.6) lets the agent issue follow-      every experiment above, REVEAL relies on a single rubric
+up queries instead of committing to a single retrieval, re-      pool that is constructed once on the training split and then
+covering evidence that an imperfect first query misses; the      applied unchanged to all five benchmarks, spanning both
+gain is small because, without an explicit stopping signal,       third-person and egocentric footage. We neither tune nor
+
+======================== PDF 第 7 页 ========================
+                       (a)                                              (b)                                                 (c)
+
+Figure 4: Analysis of the sufficiency verifier: (a) accuracy vs. number of retrieved segments; (b) verifier calibration on Ego-R1;
+(c) per-type accuracy before/after verification.
+
+
+regenerate criteria per dataset: the same fixed pool drives      Efficacy of Rubric-Guided Verification.  To locate where
+verification everywhere, and at inference the verifier only       the verifier’s 7.8-point gain arises, we compare per-type ac-
+selects a question-specific subset from it. The consistent im-      curacy on Video-MME(long) before and after rubric-guided
+provements therefore reflect the transferability of one shared       verification. As shown in Figure 4c, the gains concentrate on
+set of sufficiency criteria rather than any benchmark-specific       evidence-sensitive categories: Temporal Reasoning (+17.6),
+engineering.                                               Counting (+14.6), and Action Recognition (+12.7), which
+                                                             hinge on ordering, quantity, or action, while high-baseline
+Effect of Evidence Volume.  To test whether REVEAL’s                                                                           gist categories change  little. No category regresses; only
+gains come simply from retrieving more evidence, we dis-                                                                   Spatial Perception, with three questions, is unchanged. This
+able verification and vary the number of retrieved segments.                                                             confirms that verification helps the categories where deci-
+As shown in Figure 4a, accuracy without verification peaks                                                                    sive evidence, rather than relevance, determines the answer.
+at 76.2% around 128 segments and then declines as ex-                                                        These are precisely the categories in which topically relevant
+tra segments add distraction, whereas REVEAL with suf-                                                         segments most often omit the deciding detail, which is why
+ficiency verification reaches 79.1% using about 31 segments                                                                    sufficiency verification contributes the single largest jump in
+on average. The gap is twofold: verification not only lifts                                                                 the aggregate ablation.
+the ceiling by 2.9 points but reaches it with roughly a quar-
+ter of the evidence, so the answerer reasons over a com-
+pact, decisive context rather than a relevance-ranked list that                                                          5  Conclusion
+dilutes the critical segment. The downward slope beyond
+128 segments is itself informative: once the decisive evi-
+                                        We presented REVEAL, a framework for long-video ques-dence is already present, further relevant-but-redundant seg-
+                                                                     tion answering that separates evidence sufficiency from re-ments actively hurt by crowding the context with plausible
+                                                                          trieval relevance. Rather than using rubrics only to evaluatedistractors—precisely the failure mode that an explicit suffi-
+                                                               outputs or shape training, REVEAL brings them into theciency test is designed to avoid. This confirms that targeted
+                                                                 inference loop: a rubric-guided verifier judges whether theacquisition, not sheer volume, drives the gain.
+                                                                    retrieved evidence is sufficient and turns unmet criteria into a
+Calibration of Sufficiency Verdicts.  To assess whether      missing-evidence analysis that drives targeted retrieval over
+the verifier’s verdict reflects real evidence sufficiency, we      an offline-online video memory, with the rubrics induced au-
+use Ego-R1’s target-time annotations—the interval contain-       tomatically from contrastive pairs of decisive and mislead-
+ing each answer’s supporting evidence—as retrieval-free or-      ing evidence. Across several long-video benchmarks, RE-
+acle evidence, and group questions by the final verdict. As    VEAL attains state-of-the-art accuracy, surpassing strong
+shown in Figure 4b, REVEAL scores 76.7% on sufficient ver-      open-source and closed-source MLLMs, and our analyses
+sus 57.1% on insufficient questions, and injecting the gold       attribute the gains to explicit sufficiency verification rather
+captions and frames recovers only +1.4 points for the former      than to feeding more relevant evidence. A current limitation
+but +6.5 for the latter. This suggests that the verdict sepa-        is that the online memory does not yet feed verification sig-
+rates well-supported from under-supported predictions and       nals back to continually revise the offline memory, which we
+that insufficient cases tend to lack decisive evidence; caption-       leave to future work. More broadly, our results suggest that
+only oracles (72.6%/58.4%) further indicate our memory       explicit evidence-sufficiency verification is an interpretable
+already carries most of the answer signal. A qualitative trace       control signal that could extend to other retrieval-based and
+is provided in the supplementary material.                       agent-based multimodal tasks.
+
+======================== PDF 第 8 页 ========================
+                 References                       Augmented Generation. In Proceedings of the 2023 Confer-
+                                                          ence on Empirical Methods in Natural Language Processing,Arora, R. K.; Wei, J.; Hicks, R. S.; Bowman, P.; Quiñonero-
+                                                        7969–7992.Candela, J.; Tsimpourlas, F.; Sharman, M.; Shah, M.; Val-
+lone, A.; Beutel, A.; et al. 2025. HealthBench: Evaluating     Kim, S.; Shin, J.; Cho, Y.; Jang, J.; Longpre, S.; Lee, H.;
+Large Language Models Towards Improved Human Health.      Yun, S.; Shin, S.; Kim, S.; Thorne, J.; and Seo, M. 2023.
+arXiv preprint arXiv:2505.08775.                             Prometheus: Inducing Fine-grained Evaluation Capability in
+                                                      Language Models. arXiv preprint arXiv:2310.08491.Asai, A.; Wu, Z.; Wang, Y.; Sil, A.; and Hajishirzi, H.
+2024. Self-RAG: Learning to Retrieve, Generate, and Cri-      Kurpath, M.  I.; Kaithakkodan,  J. M.; Zhou,  J.; Mullap-
+tique through Self-Reflection. In International Conference        pilly, S. S.; Almansoori, M.; Ahsan, N.; Kalmakhanbet, B.;
+on Learning Representations.                                    Shikhar, S.; Lalla, R.; Lahoud, J.; et al. 2025. LongShOT-
+                                                         Bench: A Benchmark and Agentic Framework for Omni-
+Bai, S.; Cai, Y.; Chen, R.; et al. 2025. Qwen3-VL Technical
+                                                   Modal Reasoning and Tool Use in Long Videos.  arXiv
+Report. arXiv preprint arXiv:2511.21631.
+                                                                  preprint arXiv:2512.16978.
+Chen, B.; Yue, Z.; Chen, S.; Wang, Z.; Liu, Y.; Li, P.; and                                                            Lewis, P.; Perez, E.; Piktus, A.; Petroni, F.; Karpukhin, V.;
+Wang, Y. 2025.  LVAgent: Long Video Understanding by                                                             Goyal, N.; Küttler, H.; Lewis, M.; Yih, W.-t.; Rocktäschel, T.;
+Multi-Round Dynamical Collaboration of MLLM Agents.                                                                          et al. 2020. Retrieval-Augmented Generation for Knowledge-
+arXiv preprint arXiv:2503.10200.                                                                  Intensive NLP Tasks.  In Advances in Neural Information
+Chen, G.; Liu, Y.; Huang, Y.; He, Y.; Pei, B.; Xu, J.; Wang,      Processing Systems, volume 33, 9459–9474.
+Y.; Lu, T.; and Wang, L. 2024a. CG-Bench: Clue-grounded                                                                      Li, S.; Zhao,  J.; Wei, M.; Ren, H.; Zhou, Y.; Yang,  J.;
+Question Answering Benchmark for Long Video Under-                                                                 Liu, S.; Zhang, K.; and Chen, W. 2026.  RubricHub: A
+standing. arXiv preprint arXiv:2412.12075.                                                        Comprehensive and Highly Discriminative Rubric Dataset
+Chen,  J.; Xiao,  S.; Zhang,  P.; Luo, K.; Lian, D.; and       via Automated Coarse-to-Fine Generation.  arXiv preprint
+Liu,  Z. 2024b.  BGE M3-Embedding:  Multi-Lingual,      arXiv:2601.08430.
+Multi-Functionality,  Multi-Granularity  Text Embeddings                                                                 Lin, B.; Ye, Y.; Zhu, B.; Cui, J.; Ning, M.; Jin, P.; and Yuan,
+Through  Self-Knowledge  Distillation.    arXiv  preprint                                                              L. 2023.  Video-LLaVA: Learning United Visual Repre-
+arXiv:2402.03216.                                                                  sentation by Alignment Before Projection.  arXiv preprint
+Fan, Y.; Ma, X.; Wu, R.; Du, Y.; Li,  J.; Gao, Z.; and      arXiv:2311.10122.
+Li, Q. 2024.  VideoAgent: A Memory-augmented Mul-       Liu, T.; Xu, R.; Yu, T.; Hong, I.; Yang, C.; Zhao, T.; and
+timodal Agent for Video Understanding.  arXiv preprint     Wang, H. 2025a. OpenRubrics: Towards Scalable Synthetic
+arXiv:2403.11481.                                          Rubric Generation for Reward Modeling and LLM Align-
+Fan, Z.; Wang, W.; Wu, X.; and Zhang, D. 2025. SedarEval:      ment. arXiv preprint arXiv:2510.07743.
+Automated Evaluation using Self-Adaptive Rubrics. arXiv       Liu, W.; Jin, J.; Huang, Z.; Wen, T.; Dong, G.; Zhao, Z.; Zhu,
+preprint arXiv:2501.15595.                                         Y.; Dou, Z.; and Wen, J.-R. 2026. The Rules of the Game:
+Fu, C.; Dai, Y.; Luo, Y.; Li, L.; Ren, S.; Zhang, R.; Wang,    A Survey of Rubrics for Large Language Models.  arXiv
+Z.; Zhou, C.; Shen, Y.; Zhang, M.; et al. 2024.  Video-       preprint.
+MME: The First-Ever Comprehensive Evaluation Bench-       Liu, Y.; Iter, D.; Xu, Y.; Wang, S.; Xu, R.; and Zhu, C. 2023.
+mark of Multi-modal LLMs in Video Analysis.   arXiv      G-Eval: NLG Evaluation using GPT-4 with Better Human
+preprint arXiv:2405.21075.                                   Alignment. In Proceedings of the 2023 Conference on Empir-
+Gao, S.; Su, Y.; Sui, P.; Ginder, C.; and Zitnik, M. 2026.       ical Methods in Natural Language Processing, 2511–2522.
+Qworld: Question-Specific Evaluation Criteria for LLMs.       Liu, Y.; Lin, K. Q.; Chen, C. W.; and Shou, M. Z. 2025b.
+arXiv preprint arXiv:2603.23522.                           VideoMind: A Chain-of-LoRA Agent for Long Video Rea-
+Google DeepMind. 2025. Gemini 2.5: Pushing the Fron-       soning. arXiv preprint arXiv:2503.13444.
+tier with Advanced Reasoning, Multimodality, Long Con-      Long; et al. 2025. M3-Agent. Technical report.
+text, and Next Generation Agentic Capabilities.  Technical      Luo, Y.; Zheng, X.; Li, G.; Yin, S.; Lin, H.; Fu, C.; Huang,
+report.                                                                              J.; Ji, J.; Chao, F.; Luo, J.; and Ji, R. 2025. Video-RAG:
+Gutiérrez, B.  J.; Shu, Y.; Qi, W.; Zhou, S.; and Su, Y.       Visually-aligned Retrieval-Augmented Long Video Compre-
+2025.  From RAG to Memory: Non-Parametric Contin-      hension. arXiv preprint.
+ual Learning for Large Language Models.  arXiv preprint     Maaz, M.; Rasheed, H.; Khan, S.; and Khan, F. S. 2023.
+arXiv:2502.14802.                                       Video-ChatGPT: Towards Detailed Video Understanding
+He, B.; Li, H.; Jang, Y. K.; Jia, M.; Cao, X.; Shah, A.;       via Large Vision and Language Models.  arXiv preprint
+Shrivastava, A.; and Lim, S.-N. 2024. MA-LMM: Memory-      arXiv:2306.05424.
+Augmented Large Multimodal Model for Long-Term Video     OpenAI. 2025. GPT-5 System Card. System card.
+Understanding. In Proceedings of the IEEE/CVF Conference                                                                Qi, Z.; Dickens, C.; Pham, D.; Dsouza, A.; Parchami, A.;
+on Computer Vision and Pattern Recognition.                                                                    Sala, F.; and Varma, P. 2026.  RIFT: A RubrIc Failure
+Jiang, Z.; Xu, F. F.; Gao, L.; Sun, Z.; Liu, Q.; Dwivedi-Yu, J.;     Mode Taxonomy and Automated Diagnostics. arXiv preprint
+Yang, Y.; Callan, J.; and Neubig, G. 2023. Active Retrieval      arXiv:2604.01375.
+
+======================== PDF 第 9 页 ========================
+Qwen Team. 2026. Qwen3.5-Omni Technical Report. arXiv      Yan, S.-Q.; Gu, J.-C.; Zhu, Y.; and Ling, Z.-H. 2024. Cor-
+preprint arXiv:2604.15804.                                         rective Retrieval Augmented Generation.  arXiv preprint
+Radford, A.; Kim, J. W.; Hallacy, C.; Ramesh, A.; Goh,      arXiv:2401.15884.
+G.; Agarwal, S.; Sastry, G.; Askell, A.; Mishkin, P.; Clark,      Yang, Z.; Chen, D.; Yu, X.; Shen, M.; and Gan, C. 2024.
+J.; et al. 2021. Learning Transferable Visual Models from     VCA: Video Curious Agent for Long Video Understanding.
+Natural Language Supervision. In International Conference      arXiv preprint arXiv:2412.10471.
+on Machine Learning, 8748–8763.                                                          Yang, Z.; Janghorbani, S.; Zhang, D.; Han, J.; Qian, Q.;
+Schulman, J.; Wolski, F.; Dhariwal, P.; Radford, A.; and       Ressler, A.; Lyng, G. D.; Batra, S. S.; and Tillman, R. E.
+Klimov, O. 2017. Proximal Policy Optimization Algorithms.      2026.  Health-SCORE: Towards Scalable Rubrics for Im-
+arXiv preprint arXiv:1707.06347.                              proving Health-LLMs. arXiv preprint arXiv:2601.18706.
+Shen; et al. 2025. Vgent. Technical report.                     Yao, S.; Zhao, J.; Yu, D.; Du, N.; Shafran, I.; Narasimhan,
+Shen, X.; Xiong, Y.; Zhao, C.; Wu, L.; Chen,  J.; Zhu,       K.; and Cao, Y. 2023. ReAct: Synergizing Reasoning and
+C.; Liu, Z.; Xiao, F.; Varadarajan, B.; Bordes, F.; et al.      Acting in Language Models. In International Conference on
+2024.  LongVU: Spatiotemporal Adaptive Compression      Learning Representations.
+for Long Video-Language Understanding.  arXiv preprint                                                           Yeo, J. H.; Chung, S.; Park, S.; Kim, D. H.; Moon, J.; and
+arXiv:2410.17434.                                                          Ro, Y. M. 2025a. GCAgent: Long-Video Understanding via
+Shinn, N.; Cassano, F.; Gopinath, A.; Narasimhan, K.; and      Schematic and Narrative Episodic Memory. arXiv preprint
+Yao, S. 2023. Reflexion: Language Agents with Verbal Re-      arXiv:2511.12027.
+inforcement Learning. In Advances in Neural Information                                                           Yeo, W.; Kim, K.; Yoon,  J.; and Hwang, S.  J. 2025b.
+Processing Systems.                                               WorldMM: Dynamic Multimodal Memory Agent for Long
+Song, E.; Chai, W.; Wang, G.; Zhang, Y.; Zhou, H.; Wu, F.;      Video Reasoning. arXiv preprint arXiv:2512.02425.
+Chi, X.; Guo, X.; Ye, T.; Zhang, Y.; et al. 2024. MovieChat:                                                                Zhai, X.; Mustafa, B.; Kolesnikov, A.; and Beyer, L. 2023.
+From Dense Token to Sparse Memory for Long Video Un-                                                       Sigmoid Loss for Language Image Pre-Training. In Proceed-
+derstanding. In Proceedings of the IEEE/CVF Conference                                                                ings of the IEEE/CVF International Conference on Computer
+on Computer Vision and Pattern Recognition.                                                                   Vision, 11975–11986.
+Tian, S.; Wang, R.; Guo, H.; Wu, P.; Dong, Y.; Wang, X.;
+                                                         Zhang, J.; Wang, Z.; Gui, L.; Mysore Sathyendra, S.; Jeong,
+Yang,  J.; Zhang, H.; Zhu, H.; and Liu, Z. 2025.  Ego-
+                                                                                       J.; Veitch, V.; Wang, W.; He, Y.; Liu, B.; and Jin, L. 2026.
+R1: Chain-of-Tool-Thought for Ultra-Long Egocentric Video
+                                                         Chasing the Tail: Effective Rubric-based Reward Modeling
+Reasoning. arXiv preprint arXiv:2506.13654.
+                                                                       for Large Language Model Post-Training. In International
+Waheed, A.; Wu, Z.; Alharthi, D.; Kim, S.; and Raj, B. 2025.                                                           Conference on Learning Representations (ICLR).
+VideoJudge: Bootstrapping Enables Scalable Supervision of
+                                                         Zheng, L.; Chiang, W.-L.; Sheng, Y.; Zhuang, S.; Wu, Z.;MLLM-as-a-Judge for Video Understanding. arXiv preprint
+                                                        Zhuang, Y.; Lin, Z.; Li, Z.; Li, D.; Xing, E.  P.; et  al.arXiv:2509.21451.
+                                                           2023. Judging LLM-as-a-Judge with MT-Bench and Chat-
+Wang, P.; Bai, S.; Tan, S.; Wang, S.; Fan, Z.; Bai, J.; Chen,                                                               bot Arena. In Advances in Neural Information Processing
+K.; Liu, X.; Wang, J.; Ge, W.; et al. 2024a. Qwen2-VL: En-                                                               Systems.
+hancing Vision-Language Model’s Perception of the World
+                                                        Zhou, J.; Shu, Y.; Zhao, B.; Wu, B.; Liang, Z.; Xiao, S.; Qin,at Any Resolution. arXiv preprint arXiv:2409.12191.
+                                                        M.; Yang, X.; Xiong, Y.; Zhang, B.; et al. 2024. MLVU:
+Wang, W.; He, Z.; Hong, W.; Cheng, Y.; Zhang, X.; Qi, J.;
+                                                      Benchmarking Multi-task Long Video Understanding. arXiv
+Gu, X.; Huang, S.; Xu, B.; Dong, Y.; et al. 2024b. LVBench:
+                                                                  preprint arXiv:2406.04264.
+An Extreme Long Video Understanding Benchmark. arXiv
+                                                        Zhou, Y.; Li, S.; Liu, S.; Fang, W.; Zhang, K.; Zhao, J.;preprint arXiv:2406.08035.
+                                                          Yang, J.; Zhou, Y.; Lv, J.; Zheng, T.; Lu, H.; Chen, W.; Xie,
+Wang, X.; Zhang, Y.; Zohar, O.; and Yeung-Levy, S. 2024c.
+                                                                      Y.; and Song, M. 2025. Breaking the Exploration Bottle-
+VideoAgent: Long-form Video Understanding with Large
+                                                              neck: Rubric-Scaffolded Reinforcement Learning for Gen-
+Language Model as Agent. arXiv preprint arXiv:2403.10517.
+                                                                       eral LLM Reasoning. arXiv preprint arXiv:2508.16949.
+Wang, Z.; Yoon, J.; Yu, S.; Islam, M. M.; Bertasius, G.; and
+                                                         Zuo, J.; Deng, Y.; Kong, L.; Yang, J.; Jin, R.; Zhang, Y.;Bansal, M. 2025a. Video-RTS: Rethinking Reinforcement
+                                                           Sang, N.; Pan, L.; Liu, Z.; and Gao, C. 2025. VideoLucy:Learning and Test-Time Scaling for Efficient and Enhanced
+                                                   Deep Memory Backtracking for Long Video Understanding.Video Reasoning. In Proceedings of the 2025 Conference on
+                                                            arXiv preprint arXiv:2510.12422.Empirical Methods in Natural Language Processing.
+Wang, Z.; Zhou, H.; Wang, S.; Li, J.; Xiong, C.; Savarese,
+S.; Bansal, M.; Ryoo, M. S.; and Niebles,  J. C. 2025b.
+Active Video Perception: Iterative Evidence Seeking for
+Agentic Long  Video  Understanding.    arXiv  preprint
+arXiv:2512.05774.
+Wu, H.; Li, D.; Chen, B.; and Li, J. 2024. LongVideoBench:
+A Benchmark for Long-context Interleaved Video-Language
+Understanding. arXiv preprint arXiv:2407.15754.
+
+======================== PDF 第 10 页 ========================
+    A  Additional Details on Datasets             This split stresses long-horizon third-person understanding.
+We evaluate REVEAL on five public long-video QA bench-     LVBench.  LVBench targets extreme-length third-person
+marks that together span third-person and egocentric footage      videos averaging over an hour. Because several source videos
+and a broad range of durations and reasoning demands. All      have been removed from their original hosting site, we evalu-
+benchmarks are scored with multiple-choice accuracy, and       ate on the publicly retrievable subset of 86 videos with 1,267
+every method is evaluated on exactly the same question set       questions and run all baselines on this identical subset, so
+for each benchmark.                                     no result is compared against externally reported numbers
+                                                      computed on the full set.Why these benchmarks.  We select these five benchmarks
+so that our evaluation jointly stresses the conditions RE-     LongVideoBench.  We use the public validation split of
+VEAL is designed for, namely locating and combining sparse      LongVideoBench: 1,337 questions over 753 videos. Its ques-
+decisive evidence across long temporal horizons. They are       tions emphasize referring and temporal reasoning, where the
+chosen to vary along three axes. First, in viewpoint, Video-     model must locate a specific referenced moment rather than
+MME-L and LVBench are third-person, whereas EgoLifeQA       rely on global gist.
+and Ego-R1 Bench are egocentric, where evidence is sparser
+                                                    EgoLifeQA.  EgoLifeQA is an egocentric daily-life bench-and tied to fine-grained daily activities; this tests whether our
+                                                         mark; we evaluate the single-participant (A1) setting withmemory and sufficiency verification transfer across perspec-
+                                                     500 questions. Answer evidence is sparse and tied to fine-tives rather than overfitting to one. Second, in duration, the
+                                                              grained everyday activities spread across very long record-videos range from roughly 30–60 minutes (Video-MME-L)
+                                                                      ings.to over an hour (LVBench) to week-scale recordings (Ego-R1
+Bench), probing scalability as the search space grows. Third,     Ego-R1 Bench.  Ego-R1 Bench evaluates ultra-long ego-
+in reasoning demand, the benchmarks emphasize different       centric reasoning over week-scale recordings with 300 ques-
+skills, from global gist and event ordering to referring and       tions, many of which require chaining evidence across widely
+temporal localization (LongVideoBench) and cross-event ev-      separated moments. It provides target-time annotations mark-
+idence chaining (Ego-R1 Bench). All five are public, widely      ing the interval that contains each answer’s supporting evi-
+used, and evaluated under the same multiple-choice protocol,      dence, which we use only for the retrieval-free oracle analysis
+which keeps our results comparable to prior work; in addi-       in the main paper.
+tion, Ego-R1 Bench provides target-time annotations that
+enable the retrieval-free oracle analysis in the main paper.      B  Additional Implementation Details
+We deliberately avoid short-video or single-clip benchmarks,
+since they do not exhibit the long-horizon, sparse-evidence     B.1  Baseline Setup
+retrieval problem that motivates REVEAL.                     For fair comparison, we run each modular baseline with its
+                                                                 released pipeline but replace its interchangeable backbone
+Evaluation metric.  Every benchmark we use is posed as                                                            with the same Qwen3.5-27B model used by REVEAL, so
+multiple-choice question answering, so we report top-1 an-                                                                       that accuracy differences reflect retrieval and memory de-
+swer accuracy, i.e., the fraction of questions whose selected                                                                sign rather than model capacity. M3-Agent is the exception:
+option matches the gold option. We adopt accuracy for three                                                                                                it relies on a task-trained checkpoint and changing its back-
+reasons. First, it is the metric defined by the original bench-                                                       bone would require retraining, so we evaluate its released
+marks and used by prior work, so our results are directly                                                             checkpoint as published. The direct open-source and com-
+comparable to published baselines without any re-scoring.                                                              mercial MLLMs use neither retrieval nor an explicit mem-
+Second, it is objective and fully reproducible: correctness is                                                           ory module: following common practice, we sample frames
+an exact match against a single gold option, which avoids the                                                             uniformly at 1 fps and cap the visual input at 768 frames,
+noise and prompt sensitivity of free-form generation met-                                                             uniformly subsampling any longer video down to this bud-
+rics or LLM-as-a-judge scoring. This matters for our setting,                                                                          get, and feed the resulting frames together with the question
+where questions probe fine-grained temporal, causal, and                                                       and options. Unless otherwise stated, all other settings follow
+counting distinctions and a partial-credit metric could ob-                                                           each method’s official specification.
+scure whether the decisive evidence was actually retrieved.
+Third, a single scalar per benchmark lets us compare perfor-     B.2  Offline and Online Memory
+mance consistently across viewpoint regimes (third-person
+                                                                 Offline memory.  The offline memory M stores a persis-vs. egocentric) and across widely varying video durations.
+                                                                            tent, multi-scale representation of the entire video that anyBecause the answer options are fixed, accuracy also cleanly
+                                                                           later question can query. Because an hour-long video cannotisolates the effect of evidence sufficiency, which is our central
+                                                        be fed to a VLM in full, M uses similarity-based variable-question, from confounds introduced by answer-generation
+                                                                length segmentation to preserve coherent events and a three-style.
+                                                                       level hierarchy to expose evidence at multiple temporal gran-
+Video-MME-L.  We use the Long split of Video-MME,        ularities. It is constructed once, before any question is ob-
+which contains 900 questions over 300 videos of roughly       served, through the bottom-up process described below.
+30–60 minutes each drawn from diverse domains. Human-      We first sample video frames at 1 fps and remove low-
+written subtitles are provided; when available, they are tem-       quality frames before segmentation. Near-black, near-white,
+porally aligned to segments during memory construction.      and nearly uniform frames are detected using JPEG size
+
+======================== PDF 第 11 页 ========================
+and pixel statistics, while blurred frames are filtered using a     The offline memory exposes two independent retrieval chan-
+Laplacian-variance criterion. The remaining frames are en-       nels rather than a single fused index. The narrative embed-
+coded using SigLIP. Rather than partitioning the video into      dings form the primary channel: a text query is matched
+fixed-duration chunks, adjacent frames are greedily grouped       against them and returns the corresponding narratives across
+into variable-length segments when their visual cosine sim-        all three levels. The L1 visual embeddings form a separate
+ilarity exceeds a threshold θ, which is set to 0.8 by default.      channel: the memory stores only the visual vectors, and when
+This similarity-based grouping reduces the likelihood that a      a query is matched against them, the frames of each re-
+coherent action or scene transition is divided across unrelated       trieved segment are extracted on demand from the original
+memory units.                                               video by its temporal boundaries (tsi, tei) and supplied to the
+  For each segment, the same Qwen3.5-27B video-language      answerer when fine-grained visual appearance is required.
+model that later serves as planner, verifier, and answerer     The two channels are queried separately, so text retrieval
+generates a fine-grained textual description using the seg-       returns narratives while visual retrieval returns raw frames.
+ment frames together with temporally aligned  subtitles     LongVideoBench videos vary widely in length, so we route
+when the dataset provides them; we do not run automatic       the frames supplied to the answerer by video duration: for
+speech recognition. The captioning prompt preserves answer-      videos longer than 10 minutes we sample frames densely
+relevant information, including identities, objects, actions,      within the retrieved span, whereas videos of at most 10 min-
+state changes, temporal transitions, spatial relations, and       utes are short enough to be covered in full and are instead
+counts. Each L1 memory item is represented as                sampled uniformly at 1 fps over their entire duration. Mem-
+                                                           ory construction and rubric-guided retrieval are identical in
+            m(1)i =  tsi, tei, x(1)i   , h(1)i   , vi   ,            (6)      both cases; only the frames fed to the answerer differ.
+where (tsi, tei) denote the temporal boundaries, x(1)i    is the      Online memory.  The  implementation  maintains  one
+segment-level narrative, h(1)i   is its BGE-M3 textual embed-     OnlineMemory object per question. Its persistent state af-                                                                            ter round t isding, and vi is the SigLIP visual embedding of a represen-
+tative keyframe. Thus, h(1)i  serves the text-retrieval channel,                 Ot = (Et, Vt, Ht, Nt, At) ,            (11)
+while vi serves the visual channel. The resulting L1 segments
+                                                       where Et is the admitted evidence cache (text, chunk ID,are approximately 10 seconds long on average.
+                                                                 source, and round), Vt is the set of visited memory IDs,  Higher-level memories are constructed bottom-up by sum-
+                                              Ht is the ordered query history, Nt records whether eachmarizing consecutive lower-level entries. Every 12 L1 de-
+                                                              attempt contributed new evidence, and At is the verifier’sscriptions are summarized into an L2 event-level representa-
+                                                                            latest missing-evidence analysis. New evidence is rejectedtion:
+                                                 when its embedding cosine similarity to the cache exceeds
+              x(2)j = S2  x(1)12j, . . . , x(1)12j+11   ,           (7)       0.9. For planner feedback, the implementation exposes only
+where S2 is an LLM summarizer instructed to preserve event      (Ht, Nt, At); criterion scores and verdict metadata remain in
+progression, temporal order, entity interactions, and state       the execution trace. This distinction prevents verbose verifier
+transitions. Each L2 entry contains an approximately 120-       state from diluting the next retrieval target.
+word event-timeline summary.
+   Similarly, every 12 consecutive L2 entries are summarized     B.3  Prompt Details
+into an L3 video-level representation:                        Planner prompt.  Round 0 uses a separate decomposer
+                                                       prompt that requests 2–4 self-contained subquestions of at
+             x(3)k = S3  x(2)12k, . . . , x(2)12k+11   ,           (8)      most 15 words, with one query per option for negation ques-
+where S3 produces an approximately 300-word description       tions. From round 1 onward, the system prompt presents
+of the global narrative, major events, and coarse temporal       exactly two actions: Text Retrieval, with 1–4 focused
+structure. L1 retains local visual details, L2 captures event       queries, and Uniform Sampling, with an empty query
+processes, and L3 provides whole-video context. Because         list. The user message contains the question and options,
+upper levels are constructed from lower-level descriptions       prior queries under “Already tried”, current retrieval-quality
+rather than by repeatedly processing raw frames, the hierar-       records, timestamps covered by current evidence, and At
+chy remains consistent with the original segment observa-      under <missing_evidence>. The required output is
+tions while avoiding additional visual encoding cost.             {"strategy": "Text Retrieval" |
+  Each narrative representation x(ℓ)i   at level ℓ∈{1, 2, 3} is       "Uniform Sampling",                                                     "queries": ["..."],encoded using BGE-M3:
+                                                     "reasoning": "one sentence"}
+                    h(ℓ)i = ftext  x(ℓ)i     .                 (9)      Uniform sampling is instructed for global summaries, events
+                                                                    distributed across the video, chronological questions, or re-Accordingly, every memory level stores its narrative together
+                                                               peatedly failed targeted retrieval. Generated queries are addi-
+with h(ℓ)i   , whereas the visual embedding vi is retained only       tionally rejected when Jaccard similarity to history is at least
+for L1 segments, where it remains temporally aligned with                                                               0.9 or BGE cosine similarity to accumulated evidence is at
+the source frames. The offline memory is therefore                                                                         least 0.70; if no query survives, the executor falls back to
+     M = ML1 ∪ML2 ∪ML3.           (10)      uniform sampling. For each surviving query, retrieval takes
+
+======================== PDF 第 12 页 ========================
+the top 8 L1 segment narratives, 4 L2 event summaries, and      by a defining attribute, and consistently excludes alternative
+2 L3 global summaries; the candidates are merged across       counts. Each criterion supplies explicit boundaries for scores
+queries and rubric-reranked to 8 evidence pieces before be-       1, 0.5, and 0, with the weighted score ρ = Pk wkzk/ Pk wk
+ing admitted to the cache. The loop runs for at most K = 3     compared against τ.
+rounds. These rules match src/agents/planner.py
+in the evaluated mainline; time and image actions are not
+enabled.
+Verifier prompts.   Verification uses two calls. The first re-     B.5  Hyperparameter Selection
+ceives only the question, options, and criterion catalog and
+returns the names of relevant criteria; its result is cached per
+question. The second receives the selected rubric and accu-
+                                                   The main hyperparameters were tuned on Video-MME-
+mulated evidence. For every option and criterion it outputs a
+                                            L during development and then applied unchanged to all
+sufficiency score of 1, 0.5, or 0, where evidence that clearly
+                                                                 other benchmarks. We grid-searched the number of retrieval
+rules out an option is as sufficient as evidence that confirms
+                                                           rounds K ∈{1, 2, 3, 4, 5} and the sufficiency threshold
+it. Its strict output schema is
+                                                             τ ∈{0.6, 0.7, 0.8, 0.85, 0.9}, and additionally varied the
+  {"rubric_criteria_scores": {                       segmentation similarity θ around its default of 0.8. For each
+    "A": {"criterion_name": 0.0},                     configuration we compared development accuracy under a
+    "B": {"criterion_name": 0.0}},                                                                    fixed per-round retrieval budget and selected the setting
+   "unknown_options": ["A"],
+                                                                       that maximized accuracy without incurring unnecessary re-   "missing_evidence_analysis":
+                                                                             trieval, giving K = 3, τ = 0.7, and θ = 0.8.    "specific fact to retrieve"}
+
+The model does not emit the final verdict. The implemen-
+tation computes ρt,o = Pk wkzt,o,k/ Pk wk, aggregates
+ρt = maxo ρt,o, and compares it with the rubric-pool thresh-
+old τ = 0.7. Only when the result is insufficient is the     B.6  Computing Infrastructure
+nonempty missing-evidence analysis fed back to the planner.
+This procedure matches src/agents/verifier.py
+and the rubric_pool.yaml configuration used by the                                                               All experiments were run on a Linux server (Ubuntu 24.04,
+mainline runs.                                                                kernel 6.17) with a 192-core Intel Xeon Platinum 8558 CPU,
+                                                     818 GB of RAM, and NVIDIA RTX PRO 6000 (Black-
+B.4  Contrastive Rubric Construction Details                                                                     well, 96 GB) GPUs (driver 580, CUDA 13). A single 96 GB
+Evidence sampling and labeling.  For each development    GPU is sufficient to host Qwen3.5-27B, which we serve
+question, candidate evidence  is retrieved using L1@16,      with vLLM 0.20; the number of GPUs used varies across
+L2@16, and all L3 summaries. Given the question, options,      runs and only parallelizes evaluation without affecting re-
+and gold answer, a teacher labels a sufficient set E+ contain-        sults. The retrieval encoders SigLIP-Large and BGE-M3 run
+ing the decisive information and a misleading set E−that      under Python 3.11 with PyTorch 2.11 (CUDA 12.8 build),
+is topically relevant but omits the critical action, transition,      transformers 5.7, sentence-transformers 5.4, and FlagEm-
+relation, causal clue, or exclusion evidence.                    bedding 1.4.
+
+Pair filtering.  We retain a question only when the answer
+model is correct with E+, incorrect without video evidence,
+and incorrect or unsupported with E−. Each retained ques-
+tion yields one positive and one negative evidence chain. This     B.7  Efficiency and Cost
+removes prior-answerable and weakly contrastive cases; on
+Video-MME, approximately 44% of candidates are filtered
+out.
+                                                     Beyond accuracy, we compare REVEAL’s end-to-end cost
+Rubric refinement and verification.  For every retained       against representative retrieval- and memory-based base-
+pair, a proposer may add, rewrite, decompose, delete, or       lines on two benchmarks. Table 3 reports wall-clock run-
+reweight criteria under the constraint that each criterion sep-       time, GPU-hours, and total token consumption, and Table 4
+arates the sufficient and misleading chains. Proposed criteria      summarizes REVEAL’s average retrieval rounds and LLM
+are clustered, deduplicated, and weight-normalized. The up-        call cost across all five evaluation benchmarks. For each
+dated library is then evaluated on held-out pairs; misjudged      benchmark, all methods are run on the same question set and
+examples form the next working set, and refinement repeats       the same hardware; all figures are approximate and denoted
+until validation stabilizes. At inference time, the verifier se-      by “∼”. REVEAL achieves the highest accuracy among the
+lects relevant criteria from the merged library rather than     compared methods while maintaining moderate end-to-end
+constructing a new rubric.                                           cost: its runtime is below the heavier memory-based base-
+  As an example, a counting rubric checks whether the evi-       line and remains within the same order of magnitude as
+dence enumerates distinct instances, identifies each instance       lightweight retrieval systems.
+
+======================== PDF 第 13 页 ========================
+                    LVBench                                 in runtime. REVEAL is both more accurate and faster than
+                                                      VideoLucy and VideoRAG on both benchmarks, and it is
+Method              Time (h)      GPU-h       Tok. (M)
+                                                                  also faster than Vgent on Video-MME-L. HippoRAG, and
+REVEAL (ours)        ∼5.5       ∼88        ∼145       Vgent on LVBench, provide lower wall-clock cost, but at the
+VideoLucy           ∼14        ∼224       ∼230       expense of lower accuracy. This favorable trade-offfollows
+VideoRAG             ∼6.4       ∼102       ∼80       from bounded and selective computation: verification adds
+HippoRAG            ∼1.55       ∼25        ∼55.9        further retrieval only when the current evidence is insuffi-
+Vgent                 ∼3.1       ∼50        ∼97          cient, and each repair round targets a diagnosed evidence
+                 Video-MME-L                         gap rather than broadly expanding the context. Online mem-
+                                                           ory additionally suppresses redundant retrieval, while early
+Method              Time (h)      GPU-h       Tok. (M)                                                              stopping avoids unnecessary rounds once decisive evidence
+REVEAL (ours)        ∼5.5       ∼88        ∼199       has been collected. REVEAL therefore spends its additional
+VideoLucy           ∼10        ∼160       ∼164       computation on improving evidence quality rather than sim-
+VideoRAG           ∼8        ∼128       ∼102        ply increasing evidence volume, yielding higher accuracy
+HippoRAG            ∼3.33       ∼53        ∼122.5       with controlled runtime overhead. Table 4 further shows that
+Vgent                 ∼6.4       ∼102       ∼136.75        this control extends beyond the two efficiency benchmarks:
+                                                                across all five evaluation sets, REVEAL typically stops after
+Table 3: End-to-end efficiency on LVBench and Video-      roughly two retrieval rounds on average and stays within a
+MME-L. All methods use the same question set and hardware      narrow band of 5.3–6.9 LLM calls per question, indicating
+within each benchmark; values are approximate (∼).               that the retrieve–verify–repair loop remains stable rather than
+                                                          expanding into many serial steps.
+Dataset                      Iter dist. (1/2/3)        Avg. rounds     LLM calls/Q
+
+Video-MME-L          589 / 48 / 263             1.64                 5.3
+
+LVBench               407 / 64 / 796             2.31                 6.6
+
+LongVideoBench         28 / 16 / 90              2.46                 6.9
+
+EgoLife (A1)             19 / 1 / 30              2.22                 6.4
+EgoR1 (6 users)          56 / 12 / 82              2.17                 6.3      C  Additional Description on Experiments
+
+Table 4: Retrieval rounds and LLM call cost of REVEAL
+across five benchmarks. “Iter dist.” gives the number of ques-
+tions that terminate after 1, 2, or 3 retrieval rounds.
+                                                            This section provides additional qualitative support for the
+Why token count and runtime are not proportional.  The                                                              Analysis in the main paper, complementing the evidence-
+Video-MME-L result illustrates that total token volume is not                                                          volume, verifier-calibration, and per-type breakdowns re-
+the sole determinant of wall-clock time: REVEAL processes                                                              ported there.
+approximately 199M tokens yet completes faster than sev-
+eral methods with lower token counts. Token count measures
+aggregate model input and output, whereas runtime also de-
+pends on the number of sequential calls, batching efficiency,
+repeated retrieval, and autoregressive decoding. REVEAL
+reduces the critical path in several ways. Its hierarchical                                                  C.1  Case Study
+memory is constructed once per video and reused across
+questions, and its rubric pool is fixed rather than regenerated
+for every query. During online QA, retrieval is capped at
+K = 3 rounds, stops as soon as the accumulated evidence
+is sufficient, and uses online memory to reject duplicate evi-
+                                                              Figure 5 traces one Video-MME-L question that the no-
+dence and avoid repeating unsuccessful searches. The system
+                                                                  rubric variant answers incorrectly and REVEAL answers
+averages only 1.64–2.46 retrieval rounds and 5.3–6.9 LLM                                                                       correctly. The question asks which listed event is not shown,
+calls per question across the five benchmarks (Table 4); on
+                                                       and the first retrieval round returns segments that are all
+the two efficiency benchmarks specifically, it uses 5.3 calls
+                                                                     topically on-video, so a relevance-only reader commits to a
+per question on Video-MME-L and 6.6 on LVBench. Thus,
+                                                              plausible-but-wrong option. The rubric verifier insteadmarks
+the additional tokens support reusable multi-scale memory                                                             every option unknown and returns insufficient: no segment
+and explicit verification, while the number of sequential de-
+                                                                   yet grounds the presence or absence of the decisive event.
+pendencies remains bounded; this allows substantial token
+                                                   The planner turns this diagnosis into a targeted repair query,
+volume to be processed without a proportional increase in
+                                                                      retrieves the two segments that settle it, and the verifier then
+end-to-end latency.                                                                   returns sufficient, after which the answerer selects the correct
+Accuracy–efficiency trade-off.  Taken together with the       option. This is the intended behaviour—separating relevance
+main results, Table 3 shows that REVEAL’s consistent ac-      from sufficiency and repairing the specific gap—made con-
+curacy advantage does not require a proportional increase       crete.
+
+======================== PDF 第 14 页 ========================
+ Q. Which of the following is not depicted in the video?
+    (A) Leopard climbs trees   (B) Hyenas prey on ani-
+  mals
+    (C) A lion is attacked by lions
+    (D) Eagles eat animal bodies ←gold
+
+ Round 0  decompose into four per-option probes; re-
+  trieve 26 segments.
+  Verifier: all options unknown ⇒insufficient.
+ Round 1   repair query: “visual evidence of eagles eat-
+  ing animal carcasses”; +2 decisive segments.
+  Verifier: sufficient.
+  No-rubric variant →(C) (×)   REVEAL →(D) (✓)
+
+Figure  5: A  representative  retrieve–verify–repair  trace
+(Video-MME-L). Relevance-only retrieval is insufficient for
+a negation question; the rubric verifier localizes the gap and
+one targeted repair round supplies the decisive evidence, flip-
+ping the answer from wrong to right.

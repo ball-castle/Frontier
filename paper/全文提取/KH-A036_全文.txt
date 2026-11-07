@@ -1,0 +1,760 @@
+KH-A036 | Long-Term Feature Banks for Detailed Video Understanding
+来源：https://arxiv.org/abs/1812.05038
+本地PDF：专题文献/何恺明/KH-A036_Long_Term_Feature_Banks_for_Detailed_Video_Understanding_CVPR2019.pdf
+SHA-256：f27e2c001bf0963ed19a53eef73cdd6d211f9b24dca007300dde5710bed2dfe1
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+             Long-Term Feature Banks for Detailed Video Understanding
+
+
+                    Chao-Yuan Wu1,2        Christoph Feichtenhofer2       Haoqi Fan2
+                     Kaiming He2             Philipp Kr¨ahenb¨uhl1       Ross Girshick2
+                    1The University of Texas at Austin   2Facebook AI Research (FAIR)
+
+
+                        Abstract                                                                   Target frame
+
+           To understand the world, we humans constantly need to2019
+          relate the present to the past, and put events in context.
+         In this paper, we enable existing video models to do the
+         same. We propose a long-term feature bank—supportiveApr
+         information extracted over the entire span of a video—to                                                                                                                            Input clip (4 seconds)
+        augment state-of-the-art video models that otherwise would17                                                                      Figure 1. What are these people doing? Current 3D CNN video
+         only view short clips of 2-5 seconds.  Our experiments                                                                     models operate on short clips spanning only ∼4 seconds. With-
+         demonstrate that augmenting 3D convolutional networks      out observing longer-term context, recognition is difﬁcult. (Video
+         with a long-term feature bank yields state-of-the-art results     from the AVA dataset [14]; see next page for the answer.)
+        on three challenging video datasets: AVA, EPIC-Kitchens,
+        and Charades. Code is available online.1
+                                                            The long-term feature bank is inspired by works that[cs.CV]
+         1. Introduction                                            leverage long-range temporal information by using pre-
+                                                             computed visual features [25, 31, 45, 57]. However, these
+         What is required to understand a movie? Many aspects     approaches extract features from isolated frames using an
+         of human intelligence, for sure, but memory is particularly     ImageNet pre-trained network, and then use the features as
+         important. As a ﬁlm unfolds there’s a constant need to relate     input into a trained pooling or recurrent network. Thus the
+         whatever is happening in the present to what happened in    same features represent both the present and the long-term
+          the past. Without the ability to use the past to understand      context. In contrast, we propose to decouple the two: the
+          the present, we, as human observers, would not understand     long-term feature bank is an auxiliary component that aug-
+        what we are watching.                                    ments a standard video model, such as a state-of-the-art 3D
+            In this paper, we propose the idea of a long-term feature    CNN.  This design enables the long-term feature bank to
+        bank that stores a rich, time-indexed representation of the      store ﬂexible supporting information, such as object detec-
+          entire movie. Intuitively, the long-term feature bank stores      tion features, that differ from what the 3D CNN computes.
+          features that encode information about past and (if avail-         Integrating the long-term feature bank with 3D CNNs
+          able) future scenes, objects, and actions. This information       is straightforward. We show that a variety of mechanisms
+         provides a supportive context that allows a video model,      are possible, including an attentional mechanism that relatesarXiv:1812.05038v2
+         such as a 3D convolutional network, to better infer what     information about the present (from the 3D CNN) to long-
+            is happening in the present (see Fig. 1, 2, and 5).               range information stored in the long-term feature bank. We
+        We expect the long-term feature bank to improve state-      illustrate its application to different tasks with different out-
+          of-the-art video models because most make predictions     put requirements: we show results on datasets that require
+         based only on information from a short video clip, typi-      object-level as well as frame- or video-level predictions.
+          cally 2-5 seconds [5, 33, 46–48, 51, 52, 56]. The reason for                                                                                  Finally, we conduct extensive experiments demonstrat-
+           this short-term view is simple: benchmark advances have                                                                      ing  that augmenting 3D CNNs with a long-term  fea-
+          resulted from training end-to-end networks that use some                                                                             ture bank yields state-of-the-art results on three challeng-
+        form of 3D convolution, and these 3D convolutions require                                                                      ing video datasets: AVA spatio-temporal action localiza-
+         dense sampling in time to work effectively. Therefore, to ﬁt                                                                             tion [14], EPIC-Kitchens verb, noun, and action classiﬁca-
+          in GPU memory the video inputs must be short.                                                                             tion [6], and Charades video classiﬁcation [38]. Our abla-
+           1https://github.com/facebookresearch/                   tion study establishes that the improvements on these tasks
+        video-long-term-feature-banks                               arise from the integration of long-term information.
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+...                                                                                                               ...
+
+                                           3D CNN input
+
+                                           Long-Term Feature Bank
+
+Figure 2. The action becomes clear when relating the target frame to the long-range context. Our long-term feature bank provides long-
+term supportive information that enables video models to better understand the present. (AVA ground-truth label: ‘listening to music’.)
+
+2. Related Work                                       3. Long-Term Feature Bank Models
+
+Deep networks are the dominant approach for video un-        For computer vision models to make accurate predic-
+derstanding [5, 21, 33, 39, 46–48, 50, 51, 56]. This includes      tions on long, complex videos they will certainly require the
+the highly successful two-stream networks [21, 39, 50] and      ability to relate what is happening in the present to events
+3D convolutional networks [5,33,46–48,51,56]. In this pa-      that are distant in time. With this motivation in mind, we
+per, we use 3D CNNs, but the long-term feature bank can     propose a model with a long-term feature bank to explicitly
+be integrated with other families of video models as well.       enable these interactions.
+
+Temporal and relationship models include RNNs that                                                               3.1. Method Overview
+model the evolution of video frames [7, 24, 27, 44, 57]
+and multilayer perceptrons that model ordered frame fea-     We describe how our method can be used for the task
+tures [58]. To model ﬁner-grained interactions, a growing     of spatio-temporal action localization, where the goal is to
+line of work leverages pre-computed object proposals [52]      detect all actors in a video and classify their actions. Most
+or detections [4,30], and models their co-occurrence [30,43,      state-of-the-art methods [9, 14, 43] combine a ‘backbone’
+52], temporal order [4], or spatial arrangement [52] within    3D CNN (e.g., C3D [46], I3D [5]) with a region-based per-
+a short clip.                                              son detector (e.g., Fast/Faster R-CNN [10,34]). To process
+                                                           a video, it is split into short clips of 2-5 seconds, which are
+Long-term video understanding with modern CNNs is
+                                                            independently forwarded through the 3D CNN to compute
+less explored, in part due to GPU memory constraints.
+                                                           a feature map, which is then used with region proposals and
+One strategy to overcome these constraints is to use pre-
+                                                             region of interest (RoI) pooling to compute RoI features for
+computed features without end-to-end training [25, 31, 45,
+                                                         each candidate actor [9,14]. This approach, which captures
+57]. These methods do not optimize features for a target
+                                                           only short-term information, is depicted in Fig. 3a.
+task, and thus are likely suboptimal.  Another strategy is
+                                                    The central idea in our method is to extend this approach
+to use aggressive subsampling [50,58] or large striding [8].
+                                                           with two new concepts: (1) a long-term feature bank that
+TSN [50] samples 3-7 frames per video. ST-ResNet [8] uses
+                                                                      intuitively acts as a ‘memory’ of what happened during the
+a temporal stride of 15. To our knowledge, our approach
+                                                                     entire video—we compute this as RoI features from de-
+is the ﬁrst that enjoys the best of three worlds: end-to-end
+                                                                   tections at regularly sampled time steps; and (2) a feature
+learning for strong short-term features with dense sampling
+                                                bank operator (FBO) that computes interactions between
+and decoupled, ﬂexible long-term modeling.
+                                                                the short-term RoI features (describing what actors are do-
+Spatio-temporal action localization is an active research     ing now) and the long-term features. The interactions may
+area [12, 14, 17, 32, 40, 53].  Most recent approaches ex-     be computed through an attentional mechanism, such as a
+tend object detection frameworks [10, 34] to ﬁrst propose     non-local block [51], or by feature pooling and concatena-
+tubelets/boxes in a short clip/frame, and then classify the      tion. Our model is summarized in Fig. 3b. We introduce
+tubelets/boxes into action classes [14, 17, 20, 32, 36, 36].     these concepts in detail next.
+The detected tubelets/boxes can then be optionally linked
+to form full action tubes [12, 17, 20, 32, 36, 40]. In contrast     3.2. Long-Term Feature Bank
+to our method, these methods ﬁnd actions within each frame                                                    The goal of the long-term feature bank, L, is to provide
+or clip independently without exploiting long-term context.
+                                                                  relevant contextual information to aid recognition at the cur-
+Information  ‘bank’ representations,  such  as  object      rent time step. For the task of spatio-temporal action lo-
+bank [26], detection bank [1], and memory networks [42]      calization, we run a person detector over the entire video
+have been used as image-level representations, for video in-      to generate a set of detections for each frame. In parallel,
+dexing and retrieval, and for modeling information in text    we run a standard clip-based 3D CNN, such as C3D [46] or
+corpora. We draw inspiration from these approaches and de-    I3D [5], over the video at regularly spaced intervals, such as
+velop methodologies for detailed video understanding tasks.     every one second. We then use RoI pooling to extract fea-
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+                                                                                                        Feature bank operator:
+                                    Classifier                                                       Classifier
+                                                                                                      FBO(S, L)~
+                                                                                                                                                                                                  L~
+
+                     Short-term                                               Short-term            Long-term …           …
+                       features: S                                                   features: S         feature bank: L
+
+
+                             RoI Pool                                            RoI Pool
+                                                                                                                                     feature
+                                backbone                                         backbone                          extractor
+
+            …               … video            …                              … video
+                                               frames                                                                      frames
+
+                              (a) 3D CNN                                        (b) 3D CNN with a Long-Term Feature Bank (Ours)
+
+Figure 3. We contrast our model with standard methods.  (a) 3D CNN: vanilla 3D CNNs process a short clip from a video (e.g., 2-5
+seconds) and use pooling to obtain a representation of the clip (e.g., [5, 46, 51]). (b) Long-Term Feature Bank (Ours): We extend the
+vanilla 3D CNN with a long-term feature bank L and a feature bank operator FBO(S, ˜L) that computes interactions between the short-term
+and long-term features. Our model is able to integrate information over a long temporal support, lasting minutes or even the whole video.
+
+tures for all person detections at each time-step processed     using the I3D technique [5].  The network structure is
+by the 3D CNN. Formally, L = [L0, L1, . . . , LT −1] is a    modiﬁed to include non-local operations [51].  After in-
+time-indexed list of features for video time steps 0, . . . , T −     ﬂating the network from 2D to 3D, we pre-train  it for
+1, where Lt ∈RNt×d is the matrix of Nt d-dimensional RoI     video classiﬁcation on the Kinetics-400 dataset [5]. Thefeatures at time t. Intuitively, L provides information about     model achieves 74.9% (91.6%) top-1 (top-5) accuracy on
+when and what all actors are doing in the whole video and it      the Kinetics-400 [5] validation set. Finally, we remove the
+can be efﬁciently computed in a single pass over the video     temporal striding for conv1 and pool1 following [52], and
+by the detector and 3D CNN.                             remove the Kinetics-speciﬁc classiﬁcation layers to yield
+                                                                the backbone model. The exact model speciﬁcation is given
+3.3. Feature Bank Operator                                                                   in the Appendix. The resulting network accepts an input
+  Our model references information from the long-term     of shape 32 × H × W × 3, representing 32 RGB frames
+features L via a feature bank operator, FBO(St, ˜Lt).     with spatial size H × W, and outputs features with shape
+The  feature bank  operator accepts  inputs St and  ˜Lt,     16 × H/16 × W/16 × 2048. The same architecture is usedwhere St is the short-term RoI pooled feature and ˜Lt is      to compute short-term features S and long-term features L.
+[Lt−w, . . . , Lt+w], a subset of L centered at the current clip     Parameters are not shared between these two models unless
+at t within ‘window’ size 2w + 1, stacked into a matrix     otherwise noted.
+                          t′=t−w Nt′. We treat the win-˜Lt ∈RN×d, where N = Pt+w                                                RoI Pooling. We ﬁrst average pool the video backbone fea-dow size 2w + 1 as a hyperparameter that we cross-validate
+                                                                   tures over the time axis. We then use RoIAlign [15] with ain our experiments. The output is then channel-wise con-
+                                                                      spatial output of 7   7, followed by spatial max pooling, tocatenated with St and used as input into a linear classiﬁer.             ×                                                                 yield a single 2048 dimensional feature vector for the RoI.   Intuitively, the feature bank operator computes an up-
+                                                          This corresponds to using a temporally straight tube [14].dated version of the pooled short-term features St by relat-
+ing them to the long-term features. The implementation of                                                       Feature Bank Operator Instantiations. The feature bank
+FBO is ﬂexible. Variants of attentional mechanisms are an                                                              operator can be implemented in a variety of ways. We ex-
+obvious choice and we will consider multiple instantiations                                                          periment with the following choices; others are possible.
+in our experiments.
+                                                      – LFB NL:  Our  default  feature  bank  operator
+Batch vs. Casual. Thus far we have assumed a batch set-    FBONL(St, ˜Lt) is an attention operator. Intuitively, we use
+ting in which the entire video is available for processing.     St to attend to features in ˜Lt, and add the attended informa-
+Our model is also applicable to online, casual settings. In      tion back to St via a shortcut connection. We use a simple
+this case, ˜Lt contains only past information of window size     implementation in which FBONL(St, ˜Lt) is a stack of up
+2w + 1; we consider both batch and causal modes of oper-      to three non-local (NL) blocks [51]. We replace the self-
+ation in our experiments.                                         attention of the standard non-local block [51] with atten-
+                                                                   tion between the local features St and the long-term feature
+3.4. Implementation Details                                                 window ˜Lt, illustrated in Fig. 4.  In addition, our design
+Backbone. We use a standard 3D CNN architecture from     uses layer normalization (LN) [3] and dropout [41] to im-
+recent video classiﬁcation work. The model is a ResNet-     prove regularization. We found these modiﬁcations to be
+50 [16] that is pre-trained on ImageNet [35] and ‘inﬂated’     important since our target tasks contain relatively few train-
+into a network with 3D convolutions (over space and time)     ing videos and exhibit overﬁtting. The stack of modiﬁed
+
+
+                                                 3
+
+======================== PDF 第 4 页 ========================
+[Text extraction skipped on PDF page 4: a previous extraction produced 752,795,990 characters from the embedded text layer. See this page in the PDF.]
+
+======================== PDF 第 5 页 ========================
+Support (sec.)   2     3     5     10    15    30    60                mAP            mAP               mAP
+3D CNN       22.1   22.2   22.3   20.0   19.7   17.5   15.7     K400 feat.        19.7     Avg pool     23.1      Global pool       24.9
+STO           23.2   23.6   23.3   21.5   20.9   18.5   16.9     AVA feat.        24.3    Max pool     23.2     2 × 2 Grid        25.1
+LFB (causal)     -     24.0   24.3   24.6   24.8   24.6   24.2    LFB             25.5    NL           25.5     4 × 4 Grid        25.1
+LFB (batch)      -     24.2   24.7   25.2   25.3   25.3   25.5                                                        Detection         25.5
+
+                  (a) Temporal support (mAP in %)                       (b) Feature decoupling       (c) LFB operator       (d) LFB spatial design
+
+
+            mAP                  params FLOPs mAP                   mAP     model          ﬂow    val       test
+1L                25.1    3D CNN     1×   1×    22.1     R50-I3D-NL               AVA [14]      ✓    15.6        -
+2L (default)       25.5    3D CNN ×2  2×   2×    22.9        center-crop (default)    25.8    ACRN [43]     ✓    17.4        -
+2L w/o scale       25.2    STO        1.00× 1.12×  23.2     R101-I3D-NL               RTPR [24]     ✓    22.3        -
+2L w/o LN        23.9    STO ×2     2.00× 2.24×  24.1        center-crop (default)    26.8     9-model ens. [19]  ✓    25.6    21.1
+2L w/o dropout    25.4    LFB (2L)    2.00× 2.12×  25.5        3-crop                27.1     R50-I3D-NL [19]          19.3        -
+2L (dot product)   25.5    LFB (3L)    2.00× 2.15×  25.8        3-crop+ﬂips           27.4    RTPR [24]                20.5        -
+2L (concat)        25.3                                                3-crop+ﬂips+3-scale   27.7      Girdhar et al. [9]           21.9    21.0
+3L                25.8                                                      LFB (R50)                25.8    24.8
+                                                                     LFB (best R101)           27.7    27.2
+
+   (e) LFB NL design                    (f) Model complexity                  (g) Backbone & testing               (h) Comparison to prior work
+Table 1. AVA ablations and test results. STO: 3D CNN with a non-local (NL) short-term operator; LFB: 3D CNN with a long-term
+feature bank; the LFB operator is a two-layer (2L) NL block by default. We perform ablations on the AVA spatio-temporal action
+localization. The results validate that longer-term information is beneﬁcial, that the improvement is larger than what would be observed by
+ensembling, and demonstrate various design choices. Finally, we show state-of-the-art results on the AVA test set.
+
+Inference. At test time we use detections with scores ≥     Feature Decoupling. In Table 1b, we compare our de-0.85. All models rescale the short side to 256 pixels and     coupled feature approach with prior long-term modeling
+use a single center crop of 256×256. For both training and      strategies where a single, pre-computed feature type is usedinference, if a box crosses the cropping boundary, we pool      (e.g. [25,31,45,57]). To do this, we use the same 3D CNN
+the region within the cropped clip. In the rare case where a      for both short-term and long-term feature bank computation
+box falls out of the cropped region, RoIAlign [15] pools the     and keep it ﬁxed during training; only the parameters of the
+feature at the boundary.                          FBO and classiﬁer are updated. We consider two choices:
+                                                          a Kinetics-400 [5] pre-trained 3D CNN (‘K400 feat.’) and
+4.2. Ablation Experiments                               a 3D CNN that is ﬁne-tuned on AVA (‘AVA feat.’). Our de-
+                                                         coupled approach, which updates the short-term 3D CNN
+Temporal Support. We ﬁrst analyze the impact of increas-
+                                                         based on the long-term context, works signiﬁcantly better.
+ing temporal support on models both with and without LFB.
+For models without LFB, we evaluate a vanilla 3D CNN                                      FBO Function Design. We next compare different FBO
+(Fig. 3a) and a 3D CNN extended with STO (denoted ‘STO’                                                              function designs in Table 1c. We see that a non-local func-
+in tables). To increase their temporal support, we increase                                                                   tion signiﬁcantly outperforms pooling on AVA. This is not
+the temporal stride but ﬁx the number of input frames so                                                                   surprising, since videos in AVA (and videos in general) are
+that the model covers a longer temporal range while still                                                                   multi-actor, multi-action, and can exhibit complex interac-
+being feasible to train. To increase the temporal support of                                                                   tions possibly across a long range of time. We expect a more
+LFB models, we increase the ‘window size’ 2w + 1 of ˜Lt.                                                     complex function class is required for reasoning through the
+   Table 1a compares model performance. Increasing tem-     complex scenes.  Nonetheless, pooling still offers a clear
+poral support through striding in fact hurts the performance     improvement. This again conﬁrms the importance of long-
+of both ‘3D CNN’ and ‘STO’. Temporal convolution might     term context in video understanding.
+not be suitable for long-term patterns, since long-term pat-
+terns are more diverse, and include challenging scene cuts.   FBO Input Design. What spatial granularity is required
+On the other hand, increasing temporal support by adding      for complex video understanding?  In Table 1d, we com-
+an LFB steadily improves performance, leading to a large     pare constructing long-term features using detected objects
+gain over the original ‘3D CNN’ (22.1 →25.5). The online      (‘Detection’), regular grids (‘Grid’), and non-spatial fea-(causal) setting shows a similar trend.                            tures (‘Global pool’). In the ‘Grid’ experiments, we divide
+   Overall we observe strong improvements given by long-      the feature map into a k × k grid, for k = 2, 4, and average
+range context even though AVA actions are designed to be      the features within each bin to obtain a localized represen-
+‘atomic’ and localized within ±0.5 seconds. For the rest of      tation without an object detector (similar to ACRN [43]).the ablation study, we focus on the batch setting and use a        Table 1d shows that the actor-level features (‘Detection’)
+window size of 60 seconds due to the strong performance.      works better than coarser regular-grid or non-spatial fea-
+
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+A                                                                     P( talking )?
+
+
+
+
+
+                                                                                             4 sec.         14.9%
+                                                                                             6 sec.                     19.2%
+                                                                                             8 sec.                                  45.5%
+                                                                                            10 sec.                                             65.9%
+B                                                                 P( holding an object )?
+
+
+
+
+                                                                                            4 sec.         20.3%
+                                                                                            6 sec.                     40.4%
+                                                                                            8 sec.                                  35.9%
+                                                                                            10 sec.                                              47.5%
+
+C                                                                      P( talking )?
+
+
+
+
+
+                                                                                             4 sec.          7.2%
+                                                                                             6 sec.                     11.2%
+                                                                                             8 sec.                                  28.9%
+                                                                                            10 sec.                                             31.2%
+D                                                                    P( listen to )?
+
+
+
+
+
+                                                                                             4 sec.         47.0%
+                                                                                             6 sec.                     34.1%
+                                                                                             8 sec.                                 35.7%
+                                                                                            10 sec.                                             12.8%
+
+Figure 5. Example Predictions. We compare predictions made by models using LFB of different window sizes. Through LFB, the model
+is able to exploit information distant in time, e.g., the zoomed-in frames in example A and C, to improve predictions. We encourage readers
+to zoom in for details. (Blue: correct labels. Red: incorrect labels. Best viewed on screen.)
+
+tures. We believe this suggests a promising future research      that when observing only short-term information, the model
+direction that moves from global pooling to a more detailed       is confused and not able to make accurate predictions in
+modeling of objects/actors in video.                            these cases. When observing more context, e.g., zoomed-
+Non-Local Block Design. Next, we ablate our NL block      in frames (example A, C) or frames that give clearer cue
+design. In Table 1e, we see that adding a second layer of     (example B, D), an LFB model is able to leverage the infor-
+NL blocks leads to improved performance.  In addition,     mation and improve predictions.
+scaling [49], layer normalization [3], and dropout [41] all    Backbone and Testing. So far for simplicity, we have used
+contribute to good performance. Layer normalization [3],     a relatively small backbone of R50-I3D-NL and performed
+which is part of our modiﬁed NL design, is particularly im-     center-crop testing.  In Table 1g, we show that with an
+portant. As found in [51], the default embedded Gaussian    R101-I3D-NL backbone, LFB (3L) achieves 26.8 mAP, and
+variant performs similarly to dot product and concatenation.     with standard testing techniques, 27.7 mAP. We use short
+(Later     we found                  that adding                          a third layer                                        of                           NL                                            blocks                                                            fur-      side ∈{224, 256, 320} pixels for 3-scale testing.ther improves              accuracy,                       but otherwise                                   use                                  two                                     by                                                      default.)
+                                                 Comparison to Prior Work. Finally we compare with
+Model Complexity. Our approach uses two instances of
+                                                               other state-of-the-art methods (Table 1h). For fair compari-
+the backbone model: one to compute the long-term features
+                                                               son, we follow Girdhar et al. [9] and train on both the train-
+and another to compute the short-term features. It thus uses                                                             ing and validation set for test set evaluation.2 For this model
+around 2× more parameters and computation than our base-    we use a      longer schedule due to the larger data size.lines. What if we simply use   more computation on base-            1.5×                  2×                            Our model, using only RGB frames, signiﬁcantly outper-lines through an ensemble? We ﬁnd that both ‘3D CNN’ or
+                                                        forms all prior work including strong competition winners
+‘STO’ are not able to obtain a similar gain when ensembled;
+                                                                     that use optical ﬂow and large ensembles. Our single model
+the LFB model works signiﬁcantly better (Table 1f).
+                                                          outperforms the best previous single-model entry by Gird-
+Example Predictions. We qualitatively present a few ex-                                                             har et al. [9] with a margin of 5.8 and 6.2 points mAP on
+amples illustrating the impact of LFB in Fig. 5. Speciﬁcally,                                                                 validation and test set respectively.
+we compare predictions made by models with LFB of dif-
+ferent window sizes, from 4 seconds to 10 seconds. We see          2Test set performance evaluated by ActivityNet server.
+
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+5. Experiments on EPIC-Kitchens                                               Verbs          Nouns          Actions
+                                                                                                    top-1    top-5    top-1    top-5    top-1    top-5
+  The long-term feature bank is a generalizable and ﬂex-       Validation
+ible concept. We illustrate this point on two tasks in the         Baradel [4]        40.9         -           -           -           -           -
+EPIC-Kitchens dataset [6] for which we store different      3D CNN          49.8     80.6     26.1     51.3     19.0     37.8
+                                                        3D CNN ens.      50.7     81.2     27.8     52.8     20.0     39.0
+types of information in the feature bank.
+                                                       STO              51.0     80.8     26.6     51.5     19.5     38.3
+  The EPIC-Kitchens dataset consists of videos of daily      STO ens.          51.9     81.2     27.8     52.5     20.5     39.4
+activities (mostly cooking) recorded in participants’ native      LFB NL          51.7     81.2     29.2     55.3     21.4     40.2
+kitchen environments. Segments of each video are anno-      LFB Avg         53.0     82.3     29.1     55.4     21.2     40.8
+tated with one verb (e.g., ‘squeeze’) and one noun (e.g.,      LFB Max         52.6     81.2     31.8     56.8     22.8     41.1
+                                         ∆           +3.2    +1.7    +5.7    +5.5    +3.8    +3.3
+‘lemon’). The task is to predict the verb, noun, and the com-
+                                                                             Test s1 (seen)
+bination (termed action [6]) in each segment. Performance      TSN RGB [6]     45.7     85.6     36.8     64.2     19.9     41.9
+is measured by top-1 and top-5 accuracy.                     TSN Flow [6]     42.8     79.5     17.4     39.4      9.0     21.9
+  The dataset consists of 39,594 segments in 432 videos.      TSN Fusion [6]    48.2     84.1     36.7     62.3     20.5     39.8
+Test set annotations are not released; for validation we split      LFB Max         60.0     88.4     45.0     71.8     32.7     55.3
+                                                                             Test s2 (unseen)
+the original training set into a new training/validation split
+                                                       TSN RGB [6]     34.9     74.6     21.8     45.3     10.1     25.3
+following Baradel et al. [4]. We train independent models                                                       TSN Flow [6]     40.1     73.4     14.5     33.8      6.7     18.6
+to recognize verbs and nouns, and combine their predictions      TSN Fusion [6]    39.4     74.3     22.7     45.7     10.9     25.3
+for actions. For actions, we additionally use a prior based      LFB Max         50.9     77.6     31.5     57.8     21.2     39.4
+on the training class frequencies of verbs and nouns; see the
+                                                                  Table 2. EPIC-Kitchens validation and test server results. Aug-
+Appendix for details.
+                                                              menting 3D CNN with LFB leads to signiﬁcant improvement.
+
+5.1. Implementation Details
+Long-Term Feature Banks. Recognizing which object a     5.2. Quantitative Evaluation
+person is interacting with (the noun task) from a short seg-
+                                          We now quantitatively evaluate our LFB models. Table 2ment is challenging, because the object is often occluded,
+                                                    shows that augmenting a 3D CNN with LFB signiﬁcantlyblurred, or can even be out of the scene. Our LFB is well-
+                                                             boosts the performance for all three tasks. Using object fea-suited for addressing these issues, as the long-term support-
+                                                                   tures for the noun model is particularly effective, leading toing information can help resolve ambiguities.  For exam-
+                                                  5.7% (26.1         absolute improvement over our strongple, if we know that the person took a lemon from the re-            →31.8)                                                               baseline model. On verb recognition, LFB with 3D CNNfrigerator 30 seconds ago, then cutting a lemon should be
+                                                                  features results in 3.2% (49.8         improvement andmore likely. Based on this motivation, we construct an LFB                          →53.0)                                                          outperforms previous state-of-the-art by Baradel et al. [4]that contains object-centric features.  Speciﬁcally, we use
+                                                    by 12.1% (40.9Faster R-CNN to detect objects and extract object features                 →53.0).
+using RoIAlign from the detector’s feature maps (see the     We also observe that FBOMax and FBOAvg outperform
+Appendix for details of our detector).                  FBONL on EPIC-Kitchens. We conjecture that this is due to
+  On the other hand, for recognizing verbs we use a video      the simpler setting: each video has only one person, doing
+model to construct an LFB that captures motion patterns.     one thing at a time, without the complicated person-person
+Speciﬁcally, we use our baseline 3D CNN ﬁne-tuned on      interactions of AVA. Thus a simpler function sufﬁces.
+EPIC-Kitchens verbs to extract clip-level features every 1      On the test set, our method outperforms prior work by
+second of video. Our default setting uses a window size of     a large margin on both the ‘seen kitchens (s1)’ and ‘un-
+40 seconds for the verb model, and 12 seconds for the noun     seen kitchens (s2)’ settings. Our LFB model outperforms
+model, chosen on the validation set.                             the Two-Stream [39] TSN [50] baseline by 50% relatively
+                                                                   for s1, and almost doubles the performance for s2, in terms
+Adaptation to Segment-Level Tasks. To adapt our model
+                                                              of top-1 action accuracy.
+for segment-level predictions, we replace the RoI pooling
+by global average pooling, resulting in S ∈R1×2048. For
+the STO baseline, we use a slightly modiﬁed formulation:     6. Experiments on Charades
+STO(S′t) := FBONL(St, S′t), where S′t contains 16 spa-
+tially pooled features, each at a temporal location, and St         Finally we evaluate our approach on  the Charades
+is S′t pooled over the time axis. STO learns to interact      dataset [38]. The Charades dataset contains 9,848 videos
+with information at different time steps within the short clip.     with an average length of 30 seconds. In each video, a per-
+Training and inference procedures are analogous to our ex-     son can perform one or more actions. The task is to recog-
+periments on AVA; see the Appendix for details.                nize all the actions in the video without localization.
+
+
+                                                 7
+
+======================== PDF 第 8 页 ========================
+iterations / lr / wd    50k / 0.0025 / 1e-4 [52]    24k / 0.02 / 1.25e-5
+                                                                        203D CNN                              33.8                  38.3            (%)
+STO                                  37.8                  39.6
+
+Table 3. Training schedule on Charades. Our 2× shorter sched-             10
+ule works signiﬁcantly better than the schedule used in STRG [52].                                                                                                                                                                                                                                                                                                                                               improvement
+                      backbone      modality       train /   trainval
+                                                                         0
+                                                            val       / test                                                                                                 EPIC Nouns (top-1)     AVA
+2-Strm. [39] (from [37])  VGG16      RGB+Flow    18.6        -                                                                                                                                                                                                                                                   Relative                       EPIC Verbs (top-1)        Charades
+Asyn-TF [37]        VGG16      RGB+Flow    22.4        -
+CoViAR [54]          R50          Compressed   21.9        -                    3.75      7.5      15      30      60      120
+MultiScale TRN [58]     Inception    RGB          25.2        -                            Temporal support (seconds)
+I3D [5]                  Inception-I3D RGB          32.9    34.4                                                                  Figure 6. Relative improvement of LFB models with different
+I3D [5] (from [51])      R101-I3D    RGB          35.5    37.2
+                                                      window sizes over vanilla 3D CNN.
+I3D-NL [51] (from [52])  R50-I3D-NL  RGB          33.5        -
+I3D-NL [51]           R101-I3D-NL RGB          37.5    39.5      method (37.5% mAP) [52]. We observe that the beneﬁt of
+STRG [52]            R50-I3D-NL  RGB          37.5        -
+                                                            using the short-term operator becomes smaller when using
+STRG [52]            R101-I3D-NL RGB          39.7        -
+3D CNN              R50-I3D-NL  RGB          38.3        -        a stronger baseline.  In all following experiments we use
+3D CNN ens.          R50-I3D-NL  RGB          39.5        -        our 24k schedule as default, and use a 2-stage training ap-
+STO                 R50-I3D-NL  RGB          39.6        -        proach similar to STRG [52] for training LFB models; see
+STO ens.             R50-I3D-NL  RGB          40.0        -         the Appendix for details. At test time, we sample 10 clips
+LFB Avg             R50-I3D-NL  RGB          38.4        -         per video, and combine the predictions using max pooling
+LFB Max             R50-I3D-NL  RGB          38.6        -
+                                                            following prior work [51, 52]. We use (left, center, right)
+LFB NL              R50-I3D-NL  RGB          40.3        -
+                                                            3-crop testing following Wang et al. [51].3D CNN              R101-I3D-NL RGB          40.3    40.8
+3D CNN ens.          R101-I3D-NL RGB          41.7        -
+                                                               6.2. Quantitative Evaluation
+STO                 R101-I3D-NL RGB          41.0        -
+STO ens.              R101-I3D-NL RGB          42.3        -           For Charades, we experiment with both ResNet-50-I3D-
+LFB Avg             R101-I3D-NL RGB          40.8        -     NL and ResNet-101-I3D-NL [5, 16, 51] backbones for a
+LFB Max             R101-I3D-NL RGB          40.9        -
+                                                                 consistent comparison to prior work.  Table 4 shows thatLFB NL              R101-I3D-NL RGB          42.5    43.4
+                                          LFB models again consistently outperform all models with-Table 4. Action recognition accuracy on Charades. (mAP in %)
+                                                             out LFB, including prior state-of-the-art on both validation
+6.1. Implementation Details                           and test sets. The improvement on Charades is not as large
+                                                              as other datasets, in part due to the coarser prediction task
+  We use the RGB frames at 24 FPS provided by the                                                                    (video-level).
+dataset authors. We sample training and testing clips (32
+frames) with a temporal stride of 4 following STRG [52],     7. Discussion
+resulting in input clips spanning 125 frames (∼5.2 seconds).         Fig. 6 shows the relative gain of using LFB of differentThe LFB is sampled at 2 clips per second. We found a post-
+                                                 window sizes.4 We see that different datasets exhibit differ-
+activation version of NL′ to work better on Charades, so we
+                                                                ent characteristics. The movie dataset, AVA, beneﬁts from
+adopt it in the following experiments. Details and full re-
+                                                           very long context lasting 2+ minutes. To recognize cooking
+sults of both variants are in the Appendix. Other details are
+                                                                        activities (EPIC-Kitchens), context spanning from 15 to 60
+identical to the verb model for EPIC-Kitchens.
+                                                         seconds is useful. Charades videos are much shorter (∼30Training and Inference. We train 3D CNN models for     seconds), but still, extending the temporal support to 10+
+24k iterations with a learning rate of 0.02 and weight de-     seconds is beneﬁcial. We conjecture that more challenging
+cay of 1.25e-5. Note that these hyperparameters are differ-      datasets in the future may beneﬁt even more.
+ent from STRG [52], which uses longer schedule (50k it-        In conclusion, we propose a Long-Term Feature Bank
+erations), smaller learning rate (0.0025), and larger weight      that provides long-term supportive information to video
+decay (1e-4).3 Table 3 compares the two settings, and we     models. We show that enabling video models with access
+see that surprisingly our 2× shorter schedule works signif-      to long-term information, through an LFB, leads to a large
+icantly better. With the new schedule, a simple NL model     performance gain and yields state-of-the-art results on chal-
+without proposals (STO) works as well as the full STRG     lenging datasets like AVA, EPIC-Kitchens, and Charades.
+
+   3The original STRG [52] uses a batch size of 8. For clear comparison,         4For each dataset, we use its best-performing FBO.  Standard error
+we use the same batch size as ours (16), but adjust the learning rate and        is calculated based on 5 runs. The temporal support here considers the
+schedule according to ‘Linear Scaling Rule’ [13]. We veriﬁed that the       support of each clip used for computing L, so Charades’s support starts at
+accuracy matches that of the original 4-GPU training.                         a higher value due to its larger 3D CNN clip size (∼5.2 seconds).
+
+
+                                                 8
+
+======================== PDF 第 9 页 ========================
+Appendix A. Backbone Architecture                   error around the mean, computed from 5 runs. We see that
+                                                             they lead to improvement in different action classes. Using
+  We  use  ResNet-50  I3D  [14, 16]  with  non-local                                          LFB leads to improvement in many interactive actions, such
+blocks [51] as the ‘backbone’ of our model.  Following                                                              as ‘play musical instrument’ or ‘sing to’, while improving
+Wang et al. [52], the network only downsamples the tem-
+                                                      backbone leads to improvement in more standalone actions,
+poral dimension by a factor of two.  Table 5 presents the
+                                                         such as ‘hand shake’ or ‘climb’.  This suggests that im-
+exact speciﬁcation.
+                                                           proving long-term modeling (through LFB) and short-term
+                                                       modeling (through improving backbone) are complemen-Stage                   Speciﬁcation                   Output size
+conv1          5×7×7, 64, stride 1, 2, 2          32×112×112       tary; we believe both are important for future video under-
+pool1         1×3×3 max, stride 1, 2, 2          32×56×56       standing research.
+         3×1×1, 64   
+res2            1×3×3, 64    ×3               32×56×56                    1×1×1, 256                           Appendix D. AVA STO Regularization
+pool2         2×1×1 max, stride 2, 1, 1          16×56×56
+                                                     To address the overﬁtting issue of STO on AVA, we ex-         3(1)×1×1, 128 
+res3             1  ×3×3, 128  ×4, NL: 1, 3        16×28×28      perimented with a number of regularization techniques, as        
+             1  ×1×1, 512                                summarized in Table 6. We found that dropout [41] was in-
+         3(1)×1×1, 256                                    sufﬁcient to regularize an STO, but injecting ‘distractors’,
+res4          1  ×3×3, 256       NL: 1, 3, 5      16×14×14                      ×6,                                            i.e., randomly sampled features, into the features being at-
+             1  ×1×1, 1024
+                                                          tended during training was very effective. We report STO         3(1)×1×1, 512 
+res5          1  ×3×3, 512                    16×14×14        results with ‘distractor’ training for AVA unless otherwise                    ×3
+             1  ×1×1, 2048                                          stated. For STO on other datasets, we did not observe ob-
+Table  5.  ResNet-50  NL-I3D  [14, 16, 51]  backbone  used     vious overﬁtting.
+in  this  paper.   Here we assume  input  size 32×224×224
+(frames×width×height). ‘NL: i0, i1, . . . ’ in stage ‘resj’ denotes     3D CNN   STO     STO       STO       STO
+additional non-local blocks [51] after block i0, i1,  . . . of resj.                      + 0.5 dropout    + 0.8 dropout    + distractors
+3(1)×1×1 denotes that we either use a 3×1×1 or a 1×1×1 con-         22.1       20.2         20.1             20.9            23.2
+volution. Speciﬁcally, we use 3×1×1 for block 0, 2 of res3, block
+                                                                  Table 6. STO with different regularization techniques on AVA
+0, 2, 4 of res4, and block 1 of res5, and use 1×1×1 for the rest.
+                                                (mAP in %).
+
+Appendix B. AVA Person Detector
+                                          Appendix E.  Training  Schedule  for EPIC-
+  We use  Faster R-CNN  [34] with a ResNeXt-101-
+                                                           KitchensFPN [28, 55] backbone for person detection. The model
+is pre-trained on ImageNet for classiﬁcation, and on COCO                                          We train the verb models for 36k iterations with 10−5
+for keypoint detection. The model obtains 56.9 box AP and                                                         weight decay and a learning rate of 0.0003, which is then
+67.0 keypoint AP on COCO keypoints. Model parameters                                                           decreased by 10 times at iteration 28k and 32k.  For the
+are available in Detectron Model Zoo [11]. We ﬁne-tune the                                                    noun models, we train for 50k iterations with weight decay
+model on AVA bounding boxes from the training videos for    10−6 and a learning rate of 0.001, which is decreased by 10
+130k iterations with an initial learning rate of 0.005, which                                                            times at iteration 40k and 45k.
+is decreased by a factor of 10 at iteration 100k and 120k. To
+improve generalization, we train with random scale jitter-
+ing (from 512 to 800 pixels). The ﬁnal model obtains 93.9    Appendix F. EPIC-Kitchens Inference
+AP@50 on the AVA validation set.
+                                          We sample training clips such that the center of the clip
+                                                                            falls within a training segment. For testing, we sample one
+Appendix C. LFB vs. Improving Backbones
+                                                                center clip per segment, resize such that the short side is
+  A large body of recent research focuses on improving 3D     256 pixels, and use a single center crop of 256×256. We
+CNN architectures, i.e., improving modeling of short-term     compute the probability of an action as the product of the
+patterns. This paper, on the other hand, aims at improving     softmax scores, weighted by a prior µ, i.e.
+the modeling of long-term patterns. How do these two di-
+rections impact video understanding differently?              P(action = (v, n)) ∝µ(v, n)P(verb = v)P(noun = n),
+  We plot the per-class impact of LFB in Fig. 7, the per-
+class impact of improving backbone in Fig. 8, and compare     where µ is a prior estimated as the count of (v, n) pair di-
+them in Fig. 9. The error bars are plus/minus one standard     vided by count of n in training annotations.
+
+
+                                                 9
+
+======================== PDF 第 10 页 ========================
+     80
+
+                                                                                                                                   LFB (R50-I3D-NL)
+     60                                                                                                                                    3D CNN (R50-I3D-NL)
+
+
+     40
+
+
+     20
+
+
+                                                                                             up                                                                             art                                                                                                                                                                               cut                                                                                              clap                                                            TV)                                                                  read                                                                                                                               boat                         walk                                                                                                                       write                                                                                                              down      0stand                                                                           drink                                                                                                                                                                                              shoot                                                                                                                                      down                                                                                                                               shake                                                                                             get                                                     abox)                                                                                                                          music)                                                                                                                                                                                                                                object)                                                                                                                                   person                                                                       upperson                                                                                                                                                                                object)                                                                                                                                                                                    object)                                                                                                                                                                   swimobject)                                    object)                        sitobject)                                                                                         aphoto                                           car)dancephonerun/jog                   person)                                                                        person)                                                                                                                                        person)                                                                                   person)                                                                                                                                                                  person)                                                                                                                                    waveperson)                                          atruck)                                       waist)lie/sleep                                                                                                                                               sail                                                                                       to                                                                                                                                                                                             computerenter           person)aperson)                                                                               to                                                                                 hand                                                                                                                                                                                                 clothingfall                                                                                                                                                                    cellphone                            the                                                                                                      (e.g.,                                     a                                                                                                                                                                                                       jump/leap           (a                                              (a                                                                                         (a                                                      (a                                                                                                          (a                                                                                               window)(aperson)                                                                                                                                                                     throwmountain)                                                                                                                                                                (an                                            a                                                                                         martial                                                                                                                                                                               (an                                                                                                                              (an                                                                                                                                (an                        (an                  (an                                                                                                                                      hand                                                                                                                   putlift/pick                                                                                                         on                                                                                                              hand                                                                                                                                                                                        take                                                                              a                                                                                                           from                             (at                                                    eatcrouch/kneelsmoke                                                                                                                                                      to                                                                                                                                                                          lift                                                                                         person)instrumentacar,                                                                                                                                                                                hit                                                   adoor,                                                                                                          ata                                                                                                                  ona      (aself,                                                                                          ascrewdriver)                                                                           hug                                                                                                                                                 (e.g.,                                                                                                self,                 abike,aanswer                                                                grab                                                                                                                                                 pull                                                                                                                   object                                                                                                                                   push                                                                                                                      (e.g.,                                                                       watch                                                                                                                                                                                    (another    watch                        touch                                                                                                                                                                                                                    (e.g.,                                           (e.g.,                                                                      ﬁght/hit            listen                                                                                                                       kissobject                                                                                                                                                                                                                 point                                                                                                           (e.g.,                                                                                                                                         (e.g.,                                                                                                                                                work       (e.g.,                                                                                                                                                                                                                                                     (e.g.,                                                                                                 (e.g.,musical                                                                                                                                     listen                                                                                                                                                                                              dress/put          tocarry/hold                                                                              open                                                                                                                                     push                                                                                                                                                  on/look   to                               ride                                                     to                        bend/bow                                                                                                               take                                                                                                                                                              climb                                                                                                                                                                                           turn                                                                                     drive                                                                                                             close                                                                     play                                                                                                                                       text talk                                                                                                                        give/serve                                                                    sing
+
+Figure 7. Impact of LFB. We compare per-class AP of 3D CNN (22.1 mAP) and LFB model (25.5 mAP) on AVA. LFB leads to larger
+improvement on interactive actions, e.g., ‘sing to’, ‘play musical instrument’, or ‘work on a computer’. (Bold: 5 classes with the largest
+absolute gain. Blue: 5 classes with the largest relative gain. Red:  classes with decreased performance. Classes are sorted by frequency. )
+
+
+
+
+     80
+
+                                                                                                                                           3D CNN (R101-I3D-NL)
+     60                                                                                                                                    3D CNN (R50-I3D-NL)
+
+
+     40
+
+
+     20
+
+
+                                                                                             up                                                                             art                                                                                                                                                                               cut                                           car)                                                                                              clap                                                            TV)                                                                                                                               boat                                                             read                         walk                                                                                                                       write                                                                                                              down      0stand                                                                           drink                                                                                                                                                                                              shoot                                                                                                                                      down                                                                                             get                                                     abox)                                                                                                                                                                                    object)                                                                                                                                   personshake                                                                       upperson                                                    eatsmoke                                                                                                                          music)                                                                                                                                                                                object)                                                                                                                                                                      swimobject)                        sitobject)                                    object)                                                                                                                                                                                                                                object)                                                                                         aphoto                                                                                                                                        person)                   person)                                                                        person)                                                                                   person)                                                                                                                                                                  person)                                                                                                                                    waveperson)                                          atruck)                                       waist)lie/sleep                                                                                                                                               sail           person)aperson)                                                                               to                                                                                       to                                                                                                                                                                                             computerenter                                                                                 hand                                                                                                                                                                                                 clothingfall                                                                                                                                                                    cellphone                            the                                                                                                      (e.g.,                                     a                                                                                                                                                                                                       jump/leap           (a                                                                                         (a                                              (a                                                      (a                                                                                                          (a                                                                                               window)(aperson)                                                                                                                                (an                                            a                                                                                         martial                                                                                         person)instrument                                                                                                                                                                               (an                                                                                                                              (an                  (an                        (an                                                                                                                                                                (an                                                                                                                                      hand                                                                                                                   putlift/pick                                                                                                         on                                                                                                                                                                                        take                                                                                                           fromhand                                                                           amountain)throw                 abike,a                             (at                                                                                                                                                      to                                                                                                                                                                          lift                                        acar,                                                   adoor,                                           answer                                                                                                          ata                                           dancephonerun/jog crouch/kneel                                                                                                                                                                                hit      (aself,                                                                                          ascrewdriver)                                                                                                                  ona                                                                           hug                                                                                                self,                                                                                                                                                 (e.g.,                                                                grab                                                                                                                                                 pull                                                                                                                                  push                                                                                                                   object                                                                                                                      (e.g.,                                                                       watch                                                                                                                                                                                    (another    watch                        touch                                                                                                                                                                                                                  (e.g.,                                           (e.g.,                                                                      ﬁght/hit            listen                                                                                                                       kissobject                                                                                                                                                                                                                 point                                                                                       musical                                                                                                           (e.g.,                                                                                                                                         (e.g.,       (e.g.,                                                                                                                                                                                                                                                     (e.g.,                                                                                                                                                work                                                                                                 (e.g.,                                                                                                                                                                                              dress/put                                                                                                                                     listen          tocarry/hold                                                                              open                                                                                                                                     push                                                                                                                                                  on/look   to                               ride                                                     to                        bend/bow                                                                                                               take                                                                         play                                                                                                                                                                                           turn                                                                                                                                                        climb                                                                                     drive                                                                                                             close                                                                                                                                       text talk                                                                                                                        give/serve                                                                    sing
+
+Figure 8. Impact of improving backbone. We compare per-class AP of 3D CNN with the default backbone (R50-I3D-NL; 22.1 mAP)
+and a stronger backbone (R101-I3D-NL; 23.0 mAP) on AVA. Improving backbone leads to larger improvement in standalone actions, such
+as ‘crouch/kneel’, ‘read’, or ‘hand shake’. (Bold: 5 classes with the largest absolute gain. Blue: 5 classes with the largest relative gain.
+Red:  classes with decreased performance. )
+
+
+
+     20                                                                                                                                                        Adding LFB
+
+                                                                                                                                                                                      Improving backbone
+     10
+
+
+
+      0
+
+
+  −10
+                                                                                             up                                                                                                                                                                               cut                                           car)                                                                                              clap                                                                             artTV)                                                                  read                                                                                                                               boat                         walk                                                                                                                       write                                                                                                              down         stand                                                                           drink                                                                                                                                                                                              shoot                                                                                                                                      down                                                                                                                               shake                                                                                             get                                                     abox)                                                                                                                                   person                                                                       upperson                                                                                                                          music)                                                                                                                                                                      swimobject)                                                                                                                                                                                object)                                                                                                                                                                                    object)                                    object)                        sitobject)                                                                                                                                                                                                                                object)                                           dancephonerun/jog                                                                                         aphoto                   person)                                                                        person)                                                                                                                                        person)                                                                                   person)                                                                                                                                                                  person)                                                                                                                                    waveperson)                                          atruck)                                       waist)lie/sleep                                                                                                                                               sail           person)aperson)                                       a                                                                               to                                                                                       to                                                                                                                                                                                             computerenter                                                                                 hand                                                                                                                                                                                                 clothingfall                                                                                                                                                                    cellphone                            the                                                                                                      (e.g.,                                                                                                                                                                                                       jump/leap           (a                                              (a                                                                                         (a                                                      (a                                                                                                          (a                                                                                               window)(aperson)                                                                                                                                                                     throwmountain)                                            a                                                                                         martial                                                                                              person)instrument                                                                                                                                                                               (an                                                                                                                              (an                                                                                                                                (an                        (an                  (an                                                                                                                                                                (an                                                                                                                                      hand                                                                                                                   putlift/pick                                                                                                         on                                                                                                              hand                                                                              a                                                                                                           from                                                                                                                                                                                        take                 abike,a                             (at                                                    eatcrouch/kneelsmoke                                                                                                                                                      to                                                                                                                                                                          lift                                        acar,                                                   adoor,                                           answer                                                                                                          ata                                                                                                                                                                                hit      (aself,                                                                                          ascrewdriver)                                                                                                                  ona                                                                           hug                                                                                                                                                 (e.g.,                                                                grab                                                                                                                                                 pull                                                                                                                   object                                                                                                                                   push                                                                                                                      (e.g.,                                                                       watch                                                                                                                                                                                    (another    watch                        touch                                                                                                                                                                                                                    (e.g.,                                           (e.g.,                                                                      ﬁght/hit            listen                                                                                                                       kissobject                                                                                                                                                                                                                 point                                                                                                self,musical                                                                                                           (e.g.,                                                                                                                                         (e.g.,       (e.g.,                                                                                                  (e.g.,                                                                                                                                                                                                                                                     (e.g.,                                                                                                                                                work                                                                                                                                                                                              dress/put                                                                                                                                     listen          tocarry/hold                                                                              open                                                                                                                                     push                                                                                                                                                  on/look   to                                                        to                               ride                        bend/bow                                                                                                               take                                                                                                                                                              climb                                                                         play                                                                                                                                                                                           turn                                                                                     drive                                                                                                             close                                                                                                                                       text talk                                                                                                                        give/serve                                                                      sing
+
+Figure 9. Adding LFB vs. improving backbone. We compare the absolute improvement (in AP) brought by LFB and the improvement
+brought by improving backbone. We see that they lead to improvement in different action classes. This suggests that improving long-term
+modeling (through LFB) and short-term modeling (through improving backbone) are complementary; we believe both are important for
+future video understanding research.
+
+
+Appendix G.  Object  Detector  for LFB  of      tion 60k and 80k. The ﬁnal model achieves 2.4 AP on the
+            EPIC-Kitchens Noun Model         ‘new’ validation split. The AP is low because with the new
+                                                                       train/val split, most of the classes are unseen during train-
+                                                                    ing. In addition, most of the classes have zero instance in
+  We use Faster R-CNN [34] with ResNeXt-101-FPN [28,
+                                                                the new, smaller validation set, and we calculate the average
+55] backbone for the object detector. The detector is pre-
+                                                                precision of those classes as 0. This is also not compara-
+trained on Visual Genome [22] with 1600 class labels de-
+                                                                ble to the performance reported in [6], where the model is
+ﬁned in Anderson et al. [2]. We ﬁne-tune this model on
+                                                                 trained on the full training set, and evaluated on the unre-
+the ‘new’ training split (deﬁned in Baradel et al. [4]) of
+                                                              leased test sets.
+EPIC-Kitchens for 90k iterations, with random scale jitter-
+ing (from 512 to 800 pixels). We use an initial learning
+rate of 0.005, which is decreased by a factor of 10 at itera-
+
+
+                                                 10
+
+======================== PDF 第 11 页 ========================
+Appendix H. Charades Training Schedule             W. Price, et al. Scaling egocentric vision: The EPIC-kitchens
+                                                                                  dataset. In ECCV, 2018. 1, 7, 10
+  We train the models to predict the ‘clip-level’ labels, i.e.,        [7]  J.  Donahue,   L.  Anne  Hendricks,   S.  Guadarrama,
+the union of the frame labels that fall into the clip’s tempo-        M. Rohrbach, S. Venugopalan, K. Saenko, and T. Dar-
+ral range. We train the baseline 3D CNNs with the default               rell. Long-term recurrent convolutional networks for visual
+24k schedule with learning rate 0.02, which is decreased           recognition and description. In CVPR, 2015. 2
+by a factor of 10 at iteration 20k. To train LFB models,        [8] C. Feichtenhofer, A. Pinz, and R. Wildes.  Spatiotemporal
+we use a 2-stage approach following STRG [52]. We ﬁrst            residual networks for video action recognition.  In NIPS,
+train the model without the FBO using the 24k schedule,           2016. 2
+                                                                            [9] R. Girdhar, J. Carreira, C. Doersch, and A. Zisserman. Aand then add FBO, freeze backbone, and train for half of
+                                                                                  better baseline for AVA. arXiv preprint arXiv:1807.10066,
+the schedule (12k iterations, so 36k in total). This schedule
+                                                                     2018. 2, 5, 6
+helps prevent overﬁtting that was observed when training
+                                                                     [10] R. Girshick. Fast R-CNN. In ICCV, 2015. 2
+directly with FBO in one stage. For training STO, we ob-                                                                     [11] R. Girshick,  I. Radosavovic, G. Gkioxari, P. Doll´ar, and
+served worse performance with this 2-stage approach, so we                                                                K. He. Detectron, 2018. 9
+report the STO performance using the default 24k schedule.      [12] G. Gkioxari and J. Malik. Finding action tubes. In CVPR,
+                                                                     2015. 2
+Appendix I. Charades NL Block Details               [13]  P.  Goyal,   P.   Doll´ar,   R.  Girshick,   P.  Noordhuis,
+                                                                        L. Wesolowski, A. Kyrola, A. Tulloch, Y. Jia, and K. He.
+                                                                        Accurate, large minibatch sgd: Training imagenet in 1 hour.
+                   R50-I3D-NL       R101-I3D-NL                     arXiv preprint arXiv:1706.02677, 2017. 8
+                      pre-act    post-act     pre-act    post-act
+                                                                     [14] C. Gu, C. Sun, D. A. Ross, C. Vondrick, C. Pantofaru, Y. Li,
+     STO         39.0       39.6       40.5       41.0
+                                                                             S. Vijayanarasimhan, G. Toderici, S. Ricco, R. Sukthankar,     LFB NL     39.5       40.3       41.5       42.5
+     3D CNN           38.3                 40.3                              et al. AVA: A video dataset of spatio-temporally localized
+                                                                     atomic visual actions. In CVPR, 2018. 1, 2, 3, 4, 5, 9
+Table 7. Pre-activation vs. post-activation NL′ on Charades.
+                                                                     [15] K. He, G. Gkioxari, P. Doll´ar, and R. Girshick. Mask R-
+                                                     CNN. In ICCV, 2017. 3, 5
+  We experimented with two variants of NL′ design: a      [16] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning
+pre-activation (the default variant described in paper), and            for image recognition. In CVPR, 2016. 3, 8, 9
+a post-activation variant, where we move ReLU after the      [17] R. Hou, C. Chen, and M. Shah. Tube convolutional neural
+skip connection, and move the layer normalization after the          network (T-CNN) for action detection in videos.  In ICCV,
+output linear layer. For both variants, LFB consistently out-           2017. 2
+performs STO and baseline 3D CNN (Table 7). We choose      [18] S. Ioffe and C. Szegedy. Batch normalization: Accelerating
+post-activation as default for Charades due to the stronger          deep network training by reducing internal covariate shift. In
+performance. For AVA and EPIC-Kitchens, we did not ob-         ICML, 2015. 4
+                                                                     [19]  J. Jiang, Y. Cao, L. Song, S. Z. Y. Li, Z. Xu, Q. Wu, C. Gan,serve any noticeable difference between the two variants.
+                                                                    C. Zhang, and G. Yu. Human centric spatio-temporal action
+                                                                                  localization. In ActivityNet workshop, CVPR, 2018. 5
+References                                                      [20] V. Kalogeiton, P. Weinzaepfel, V. Ferrari, and C. Schmid.
+                                                                     Action tubelet detector for spatio-temporal action localiza- [1] T. Althoff, H. O. Song, and T. Darrell. Detection bank: an
+                                                                                      tion. In ICCV, 2017. 2     object detection based video representation for multimedia
+                                                                     [21] A. Karpathy, G. Toderici, S. Shetty, T. Leung, R. Sukthankar,     event recognition. In International Conference on Multime-
+                                                                 and L. Fei-Fei. Large-scale video classiﬁcation with convo-      dia, 2012. 2
+                                                                                 lutional neural networks. In CVPR, 2014. 2
+ [2]  P. Anderson, X. He, C. Buehler, D. Teney, M. Johnson,
+                                                                     [22] R. Krishna, Y. Zhu, O. Groth, J. Johnson, K. Hata, J. Kravitz,
+      S. Gould, and L. Zhang.  Bottom-up and top-down atten-
+                                                                             S. Chen, Y. Kalantidis, L.-J. Li, D. A. Shamma, et al.  Vi-
+      tion for image captioning and visual question answering. In
+                                                                             sual genome: Connecting language and vision using crowd-
+    CVPR, 2018. 10
+                                                                      sourced dense image annotations. IJCV, 2017. 10
+ [3]  J. L. Ba, J. R. Kiros, and G. E. Hinton. Layer normalization.                                                                     [23] Y. LeCun. Learning process in an asymmetric threshold net-
+     arXiv preprint arXiv:1607.06450, 2016. 3, 6                                                                    work.  In Disordered systems and biological organization.
+ [4]  F. Baradel, N. Neverova, C. Wolf, J. Mille, and G. Mori.           1986. 4
+     Object level visual reasoning in videos. In ECCV, 2018. 2,      [24] D. Li, Z. Qiu, Q. Dai, T. Yao, and T. Mei. Recurrent tubelet
+      7, 10                                                              proposal and recognition networks for action detection.  In
+ [5]  J. Carreira and A. Zisserman. Quo vadis, action recognition?        ECCV, 2018. 2, 5
+     a new model and the kinetics dataset. In CVPR, 2017. 1, 2,      [25]  F. Li, C. Gan, X. Liu, Y. Bian, X. Long, Y. Li, Z. Li,
+      3, 5, 8                                                                                  J. Zhou, and S. Wen.  Temporal modeling approaches for
+ [6] D. Damen,  H.  Doughty,  G. M.  Farinella,  S.  Fidler,            large-scale youtube-8m video understanding. arXiv preprint
+     A. Furnari, E. Kazakos, D. Moltisanti, J. Munro, T. Perrett,           arXiv:1707.04555, 2017. 1, 2, 5
+
+
+                                                 11
+
+======================== PDF 第 12 页 ========================
+[26]  L.-J. Li, H. Su, L. Fei-Fei, and E. P. Xing.  Object bank:      [45] Y. Tang, X. Zhang, J. Wang, S. Chen, L. Ma, and Y.-G. Jiang.
+   A high-level image representation for scene classiﬁcation &           Non-local netvlad encoding for video classiﬁcation.  arXiv
+     semantic feature sparsiﬁcation. In NIPS, 2010. 2                       preprint arXiv:1810.00207, 2018. 1, 2, 5
+[27] Z. Li, K. Gavrilyuk, E. Gavves, M. Jain, and C. G. Snoek.      [46] D. Tran, L. Bourdev, R. Fergus, L. Torresani, and M. Paluri.
+     Videolstm convolves, attends and ﬂows for action recogni-          Learning spatiotemporal features with 3d convolutional net-
+      tion. Computer Vision and Image Understanding, 2018. 2             works. In ICCV, 2015. 1, 2, 3
+[28] T.-Y. Lin, P. Doll´ar, R. B. Girshick, K. He, B. Hariharan, and      [47] D. Tran, J. Ray, Z. Shou, S.-F. Chang, and M. Paluri. Con-
+      S. J. Belongie. Feature pyramid networks for object detec-           vnet architecture search for spatiotemporal feature learning.
+      tion. In CVPR, 2017. 4, 9, 10                                      arXiv preprint arXiv:1708.05038, 2017. 1, 2
+[29] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ra-      [48] G. Varol,  I. Laptev, and C. Schmid.  Long-term temporal
+     manan, P. Doll´ar, and C. L. Zitnick. Microsoft coco: Com-           convolutions for action recognition. PAMI, 2018. 1, 2
+    mon objects in context. In ECCV, 2014. 4                       [49] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones,
+[30] C.-Y. Ma, A. Kadav, I. Melvin, Z. Kira, G. AlRegib, and H. P.          A. N. Gomez, Ł. Kaiser, and I. Polosukhin. Attention is all
+     Graf. Attend and interact: Higher-order object interactions         you need. In NIPS, 2017. 6
+      for video understanding. In CVPR, 2018. 2                      [50] L. Wang, Y. Xiong, Z. Wang, Y. Qiao, D. Lin, X. Tang, and
+[31] A. Miech,  I. Laptev, and  J. Sivic.   Learnable pooling           L. Van Gool. Temporal segment networks: Towards good
+     with context gating for video classiﬁcation. arXiv preprint            practices for deep action recognition. In ECCV, 2016. 2, 7
+     arXiv:1706.06905, 2017. 1, 2, 5                                 [51] X. Wang, R. Girshick, A. Gupta, and K. He. Non-local neural
+[32] X. Peng and C. Schmid. Multi-region two-stream r-cnn for           networks. In CVPR, 2018. 1, 2, 3, 6, 8, 9
+     action detection. In ECCV, 2016. 2                              [52] X. Wang and A. Gupta. Videos as space-time region graphs.
+                                                                           In ECCV, 2018. 1, 2, 3, 4, 8, 9, 11[33] Z. Qiu, T. Yao, and T. Mei. Learning spatio-temporal repre-
+      sentation with pseudo-3d residual networks. In ICCV, 2017.      [53]  P. Weinzaepfel, Z. Harchaoui, and C. Schmid. Learning to
+      1, 2                                                                    track for spatio-temporal action localization. In ICCV, 2015.
+                                                              2[34] S. Ren, K. He, R. Girshick, and J. Sun. Faster R-CNN: To-
+     wards real-time object detection with region proposal net-      [54] C.-Y. Wu, M. Zaheer, H. Hu, R. Manmatha, A. J. Smola,
+     works. In NIPS, 2015. 2, 4, 9, 10                                and P. Kr¨ahenb¨uhl. Compressed video action recognition. In
+                                                         CVPR, 2018. 8[35] O. Russakovsky, J. Deng, H. Su, J. Krause, S. Satheesh,
+                                                                     [55] S. Xie, R. Girshick, P. Doll´ar, Z. Tu, and K. He. Aggregated      S. Ma, Z. Huang, A. Karpathy, A. Khosla, M. Bernstein,
+                                                                               residual transformations for deep neural networks. In CVPR,     A. C. Berg, and L. Fei-Fei. ImageNet Large Scale Visual
+                                                                     2017. 4, 9, 10     Recognition Challenge. IJCV, 2015. 3, 4
+                                                                     [56] S. Xie, C. Sun, J. Huang, Z. Tu, and K. Murphy. Rethinking[36] S. Saha, G. Singh, and F. Cuzzolin. AMTnet: Action-micro-
+                                                                         spatiotemporal feature learning for video understanding. In     tube regression by end-to-end trainable deep architecture. In
+                                                       ECCV, 2018. 1, 2    ICCV, 2017. 2
+                                                                     [57]  J. Yue-Hei Ng, M.  Hausknecht,  S.  Vijayanarasimhan,[37] G. A. Sigurdsson, S. K. Divvala, A. Farhadi, and A. Gupta.
+                                                                O. Vinyals, R. Monga, and G. Toderici. Beyond short snip-     Asynchronous temporal ﬁelds for action recognition.   In
+                                                                                  pets: Deep networks for video classiﬁcation. In CVPR, 2015.    CVPR, 2017. 8
+                                                                                   1, 2, 5
+[38] G. A. Sigurdsson, G. Varol, X. Wang, A. Farhadi, I. Laptev,
+                                                                     [58] B. Zhou, A. Andonian, A. Oliva, and A. Torralba. Temporal
+     and A. Gupta. Hollywood in homes: Crowdsourcing data
+                                                                                  relational reasoning in videos. In ECCV, 2018. 2, 8
+      collection for activity understanding. In ECCV, 2016. 1, 7
+[39] K. Simonyan and A. Zisserman. Two-stream convolutional
+     networks for action recognition in videos. In NIPS, 2014. 2,
+      7, 8
+[40] G. Singh, S. Saha, M. Sapienza, P. H. Torr, and F. Cuzzolin.
+     Online real-time multiple spatiotemporal action localisation
+     and prediction. In ICCV, 2017. 2
+[41] N. Srivastava, G. Hinton, A. Krizhevsky, I. Sutskever, and
+     R. Salakhutdinov. Dropout: a simple way to prevent neural
+     networks from overﬁtting. JMLR, 2014. 3, 4, 6, 9
+[42] S. Sukhbaatar, A. Szlam, J. Weston, and R. Fergus. End-to-
+     end memory networks. In NIPS, 2015. 2
+[43] C. Sun, A. Shrivastava, C. Vondrick, K. Murphy, R. Suk-
+      thankar, and C. Schmid. Actor-centric relation network. In
+    ECCV, 2018. 2, 5
+[44] L. Sun, K.  Jia, K. Chen, D.-Y. Yeung, B. E. Shi, and
+      S. Savarese. Lattice long short-term memory for human ac-
+      tion recognition. In ICCV, 2017. 2
+
+
+                                                 12

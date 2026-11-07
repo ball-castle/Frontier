@@ -1,0 +1,506 @@
+KH-A007 | Joint Inverted Indexing
+来源：https://openaccess.thecvf.com/content_iccv_2013/html/Xia_Joint_Inverted_Indexing_2013_ICCV_paper.html
+本地PDF：专题文献/何恺明/KH-A007_Joint_Inverted_Indexing_ICCV2013.pdf
+SHA-256：415ee0ab3594257cd0fabed8485a5db5ad89aaee0498c0d784f8bd56c0731f7e
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                            Joint Inverted Indexing
+
+
+                 Yan Xia1∗    Kaiming He2     Fang Wen2      Jian Sun2
+      1University of Science and Technology of China          2Microsoft Research Asia
+
+
+                 Abstract                            binary embedding [17], or product-quantized codes [19]) or
+                                                          with geometric considerations [17, 33].
+   Inverted indexing is a popular non-exhaustive solution      An effective way to improve the recall of inverted in-
+to large scale search. An inverted ﬁle is built by a quantizer     dexing methods is to use multiple quantizers (also known
+such as k-means or a tree structure. It has been found that     as multiple hash tables [8, 26]). Multiple quantizers intro-
+multiple inverted ﬁles, obtained by multiple independent     duce redundant coverage among the lists. A query is com-
+random quantizers, are able to achieve practically good re-     pared to the items in multiple (overlapping) lists to reduce
+call and speed.                                                 the chance of missing true neighbors. The Locality Sen-
+   Instead of computing the multiple quantizers indepen-      sitive Hashing (LSH) [16, 8, 2] is a widely used multiple-
+dently, we present a method that creates them jointly. Our     quantizer method1. In LSH each quantizer (hash table) is
+method jointly optimizes all codewords in all quantizers.     binning a low dimensional random subspace.  In [28, 23]
+Then it assigns these codewords to the quantizers. In exper-     multiple randomized k-d trees are used and have shown ad-
+iments this method shows signiﬁcant improvement over var-     vantages over LSH. In [26] Paulev´e et al. compare the per-
+ious existing methods that use multiple independent quan-     formance of lattices, trees, and k-means as the hash tables.
+tizers. On the one-billion set of SIFT vectors, our method    They recommend using randomly re-initialized k-means as
+is faster and more accurate than a recent state-of-the-art     the multiple quantizers. This method is named as “k-means
+inverted indexing method.                           LSH” or KLSH [26].
+                                                                 In the spirit of hash, all the above multi-quantizer meth-
+                                                        ods create the quantizers independently and randomly. The
+1. Introduction                                        KLSH method [26] enjoys an advantage that its individu-
+   Inverted indexing [32] is of central importance in modern      al quantizer is (locally) optimal in the sense of minimizing
+search engines for both text retrieval [4] and image/video     quantization error [14]. But we point out that for KLSH,
+retrieval [29]. In text search engines like Google [5], a doc-     the codewords from different codebooks tend to be similar.
+ument is represented by a vector of weighted word frequen-     This is because the k-means algorithm tends to put the code-
+cies. Inverted indexing is built as a vocabulary of words, and     words around densely distributed data even in different ran-
+each word has a list of the documents that contain this word.    dom trials. Actually, the codewords can be different from
+Online, the search engine retrieves the lists corresponding     each other only because of the local optimality of the k-
+to the query words and ranks the returned documents. This    means nature. The similar codewords would reduce the re-
+is a non-exhaustive solution because only a very small por-     dundant coverage and limit the gain of multiple quantizers.
+tion of documents are checked. Inverted indexing provides       To illustrate, we consider simple 1-d data subject to a
+a practical solution to large scale problems.                  two-peak distribution (Fig. 1). Suppose we want two quan-
+  The above approach has been adapted to image/video      tizers each with two codewords.  If each quantizer is con-
+retrieval by introducing “visual words” [29].  The visual      structed randomly and independently as in KLSH, the two
+words (codewords) are obtained by quantizing visual vec-     codewords in a quantizer will always be placed near the t-
+tors, e.g., via k-means [29], k-means trees [24], or other    wo peaks. The space partitioning of the two quantizers are
+tree structures [11, 10, 20]. The inverted indexing is built as     almost the same (Fig. 1 left), and the gain of having the
+a codebook of the codewords. Each codeword has a list of     second quantizer is lost. If a query is located very close to
+all vectors (or their IDs) belonging to this codeword. Given     the partitioning boundary, the recall of retrieving the true
+a query vector, the system ﬁnds the codeword of the query    k-NNs can be low.
+and checks those items in the list of this codeword. The
+checking can be distance computation (using raw vectors,       1LSH has also been used as compact binary encoding for distance rank-
+                                                                             ing [30]. Unless speciﬁed, in this paper we refer to LSH as a multiple-
+   ∗This work was done when Yan Xia was an intern at MSRA.                 quantizer method that uses inverted indexing, as it was described in [8, 2].
+
+
+                                                 1
+
+======================== PDF 第 2 页 ========================
+distribution      c1 c3   c2 c4               c1 c3   c2 c4           cases.2. Related Work
+                                     data
+  quantizer 1                         quantizer 1                      Recent progress on large scale search are mainly in two
+          q                        q                  ways: exhaustive and non-exhaustive. One could efﬁciently
+       c1      c2                 c1       c2            exhaust millions of items using compact encoding like bina-
+  quantizer 2                         quantizer 2                     ry embedding (e.g., [30, 31, 13, 15]) or product quantization
+                                                                  [19, 12]. But for larger datasets, non-exhaustive search is          q                         q
+        c3       c4                  c3        c4              still highly desired, and compact encoding is often used for
+                                                              re-ranking the retrieved data [17, 19, 3]. In this paper, we
+        KLSH                            Joint
+                                                            focus on non-exhaustive search based on inverted indexing.
+Figure 1. KLSH vs. joint quantizers. We illustrate two quantizers
+                                                                  Inverted indexing could be built using a quantizer like
+with two codewords in each quantizer. Top: the locations of the
+                                                      k-means [22], a binary tree [10, 7], hierarchical k-meansfour codewords (c1 to c4). Middle and Bottom: quantizer 1 and
+quantizer 2, with the partitioning boundaries. When a query (q)      [11, 24], or a lattice [1]. An index represents a cluster, a tree
+is near any partitioning boundary, the independent quantizers may      leaf, or a bin. The k-means quantizer is (locally) optimal in
+miss many true neighbors, while the joint quantizers can retrieve     terms of quantization distortion [14].
+more true neighbors because the query is well inside at least one           It is an attractive way to use multiple quantizers to im-
+partition.                                                  prove search accuracy. The LSH method [16, 6, 8] random-
+                                                                   ly generates L hash tables, each of which is binning a low
+                                                          dimensional subspace. For each single hash table, an in-
+   In the above example, we can instead generate all the                                                               verted indexing system is built with each bin as an index,
+four codewords jointly via a single pass of k-means clus-                                                      and each index has a list containing all the vectors in the
+tering. These four codewords are distant from each other                                                                    bin. This is repeated for each of the L hashing tables. Giv-
+(Fig. 1 right). Then we construct each quantizer by mutual-                                                       en a query, the algorithm retrieves L lists and checks all the
+exclusively selecting two codewords with some care, and                                                            items in them.
+the two resulting quantizers can be substantially different.                                                                  Instead of binning, the methods in [28, 23] use random-
+Any query that lies near the partitioning boundary of one                                                              ized trees. Each single tree is generated by random projec-
+quantizer can still ﬁnd its k-NNs through the other quantiz-                                                                        tion. In [28] it is empirically observed that if the trees are
+er, and the recall is improved.                                                           independently rotated, the error rate is smaller when visit-
+   With this motivation, in this paper we propose joint in-                                                             ing shallow nodes in all trees than deeply backtracking a
+verted indexing - a novel multiple-quantizer method. Rather                                                                 single one. In [23] this way is found superior to LSH.
+than construct quantizers independently, we create them                                                    The KLSH method [26] uses randomly re-initialized k-
+jointly. We divide this challenging problem into two sub-                                                   means to build each quantizer. The experiments in [26] (al-
+problems, each of which is formulated as optimization. We                                                           so in this paper) show this is superior to various alternatives
+ﬁrst jointly optimize all the codewords of all quantizers.                                                              including lattices and trees. But as discussed in the intro-
+The optimized codewords are then assigned to the quan-                                                                duction, the codewords in the multiple quantizers can be
+tizers, with a consideration that the total distortion of all                                                                  similar in random trials.
+quantizers is small.                                                     Most recently, an inverted multi-index method [3] has
+   Experiments on million/billion-scale datasets show that                                                       been proposed. This is actually a single quantizer method,
+our method performs signiﬁcantly better than a various                                                   whose quantizer is the Cartesian product of multiple sub-
+multiple-quantizer methods like LSH [2], randomized trees                                                                 quantizers.  As such, each codeword is indexed by the
+[28, 23], and KLSH [26].                                                              Cartesian product of multiple sub-indices. The quantiza-
+  On a one-billion SIFT set, our method is faster and more                                                                   tion of the space can be much ﬁner (e.g., than classic k-
+accurate than a recent state-of-the-art method called “invert-                                                          means). The ﬁner quantization, in conjunction with a soft-
+ed multi-index” [3]. When searching in one billion items                                                          assignment scheme, has shown great superiority to a single
+for the ﬁrst nearest neighbor of a query, our method takes                                                     k-means quantizer [3]. This is a methodology different from
+less than ten milliseconds using a single thread and achieves                                                              multiple quantizers. We will compare with this method ex-
+over 90% recall in the ﬁrst retrieved one hundred items (de-                                                                perimentally.
+tailed in Sec. 4 and Table  3).  The superiorities of our
+method to [3] are at the cost of more memory consumption.     3. Joint Inverted Indexing
+It depends on applications whether this is desired. But we
+believe accuracy and speed are both of central importance     We ﬁrst introduce the formulation of the method, and
+in many practices, and our method can be favored in these     then present the algorithm.
+
+======================== PDF 第 3 页 ========================
+3.1. Formulation                                           of all data:   x  min(l,k) d(x, clk)  . It is easy to show that
+                                                                        this problem is equivalent to optimizing:  Denote the number of quantizers as L, and the number
+                                          ⎛       ⎞
+of codewords in each quantizer as K. We assume K and                  L K
+L are pre-deﬁned and application-based (e.g., in [26] K=2n            min     ⎝       d(x, clk)⎠,        (4)
+and L=16).                                                                          {clk}   l=1 k=1   x∈S(l,k)
+
+Background    It is well-known that a k-means quantizer                                with:
+attempts to minimize the quantization distortion [14]:
+                                                                           S(l,k) =  x | d(x, clk) < d(x, cl′k′),  ∀(l′, k′) ̸= (l, k)   .
+               K
+            min           d(x, ck),              (1)     Unlike in (2) where each x has been counted L times, in
+                {ck}                    k=1 x∈Ck                                 (4) each x has been counted only once. Replacing (l, k)
+   with:  Ck = {x | d(x, ck) < d(x, ck′),   ∀k′ ̸= k} .       by a one-to-one mapping to an integer j: M(l, k) →j ∈
+                                                                          [1, L × K], we can rewrite (4) as this optimization problem:
+Here x belongs to the training dataset, ck is a codeword,               ⎛      ⎞
+Ck is a cluster, and d(·, ·) is the squared Euclidean distance                  L×K
+                                                         min    ⎝     d(x, cj)⎠            (5)between two vectors. The optimization is w.r.t. the set of                    {cj}
+codewords {ck}. The distortion in (1) can be optimized via                        j=1   x∈Sj
+the classical EM-alike algorithm: alternatively update the         with:  Sj = {x | d(x, cj) < d(x, cj′),   ∀j′ ̸= j} .
+codewords {ck} and assign data to the clusters {Ck}.
+   For L independent k-means quantizers as in KLSH [26],    Comparing (5) to (1), one can ﬁnd the problem (5) is a s-
+                                                                 ingle pass of k-means with L×K clusters, so can be eas-we can formulate them as minimizing the total distortion of
+                                                                          ily optimized.  We denote the optimized codewords asall quantizers:
+                                    C = {cj | 1 ≤j ≤L × K}.           ⎛        ⎞
+               L   K                              The above joint codewords optimization has not yet con-
+         min   ⎝        d(x, clk)⎠,          (2)     sidered the belonging of any codeword to the quantizers. A
+              {clk}   l=1  k=1 x∈Clk                            naive way is to randomly assign the codewords in C without
+                                                           replacement2 to the L quantizers. We call this way as “Joint
+   with:  Clk = x | d(x, clk) < d(x, clk′),   ∀k′ ̸= k   .                                                                 (rand-assign)”. In experiments, this simple way has already
+Here we use Clk and clk to denote the l-th quantizer’s cluster    shown better search performance than KLSH (detailed in
+                                                             Sec. 4, Fig. 6). This implies that the joint codewords op-and codeword. If all the codewords {clk | 1 ≤k ≤K, 1 ≤
+l ≤L} are initialized randomly, minimizing (2) is equiva-     timization is an effective method for multiple quantizers.
+lent to independently minimizing L separate problems as in     This is due to two nice properties of joint codewords opti-
+                                                              mization: (i) each x is expected to be accurately quantized(1). This is the way of KLSH. If it were not for the local
+                                                                        at least once, in the sense of optimizing (4); (ii) the code-optimality of k-means clustering, all the quantizers should
+                                                     words among the quantizers are guaranteed to be sufﬁcient-be identical.
+                                                                   ly different from each other.
+Joint Codewords Optimization  In (2) the codewords in
+                                                            Joint Codewords Assignment  Suppose the set C hasone quantizer are unaware of those in other quantizers. So
+                                                       been ﬁxed, i.e., the problem in (4) (or equivalently (5)) hasthe independent optimization of any two quantizers may
+                                                       been optimized. It is still possible for us to improve the per-push the codewords towards similar positions due to the k-
+                                                       formance of “Joint (rand-assign)” by a better assignment.means nature. To overcome this issue, we propose to opti-
+                                                             Notice that the quantization distortion of any individualmize all the codewords jointly.
+                                                              quantizer has not been considered in (4). For a better as-  We notice that in multiple inverted ﬁles, it is sufﬁcient
+                                                           signment, we consider the total distortion of all quantizersfor a true datum to be correctly retrieved if it is covered by
+one of the L lists. Motivated by this, it is reasonable for us      subject to a constraint. Formally, we consider:
+                                        ⎛        ⎞
+to consider the smallest distortion of a datum x among all                  L   K
+L quantizers. Formally, we consider:                                                         min  ⎝        d(x, clk)⎠,           (6)
+                                                                               l=1  k=1 x∈Clk
+                  min             min                          d(x, clk)   ,                (3)
+                                l                         k                                                                  with:  Clk = x | d(x, clk) < d(x, clk′),   ∀k′ ̸= k
+                                                                      k ∈C,  and   clk ̸= cl′k′   ∀(l′, k′) ̸= (l, k).   (7)or equivalently min(l,k) d(x, clk), as the smallest distortion           s.t.   cl
+of x. To jointly optimize all codewords of all quantizers,        2The term “without replacement” indicates each sample can only be
+we propose to minimize the sum of the smallest distortion       selected once.
+
+======================== PDF 第 4 页 ========================
+                                                                                                                 quantizer 1
+
+
+
+
+
+    (a) Codewords Generation         (b) Codewords Grouping          (c) Codewords Assignment       quantizer 2         quantizer 3
+Figure 2. Joint Inverted Indexing. We illustrate L=3 quantizers with K=8 codewords in each quantizer. Each dot represents a data point. (a)
+Codewords Generation. All L × K codewords in all quantizers are generated simultaneously by k-means clustering. Each ♦represents a
+codeword. (b) Codewords Grouping. The codewords are grouped into K balanced groups. (c) Codewords Assignment. A quantizer is
+constructed by randomly selecting one codeword from each group without replacement. The codewords in quantizer 1, 2, 3 are represented
+by ▲, ⃝, ⊞respectively. Each quantizer is shown on the right.
+
+The objective function in (6) is the total distortion of all                       K=29        K=212
+quantizers as in (2). The constraint in (7) means that the         Joint (rand-assign)   9.612 ± 0.006   8.225 ± 0.002
+codewords must be mutual-exclusively selected from the                Joint         9.466 ± 0.005   8.111 ± 0.001
+ﬁxed C. As such, the codewords must be subject to the
+                                                                  Table 1. The total distortion of “Joint (rand-assign)” and “Joint” injointly optimized codewords in (4).
+                                                       SIFT1M. We use L=16 quantizers. For each K, the distortion is
+  The constraint (7) leads to a fundamentally different op-
+                                                                 averaged on 10 random trails subject to the same ﬁxed constraints.
+timization problem in (6). Because the set C has been ﬁxed,                                                        The standard deviation is also evaluated. All numbers in the table
+the codewords cannot be arbitrarily updated (e.g., via aver-     have a unit of ×1011.
+aging in-cluster data). In fact, in (6) we can only optimize
+w.r.t. the one-to-one mapping M(l, k) →j. This is a com-
+binatorial problem and an (even locally) optimal solution     concentrated. We can expect such a quantizer to have small-
+can only be approximately achieved.                             er distortion than a quantizer that randomly selects from
+                                                               the whole set C (as in “Joint (rand-assign)”). We denote
+3.2. Algorithm                                                               the way in Step 1-3 as “Joint”, and quantitatively compare
+  Based on the above formulations, we present an algorith-     the total distortion of “Joint (rand-assign)” and “Joint” on a
+m to jointly generate the quantizers. It has three steps:       SIFT1M dataset [19] in Table 1. We see that when subjec-
+   Step 1 - Codewords Generation. L×K codewords are        t to the same constraint, the “Joint” way has smaller total
+                                                                      distortion. Table 1 also gives the standard deviations (std)generated by a single pass of k-means (Fig. 2(a)).  This
+                                                              of total distortion in 10 random trails for both methods (allsolves the optimization problem in (5) and gives the set C.
+   Step 2 - Codewords Grouping. We divide the L×K       trails subject to the same constraint). We see that it is very
+codewords into K groups (each group contains L code-     hard for different random trails to substantially impact the
+                                                                      distortion. We have also tried to optimize the total distortionwords) (Fig. 2(b)). This is achieved by a balanced clustering
+                                                    by greedily swapping pairs of codewords between quantiz-algorithm like a binary tree. We group the codewords by a
+                                                                         ers. But we ﬁnd even tens of thousands of swaps can onlyrandom projection tree [9].
+                                                              lead to ignorable reduction to the total distortion (≪std).   Step 3 - Codewords Assignment. A K-codeword quan-
+                                                          This is perhaps due to the combinatorial nature of the prob-tizer is generated by randomly selecting one codeword from
+each of the K groups without replacement. We repeat this     lem. So we does not apply this greedy way.
+for L times and construct all the L quantizers (Fig. 2(c)).                                                                 Visualization:
+Discussions:                                  We  visualize the behaviors of KLSH [26] and our
+   Intuitively, to make a quantizer with small distortion, we    method by a toy example.  In Fig. 3 we randomly gener-
+expect the K codewords of this quantizer to be dispersed.      ate 500 data points subject to a 2-d Gaussian Mixture Mod-
+So we group the codewords by a second pass of clustering      el (GMM). For this database we build 3 quantizers with 8
+(in Step 2, by a tree), and randomly select one codeword     codewords in each quantizer (L = 3, K = 8).
+from each group to form a quantizer (in Step 3). As such,     We can see that in KLSH some codewords of different
+we can avoid the codewords in any quantizer from being too     quantizers are very similar.  In Fig. 4(a) we show the be-
+
+======================== PDF 第 5 页 ========================
+                                                                                                                                           (a) SIFT1M
+                                                                                                                                                                      29
+
+      similar                                                                                                                                               28
+   codewords                                                                                                                                                      28
+                                                                                                            K=213                                               9
+                                                                                                                                                                   9
+
+                                                                                                          K=212
+
+                                                                                                                       k2=211
+       similar                                                                                                                                                13
+    codewords                                                            R
+
+                                                                                                    h=12
+
+                                                                                                      h=12
+
+
+
+
+
+                                                                                                      d=18
+  quantizer 1   quantizer 2   quantizer 3     quantizer 1   quantizer 2    quantizer 3
+             (a) KLSH                            (b) Joint
+                                                                                             N
+Figure 3. A toy data of 2-d GMM distribution. (a) Quantizers of
+KLSH. (b) Our quantizers. Top: the locations of all codewords in                                              (b) GIST1M
+all quantizers. Bottom: the space partitions by individual quantiz-                                                                       29
+ers. Each dot represents a data point. The codewords in quantizer                                                                              28
+1, 2, 3 are represented by ▲, ⃝, ⊞respectively.                                                                                                             28
+                                                                                                                K=212
+
+                                                                                                               K=211                                               9
+
+                                                                      R               k2=211                                             9
+      query       missed
+
+                                                                                                                                                             11
+                                                                                                     h=12
+
+                                                                                                      h=12
+
+                   retrieved                                                                     d=15
+
+
+            (a) KLSH                           (b) Joint                                             N
+
+Figure 4. Visualization of querying.  (a) KLSH, (b) our method.                                                 (c) SIFT1B
+Given a query (⋆), the cell where the query lies in each quantizer
+                                                                                                                                                                                   217
+is shown by the partitioning boundary. A dark dot • represents a
+successfully retrieved nearest neighbor, and a red cross × repre-                                                                             217
+sents a missed neighbor.                                                                              K=220                                            217
+
+                                                                                                             K=220
+
+                                                                                                                           k2=220
+havior of these quantizers to a typical query point: due to       R                                                        17
+the similar codewords, the gain of the multiple quantizers is                                                                    17
+limited. Many true k-NNs of this query are not retrieved.                      h=20
+   In contrast, all the codewords are jointly optimized by                    h=20                                                    23
+our method (Fig. 3(b)). Given the query point, the clusters                                d=27
+can cover more potential candidates (Fig. 4(b)) and retrieve
+more true k-NNs.
+
+                                                                                             N
+4. Experiments                                               Figure 5. Comparisons with multiple-quantizer methods on (a)
+                                                       SIFT1M, (b) GIST1M, and (c) SIFT1B. All the methods are us-
+  We evaluate on three public datasets from [19, 18]:  (i)      ing L=16 quantizers. R and N are averaged over all queries. The
+SIFT1M with one million 128-d SIFT vectors [21];  (ii)      parameter settings control the ﬁneness of the quantization.  For
+GIST1M with one million 960-d GIST vectors [25]; and    m-HKM, we use two levels of k-means with k centers each lev-
+(iii) SIFT1B with one billion SIFT. All datasets have pro-        el. For m-RPT and RKD, we use trees of h levels. For LSH, we
+vided independent queries for evaluation (10,000 in the two      use d-dimensional subspaces [2]. The parameters are given near
+SIFT sets and 1,000 in the GIST set).                           each marker. Note a straight line that links two markers is only for
+                                                                                illustration - there is no value recorded on the line.   All on-line experiments are conducted on a workstation
+with an Intel Xeon 2.67GHz CPU (using a single thread)
+and 96GB RAM. All algorithms are implemented in C++.
+
+======================== PDF 第 6 页 ========================
+                             SIFT1M                                                                                          (a) SIFT1M
+
+
+                                                                            29
+
+                                                                   29
+
+
+                                                                 28                       R
+
+R
+            K=213
+
+
+
+           K=213
+
+
+                                                                                                                      L
+          K=212                                                                                                                          (b) SIFT1B
+
+
+
+                                 N
+Figure 6. Comparisons among the Joint, Joint (rand-assign), and
+KLSH. We use L=16 here.
+
+
+                                                                              R
+Comparisons with Multiple-Quantizer Methods  We
+compare our method with the following multiple-quantizer
+methods: LSH [6], randomized k-d trees (RKD) [28], and
+KLSH [26]. We also compare with two alternatives: mul-
+tiple hierarchical k-means (m-HKM) and multiple random
+projection trees (m-RPT). They are straightforward exten-                                           L
+sions of hierarchical k-means [23] and random projection      Figure 7. Recall vs. L.  (a) SIFT1M (N = 5000).  (b) SIFT1B
+trees [9] by independently and randomly generating multi-    (N = 10000). Because all methods studied cannot retrieve ex-
+ple quantizers.                                                         actly N candidates, in this ﬁgure the recall is linearly interpolated
+  Both KLSH and our method should scan all codewords     from the recall obtained by the nearest two values of N.
+given a query. This can be time-consuming when the num-
+ber of codewords is large, e.g., in SIFT1B. To speedup, in                   parameters    N     R     time (ms)
+this set for both KLSH and our method, we adopt a k-d tree            Joint    K=218    6.44×105   0.849      5.6
+[10] to approximately search for the codeword of a query.       KLSH    K=218    6.37×105   0.763      5.6
+The performance on SIFT1B is reported based on this im-       RKD     h=18     6.42×105   0.379      3.4
+plementation.                                                 LSH     d=26     6.50×105   0.186      3.4
+   In Fig. 5, we adopt the evaluation setting as in the KLSH
+paper [26]. We evaluate the recall R versus N, where N is      Table 2. Retrieval time on SIFT1B. The parameters of each method
+the number of data retrieved by all L lists (i.e., N is the size      are set such that N ≃6×105. We use L=16 here.
+of the union set of the L lists [26]). The number N is con-
+sidered because it is the number of data actually checked
+(e.g., re-ranking or geometric consistency checking [17]).     assign)” is a way that has jointly optimized codewords but
+We treat the 100 nearest neighbors of each query as the     has larger total distortion than the “Joint” way (Table 1).
+ground truth. In Fig. 5 all methods use the same number      Fig. 6 shows that even the “Joint (rand-assign)” way out-
+of quantizers (L). Each method is evaluated using several     performs KLSH. This implies the jointly optimized code-
+parameter settings. The parameters control the ﬁneness of     words are very essential for good performance. Fig. 6 al-
+the quantization (e.g., the number of codewords, leaves, or     so shows that the “Joint” way is better than “Joint (rand-
+bins). See the caption of Fig. 5 for the details of the param-      assign)”. This implies that given the jointly optimized code-
+eters.                                                     words, the search accuracy can be improved by reducing the
+   Fig. 5 shows that our joint quantizers outperform KLSH      total distortion.
+and other alternatives. Fig. 5 also shows that KLSH is better        In Fig. 7 we investigate the recall versus the number of
+than the other competitors that use independent quantizer-     quantizers (L) at a given number N. We see that our method
+s. This implies KLSH beneﬁts from the k-means quantizers      consistently outperforms KLSH and other competitors for
+that give smaller distortion than the other independent quan-      different L.
+tizers.                                                        Table 2 shows the retrieval time per query in SIFT1B.
+   In Fig. 6 we further compare with the “Joint (rand-    The retrieval time is the time used to retrieve the L lists, and
+assign)” way.  As discussed in Sec. 3.2, “Joint (rand-       is without data re-ranking (the case with re-ranking will be
+
+======================== PDF 第 7 页 ========================
+                methods     parameters   R@100   R@300  R@1000   time(ms)  RAM (GB)
+            Multi-D-ADC   N=10000    0.748(0.740)    0.749     0.751        6.8(7)        20
+            Multi-D-ADC   N=30000    0.885(0.885)    0.886     0.887      16.9(16)       20
+            Multi-D-ADC   N=50000     0.929      0.932     0.934      27.9        20
+           KLSH-ADC    K=219       0.836      0.854     0.861       5.6        80
+           KLSH-ADC    K=218       0.860      0.882     0.889       7.8        80
+           KLSH-ADC    K=217       0.894      0.917     0.924      11.8        80
+              Joint-ADC     K=219       0.884      0.904     0.911       5.6        80
+              Joint-ADC     K=218       0.920      0.945     0.952       7.8        80
+              Joint-ADC     K=217       0.938      0.964     0.972      11.8        80
+
+Table 3. Comparisons in SIFT1B. The ADC are all using 16 bytes per vector. For Multi-D-ADC, we use the second-order index with k=214
+as in [3]. The values in brackets are reported in [3], showing our re-implementation is very comparable to [3].
+
+
+shown in Table 3). We set the parameters of each method     and our method cannot retrieve exactly N data, their perfor-
+such that the number N of each method is about the same.    mance is tuned by K.
+We see that both our method and KLSH slightly trade some                                                              Table 3 shows that our Joint-ADC outperforms Multi-D-
+retrieval time for substantially higher recall.                                     ADC in both speed and accuracy. The Multi-D-ADC can
+                                                       improve its performance on “R@n” by increasing N. But
+Comparisons with Inverted Multi-Index [3]  We also
+                                                         because the short lists in its ﬁner quantizer are “too short”,
+compare with inverted multi-index [3], a recent state-of-
+                                                                        this operation retrieves a very large number of lists and takesthe-art inverted indexing method. As discussed in Sec. 2,
+                                                  more time (cache-unfriendly). On the contrary, our method
+this method is actually a single quantizer method with ﬁn-
+                                                          (and KLSH) retrieves a ﬁxed number (L) of longer lists,
+er quantization and soft-assignments.  This is a different
+                                                      and spends some more time on the ADC re-ranking. The
+scheme with multiple-quantizer methods including KLSH
+                                                             systematic comparisons in Table 3 show that our method is
+and ours. We compare with this method by experiments,
+                                                          a better practice.
+using a protocol as the one in [3].
+                                                    The inverted multi-index is a soft-assignment method  We compare with the “Multi-D-ADC” version of [3] (its
+                                                          with a single but very ﬁne quantizer.  In [3] it has beenbest performed version). We brieﬂy introduce it as below.
+                                                  shown that this method is faster and more accurate than oth-This method uses a soft-assignment way [27]. Due to it-
+                                                                   er soft-assignment methods with a coarser quantizer, suchs ﬁner quantization, this method retrieves a large number
+                                                              as the IVFADC/IVFADC+R methods [18, 19]. So we omit(often thousands) of very short lists, until the total number
+                                                               the comparisons with these methods in this paper.of data in all lists reaches some given N. All the retrieved
+data in these lists are re-ranked, using the compact encod-
+                                                           Discussions   All the multiple-quantizer methods (includ-
+ing method of product quantization (PQ) [19]. The Multi-
+                                                             ing LSH, RKD, KLSH, and ours) require considerable
+D-ADC in [3] encodes the residual vector to a codeword
+                                              memory consumption. Each single quantizer uses one in-
+and re-ranks the data using the asymmetric distance com-
+                                                              verted ﬁle that stores all the vector IDs. For a one-billion
+putation (ADC) [19]. The term ‘-D-ADC’ implies residual                                  1
+                                                                            set, each ID takes 4 bytes ( 8⌈log2 109⌉). So each invertedencoding.                                                             ﬁle consumes 109×4 bytes. So it takes 64GB to store all
+   Because it can be more complicate to encode residual    L=16 inverted ﬁles, plus 16GB due to ADC (independent
+vectors in multiple quantizers (KLSH and ours), we sim-    on L). On the contrary, the inverted multi-index method [3]
+ply use PQ to encode the original vector (it is observed that       is memory efﬁcient as a single quantizer method.  It takes
+encoding the original vector is inferior [3]). Then we use     only 4GB for storing IDs (still plus 16GB due to ADC). In
+ADC to re-rank the retrieved data. We term these methods      this sense, our method trades memory consumption (∼4×)
+as KLSH-ADC and Joint-ADC (ours).                           for both faster speed and higher accuracy. But we believe
+   Following [3], in this experiment we consider the ﬁrst      this is a desired property in many practices.  Further, be-
+nearest neighbor of a query as the ground truth. The accu-     cause [3] is a single-quantizer method, it is still an open
+racy is measured by “R@n”, that is, the recall at the top-n     problem of improving its performance if more memory is
+ranked data after re-ranking. In Table 3 we show the query-      available. One may increase the number of bytes (for re-
+ing time and recall in SIFT1B. The querying time consists     ranking) used in Multi-D-ADC. But re-ranking takes effec-
+of both retrieval time and re-ranking time. Both KLSH and        t only when the true neighbors have been included in the
+our method use L=16 quantizers here. Because both KLSH      short lists. Table 3 shows R@n of Multi-D-ADC becomes
+
+======================== PDF 第 8 页 ========================
+saturated (e.g., from 0.748 to 0.751) when n increases. This      [13] Y. Gong and S. Lazebnik.  Iterative quantization: A pro-
+implies Multi-D-ADC could hardly be improved by using           crustean approach to learning binary codes. In CVPR, 2011.
+more bytes for reranking. Besides, using more bytes also      [14] R. Gray. Vector quantization. ASSP Magazine, IEEE, 1(2):4–
+consumes more time in re-ranking.                                      29, 1984.
+                                                                      [15] K. He, F. Wen, and J. Sun. K-means Hashing: an Afﬁnity-  As a k-means-based method, our method requires con-
+                                                                         Preserving Quantization Method for Learning Binary Com-siderable off-line training time. The training time is mainly
+on obtaining the L×K codewords in the single pass of k-           pact Codes. In CVPR, 2013.
+                                                                      [16]  P. Indyk and R. Motwani. Approximate nearest neighbors:
+means. But as in most k-means practices, we empirically                                                                      towards removing the curse of dimensionality.  In STOC,
+ﬁnd it is not necessary to use all data for training. E.g., in          pages 604–613, 1998.
+the experiments on the SIFT1B set, we only use 10% ran-      [17] H. Jegou, M. Douze, and C. Schmid. Hamming embedding
+dom samples for training the codebooks. For the results re-          and weak geometric consistency for large scale image search.
+ported in this paper, the training time of SIFT1B is around           In ECCV, pages 304–317, 2008.
+4-6 hours (8-core), depending on the parameters. We be-      [18] H. Jegou, M. Douze, and C. Schmid. Product quantization
+lieve this off-line cost is acceptable, given the good on-line            for nearest neighbor search. TPAMI, 33:117–128, 2011.
+querying performance of the algorithm.                           [19] H. Jegou, R. Tavenard, M. Douze, and L. Amsaleg. Search-
+   In this paper all the on-line querying performance are           ing in one billion vectors: re-rank with source coding.  In
+                                                               ICASSP, pages 861–864, 2011.evaluated using a single thread. Our method is friendly to
+                                                                      [20] H. Lejsek, F. H. ´Asmundsson, B. T. J´onsson, and L. Amsa-
+multi-core implementation as a multi-quantizer method. We
+                                                                                     leg. Nv-tree: An efﬁcient disk-based index for approximate
+will study this topic in the future.                                                                         search in very large high-dimensional collections. TPAMI,
+                                                                       31(5):869–883, 2009.
+References                                                       [21] D. G. Lowe. Distinctive image features from scale-invariant
+                                                                            keypoints. IJCV, 60:91–110, 2004. [1] E. Agrell, T. Eriksson, A. Vardy, and K. Zeger. Closest point
+                                                                     [22]  J. B. MacQueen. Some methods for classiﬁcation and analy-     search in lattices. IEEE Transactions on Information Theory,
+                                                                                        sis of multivariate observations. In Proceedings of 5th Berke-     48(8):2201–2214, 2002.
+                                                                                  ley Symposium on Mathematical Statistics and Probability,
+ [2] A. Andoni and P. Indyk.  Near-optimal hashing algorithms
+                                                                     pages 281–297. University of California Press, 1967.
+      for approximate nearest neighbor in high dimensions. Com-
+                                                                      [23] M. Muja and D. G. Lowe. Fast approximate nearest neigh-
+     munications of the ACM, 51:117–122, 2008.
+                                                                        bors with automatic algorithm conﬁguration.  In VISAPP,
+ [3] A. Babenko and V. S. Lempitsky. The inverted multi-index.
+                                                                     pages 331–340, 2009.
+     In CVPR, 2012.
+                                                                      [24] D. Nistr and H. Stewnius.  Scalable recognition with a vo-
+ [4] R. Baeza-Yates, B. Ribeiro-Neto, et al. Modern information                                                                         cabulary tree. In CVPR, 2006.
+      retrieval, volume 463. 1999.                                                                      [25] A. Oliva and A. Torralba. Modeling the shape of the scene: a
+ [5] S. Brin and L. Page. The anatomy of a large-scale hyper-             holistic representation of the spatial envelope. IJCV, 42:145–
+      textual web search engine.  Computer networks and ISDN                                                                        175, 2001.
+     systems, 30(1):107–117, 1998.                                   [26] L. Paulev´e, H. J´egou, and L. Amsaleg.  Locality sensitive
+ [6] M. S. Charikar. Similarity estimation techniques from round-           hashing: a comparison of hash function types and querying
+     ing algorithms. In ACM Symposium on Theory of Comput-          mechanisms.  Pattern Recognition Letters, 31:1348–1358,
+      ing, pages 380–388, 2002.                                         2010.
+ [7] S. Dasgupta and Y. Freund. Random projection trees and low      [27]  J. Philbin, O. Chum, M. Isard, J. Sivic, and A. Zisserman.
+     dimensional manifolds. In STOC, 2008.                             Lost in quantization: Improving particular object retrieval in
+ [8] M. Datar, N. Immorlica,  P. Indyk, and V. S. Mirrokni.            large scale image databases. In CVPR, 2008.
+      Locality-sensitive hashing scheme based on p-stable distri-      [28] C. Silpa-Anan and R. Hartley. Optimised kd-trees for fast
+      butions. In Symposium on Computational Geometry, pages          image descriptor matching. In CVPR, 2008.
+     253–262, 2004.                                                 [29]  J. Sivic and A. Zisserman. Video google: a text retrieval ap-
+ [9] Y. Freund, S. Dasgupta, M. Kabra, and N. Verma.  Learn-           proach to object matching in videos. In ICCV, pages 1470–
+     ing the structure of manifolds using random projections. In           1477, 2003.
+     NIPS, 2007.                                                    [30] A. B. Torralba, R. Fergus, and Y. Weiss. Small codes and
+[10]  J. H. Friedman, J. L. Bentley, and R. A. Finkel. An algorithm            large image databases for recognition. In CVPR, 2008.
+      for ﬁnding best matches in logarithmic expected time. ACM      [31] Y. Weiss, A. Torralba, and R. Fergus. Spectral hashing. In
+     Trans. Math. Softw., 3:209–226, 1977.                             NIPS, pages 1753–1760, 2008.
+[11] K. Fukunaga and P. M. Narendra. A branch and bound algo-      [32]  I. H. Witten, A. Moffat, and T. C. Bell. Managing gigabytes:
+     rithm for computing k-nearest neighbors. IEEE Trans. Com-          compressing and indexing documents and images. Morgan
+      puters, 24:750–753, 1975.                                     Kaufmann, 1999.
+                                                                      [33] Z. Wu, Q. Ke, M. Isard, and J. Sun. Bundling features for[12] T. Ge, K. He, Q. Ke, and J. Sun. Optimized product quan-
+                                                                              large scale partial-duplicate web image search.  In CVPR,      tization for approximate nearest neighbor search. In CVPR,
+                                                                      2009.     2013.

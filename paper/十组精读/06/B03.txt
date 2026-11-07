@@ -1,0 +1,714 @@
+
+===== PDF PAGE 1 =====
+                   This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                              Except for this watermark, it is identical to the accepted version;
+                             the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+           PointCNN++: Performant Convolution on Native Points
+
+
+                  Lihan Li1,2 #∗Haofeng Zhong1,2 #∗Rui Bu2  Mingchao Sun3
+                    Wenzheng Chen1 †  Baoquan Chen1 †  Yangyan Li2 †
+                                   1 Peking University 2 Ant Group 3 AMAP
+      {hfzhong, wenzhengchen, baoquan}@pku.edu.cn, {burui.br, yangyan.lyy}@antgroup.com,
+
+                           lh_li@stu.pku.edu.cn, sun.mc@outlook.com
+
+
+
+                  Abstract                              sentation of world geometry, a point cloud’s value is in-
+                                                                         trinsically tied to its high-fidelity spatial information. This
+Existing convolutional learning methods for 3D point cloud     very characteristic—inherently sparse and irregular data—
+data are divided into two paradigms: point-based methods     however, creates a fundamental challenge for modern com-
+that preserve geometric precision but often face performance      putational hardware [2, 22, 32, 33] and software [1, 21, 31,
+challenges, and voxel-based methods that achieve high effi-     34] that are heavily optimized for dense and regular data.
+ciency through quantization at the cost of geometric fidelity.       To address this challenge, the study of convolution on
+This loss of precision is a critical bottleneck for tasks such     point clouds has developed two competing paradigms, each
+as point cloud registration. We propose PointCNN++, a     embodying a significant compromise. The most prevalent,
+novel architectural design that fundamentally mitigates this      the voxel-based approach (Figure 1 II), resolves the conflict
+precision-performance trade-off.  It generalizes sparse con-     by forcefully restricting the convolution on voxel grids.
+volution from voxels to points, treating voxel-based convo-     This approach firstly applies a global voxelization to quan-
+lution as a specialized, degraded case of our more general      tize an entire continuous space of interest into a set of sparse
+point-based convolution. First, we introduce a point-centric      voxels, from which sparse convolutional operators are ap-
+convolution where the receptive field is centered on the orig-      plied. While the performance issue of such convolution has
+inal, high-precision point coordinates. Second, to make this     been substantially addressed by leveraging the sparse nature
+high-fidelity operation performant, we design a computa-     of the data, with representative work from O-CNN [46], SP-
+tional strategy that operates natively on points. We formu-    Conv [11], to MinkowskiEngine [7], the quantization is an
+late the convolution on native points as a Matrix-Vector Mul-      inherently lossy sampling operation, resulting in impaired
+tiplication and Reduction (MVMR) problem, for which we      fine geometric details—representing high-frequency spatial
+develop a dedicated, highly-optimized GPU kernel. Experi-      signals. The act of the global voxelization in the beginning
+ments demonstrate that PointCNN++ uses an order of mag-     of the process establishes an a priori error floor determined
+nitude less memory and is several times faster than repre-     by the voxel size, posing a critical bottleneck to tasks like
+sentative point-based methods. Furthermore, when used as     high-precision registration that depend on sub-voxel feature
+a simple replacement for the voxel-based backbones it gen-     uniqueness.
+eralizes,  it significantly improves point cloud registration      An alternative philosophy, the point-based paradigm, at-
+and semantic segmentation accuracies while proving both     tempts to preserve the data’s integrity by a relatively more
+more memory-efficient and faster. PointCNN++ shows that      gentle, usually learned, transformation of irregular points
+preserving geometric detail and achieving high performance      into a regular dense tensors, from which the convolution is
+are not mutually exclusive, paving the way for a new class of     then applied. Such transform-then-convolve approach (Fig-
+3D learning with high fidelity and efficiency.                    ure 1 III) is shown to be effective in harvesting the fidelity
+  Our code is publicly available at: https://github.      in point clouds, as shown in the notable representative work
+com/ant-research/pointelligence                   of PointCNN [25] and KPConv [44]. However, while the
+                                                              convolution on the dense tensor is indeed computationally
+                                                                           efficient, significant inefficiency arises in the transforma-
+1. Introduction                                             tion from irregular to regular itself. Such transformation
+                                                               introduces extra computation, parameters to learn and signif-
+The proliferation of 3D sensing technologies has established                                                                    icant memory access—a major source of inefficiency in point
+point clouds as a primary data modality in domains like au-                                                           cloud related computation on GPUs [27, 42]. Moreover, the
+tonomous driving [15, 20, 52], robotics [23, 26, 37, 60],                                                           implementation of such point-based methods often involves
+and augmented reality [3, 35, 36, 48]. As a direct repre-                                                               frequent usage of padding operations, which often intensifies
+  #Equal contributions. † Corresponding author. ∗Work done during in-      the inefficiency.
+ternship at Ant Group.                                              This paper posits that this prevailing trade-off should not
+
+
+                                                      24151
+
+===== PDF PAGE 2 =====
+                   x
+              y
+
+                p
+
+
+           z
+
+
+
+                            q
+         I                              II                                      III            Ⅳ
+Figure 1. A 2D illustration of convolutional learning for point cloud (I) with voxel-based methods (II), transform-then-convolve methods (III)
+and convolution on native points (IV). When a voxel center happens to be on an original point (the rare case, as depicted by q), the difference
+between (II) and (IV) is minimal. However, in the general cases, due to the forceful restricting of computation on voxel grids in (II), several
+problems arise: 1. misalignment between original points (e.g., point p) and convolution centers, 2. inaccurate neighborhood inclusion(e.g., x,
+instead of z, should be in the neighborhood of p), and 3. inaccurate convolution kernel usage (e.g., the feature associated with point x is more
+appropriate for being convolved with the upper-left kernel as show in (IV), instead of the upper-middle kernel as shown in (II). IV preserves
+geometric precision as those in III, while avoiding the cumbersome irregular-to-regular “transformation”.
+
+be viewed as a permanent compromise, but rather as a con-     each point independently with shared MLPs before global
+flict that can be mitigated through holistic computational de-     aggregation, while its successor PointNet++ [39] introduces
+sign. We introduce PointCNN++ (Figure 1 IV), an architec-     a hierarchical structure by recursively applying this process
+tural design that resolves this conflict by advancing a new     on nested point subsets. A central line of work focuses on
+computational paradigm.  Instead of restricting the con-     generalizing convolution operator for 2D image data into
+volution or introducing extra transformation, we design     processing 3D data.  Voxel-based methods first discretize
+the operator and compute kernel as an integrated system,     space for efficient 3D CNNs; for instance, VoxelNet [58]
+purpose-built for the high-performance processing of native      learns a unified feature representation for points within each
+point clouds, without any degradations nor superfluities. Our      voxel. PointCNN [25] proposes a learned X-Transform to
+approach begins by generalizing sparse convolution from     permute local point features into a canonical order before
+discrete voxels to continuous points, centering operations     applying a convolution. PointConv [50] learns continuous
+on the true, high-precision coordinates as much as possible.     kernel weights from relative coordinates using an MLP. KP-
+As the last operation, we use a local and adaptive voxeliza-    Conv [44] uses a set of rigid, learnable kernel points to apply
+tion to pair the data to be convolved with the discrete con-      spatially-aware weights. DGCNN [47] constructs dynamic
+volution kernels is used as the last operation to minimize     graphs in feature space, and applies convolution on the fea-
+the fidelity loss. From this perspective, voxel-based convo-      ture space neighborhoods.
+lution is merely a quantized, degraded special case of our       While Transformer has been widely used in processing
+more fundamental point-centric operator. A more general    3D point cloud data, one thing to note is that they often
+operator, however, is only practical if it is performant. To     operate on the features extracted with convolutional back-
+this end, we formulate the convolution on native points as a     bones [19, 24, 29, 30, 55, 56, 59], without which their effec-
+Matrix-Vector Multiplication and Reduction (MVMR) prob-      tiveness has not been widely demonstrated. Our work is most
+lem. With this formulation, we drew inspiration from an ef-      closely related to convolutional backbones in general, either
+ficient algorithm [41] for the Matrix-Vector Multiplication     used alone or as a part of a larger architecture, for serving
+sub-problem to develop a dedicated, highly-optimized GPU     general feature learning purposes on point cloud data. We
+kernel for the full problem.                              show that with our systematic design, the performance ad-
+   In this paper, we introduce PointCNN++, an architec-     vantage of the voxel-based methods and the precision advan-
+tural design that mitigates the long-standing conflict be-     tage of point-based methods could be combined.
+tween precision and performance in convolutional learning
+                                                                2.2. Performant Computation on Sparse Voxelsfor 3D point cloud data. We empirically demonstrate that
+PointCNN++ not only excels on precision-critical tasks such    The performance of 3D deep learning is critically dependent
+as registration but also delivers state-of-the-art results on     on their underlying computational systems. The sparse na-
+large-scale semantic segmentation benchmarks. Moreover, it      ture of 3D data is extensively explored to efficiently process
+is more memory-efficient while being even faster than exist-     data while avoiding computation on empty space. SparseC-
+ing approaches. This work proves that by holistically design-     onvNet [14] pioneered the work in this domain, introduc-
+ing the computational system of point cloud data, achieving     ing the use of hashmaps to manage the coordinates of active
+high geometric fidelity and high performance is not a mutu-      voxels.  Building on this, SpConv [51] proposed a highly-
+ally exclusive goal.                                          optimized grid-based map search and formalized the influ-
+2. Related Work                                                 ential gather-matmul-scatter dataflow. MinkowskiEngine [7]
+                                                                     significantly improved upon SparseConvNet’s hashmap im-
+2.1. Feature Learning for 3D Point Cloud                                                             plementation to reduce latency and introduced an alterna-
+Deep learning on point clouds has evolved through several      tive fetch-on-demand dataflow. More recent frameworks like
+operator paradigms. The seminal PointNet [38] processes     TorchSparse [42] and TorchSparse++ [43] have continued to
+
+
+                                                      24152
+
+===== PDF PAGE 3 =====
+push performance boundaries by developing novel traversal     taking fully considerations on the dense and regular nature
+algorithms, hand-tuned CUDA kernels, and co-optimizing     of the image data that is ubiquitously represented as discrete
+data structures and workloads specifically for GPU architec-      pixels: ❶{Pouti } are the pixels. ❷{(i, j)} are predefined
+tures. fVDB [49] integrated these concepts and further de-     as the pixels in patches around {Pouti } are taken as neigh-
+veloped a flexible framework accepting various popular 3D     borhoods, i.e., Chebyshev distance based neighbors. ❸For
+data representations into the unified voxel-based represen-      {(j, k)}, the kernels and neighborhoods are often of the same
+tation upon which a rich set of operators is based. While      spatial resolution, thus {Wk} are paired with {Pinj } if they
+existing high-performance methods typically exploit sparsity     share the same spatial locations.
+via voxelization, we show, however, that this is not a neces-         Significant efforts have been made to achieve efficient
+sary coupling. Our approach achieves comparable compu-   GPU algorithms for the specialized triplet set T  of image
+tational efficiencies by leveraging sparsity directly on native     convolution. In the early development stage of deep learning,
+point cloud representations, thereby bypassing the geometric     image convolution was not a highly optimized standard oper-
+precision loss inherent to voxelization.                           ation on GPU. One way to achieve efficient computation was
+3. Method                                                       to materialize Finj , thus lower the convolution into an highly
+                                                           optimized general matrix-matrix multiplication (GEMM), as
+This section details the design principles of PointCNN++.      practiced in the early version of Caffe [21].  However, as
+Our methodology  resolves  the  long-standing  precision-      detailed in cuDNN [6], such materialization inevitably intro-
+performance dichotomy in 3D deep learning through a syn-     duces significant amount of extra GPU memory usage, which
+ergistic co-design of the core operator and its underlying     could be addressed by lazily materializing in on-chip mem-
+computational system. We begin by establishing a general-     ory only.
+ized view of convolution and situating prior work within this                                                                      3.1.3. Convolution on 3D Sparse Voxels
+framework in Sec. 3.1. We then introduce our point-centric
+                                                      With a global voxelization of the entire 3D space of interest,convolution, highlighting its properties as a powerful gen-
+                                                                often in the form of point cloud, the space could be samplederalization in Sec. 3.2. Finally, we describe the performant
+                                                                    into sparse voxels — a representation that is a generalizationsystem design in Sec. 3.3, from the data representation to the
+                                                               of 2D pixels into 3D. By adding one dimension to the spatialoptimized GPU kernel, that makes this high-fidelity operator
+                                                                 coordinates, and relaxing the assumption of dense and regu-computationally feasible at scale.
+                                                                           lar tensor, convolution operator can be generalized from 2D
+3.1. Preliminaries on Convolution                       images into 3D sparse voxels. Yet, convolution on 3D sparse
+                                                              voxels is still a specialized instance of Eqn. (1), as illustrated3.1.1. A Generalized View of Convolution
+                                                                    in Figure 1 II: ❶{Pouti } are the discrete voxels. ❷{(i, j)} areAt its core, a convolution operator computes a feature Fouti ∈                                                               constructed by taking the non-empty voxels around {Pouti } asRCout at location Pouti  by aggregating information from neigh-                                                            neighborhoods, i.e., again, Chebyshev distance based neigh-
+borhood locations {Pinj }, each associated with a feature                                                                   bors. ❸Same as that in convolution on 2D images, {(j, k)}
+Finj ∈RCin, with the help of some learnable kernels {Wk ∈      are constructed by corresponding same spatial locations.
+RCout×Cin}. Cin and Cout are dimensions, or channels, of the       While efficient GPU algorithms of voxel-based convolu-
+input and output features, respectively. The computational                                                                    tion have been proposed in notable representative work from
+interactions among Fouti   , Finj , and Wk, could be completely    O-CNN [46], SPConv [11], to MinkowskiEngine [8, 10].
+depicted by a triplet set T =  {(i, j, k)}, where a triplet                                                         There are inherent drawbacks arise from the definition of
+(i, j, k) denotes that for convolution at location Pouti   , loca-     voxel-based convolution: (1) placing {Pouti } at the discrete
+tion Pinj is in its neighborhood, and Wk is the corresponding     voxels is at the cost of sacrificing fidelity from the origi-
+kernel to use for this neighborhood location. Thus, a gener-                                                                 nal point cloud; (2) neighborhood construction in Chebyshev
+alized view of convolution could be formulates as:                                                                 distance with imprecise centers intensifies the fidelity ero-
+                Fouti = X Wk × Finj .              (1)      sion; (3) the fineness of kernels are coupled with the fineness
+                           (i,j,k)∈T                                 of voxelization. A more detailed discussion, and address-
+The essence of different convolution types lies in how the      ing, of such drawbacks are given after the introduction of
+triplet set T =  {(i, j, k)} is constructed.  More specifi-     our method in the next section.
+cally, there are three major considerations in the construc-     3.2. Convolution on Native Points
+tion of such triplets: ❶How the locations of output features
+                                                                 Definition. Our design philosophy is to fully harvest the fi-are placed? — Considerations on defining convolution cen-
+                                                                      delity in the input point cloud. As illustrated in Figure 1 IV,ters {Pouti } to use. ❷How are the neighborhood measured?
+— Considerations on the pairing of {(i, j)} in the triplet. ❸   We start by ❶placing the convolution locations right at the
+                                                                    original high-precision points, thus {Pouti  ∈R3} are true,Which kernel to use for a location in the neighborhood? —
+                                                            continuous coordinates in our formulation. Then, ❷the pair-Considerations on the pairing of {(j, k)} in the triplet.
+                                                              ing of {(i, j)} could be constructed based on neighborhood
+3.1.2. Convolution on 2D Images                                                              search using the precise convolution centers with appropri-
+Convolution  on 2D  images  is  a  specialized  instance      ate distance metrics on continuous space. Finally ❸, for con-
+of Eqn. (1), where the triplet set {(i, j, k)} is constructed by      structing {(j, k)}, a local voxelization, centered right at Pouti
+
+
+                                                      24153
+
+===== PDF PAGE 4 =====
+of the same spatial resolution as the kernels is applied in each                      Global Memory                           Global Memory
+neighborhood region, yielding a correspondence between the
+kernels {Wk} and {Pinj } in the neighborhood voxels.
+Advantages.  It is clear that both ❶and ❷operates on the
+full precision of the original point cloud, the quality of the            C#$%
+neighborhood regions are well preserved. It is only at the fi-                          𝒯 C!"          C#$%
+nal step, ❸, with the convolution centers align exactly with                          C!"  On-chip computation                   On-chip computation
+neighborhood region centers, a local voxelization is applied.
+                                                                   Figure 2. A brute-force MVM computation inefficiently reads
+Such a local voxelization is adaptive to each neighborhood                                   Wk ∈RCout×Cin from global memory |T | times—once for every
+region, resulting in a higher quality mapping between {Wk}        triplet(left). Sorting the triplets by k optimizes this. Ideally, each
+and {Pinj }. Note that, with given neighborhood regions, it is      unique Wk is loaded just once into on-chip memory and reused for
+the appropriate fineness of the convolution kernels that de-        all its associated computations(right).
+fines the resolution of the local voxelization, rather than be-
+ing coupled to the fineness of the global voxelization as that      materialization technique once was used from image convo-
+in convolution on sparse voxels.                                     lution, to lower the computation into a large GEMM prob-
+Voxel Convolution as a Special Case. With the definition     lem. The extra memory usage introduced by materialization
+of convolution on native points, now we show that convo-     of the kernels is K × Cout × Cin, where K is the number of
+lution on voxels is a special case of convolution on native     kernel matrices to use, and K = t3 if a t resolution convo-
+points, by demonstrating the three degradations have to take      lution kernel on each spatial axis is used. While extra mem-
+that convert convolution on native points into convolution on     ory usage for materializing the kernels are manageable, the
+voxels.  First of all, such conversion inevitably introduce a      materialization of neighborhoods would result in extra mem-
+global voxelization to generate voxels that are not necessary     ory usage of Nin × K × Cin, where Nin is the size of the
+for convolution on the native points, but mandatory for con-     input point cloud, which is K times larger than the orig-
+volution on voxels. Degradation ❶, instead of using the orig-      inal data. Note that, the materialization of neighborhoods
+inal points as the convolution centers, snapping the convolu-     would “fill in" every neighborhood to a uniform maximum
+tion centers into the centers of the voxels. Degradation ❷,      size with padding, causing a memory footprint increase far
+instead of searching neighbors with the original points as      greater than that seen in image convolution and rendering
+centers within other points, searching neighbors in the voxel      the strategy impractical. Clearly, the strategy that was effec-
+space. Degradation ❸, instead of choosing appropriate fine-      tive in convolution on 2D images is certainly not acceptable
+ness thus resolution of the kernels, using the resolution that is      in convolution for native points in terms of extra memory us-
+coupled to the size of receptive field in the global voxelized      age, not to mention the latency introduced by the involved
+space.                                           memory read and write.
+   For degradation ❸, in other words, convolution on native        Considering that point cloud is inherently irregular, to the
+points decouples kernel resolution from the receptive field’s      best of our knowledge, there is no special structure to lever-
+physical span, whereas convolution on voxels couples it to     age for an alternative strategy in lowering the computation of
+the voxel resolution in the receptive field. We demonstrate     convolution on native points into a single performant prim-
+the difference with some examples. In convolution on native       itive.  Inspired by the way cuDNN [6] addresses the extra
+points, given a neighborhood of points, kernels with fineness    memory usage problem and its effectiveness, we hypothe-
+of either 33 or 53 could be used up to demand, as the contin-      size that a computation abstraction that literally follows the
+uous coordinates could result in any of the local voxels. In     general Eqn. (1) formulation has the potential of being per-
+contrast, in convolution on voxels, if a neighborhood is con-     formant while achieving zero extra memory usage.
+structed with 33 voxels based on the global voxelization, it     We abstract the computation of Eqn. (1) as a Matrix-
+does not make sense to use kernels of 53 resolution to con-     Vector Multiplication and Reduction (MVMR) problem,
+volve with such a neighborhood, as the neighborhood has     with the observation that MVMR naturally decomposes into
+been quantized into the coarser 33 voxels, leaving the extra     two distinct components:  the Wk × Finj component is a
+fineness of 53 kernels useless.                                 Matrix-Vector Multiplication(MVM), which itself is a popu-
+3.3. Performant Systematic Design                             lar operation with rich studies on achieving performant com-
+                                                                putation on GPUs, and the rest component is a Reduction
+The flexibility of convolution on native points presents a sig-                          — another example of cases with performant solutions. We
+nificant computational challenge. To make this high-fidelity                                                           develop a unified efficient GPU algorithm by taking inspira-
+design feasible at scale, we introduce a performant system-                                                                    tions from existing studies on the two sub-problems.
+atic design that spans from the fundamental computation ab-
+                                                                      3.3.2. Efficient GPU Algorithm of MVMR
+straction to a highly-optimized GPU kernel.
+                                                                        First of all, a native MVM implementation is required be-
+3.3.1. Computational Abstraction: MVMR                                                           cause MVMR involves many small MVM computations.
+Same as convolution on 2D images, convolution on native     Calling a standard library routine for each computation in-
+points is an instance of Eqn. (1). A tempting strategy for ef-      dividually from an outer loop would incur prohibitive launch
+ficient computation of it is to adapt the im2col like memory     overhead. Second, while the amount of multiplication and
+
+
+                                                      24154
+
+===== PDF PAGE 5 =====
+addition is fixed, the key to a performant implementation of     Algorithm 1 MVMR Kernel for Computing Eqn. (1)
+MVMR lies in optimizing memory access patterns. GPU                                                                  Inputs: W, Fin, T L.
+performance is critically dependent on: a) data locality, i.e.,     Output: Fout.
+how much data is accessed from fast, on-chip resources ver-         1:  (˜i, ˜j, ˜k) ←T 0L                 ▷initialize with the first triplet.
+sus the much slower, off-chip global memory. b) coalesced         2: W˜ ←W˜k, ˜F in ←Fin˜j          ▷read from global memory.
+memory access, where threads within a hardware warp ac-         3: ˜F out ←˜W × ˜F in                ▷fast on-chip computation.
+cess contiguous memory locations to maximize bandwidth.          4: for all (i, j, k) in T[1,2,...,L−1]L       do
+  The output of the convolution is a feature tensor Fout ∈         5:       if j ̸= ˜j then
+RNout×Cout, where Nout is the size of the output point cloud.         6:              ˜j ←j, ˜F in ←Fin˜j           ▷read only if necessary.
+It is computed from three inputs to the convolution operator:         7:    end if
+1) the input feature tensor Fin ∈RNin×Cin; 2) the weight         8:       if k ̸= ˜k then
+                                                                                                                              ˜k ←k, W˜ ←W˜k          ▷read only if necessary.matrix W ∈RK×Cout×Cin; 3) the collection of triplets T =         9:
+                                                                              10:    end if
+{(i, j, k)}, constructed based on the convolution definition,       11:       if i ̸= ˜i then
+where i, j and k are integers in range [0, Nout), [0, Nin), and       12:       atomicAdd(˜F out, Fout˜i  )          ▷only if necessary.
+[0, K), respectively. The computational interactions among       13:             ˜i ←i, ˜F out ←˜W × ˜F in              ▷on-chip, fast.
+Fout, W and Fin are completely depicted by the triplets T .       14:     else
+                                                                                            ˜F out ←˜F out + W˜ × ˜F in              ▷on-chip, fast.In most cases, K ≪Nin ≃Nout ≪|T |.                               15:
+                                                                              16:    end if
+  Note that the process of each triplet is independent of oth-                                                                              17: end for
+ers, as long as the conflict on Reduction write to Fout is gov-       18: atomicAdd(˜F out, Fout˜i  )
+erned by atomic primitive. Therefore, there is a straightfor-
+ward parallelism strategy to accomplish the computation of
+all the triplets: let each thread handle the computation of one      result in saving read from Fin and atomic write to Fout, re-
+triplet.  While this strategy seems ideal in terms of paral-      spectively. However, both of these savings are less effective,
+lelism, significant amount of slow global memory access is      as: 1) the amount to load from Fin or atomic write to Fout
+involved, as illustrated in Figure 2 (left):                               is often orders of magnitude smaller than the read from W;
+                                                               2) the expectation number of unique i and j in each group is   |T | × (Cout × Cin +    Cin  +      Cout       ).    (2)
+                                                     1 + L×Nout|T |  and 1 + L×Nin|T |   , respectively, — not as ideal as          |Read {zfrom W}   Read|{z}from Fin   Atomic |{z}Write to Fout
+                                                                 the 1 + L×K|T |  in the sorting by k case, as K ≪Nin ≃Nout.
+Clearly, the global memory read from W is a bottleneck,    Our analysis coincides with our profiling, thus we choose to
+and therefore, this access pattern must be addressed to im-      sort by k. Nevertheless, the above analysis is based on typ-
+prove performance. Mathematically, the final results are in-      ical configurations, in terms of unknown configurations, an
+variant to the processing order of the triplets1, but a sort-     auto tuning mechanism could be used to select the index to
+ing of the triplets could significantly change the memory ac-     be sorted by, before the massive executions.
+cess patterns, as illustrated in Figure 2 (right). More specif-       While the strategy of grouped processing on the triplet
+ically, given the triplet list T = {(i, j, k)} sorted by k, if       list sorted by k is effective in addressing the critical data
+it is split into consecutive groups of length L, based on Pi-      locality issue, a naive parallelism strategy by letting each
+geonhole Principle, most of the groups contain triplets that     thread handle the computation of one group is impractical as
+share the same k value. More specifically, in the case of      there is often not enough on-chip memory to afford an entire
+K ≪|T |, a practical approximations of the expectation      Cout × Cin matrix for each thread. We discern that the MVM
+number of unique k in each group is 1 + L×K|T |  2, which ap-     sub-problem in MVMR is an extreme case of an already spe-
+proaches 1, when L × K ≪|T |. Due to this reason, when      cialized Tall-and-Skinny Matrix-Matrix Multiplication prob-
+each of such group is processed together, almost only one     lem, by viewing a vector as a one column matrix, for which
+global memory read of W is required for each group, and     an efficient GPU algorithm is proposed in [41]. We refer
+the overall global memory access could be effectively reduce      the readers to [41] for the design considerations and details
+to O( L)1  of that in Eqn. (2):                                         that could be easily adopted into our MVM sub-problem.
+   |T |                                                     Heavily based on this, a practical and coalesced memory ac-
+    × (Cout × Cin + L × Cin +  L × Cout    ).   (3)     cess friendly parallelism strategy that integrates the afore-   L
+          |Read {zfrom W}   Read|  from{z  Fin}     Atomic|  Write{z  to}Fout            mentioned grouping logic is proposed. This strategy divides
+                                                          each of the Cout×Cin kernel matrix into Bout×Bin blocks, re-
+Beyond the option of sorting T by k, there are two alterna-                                                                     spectively, and assigns the computation related to each block
+tives: sorting by i and sorting by j. Following the analy-                                                               of a group’s MVM computation to a warp of threads, rather
+sis of the saving introduced from sorting by k, they would                                                             than assigning the entire computation to a single thread.
+    1Practically, the results may vary with order due to numerical effects     We summarize our algorithm for efficient computation of
+(e.g., floating-point arithmetic).                     MVMR in Algorithm 1, where T L = {(i, j, k)} are the L
+   2This is a classic problem that combines order statistics with a variant of       triplets assigned to a warp of threads, and on-chip resources
+the coupon collector’s problem. The expected number of unique values in a                                                                 are denoted as ˜W ∈RBout×Bin, ˜F in ∈RBin, and ˜F out ∈RBout.
+                     K(1−(1−1K )|T |)−1
+single group is 1 + (L −1)         |T |−1              .                   Note that effective global memory access saving are sup-
+
+
+                                                      24155
+
+===== PDF PAGE 6 =====
+ported for all the three sorting options in Algorithm 1. An
+implementation based on Triton [45] is provided in supple-
+mentary materials. There are three hyperparameters in our
+algorithm, L, Bout and Bin, we use 128, 32 and 32, respec-
+tively, in all of our experiments.
+  Note that there is zero extra memory usage, as all the com-
+putation are native on the input tensors, without resorting to
+any intermediate global memory — an achieved goal similar
+to that in cuDNN [6] on the implementation of efficient con-                                                                      Figure 3. Memory usage comparison of one convolution layer.
+volution for dense and regular data. The one and only “extra”
+computation in our algorithm is the sorting of the triplets by
+k, which is an highly optimized parallel algorithm on GPU,
+the latency of which is negligible.
+
+3.3.3. Efficient Gradient Computation
+
+An efficient backward pass is critical for performant model
+training and finetuning. By applying the chain rule to our
+generalized convolution as described in Eqn. (1), two re-
+quired gradients in distinct computational patterns are re-         Figure 4. Performance comparison of one convolution layer.
+vealed, both of which demand efficient computation.
+   First, the gradient with respect to the input feature Finj  is      detail our implementation in Sec.  4.1,  then use micro-
+                                                       benchmarks to quantify its GPU memory usage and com-an accumulation of transformed output gradients:
+                                                                  putational efficiency with extensive comparisons against the
+           ∇Finj L = X Wk T × ∇Fouti L.          (4)     performance prioritized voxel-based methods in Sec. 4.2. Fi-
+                          (i,j,k)∈T                                       nally, we demonstrate its superior accuracy and generaliza-
+                                                                    tion through two downstream tasks: the geometrically sen-
+This operation mirrors the structure of the forward pass,      sitive task of point cloud registration in Sec. 4.3 and the
+where a set of matrices (now the transposed weights, Wk T )      large-scale scene understanding task of semantic segmenta-
+are multiplied by a set of vectors (the incoming gradients,      tion in Sec. 4.4.
+∇Fouti L) and reduced. Consequently, this computation can be
+framed as an MVMR problem, allowing us to leverage the     4.1. Implementation Details
+very same highly-optimized kernel designed for the forward                                        We represent point clouds as jagged tensors same as that
+pass, ensuring high efficiency.                                                                    in [49], and also highlight specific architectural refinements.
+   Second, computing the gradient with respect to a weight     While not the core novelty of our work, these choices di-
+kernel Wk involves summing the outer products of the up-     verge from common practices and offer notable benefits for
+stream output gradients and the corresponding input feature      quality and robustness, which we hope will prove valuable
+vectors over all associated triplets:                                to the community. We opt for a fixed radius search over
+       ∇WkL = X   ∇Fouti L ⊗Finj .           (5)     a fixed-number (K-Nearest Neighbors, or KNN) search, as                                                                                    its spatially-local receptive field is better suited for convo-
+                            (i,j,k)∈T
+                                                                     lutional learning, whereas KNN is often a choice imposed
+This structure follows a different pattern, which we abstract     by architectural limitations.  For sampling, we employ a
+as Vector-Vector Outer product and Reduction (VVOR). For     voxel-based downsampling that, by not snapping points to
+this, we develop a second dedicated GPU kernel, follow-     voxel centers, better preserves thin structures and sparsely
+ing similar principles used to develop the kernel for MVMR,     captured regions than random downsampling with negligi-
+which efficiently computes these outer products and reduces      ble latency (contradicting the claim in [18] that random sam-
+them into the final weight gradients. The algorithm details,     pling is essential for efficiency), and we use the original
+as well as its Triton based implementation, of VVOR, are     pre-downsampled points for efficient upsampling.  While
+provided in the supplementary materials.                         these operations can be lowered into spatial lookups as in
+                                               Open3D [57] with the underlying ASH [12] engine based  By implementing the backward pass with these two spe-
+                                                     on hash map, our empirical findings led us to implement acialized, performant kernels—reusing MVMR for feature
+                                                   more robust and competitively fast mechanism built upongradients and introducing VVOR for weight gradients—we
+                                                     two highly-optimized GPU primitives: sorting and search-ensure that the entire training process is computationally ef-
+                                                                     ing. The implementation of these operations will be openficient, completing our holistic system design.
+                                                           sourced alongside our core convolution operator.
+4. Experiments                                                                4.2. Performance Study
+Our experiments are designed to validate that PointCNN++     This section is dedicated to analyzing the computational per-
+delivers both high performance and high fidelity. We first     formance of our method. We establish its efficiency and scal-
+
+
+                                                      24156
+
+===== PDF PAGE 7 =====
+                                                         method. Our operator demonstrates unparalleled efficiency,
+                                                                  consistently consuming the least GPU memory by a signif-
+                                                                    icant margin than existing voxel-based methods and over
+                                                        an order of magnitude less than existing point-based ap-
+                                                               proaches4. This advantage is a direct consequence of our ker-
+                                                                      nel’s design, which operates with a zero extra memory foot-
+                                                                          print.  It fundamentally bypasses the need for the memory-
+                                                                   intensive padding or tensor materialization that inflates the
+                                                memory consumption of competing approaches. These re-
+                                                                        sults serve as a powerful testament to the efficacy and supe-
+                                                                         rior architectural design of our native operator.Figure 5. Performance of various convolutional backbones for 3D
+learning assembled in an identical ResNet-18 [17] architecture.       Latency Analysis. Our analysis begins with the core convo-
+                                                                    lution operator (Figure 4), where our method substantially
+Table 1. Quantitative comparison for point cloud registration on the
+                                                           outperforms leading point-based and voxel-based alterna-KITTI. The best and second-best results are in red and blue. Ar-
+chitecture abbreviations: MkEngine (MinkowskiEngine), KP+Attn      tives. As shown in Figure 5, with a high-quality implemen-
+(KPConv with Attention), KP+GCN (KPConv with Graph Convo-      tation of other utilities, as described in Sec. 4.1, the convo-
+lutional Network), and PNpp+Attn (PointNet++ with Attention),      lution operations dominate network latency in our method,
+with task-specific designs of each method list in italic.                thus the operator-level advantage translates directly to pow-
+                                                                      erful end-to-end performance, which is faster than all base-
+                         RTE(m) ↓     RRE(◦) ↓    Recall(%) ↑   Method        Arch.                                        Param          lines in both forward and backward passes.  Surprisingly,
+                       Mean   Std   Mean   Std   @0.2m,1◦
+                                                           our method, when degraded into a voxel-based variant as
+   FCGF      MkEngine
+                                 0.36   0.133   0.110   0.41       85.2      8.75M      (2019)               ResUNet                                              described in Sec. 3.2, demonstrated an additional speed im-
+
+   DGR       MkEngine                                 0.35   0.072   0.090   0.36       92.1      244.68M        provement over the full method.5
+      (2020)              IR prediction
+
+    CoFiNet     KP+Attn
+                                 0.39   0.065   0.091   0.39       89.4      5.48M      (2021)              Coarse2Fine                                               4.3. Downstream Task: Point Cloud Registration
+
+    Predator    KP+GCN
+                                 0.35   0.063   0.081   0.27       93.9      158.42M      (2021)              Overlap pred.                                     Our primary goal here is to investigate a simple yet critical
+
+    GeoTrans    KP+Attn                                 0.38   0.068   0.096   0.29       85.6      25.50M         question: can solely replacing a standard voxel-based back-
+      (2022)            Geom emb.                                       bone with our geometrically faithful PointCNN++ counter-
+    Regformer   PNpp+Attn
+                                 0.22   0.077   0.058   0.28       94.6      3.12M      (2023)               Proj-aware                                              part yield significant performance gains?
+   UMEReg    MkEngine                                 0.49   0.023   0.490   0.21       79.6      7.17M          To this end, we deliberately avoid any task-specific tun-
+      (2024)         UME + SEM
+   Ours      PointCNN++                                                 ing. We take the classic FCGF [8] architecture and sim-
+                                 0.19    0.03   0.060   0.10       99.8      8.75M
+      (2025)               ResUNet                                              ply replace its MinkowskiEngine-based backbone with our
+                                                 PointCNN++ implementation.  All other components re-
+ability by benchmarking its memory footprint and latency
+                                                     main identical to the original FCGF. We then compare this
+against other representative methods on the isolated convo-
+                                                                 straightforwardly upgraded model against a series of re-
+lution operator level, as well as the timing for the end-to-end
+                                                               cent state-of-the-art methods, including DGR [9], Preda-
+forward and backward passes3.
+                                                                       tor [19], CoFiNet [53], GeoTrans [40], Regformer [28],
+Experimental Setup. To ensure a fair and controlled com-
+                                                       and UMEReg [16]. These methods often achieve high per-
+parison, all backbones used in this study are built upon a
+                                                        formance through highly-specific mechanisms and sophisti-
+ResNet-18 [17] architecture. For the operator-level bench-
+                                                               cated designs.
+marks, we use a standard convolution configuration (Cin =
+                                                                  In contrast, our approach brings only a better engine to a
+64, Cout =  128, K =  33). We benchmark our method
+                                                               vintage chassis, yet, as we will show, proves to be remark-
+against several representative point-based [25, 44] and voxel-
+                                                             ably competitive. Exploring the fusion of our backbone with
+based [7, 11, 43, 46] backbones. Crucially, we also include
+                                                        advanced modules is left for future work.
+a variant named ‘Ours (degraded)’, as described in Sec. 3.2.
+                                          We conduct evaluations on two standard benchmarks that
+This allows us to directly quantify the performance differ-
+                                                                 represent distinct environments.  KITTI Odometry [13] is
+ence between our approach and a traditional voxel-based
+                                                            a widely-used outdoor dataset from an autonomous driving
+paradigm within the same framework. For both latency and
+                                                                platform, featuring sparse LiDAR scans. 3DMatch [54] is a
+memory analysis, we use 10 large-scale scenes from the
+S3DIS dataset [4].  Timings and peak GPU memory con-                                                                     4The implementation of PointCNN [25] is based on TensorFlow, while
+sumption are recorded on a single NVIDIA RTX 4090 GPU.        all the rest are based on PyTorch. We exclude the memory usage comparison
+To ensure stability, all reported results are averaged over 10      with it, as the differences on the memory allocation strategy of these two
+independent runs per scene.                                        frameworks prevent a fair direct comparison.
+                                                           5We did not expect this, as we anticipated statistically equivalent perfor-
+Memory Analysis. The memory usage results in Figure 3      mance. While the definitive cause for this speed-up remains unknown, our
+provide compelling validation for the “nativeness” of our       analysis showed that the variant’s kernel matrix usage is more concentrated
+                                                                  on spatially ’central’ kernels. We conjecture that this access pattern could
+   3See supplementary material for performance benchmarks on various       lead to improved cache performance, though this requires further investiga-
+GPUs and scalability limits.                                                            tion.
+
+
+                                                      24157
+
+===== PDF PAGE 8 =====
+Table 2. Quantitative comparison on 3DMatch across different input point densities. We report Registration Recall (RR ↑), Feature Matching
+Recall (FMR ↑), and Inlier Ratio (IR ↑), all in percentages (%). The best results are in red bold, and the second best in blue bold.
+
+                            5000 Pts            2500 Pts            1000 Pts            500 Pts             250 Pts
+       Method
+                 RR  FMR   IR  RR  FMR   IR  RR  FMR   IR  RR  FMR   IR  RR  FMR   IR
+
+        FCGF(2019)      85.1   97.4   52.8   84.7   97.3   51.1   83.3   97.0   46.7   81.6   96.7   41.5   71.4   96.6   34.1
+        CoFiNet(2021)    89.3   98.1   49.8   88.9   98.3   51.2   88.4   98.1   51.9   87.4   98.2   52.2   87.0   98.3   52.2
+         Predator(2021)    89.0   96.6   58.0   89.9   96.6   58.4   90.6   96.5   57.1   88.5   96.3   54.1   86.6   96.5   49.3
+        GeoTrans(2023)   91.4   97.9   70.5   91.1   98.0   72.9   92.0   98.1   75.2   91.7   98.2   79.8   91.2   98.3   84.6
+
+       Ours             90.3   99.3   58.2   90.2   99.3   61.4   89.2   99.3   62.5   89.1   99.3   63.4   88.3   99.1   64.1
+
+
+large-scale indoor dataset composed of RGB-D scans from      Table 3. Head-to-head comparison on nuScenes semantic segmen-
+various scenes. Following UMEReg [16], we report Relative       tation using a ResUNet2 backbone.
+Translation Error (RTE), Relative Rotation Error (RRE) and          Operator                 mIoU (%) ↑  mAcc (%) ↑  Mem (GB) ↓  Time (per iter.) ↓
+Registration Recall (RR) on the KITTI. On the 3DMatch, we         KpConvMinkowskiEngine(point-based)(voxel-based)       74.4-            81.7-           17.032.61            23.820.131
+follow the protocol of CoFiNet [53] and use Registration Re-         PointCNN++ (Ours)                 78.2          85.3           2.43            0.102
+call (RR), Feature Matching Recall (FMR), and Inlier Ratio     setup allows us to directly measure the efficiency and accu-
+(IR) for evaluation.                                            racy gains provided by the PointCNN++ operator within a
+Results on KITTI. As shown in Table 1, the results on the      consistent network framework.
+KITTI dataset powerfully validate the effectiveness of our     Results and Analysis. The results are summarized in Ta-
+method in the zero-task specific tuning “plug-and-play” set-      ble 3.  Under the same experimental setting, training KP-
+ting. By simply replacing the backbone in the classic FCGF    Conv would require approximately 116 days, rendering  it
+architecture, we achieve state-of-the-art performance, nearly      impractical for real-world deployment. We therefore only
+halving its RTE to 0.19m and boosting its RR to a near-      report its memory and per-iteration time measured during
+perfect 99.8%.  Beyond raw accuracy, our model demon-      the training phase. PointCNN++ achieves the highest per-
+strates unparalleled registration stability, achieving the low-     formance with an mIoU of 78.2% and an mAcc of 85.3%,
+est standard deviations in both translation and rotation by a     outperforming the voxel-based MinkowskiEngine by 3.8% in
+wide margin. This combination of top-tier accuracy and ex-    mIoU . Crucially, PointCNN++ delivers these improvements
+ceptional consistency proves that our high-fidelity operator     with a smaller memory footprint (2.43 GB vs. 2.61 GB) and
+produces superior features, leading to quantifiably better and      faster execution (0.102s vs.  0.131s per iteration) than the
+more reliable registrations.                                    voxel-based baseline. Compared to the point-based KPConv,
+Results on 3DMatch. As shown in Table 2, our method    PointCNN++ reduces memory usage by nearly an order of
+demonstrates compelling results on the 3DMatch bench-     magnitude and is over 200× faster per iteration. These re-
+mark.  This is particularly noteworthy as these results are      sults underscore the dual advantage of our method:  it pre-
+achieved using an old backbone, which is considerably sim-     serves the geometric fidelity typically associated with point-
+pler than the bespoke architectures of competitors like Geo-     based methods while surpassing the computational efficiency
+Trans [40]. It indicates that our operator is powerful enough     of optimized voxel-based frameworks.
+on its own to elevate a conventional architecture to produce
+features of state-of-the-art quality.                            5. Conclusion
+4.4. Downstream Task: Semantic Segmentation       We present PointCNN++, a solution to the persistent trade-
+To   evaluate   the   generalization  and   versatility   of      off in 3D deep learning between the performance of voxel-
+PointCNN++, we further benchmark it on semantic segmen-     based grids and the precision of point-based operations. Our
+tation, a task that requires capturing both fine-grained local    work dismantles this compromise by introducing a computa-
+geometry and large-scale contextual information.                  tional system designed specifically for irregular point clouds.
+Experimental Setup. We conduct a head-to-head compari-    By framing convolution on this data as an MVMR prob-
+son on the challenging nuScenes [5] semantic segmentation     lem, we developed a dedicated GPU kernel that executes na-
+benchmark. Following the methodology in Section 4.3, we      tively without the inefficient overheads. Our results confirm
+adopt a “drop-in” replacement strategy to ensure fairness.      that sub-voxel accuracy could be retained without the perfor-
+We use a ResUNet2 backbone (with MSC pre-training and    mance penalties of prior methods, demonstrating that com-
+a batch size of 3) as the reference architecture. The core con-      putational efficiency and geometric fidelity can be achieved
+volution operators of the backbone are replaced while keep-      in unison, enabling powerful, faithful geometric learning.
+ing the rest of the architecture, including the loss functions
+and training pipeline, identical.
+Baselines. We compare our operator against representa-
+tive point-based and voxel-based paradigms.  Specifically,
+we include KPConv [44] as the point-based baseline and
+MinkowskiEngine [7] as the voxel-based baseline.  This
+
+
+                                                      24158
+
+===== PDF PAGE 9 =====
+Acknowledgments                                                    perception. IEEE transactions on pattern analysis and ma-
+                                                                         chine intelligence, 2022.
+This work was supported by Ant Group Research Intern
+                                                                      [13] Andreas Geiger, Philip Lenz, and Raquel Urtasun. Are we
+Program. And we express our sincere gratitude to Jiaheng
+                                                                       ready for autonomous driving?  the kitti vision benchmark
+Li from Peking University for his assistance in setting up
+                                                                                         suite. In 2012 IEEE conference on computer vision and pat-
+the Ant Group infrastructure used in the comparison experi-
+                                                                              tern recognition, 2012.
+ments.
+                                                                      [14] Benjamin Graham and Laurens Van der Maaten.   Sub-
+                                                                      manifold sparse convolutional networks.   arXiv preprint
+References                                                                       arXiv:1706.01307, 2017.
+ [1] Martín Abadi, Paul Barham, Jianmin Chen, Zhifeng Chen,      [15] An Guo, Yang Feng, and Zhenyu Chen. Lirtest: augmenting
+    Andy Davis, Jeffrey Dean, Matthieu Devin, Sanjay Ghe-             lidar point clouds for automated testing of autonomous driving
+     mawat, Geoffrey Irving, Michael Isard, et al.  TensorFlow:           systems. In Proceedings of the 31st ACM SIGSOFT Interna-
+     a system for Large-Scale machine learning. In 12th USENIX            tional Symposium on Software Testing and Analysis, 2022.
+    symposium on operating systems design and implementation      [16] Yuval  Haitman,  Amit  Efraim,  and  Joseph M  Francos.
+    (OSDI 16), 2016.                                                   Umeregrobust-universal manifold embedding compatible fea-
+ [2] Advanced Micro Devices (AMD). AMD CDNA 2 Archi-            tures for robust point cloud registration. In European Confer-
+      tecture.   Whitepaper, 2021.   Available  at: https://          ence on Computer Vision, 2024.
+    www.amd.com/content/dam/amd/en/documents/      [17] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+    instinct-business-docs/white-papers/amd-         Deep residual learning for image recognition. In Proceedings
+    cdna2-white-paper.pdf.                                          of the IEEE conference on computer vision and pattern recog-
+ [3] Evangelos Alexiou, Evgeniy Upenik, and Touradj Ebrahimi.             nition, 2016.
+     Towards subjective quality assessment of point cloud imaging      [18] Qingyong Hu, Bo Yang, Linhai Xie, Stefano Rosa, Yulan
+      in augmented reality. In 2017 IEEE 19th international work-          Guo, Zhihua Wang, Niki Trigoni, and Andrew Markham.
+     shop on multimedia signal processing (MMSP), 2017.                  Randla-net:  Efficient semantic segmentation of large-scale
+ [4] Iro Armeni, Ozan Sener, Amir R. Zamir, Helen Jiang, Ioan-            point clouds. In Proceedings of the IEEE/CVF conference on
+      nis Brilakis, Martin Fischer, and Silvio Savarese. 3d semantic          computer vision and pattern recognition, 2020.
+     parsing of large-scale indoor spaces.  In Proceedings of the      [19] Shengyu Huang, Zan Gojcic, Mikhail Usvyatsov, Andreas
+    IEEE Conference on Computer Vision and Pattern Recogni-           Wieser, and Konrad Schindler.   Predator:  Registration of
+      tion (CVPR), 2016.                                           3d point clouds with low overlap.  In Proceedings of the
+ [5] Holger Caesar, Varun Bankiti, Alex H. Lang, Sourabh Vora,         IEEE/CVF Conference on computer vision and pattern recog-
+     Venice Erin Liong, Qiang Xu, Anush Krishnan, Yu Pan, Gi-             nition, 2021.
+     ancarlo Baldan, and Oscar Beijbom.  nuscenes: A multi-      [20] Xinyu Huang, Xinjing Cheng, Qichuan Geng, Binbin Cao,
+    modal dataset for autonomous driving.  In Proceedings of          Dingfu Zhou, Peng Wang, Yuanqing Lin, and Ruigang Yang.
+     the IEEE/CVF Conference on Computer Vision and Pattern         The apolloscape dataset for autonomous driving. In Proceed-
+     Recognition (CVPR), pages 11621–11631, 2020.                        ings of the IEEE conference on computer vision and pattern
+ [6] Sharan  Chetlur,  Cliff  Woolley,  Philippe  Vandermersch,           recognition workshops, 2018.
+     Jonathan Cohen, John Tran, Bryan Catanzaro, and Evan Shel-      [21] Yangqing  Jia,  Evan  Shelhamer,  Jeff  Donahue,  Sergey
+     hamer. cudnn: Efficient primitives for deep learning. arXiv           Karayev, Jonathan Long, Ross Girshick, Sergio Guadarrama,
+     preprint arXiv:1410.0759, 2014.                                  and Trevor Darrell. Caffe: Convolutional architecture for fast
+ [7] Christopher Choy, JunYoung Gwak, and Silvio Savarese.            feature embedding. In Proceedings of the 22nd ACM interna-
+    4d spatio-temporal convnets: Minkowski convolutional neu-            tional conference on Multimedia, 2014.
+      ral networks.  In Proceedings of the IEEE Conference on      [22] Norm Jouppi, George Kurian, Sheng Li, Peter Ma, Rahul
+    Computer Vision and Pattern Recognition, pages 3075–3084,           Nagarajan, Lifeng Nai, Nishant Patil, Suvinay Subramanian,
+     2019.                                                 Andy Swing, Brian Towles, et al. Tpu v4: An optically recon-
+ [8] Christopher Choy, Jaesik Park, and Vladlen Koltun.  Fully            figurable supercomputer for machine learning with hardware
+     convolutional geometric features. In Proceedings of the IEEE           support for embeddings.  In Proceedings of the 50th annual
+     International Conference on Computer Vision, pages 8958–            international symposium on computer architecture, 2023.
+     8966, 2019.                                                      [23] Pileun Kim, Jingdao Chen, and Yong K Cho.  Slam-driven
+ [9] Christopher Choy, Wei Dong, and Vladlen Koltun.  Deep            robotic mapping and registration of 3d point clouds. Automa-
+     global registration. In Proceedings of the IEEE/CVF confer-            tion in Construction, 89:38–48, 2018.
+     ence on computer vision and pattern recognition, 2020.            [24] Xin Lai, Jianhui Liu, Li Jiang, Liwei Wang, Hengshuang
+[10] Christopher Choy, Junha Lee, Rene Ranftl, Jaesik Park, and          Zhao, Shu Liu, Xiaojuan Qi, and Jiaya Jia.  Stratified trans-
+     Vladlen Koltun.  High-dimensional convolutional networks          former for 3d point cloud segmentation.  In Proceedings of
+      for geometric pattern recognition.   In Proceedings of the            the IEEE/CVF Conference on Computer Vision and Pattern
+    IEEE Conference on Computer Vision and Pattern Recogni-           Recognition, pages 8500–8509, 2022.
+      tion, 2020.                                                       [25] Yangyan Li, Rui Bu, Mingchao Sun, Wei Wu, Xinhan Di, and
+[11] Spconv Contributors.   Spconv:  Spatially sparse convolu-         Baoquan Chen. PointCNN: Convolution on X-transformed
+      tion library. https://github.com/traveller59/            points. Advances in neural information processing systems,
+    spconv, 2022.                                                   2018.
+[12] Wei Dong, Yixing Lao, Michael Kaess, and Vladlen Koltun.      [26] Jiong Lin, Lechen Zhang, Kwansoo Lee, Jialong Ning, Judah
+    ASH: A modern framework for parallel spatial hashing in 3d           Goldfeder, and Hod Lipson.  Autourdf: Unsupervised robot
+
+
+                                                      24159
+
+===== PDF PAGE 10 =====
+     modeling from point cloud frames using cluster registration.           Fast and robust point cloud registration with geometric trans-
+     In Proceedings of the Computer Vision and Pattern Recogni-           former. IEEE Transactions on Pattern Analysis and Machine
+      tion Conference, 2025.                                                     Intelligence, 2023.
+[27] Yujun Lin, Zhekai Zhang, Haotian Tang, Hanrui Wang, and      [41] Cody Rivera, Jieyang Chen, Nan Xiong, Jing Zhang, Shuai-
+    Song Han.  Pointacc:  Efficient point cloud accelerator.  In         wen Leon Song,  and Dingwen  Tao.   Tsm2x:  High-
+    MICRO-54: 54th Annual IEEE/ACM International Sympo-          performance tall-and-skinny matrix–matrix multiplication on
+     sium on Microarchitecture, 2021.                                     gpus.  Journal of Parallel and Distributed Computing, 151:
+[28] Jiuming Liu, Guangming Wang, Zhe Liu, Chaokang Jiang,          70–85, 2021.
+    Marc Pollefeys, and Hesheng Wang.  Regformer: An ef-      [42] Haotian Tang, Zhijian Liu, Xiuyu Li, Yujun Lin, and Song
+      ficient projection-aware transformer network for large-scale          Han. Torchsparse: Efficient point cloud inference engine. Pro-
+     point cloud registration. In Proceedings of the IEEE/CVF In-           ceedings of Machine Learning and Systems, 2022.
+     ternational Conference on Computer Vision, 2023.                 [43] Haotian Tang, Shang Yang, Zhijian Liu, Ke Hong, Zhong-
+[29] Zhijian Liu, Xinyu Yang, Haotian Tang, Shang Yang, and         ming Yu, Xiuyu Li, Guohao Dai, Yu Wang, and Song Han.
+    Song Han.  Flatformer: Flattened window attention for effi-           Torchsparse++:  Efficient training and inference framework
+      cient point cloud transformer, 2023.                                       for sparse convolution on gpus. In IEEE/ACM International
+[30] Dening Lu, Qian Xie, Kyle Gao, Linlin Xu, and Jonathan Li.         Symposium on Microarchitecture (MICRO), 2023.
+     3dctn: 3d convolution-transformer network for point cloud      [44] Hugues Thomas, Charles R Qi, Jean-Emmanuel Deschaud,
+      classification. IEEE Transactions on Intelligent Transporta-           Beatriz  Marcotegui,  François  Goulette,  and Leonidas  J
+      tion Systems, pages 1–12, 2022.                                      Guibas. KPConv: Flexible and deformable convolution for
+[31] John  Nickolls,  Ian Buck,  Michael  Garland,  and Kevin            point clouds. In Proceedings of the IEEE/CVF international
+     Skadron. Scalable parallel programming with cuda: Is cuda           conference on computer vision, 2019.
+     the parallel programming model that application developers      [45] Philippe Tillet, Hsiang-Tsung Kung, and David Cox. Triton:
+     have been waiting for? Queue, 6(2):40–53, 2008.                    an intermediate language and compiler for tiled neural net-
+[32] NVIDIA.   NVIDIA A100 Tensor Core GPU Architec-         work computations. In Proceedings of the 3rd ACM SIGPLAN
+      ture.  Whitepaper, 2020.  Available at: https://www.            International Workshop on Machine Learning and Program-
+    nvidia.com/content/dam/en-zz/Solutions/         ming Languages, pages 10–19, 2019.
+    Data- Center/nvidia- ampere- architecture-      [46] Peng-Shuai Wang, Yang Liu, Yu-Xiao Guo, Chun-Yu Sun,
+    whitepaper.pdf.                                           and Xin Tong. O-cnn: Octree-based convolutional neural net-
+[33] NVIDIA.  NVIDIA H100 Tensor Core GPU Architecture.          works for 3d shape analysis. ACM Transactions On Graphics
+     Whitepaper, 2022. Available at: https://resources.          (TOG), 36(4):1–11, 2017.
+   nvidia.com/en- us- h100- whitepaper/h100-      [47] Yue Wang, Yongbin Sun,  Ziwei  Liu,  Sanjay E Sarma,
+    whitepaper-12-0922.                                       Michael M Bronstein, and Justin M Solomon.  Dynamic
+[34] Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer,          graph cnn for learning on point clouds. ACM Transactions
+     James Bradbury, Gregory Chanan, Trevor Killeen, Zeming         on Graphics (tog), 2019.
+     Lin, Natalia Gimelshein, Luca Antiga, et al.  Pytorch: An      [48] Zeyu Wang, Cuong Nguyen, Paul Asente, and Julie Dorsey.
+     imperative style, high-performance deep learning library. In           Pointshopar:  Supporting environmental design prototyping
+     Advances in Neural Information Processing Systems, 2019.             using point cloud in augmented reality. In Proceedings of the
+[35]  Jette   J  Peek,  Xucong  Zhang,   Klaus   Hildebrandt,         2023 CHI conference on human factors in computing systems,
+    Samuel Alexander Max, Amir H Sadeghi, AJJC Bogers,           2023.
+     and EAF Mahtab. A novel 3d image registration technique      [49] Francis Williams, Jiahui Huang, Jonathan Swartz, Gergely
+      for augmented reality vision in minimally invasive thoraco-            Klar, Vijay Thakkar, Matthew Cong, Xuanchi Ren, Ruilong
+     scopic pulmonary segmentectomy.  International journal of            Li, Clement Fuji-Tsang, Sanja Fidler, et al.  fvdb: A deep-
+     computer assisted radiology and surgery, 20(4):787–795,            learning framework for sparse, large scale, and high perfor-
+     2025.                                                    mance spatial intelligence. ACM Transactions on Graphics
+[36] Alessio Pierluigi Placitelli and Luigi Gallo.  Low-cost aug-          (TOG), 2024.
+     mented reality systems via 3d point cloud sensors.  In 2011      [50] Wenxuan Wu, Zhongang Qi, and Li Fuxin. Pointconv: Deep
+     Seventh International Conference on Signal Image Technol-           convolutional networks on 3d point clouds.  In Proceedings
+     ogy & Internet-Based Systems, 2011.                                     of the IEEE/CVF Conference on computer vision and pattern
+[37] François Pomerleau, Francis Colas, Roland Siegwart, et al.            recognition, 2019.
+   A review of point cloud registration algorithms for mobile      [51] Yan Yan, Yuxing Mao, and Bo Li. Second: Sparsely embed-
+      robotics. Foundations and Trends® in Robotics, 4(1):1–104,          ded convolutional detection. Sensors, 2018.
+     2015.                                                            [52] Zetong Yang, Li Chen, Yanan Sun, and Hongyang Li. Visual
+[38] Charles R Qi, Hao Su, Kaichun Mo, and Leonidas J Guibas.            point cloud forecasting enables scalable autonomous driving.
+     PointNet: Deep learning on point sets for 3d classification and           In Proceedings of the IEEE/CVF Conference on Computer Vi-
+     segmentation. In Proceedings of the IEEE conference on com-           sion and Pattern Recognition, 2024.
+     puter vision and pattern recognition, 2017.                        [53] Hao Yu, Fu Li, Mahdi Saleh, Benjamin Busam, and Slobodan
+[39] Charles Ruizhongtai Qi, Li Yi, Hao Su, and Leonidas J               Ilic. Cofinet: Reliable coarse-to-fine correspondences for ro-
+     Guibas.  PointNet++: Deep hierarchical feature learning on           bust pointcloud registration. Advances in Neural Information
+     point sets in a metric space. Advances in neural information           Processing Systems, 2021.
+     processing systems, 2017.                                        [54] Andy Zeng, Shuran Song, Matthias Nießner, Matthew Fisher,
+[40] Zheng Qin, Hao Yu, Changjian Wang, Yulan Guo, Yuxing           Jianxiong Xiao, and Thomas Funkhouser. 3dmatch: Learn-
+     Peng, Slobodan Ilic, Dewen Hu, and Kai Xu. Geotransformer:           ing local geometric descriptors from rgb-d reconstructions. In
+
+
+                                                      24160
+
+===== PDF PAGE 11 =====
+     Proceedings of the IEEE conference on computer vision and
+     pattern recognition, 2017.
+[55] Cheng Zhang, Haocheng Wan, Shengqiang Liu, Xinyi Shen,
+     and Zizhao Wu.  Pvt: Point-voxel transformer for 3d deep
+      learning. arXiv preprint arXiv:2108.06076, 2021.
+[56] Hengshuang Zhao, Li Jiang, Jiaya Jia, Philip HS Torr, and
+     Vladlen Koltun.   Point transformer.   In Proceedings of
+     the IEEE/CVF international conference on computer vision,
+     2021.
+[57] Qian-Yi Zhou, Jaesik Park, and Vladlen Koltun.  Open3D:
+   A modern library for 3d data processing.  arXiv preprint
+     arXiv:1801.09847, 2018.
+[58] Yin Zhou and Oncel Tuzel. Voxelnet: End-to-end learning for
+     point cloud based 3d object detection. In Proceedings of the
+    IEEE conference on computer vision and pattern recognition,
+     2018.
+[59] Zixiang Zhou, Xiangchen Zhao, Yu Wang, Panqu Wang, and
+     Hassan Foroosh. Centerformer: Center-based transformer for
+    3d object detection. In ECCV, 2022.
+[60] Haoyi Zhu, Yating Wang, Di Huang, Weicai Ye, Wanli
+     Ouyang, and Tong He. Point cloud matters: Rethinking the
+     impact of different observation spaces on robot learning. Ad-
+     vances in Neural Information Processing Systems, 2024.
+
+
+
+
+
+                                                      24161

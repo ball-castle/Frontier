@@ -1,0 +1,670 @@
+KH-A038 | Panoptic Segmentation
+来源：https://arxiv.org/abs/1801.00868
+本地PDF：专题文献/何恺明/KH-A038_Panoptic_Segmentation_CVPR2019.pdf
+SHA-256：d4d8503473ae4e1849cfeddca318adeb11c996b52da5a4bc53e86c79b9f1eea4
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                                Panoptic Segmentation
+
+
+             Alexander Kirillov1,2   Kaiming He1   Ross Girshick1   Carsten Rother2   Piotr Doll´ar1
+                1Facebook AI Research (FAIR)    2HCI/IWR, Heidelberg University, Germany
+
+
+                        Abstract
+
+         We propose and study a task we name panoptic segmen-2019          tation (PS). Panoptic segmentation uniﬁes the typically dis-
+           tinct tasks of semantic segmentation (assign a class label to
+        each pixel) and instance segmentation (detect and segmentApr        each object instance). The proposed task requires gener-                   (a) image                (b) semantic segmentation
+10   atingplete, aancoherentimportantscenestepsegmentationtoward real-worldthat is visionrich andsystems.com-
+        While early work in computer vision addressed related im-
+         age/scene parsing tasks, these are not currently popular,
+          possibly due to lack of appropriate metrics or associated
+         recognition challenges. To address this, we propose a novel
+         panoptic quality (PQ) metric that captures performance for           (c) instance segmentation        (d) panoptic segmentation[cs.CV]    all classes (stuff and things) in an interpretable and uniﬁed
+         manner. Using the proposed metric, we perform a rigorous      Figure 1: For a given (a) image, we show ground truth for: (b)
+         study of both human and machine performance for PS on      semantic segmentation (per-pixel class labels), (c) instance seg-
+          three existing datasets, revealing interesting insights about      mentation (per-object mask and class label), and (d) the proposed
+          the task. The aim of our work is to revive the interest of the      panoptic segmentation task (per-pixel class+instance labels). The
+                                                            PS task: (1) encompasses both stuff and thing classes, (2) uses a        community in a more uniﬁed view of image segmentation.
+                                                                           simple but general format, and (3) introduces a uniform evaluation
+                                                                              metric for all classes. Panoptic segmentation generalizes both se-
+                                                                         mantic and instance segmentation and we expect the uniﬁed task
+         1. Introduction                                                                                     will present novel challenges and enable innovative new methods.
+            In the early days of computer vision, things – countable
+          objects such as people, animals, tools – received the dom-
+          inant share of attention.  Questioning the wisdom of this      for these two visual recognition tasks vary substantially.
+          trend, Adelson [1] elevated the importance of studying sys-       The schism between semantic and instance segmentation
+        tems that recognize stuff – amorphous regions of similar     has led to a parallel rift in the methods for these tasks. Stuff
+                                                                            classiﬁers are usually built on fully convolutional nets [30]arXiv:1801.00868v3   texture or material such as grass, sky, road. This dichotomy
+        between stuff and things persists to this day, reﬂected in     with dilations [52, 5] while object detectors often use object
+         both the division of visual recognition tasks and in the spe-     proposals [15] and are region-based [37, 14]. Overall algo-
+          cialized algorithms developed for stuff and thing tasks.          rithmic progress on these tasks has been incredible in the
+           Studying stuff is most commonly formulated as a task      past decade, yet, something important may be overlooked
+       known as semantic segmentation, see Figure 1b. As stuff     by focussing on these tasks in isolation.
+            is amorphous and uncountable, this task is deﬁned as sim-     A natural question emerges: Can there be a reconcilia-
+         ply assigning a class label to each pixel in an image (note      tion between stuff and things? And what is the most effec-
+          that semantic segmentation treats thing classes as stuff).      tive design of a uniﬁed vision system that generates rich and
+         In contrast, studying things is typically formulated as the     coherent scene segmentations? These questions are particu-
+          task of object detection or instance segmentation, where the      larly important given their relevance in real-world applica-
+         goal is to detect each object and delineate it with a bound-      tions, such as autonomous driving or augmented reality.
+         ing box or segmentation mask, respectively, see Figure 1c.         Interestingly, while semantic and instance segmentation
+        While seemingly related, the datasets, details, and metrics     dominate current work, in the pre-deep learning era there
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+was interest in the joint task described using various names    mance for PS. To do so, we deﬁne a simple and likely sub-
+such as scene parsing [42], image parsing [43], or holistic     optimal heuristic that combines the output of two indepen-
+scene understanding [51]. Despite its practical relevance,     dent systems for semantic and instance segmentation via
+this general direction is not currently popular, perhaps due     a series of post-processing steps that merges their outputs
+to lack of appropriate metrics or recognition challenges.          (in essence, a sophisticated form of non-maximum suppres-
+   In our work we aim to revive this direction. We propose      sion). Our heuristic establishes a baseline for PS and gives
+a task that: (1) encompasses both stuff and thing classes, (2)     us insights into the main algorithmic challenges it presents.
+uses a simple but general output format, and (3) introduces     We study both human and machine performance on
+a uniform evaluation metric. To clearly disambiguate with      three popular segmentation datasets that have both stuff
+previous work, we refer to the resulting task as panoptic     and things annotations.  This includes the Cityscapes [6],
+segmentation (PS). The deﬁnition of ‘panoptic’ is “includ-    ADE20k [55], and Mapillary Vistas [35] datasets.  For
+ing everything visible in one view”, in our context panoptic     each of these datasets, we obtained results of state-of-the-
+refers to a uniﬁed, global view of segmentation.                    art methods directly from the challenge organizers. In the
+  The task format we adopt for panoptic segmentation is      future we will extend our analysis to COCO [25] on which
+simple: each pixel of an image must be assigned a semantic      stuff is being annotated [4]. Together our results on these
+label and an instance id. Pixels with the same label and id      datasets form a solid foundation for the study of both hu-
+belong to the same object; for stuff labels the instance id is    man and machine performance on panoptic segmentation.
+ignored. See Figure 1d for a visualization. This format has       Both COCO [25] and Mapillary Vistas [35] featured the
+been adopted previously, especially by methods that pro-     panoptic segmentation task as one of the tracks in their
+duce non-overlapping instance segmentations [18, 28, 2].     recognition challenges at ECCV 2018. We hope that having
+We adopt it for our joint task that includes stuff and things.    PS featured alongside the instance and semantic segmenta-
+                                                                   tion tracks on these popular recognition datasets will help  A fundamental aspect of panoptic segmentation is the
+                                                              lead to a broader adoption of the proposed joint task.task metric used for evaluation. While numerous existing
+metrics are popular for either semantic or instance segmen-
+                                                          2. Related Worktation, these metrics are best suited either for stuff or things,
+respectively, but not both. We believe that the use of disjoint       Novel datasets and tasks have played a key role through-
+metrics is one of the primary reasons the community gen-     out the history of computer vision.  They help catalyze
+erally studies stuff and thing segmentation in isolation. To     progress and enable breakthroughs in our ﬁeld, and just
+address this, we introduce the panoptic quality (PQ) metric     as importantly, they help us measure and recognize the
+in §4. PQ is simple and informative and most importantly     progress our community is making. For example, ImageNet
+can be used to measure the performance for both stuff and     [38] helped drive the recent popularization of deep learning
+things in a uniform manner. Our hope is that the proposed     techniques for visual recognition [20] and exempliﬁes the
+joint metric will aid in the broader adoption of the joint task.      potential transformational power that datasets and tasks can
+  The panoptic segmentation task encompasses both se-     have. Our goals for introducing the panoptic segmentation
+mantic and instance segmentation but introduces new al-      task are similar: to challenge our community, to drive re-
+gorithmic challenges. Unlike semantic segmentation, it re-     search in novel directions, and to enable both expected and
+quires differentiating individual object instances; this poses     unexpected innovation. We review related tasks next.
+a challenge for fully convolutional nets.  Unlike instance     Object detection tasks.  Early work on face detection
+segmentation, object segments must be non-overlapping;     using ad-hoc datasets (e.g., [44, 46]) helped popularize
+this presents a challenge for region-based methods that op-     bounding-box object detection. Later, pedestrian detection
+erate on each object independently.  Generating coherent      datasets [8] helped drive progress in the ﬁeld. The PAS-
+image segmentations that resolve inconsistencies between   CAL VOC dataset [9] upgraded the task to a more diverse
+stuff and things is an important step toward real-world uses.      set of general object classes on more challenging images.
+  As both the ground truth and algorithm format for PS    More recently, the COCO dataset [25] pushed detection to-
+must take on the same form, we can perform a detailed     wards the task of instance segmentation. By framing this
+study of human consistency on panoptic segmentation. This      task and providing a high-quality dataset, COCO helped de-
+allows us to understand the PQ metric in more detail, in-     ﬁne a new and exciting research direction and led to many
+cluding detailed breakdowns of recognition vs. segmenta-      recent breakthroughs in instance segmentation [36, 24, 14].
+tion and stuff vs. things performance. Moreover, measuring    Our general goals for panoptic segmentation are similar.
+human PQ helps ground our understanding of machine per-     Semantic segmentation tasks.  Semantic segmentation
+formance. This is important as it will allow us to monitor      datasets have a rich history [39, 26, 9] and helped drive
+performance saturations on various datasets for PS.            key innovations (e.g., fully convolutional nets [30] were de-
+   Finally we perform an initial study of machine perfor-     veloped using [26, 9]). These datasets contain both stuff
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+and thing classes, but don’t distinguish individual object in-     3. Panoptic Segmentation Format
+stances. Recently the ﬁeld has seen numerous new segmen-
+                                                   Task format.  The format for panoptic segmentation istation datasets including Cityscapes [6], ADE20k [55], and
+                                                          simple to deﬁne. Given a predetermined set of L semanticMapillary Vistas [35]. These datasets actually support both
+                                                                 classes encoded by L := {0, . . . , L −1}, the task requiressemantic and instance segmentation, and each has opted to
+                                                          a panoptic segmentation algorithm to map each pixel i ofhave a separate track for the two tasks. Importantly, they
+                                                       an image to a pair (li, zi) ∈L × N, where li representscontain all of the information necessary for PS. In other
+                                                                the semantic class of pixel i and zi represents its instancewords, the panoptic segmentation task can be bootstrapped
+                                                                            id. The zi’s group pixels of the same class into distinct seg-on these datasets without any new data collection.
+                                                           ments. Ground truth annotations are encoded identically.
+Multitask learning.  With the success of deep learning for    Ambiguous or out-of-class pixels can be assigned a special
+many visual recognition tasks, there has been substantial in-     void label; i.e., not all pixels must have a semantic label.
+terest in multitask learning approaches that have broad com-     Stuff and thing labels.  The semantic label set consists
+petence and can solve multiple diverse vision problems in a     of subsets LSt and LTh, such that L =  LSt ∪LTh and
+single framework [19, 32, 34].  E.g., UberNet [19] solves     LSt ∩LTh = ∅. These subsets correspond to stuff and thing
+multiple low to high-level visual tasks, including object de-      labels, respectively. When a pixel is labeled with li ∈LSt,
+tection and semantic segmentation, using a single network.       its corresponding instance id zi is irrelevant. That is, for
+While there is signiﬁcant interest in this area, we emphasize      stuff classes all pixels belong to the same instance (e.g., the
+that panoptic segmentation is not a multitask problem but    same sky). Otherwise, all pixels with the same (li, zi) as-
+rather a single, uniﬁed view of image segmentation. Specif-     signment, where li ∈LTh, belong to the same instance (e.g.,
+ically, the multitask setting allows for independent and po-      the same car), and conversely, all pixels belonging to a sin-
+tentially inconsistent outputs for stuff and things, while PS      gle instance must have the same (li, zi). The selection of
+requires a single coherent scene segmentation.               which classes are stuff vs. things is a design choice left to
+                                                                the creator of the dataset, just as in previous datasets.
+Joint segmentation tasks.  In the pre-deep learning era,
+                                                          Relationship to semantic segmentation.  The PS task
+there was substantial interest in generating coherent scene
+                                                          format is a strict generalization of the format for semantic
+interpretations. The seminal work on image parsing [43]
+                                                             segmentation. Indeed, both tasks require each pixel in an
+proposed a general bayesian framework to jointly model
+                                                     image to be assigned a semantic label. If the ground truth
+segmentation, detection, and recognition. Later, approaches
+                                                         does not specify instances, or all classes are stuff, then the
+based on graphical models studied consistent stuff and thing
+                                                                task formats are identical (although the task metrics differ).
+segmentation [51, 41, 42, 40]. While these methods shared
+                                                              In addition, inclusion of thing classes, which may have mul-
+a common motivation, there was no agreed upon task deﬁ-
+                                                                         tiple instances per image, differentiates the tasks.
+nition, and different output formats and varying evaluation
+                                                          Relationship to instance segmentation.  The instancemetrics were used, including separate metrics for evaluating
+                                                           segmentation task requires a method to segment each ob-results on stuff and thing classes. In recent years this direc-
+                                                                        ject instance in an image. However, it allows overlappingtion has become less popular, perhaps for these reasons.
+                                                           segments, whereas the panoptic segmentation task permits
+   In our work we aim to revive this general direction, but in
+                                                          only one semantic label and one instance id to be assigned
+contrast to earlier work, we focus on the task itself. Specif-
+                                                                   to each pixel. Hence, for PS, no overlaps are possible by
+ically, as discussed, PS: (1) addresses both stuff and thing
+                                                                 construction. In the next section we show that this differ-
+classes, (2) uses a simple format, and (3) introduces a uni-
+                                                         ence plays an important role in performance evaluation.
+form metric for both stuff and things.  Previous work on
+joint segmentation uses varying formats and disjoint met-    Conﬁdence scores.  Like semantic segmentation, but un-
+rics for evaluating stuff and things. Methods that generate      like instance segmentation, we do not require conﬁdence
+non-overlapping instance segmentations [18, 3, 28, 2] use     scores associated with each segment for PS. This makes the
+the same format as PS, but these methods typically only ad-     panoptic task symmetric with respect to humans and ma-
+dress thing classes. By addressing both stuff and things,      chines: both must generate the same type of image anno-
+using a simple format, and introducing a uniform metric,      tation.  It also makes evaluating human consistency for PS
+we hope to encourage broader adoption of the joint task.        simple. This is in contrast to instance segmentation, which
+                                                                              is not easily amenable to such a study as human annotators
+Amodal segmentation task.  In [56] objects are annotated     do not provide explicit conﬁdence scores (though a single
+amodally: the full extent of each region is marked, not just      precision/recall point may be measured). We note that con-
+the visible. Our work focuses on segmentation of all visible     ﬁdence scores give downstream systems more information,
+regions, but an extension of panoptic segmentation to the     which can be useful, so it may still be desirable to have a
+amodal setting is an interesting direction for future work.      PS algorithm generate conﬁdence scores in certain settings.
+
+
+                                                 3
+
+======================== PDF 第 4 页 ========================
+4. Panoptic Segmentation Metric                       sky                          sky
+                                                                              person                        person
+   In this section we introduce a new metric for panoptic               person         dog                          person
+segmentation. We begin by noting that existing metrics            person                       person
+are specialized for either semantic or instance segmentation
+and cannot be used to evaluate the joint task involving both
+                                                                        grass                            grassgrass
+stuff and thing classes. Previous work on joint segmenta-            Ground Truth                    Prediction
+tion sidestepped this issue by evaluating stuff and thing per-    Person — TP: {           ,      }; FN: {   }; FP: { }
+formance using independent metrics (e.g. [51, 41, 42, 40]).
+However, this introduces challenges in algorithm develop-      Figure 2: Toy illustration of ground truth and predicted panoptic
+ment, makes comparisons more difﬁcult, and hinders com-      segmentations of an image. Pairs of segments of the same color
+munication. We hope that introducing a uniﬁed metric for     have IoU larger than 0.5 and are therefore matched. We show how
+stuff and things will encourage the study of the uniﬁed task.      the segments for the person class are partitioned into true positives
+   Before going into further details, we start by identifying    TP, false negatives FN , and false positives FP.
+the following desiderata for a suitable metric for PS:
+   Completeness. The metric should treat stuff and thing
+                                                              Therefore, if IoU(p1, g) > 0.5, then IoU(p2, g) has to be
+classes in a uniform way, capturing all aspects of the task.                                                              smaller than 0.5. Reversing the role of p and g can be used
+   Interpretability. We seek a metric with identiﬁable                                                                   to prove that only one ground truth segment can have IoU
+meaning that facilitates communication and understanding.                                                          with a predicted segment strictly greater than 0.5.
+   Simplicity. In addition, the metric should be simple to
+deﬁne and implement. This improves transparency and al-       The requirement that matches must have IoU greater
+lows for easy reimplementation. Related to this, the metric     than 0.5, which in turn yields the unique matching theorem,
+should be efﬁcient to compute to enable rapid evaluation.       achieves two of our desired properties.  First, it is simple
+  Guided by these principles, we propose a new panoptic     and efﬁcient as correspondences are unique and trivial to
+quality (PQ) metric. PQ measures the quality of a predicted      obtain. Second, it is interpretable and easy to understand
+panoptic segmentation relative to the ground truth.  It in-     (and does not require solving a complex matching problem
+volves two steps: (1) segment matching and (2) PQ compu-     as is commonly the case for these types of metrics [13, 50]).
+tation given the matches. We describe each step next then       Note that due to the uniqueness property, for IoU > 0.5,
+return to a comparison to existing metrics.                   any reasonable matching strategy (including greedy and op-
+                                                                 timal) will yield an identical matching.  For smaller IoU
+4.1. Segment Matching                                                               other matching techniques would be required; however, in
+  We specify that a predicted segment and a ground truth      the experiments we will show that lower thresholds are un-
+segment can match only if their intersection over union     necessary as matches with IoU ≤0.5 are rare in practice.
+(IoU) is strictly greater than 0.5. This requirement, together
+                                                               4.2. PQ Computation
+with the non-overlapping property of a panoptic segmenta-
+tion, gives a unique matching: there can be at most one pre-     We calculate PQ for each class independently and aver-
+dicted segment matched with each ground truth segment.       age over classes. This makes PQ insensitive to class im-
+                                                               balance.  For each class, the unique matching splits the
+Theorem 1. Given a predicted and ground truth panoptic                                                               predicted and ground truth segments into three sets: true
+segmentation of an image, each ground truth segment can                                                                  positives (TP), false positives (FP), and false negatives
+have at most one corresponding predicted segment with IoU                                             (FN ), representing matched pairs of segments, unmatched
+strictly greater than 0.5 and vice verse.                                                               predicted segments, and unmatched ground truth segments,
+Proof. Let g be a ground truth segment and p1 and p2 be      respectively. An example is illustrated in Figure 2. Given
+two predicted segments. By deﬁnition, p1 ∩p2 = ∅(they     these three sets, PQ is deﬁned as:
+do not overlap). Since |pi ∪g| ≥|g|, we get the following:                                 P(p,g)∈TP IoU(p, g)
+                                                 PQ =          1         1         .           (1)
+                     |pi ∩g| ≤|pi ∩g|   for i ∈{1, 2} .                        |TP| + 2|FP| + 2|FN |    IoU(pi, g) =
+                     |pi ∪g|       |g|                                                                 1
+                                         PQ is intuitive after inspection: |TP| P(p,g)∈TP IoU(p, g)
+Summing over i, and since |p1 ∩g| + |p2 ∩g| ≤|g| due to       is simply the average IoU of matched segments, while
+the fact that p1 ∩p2 = ∅, we get:                                12|FP| + 12|FN | is added to the denominator to penalize
+                                                        segments without matches. Note that all segments receive
+                         ∩g| + |p2 ∩g|                                                            equal importance regardless of their area. Furthermore, if   IoU(p1, g) + IoU(p2, g) ≤|p1         ≤1 .
+                                            |g|                we multiply and divide PQ by the size of the TP set, then
+
+
+                                                 4
+
+======================== PDF 第 5 页 ========================
+PQ can be seen as the multiplication of a segmentation qual-      to estimate a precision/recall curve. Note that while conﬁ-
+ity (SQ) term and a recognition quality (RQ) term:            dence scores are quite natural for object detection, they are
+                                                             not used for semantic segmentation. Hence, AP cannot be
+   P(p,g)∈TP IoU(p, g)          |TP|
+ PQ =            ×         1         1          .  (2)     used for measuring the output of semantic segmentation, or
+             |TP|         |TP| + 2|FP| + 2|FN |           likewise of PS (see also the discussion of conﬁdences in §3).
+       |segmentation{zquality (SQ)}   |   recognition{zquality (RQ)  }                                                       Panoptic quality.  PQ treats all classes (stuff and things)
+Written this way, RQ is the familiar F1 score [45] widely      in a uniform way. We note that while decomposing PQ
+used for quality estimation in detection settings [33]. SQ      into SQ and RQ is helpful with interpreting results, PQ is
+is simply the average IoU of matched segments. We ﬁnd     not a combination of semantic and instance segmentation
+the decomposition of PQ = SQ × RQ to provide insight for      metrics. Rather, SQ and RQ are computed for every class
+analysis. We note, however, that the two values are not inde-      (stuff and things), and measure segmentation and recogni-
+pendent since SQ is measured only over matched segments.      tion quality, respectively. PQ thus uniﬁes evaluation over all
+  Our deﬁnition of PQ achieves our desiderata. It measures      classes. We support this claim with rigorous experimental
+performance of all classes in a uniform way using a simple     evaluation of PQ in §7, including comparisons to IoU and
+and interpretable formula. We conclude by discussing how    AP for semantic and instance segmentation, respectively.
+we handle void regions and groups of instances [25].
+  Void labels. There are two sources of void labels in the     5. Panoptic Segmentation Datasets
+ground truth: (a) out of class pixels and (b) ambiguous or
+                                                     To our knowledge only three public datasets have both
+unknown pixels. As often we cannot differentiate these two
+                                                         dense semantic and instance segmentation annotations:
+cases, we don’t evaluate predictions for void pixels. Speciﬁ-
+                                                            Cityscapes [6], ADE20k [55], and Mapillary Vistas [35].
+cally: (1) during matching, all pixels in a predicted segment
+                                        We use all three datasets for panoptic segmentation. In ad-
+that are labeled as void in the ground truth are removed from
+                                                                      dition, in the future we will extend our analysis to COCO
+the prediction and do not affect IoU computation, and (2)
+                                                              [25] on which stuff has been recently annotated [4]1.
+after matching, unmatched predicted segments that contain
+                                                            Cityscapes [6] has 5000 images (2975 train, 500 val, and
+a fraction of void pixels over the matching threshold are re-
+                                                    1525 test) of ego-centric driving scenarios in urban settings.
+moved and do not count as false positives. Finally, outputs
+                                                                                     It has dense pixel annotations (97% coverage) of 19 classes
+may also contain void pixels; these do not affect evaluation.
+                                                among which 8 have instance-level segmentations.
+  Group labels. A common annotation practice [6, 25] is
+                                            ADE20k [55] has over 25k images (20k train, 2k val,
+to use a group label instead of instance ids for adjacent in-
+                                                    3k test) that are densely annotated with an open-dictionary
+stances of the same semantic class if accurate delineation
+                                                                   label set. For the 2017 Places Challenge2, 100 thing and 50
+of each instance is difﬁcult. For computing PQ: (1) during
+                                                                        stuff classes that cover 89% of all pixels are selected. We
+matching, group regions are not used, and (2) after match-
+                                                          use this closed vocabulary in our study.
+ing, unmatched predicted segments that contain a fraction
+                                                         Mapillary Vistas [35] has 25k street-view images (18k
+of pixels from a group of the same class over the matching
+                                                                           train, 2k val, 5k test) in a wide range of resolutions. The
+threshold are removed and do not count as false positives.
+                                                                ‘research edition’ of the dataset is densely annotated (98%
+4.3. Comparison to Existing Metrics                       pixel coverage) with 28 stuff and 37 thing classes.
+
+  We conclude by comparing PQ to existing metrics for
+                                                          6. Human Consistency Study
+semantic and instance segmentation.
+Semantic segmentation metrics.  Common metrics for      One advantage of panoptic segmentation is that it en-
+semantic segmentation include pixel accuracy, mean accu-     ables measuring human annotation consistency. Aside from
+racy, and IoU [30]. These metrics are computed based only      this being interesting as an end in itself, human consistency
+on pixel outputs/labels and completely ignore object-level      studies allow us to understand the task in detail, including
+labels. For example, IoU is the ratio between correctly pre-      details of our proposed metric and breakdowns of human
+dicted pixels and total number of pixels in either the predic-     consistency along various axes. This gives us insight into
+tion or ground truth for each class. As these metrics ignore      intrinsic challenges posed by the task without biasing our
+instance labels, they are not well suited for evaluating thing      analysis by algorithmic choices. Furthermore, human stud-
+classes. Finally, please note that IoU for semantic segmen-      ies help ground machine performance (discussed in §7) and
+tation is distinct from our segmentation quality (SQ), which     allow us to calibrate our understanding of the task.
+is computed as the average IoU over matched segments.
+                                                     1COCO instance segmentations contain overlaps. We collected depth
+Instance segmentation metrics.  The standard metric for
+                                                                             ordering for all pairs of overlapping instances in COCO to resolve these
+instance segmentation is Average Precision (AP) [25, 13].       overlaps: http://cocodataset.org/#panoptic-2018.
+AP requires each object segment to have a conﬁdence score        2http://placeschallenge.csail.mit.edu
+
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+                                                                                  floor          rug ✔
+
+
+
+                                                                           building        tram ✔
+
+
+
+Figure 3: Segmentation ﬂaws. Images are zoomed and cropped.      Figure 4: Classiﬁcation ﬂaws. Images are zoomed and cropped.
+Top row (Vistas image): both annotators identify the object as     Top row (ADE20k image): simple misclassiﬁcation. Bottom row
+a car, however, one splits the car into two cars.  Bottom row      (Cityscapes image): the scene is extremely difﬁcult, tram is the
+(Cityscapes image): the segmentation is genuinely ambiguous.          correct class for the segment. Many errors are difﬁcult to resolve.
+
+         PQ  PQSt  PQTh  SQ  SQSt  SQTh  RQ  RQSt  RQTh               PQS  PQM  PQL  SQS  SQM  SQL  RQS RQM  RQL
+ Cityscapes  69.7  71.3   67.4   84.2  84.4   83.9   82.1  83.4   80.2       Cityscapes  35.1  62.3  84.8  67.8  81.0  89.9  51.5  76.5  94.1
+ADE20k    67.1  70.3   65.9   85.8  85.5   85.9   78.0  82.4   76.4     ADE20k    49.9  69.4  79.0  78.0  84.0  87.8  64.2  82.5  89.8
+ Vistas      57.5  62.6   53.4   79.5  81.6   77.9   71.4  76.0   67.7        Vistas      35.6  47.7  69.4  70.1  76.6  83.1  51.5  62.3  82.6
+
+Table 1: Human consistency for stuff vs. things. Panoptic, seg-      Table 2: Human consistency vs. scale, for small (S), medium (M)
+mentation, and recognition quality (PQ, SQ, RQ) averaged over     and large (L) objects. Scale plays a large role in determining hu-
+classes (PQ=SQ×RQ per class) are reported as percentages. Per-    man consistency for panoptic segmentation. On large objects both
+haps surprisingly, we ﬁnd that human consistency on each dataset    SQ and RQ are above 80 on all datasets, while for small objects
+is relatively similar for both stuff and things.                RQ drops precipitously. SQ for small objects is quite reasonable.
+
+
+                                                              Stuff vs. things.  PS requires segmentation of both stuffHuman annotations.  To enable human consistency anal-
+                                                      and things. In Table 1 we also show PQSt and PQTh whichysis, dataset creators graciously supplied us with 30 doubly
+                                                                              is the PQ averaged over stuff classes and thing classes, re-annotated images for Cityscapes, 64 for ADE20k, and 46
+                                                                    spectively. For Cityscapes and ADE20k human consistencyfor Vistas. For Cityscapes and Vistas, the images are an-
+                                                                   for stuff and things are close, on Vistas the gap is a bit larger.notated independently by different annotators. ADE20k is
+                                                                Overall, this implies stuff and things have similar difﬁculty,annotated by a single well-trained annotator who labeled
+                                                           although thing classes are somewhat harder.  In Figure 5the same set of images with a gap of six months. To mea-
+                                             we show PQ for every class in each dataset, sorted by PQ.sure panoptic quality (PQ) for human annotators, we treat
+                                                       Observe that stuff and things classes distribute fairly evenly.one annotation for each image as ground truth and the other
+                                                          This implies that the proposed metric strikes a good balanceas the prediction. Note that the PQ is symmetric w.r.t. the
+                                                             and, indeed, is successful at unifying the stuff and thingsground truth and prediction, so order is unimportant.
+                                                           segmentation tasks without either dominating the error.
+Human consistency.   First, Table 1 shows human con-     Small vs. large objects.  To analyze how PQ varies with
+sistency on each dataset, along with the decomposition of      object size we partition the datasets into small (S), medium
+PQ into segmentation quality (SQ) and recognition qual-     (M), and large (L) objects by considering the smallest 25%,
+ity (RQ). As expected, humans are not perfect at this task,     middle 50%, and largest 25% of objects in each dataset,
+which is consistent with studies of annotation quality from      respectively. In Table 2, we see that for large objects hu-
+[6, 55, 35]. Visualizations of human segmentation and clas-    man consistency for all datasets is quite good. For small
+siﬁcation errors are shown in Figures 3 and 4, respectively.      objects, RQ drops signiﬁcantly implying human annotators
+  We note that Table 1 establishes a measure of annotator     often have a hard time ﬁnding small objects. However, if a
+agreement on each dataset, not an upper bound on human     small object is found, it is segmented relatively well.
+consistency. We further emphasize that numbers are not    IoU threshold.  By enforcing an overlap greater than 0.5
+comparable across datasets and should not be used to assess     IoU, we are given a unique matching by Theorem 1. How-
+dataset quality. The number of classes, percent of annotated      ever, is the 0.5 threshold reasonable? An alternate strategy
+pixels, and scene complexity vary across datasets, each of       is to use no threshold and perform the matching by solving
+which signiﬁcantly impacts annotation difﬁculty.              a maximum weighted bipartite matching problem [47]. The
+
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+         Cityscapes                              ADE20k                                                                         Vistas               1                                                                        sky                              runway    road
+                                                                                      rail-track                                     blind
+     building                            toilet                                road                                   Cityscapes
+                                                                           vegetation                                      refrigerator
+     sky                                                                       ground-animal                                   kitchen                                              island                                                            ADE20k                                                                               service-lane                                  bridge                                                                   0.5     vegetation                                                                       wheeled-slow                                       television                                                                                       CDF                                                                                Vistas                                                                             building    bus                              bed
+                                                                      car-mount
+                                canopy                                                                                     on-rails     sidewalk
+                                  sky                                                                                      bicyclist
+                                   chandelier      traffic           sign                                                                         sidewalk                                                         0                                       river                                                                          car     car                                                                             0.25        0.50        0.75                                  towel                                                                                fire-hydrant
+                                                                             ego-vehicle     truck                          painting
+                                desk                                                                           truck                                         IoU
+    person                         building                               bridge
+                                                                                 front                                mountain
+     rider                                                                                           traffic-light                                    plaything                                                                  Figure 6: Cumulative density functions of overlaps for matched                                                                               other-barrier                                    wall      traffic light
+                                                                      person                                 sconce
+     fence                        cushion                                  bike-lane                    segments in three datasets when matches are computed by solv-
+                                                                            trash-can                                ashcan
+     motorcycle                                                                        motorcycle                                   grass                                                                    ing                                                                     a maximum                                                                              weighted                                                                                                           bipartite                                                                                             matching                                                                                                   problem                                                                                                                                    [47]. After
+                                                                         general                                    clock     pole                                                                   banner
+                                    stove                                                                 matching,                                                                                        less than                                                            16% of                                                                                   matched                                                                                                            objects have                                                                                              IoU below                                                                                                                                              0.5.                                                                   bus     train                                     chair                                                                          crosswalk-zebra
+                             swimming pool                                                                                      street-light     bicycle
+                                   car                                       bicycle
+                               hood     wall                                                                            catch-basin                                                                                   threshold=0.25         threshold=0.5         threshold=0.75                                   pot                                                              snow
+     terrain                                   blanket                                                                         fence
+   0           0.5          1   light                                 curb                                 71.3
+                                            table                             motorcyclist         PQ                coffee                                                                   70        69.7           68.1  67.1                                                                   back                                     tree
+                                    airplane                               parking
+                                                                           pole                                     glass                                                                                                                   61.6     60.2                                                                                billboard                                     bicycle                                                                                terrain                     PQ 60              59.2                                                                                                                                  57.5                                   poster
+                                                                             junction-box                                       bottle
+                                                                 manhole                                           traffic                                                light
+                                                                             wall
+                                  countertop
+                                                                              bird                                                                   50                                                         49.2                                   flower                                                                   mountain              Things                                  rock                                                                                         utility-pole
+                Stuff              streetlight                                guard-rail                              Cityscapes         ADE20k              Vistas
+                                  basket                                cctv-camera
+                                   step                                    bike-rack
+                                       shelf                                    crosswalk-plain
+                                     tray                                                                                  traffic-sign-frame
+                                   earth                                                                            curb-cut                     Figure 7: Human consistency for different IoU thresholds. The
+                         0                                             0.5            1 0                                                                               0.5            1      difference in PQ using a matching threshold of 0.25 vs. 0.5 is rel-                             PQ                                                    PQ
+                                                                           atively small. For IoU of 0.25 matching is obtained by solving a
+Figure 5: Per-Class Human consistency, sorted by PQ. Thing    maximum weighted bipartite matching problem. For a threshold
+classes are shown in red, stuff classes in orange (for ADE20k      greater than 0.5 the matching is unique and much easier to obtain.
+every other class is shown, classes without matches in the dual-
+annotated tests sets are omitted). Things and stuff are distributed                Segmentation Quality (SQ)         Recognition Quality (RQ)
+fairly evenly, implying PQ balances their performance.                                        89.2
+                                                                                                                           85.7                                                                  85 84.2        82.1       85.8                                                                                                                                 79.5             81.4                                                                                                                      78.0
+                                                                  75        72.5                                               71.4                                                                                                                 68.7
+optimization will return a matching that maximizes the sum      65                                                      59.4
+of IoUs of the matched segments. We perform the match-
+                                                           α=1 α=12 α=14      α=1 α=12 α=14      α=1 α=12 α=14
+ing using this optimization and plot the cumulative density              Cityscapes         ADE20k               Vistas
+functions of the match overlaps in Figure 6. Less than 16%
+of the matches have IoU overlap less than 0.5, indicating      Figure 8: SQ vs. RQ for different α, see (3). Lowering α reduces
+that relaxing the threshold should have minor effect.              the penalty of unmatched segments and thus increases the reported
+  To verify this intuition, in Figure 7 we show PQ com-    RQ (SQ is not affected). We use α of 0.5 throughout but by tuning
+puted for different IoU thresholds. Notably, the difference    α one can balance the inﬂuence of SQ and RQ in the ﬁnal metric.
+in PQ for IoU of 0.25 and 0.5 is relatively small, especially
+compared to the gap between IoU of 0.5 and 0.75, where the
+                                                              of PS vs. RQ on the ﬁnal PQ metric. In Figure 8 we show
+change in PQ is larger. Furthermore, many matches at lower
+                                         SQ and RQ for various α. The default α strikes a good bal-
+IoU are false matches. Therefore, given that the matching
+                                                         ance between SQ and RQ. In principle, altering α can be
+for IoU of 0.5 is not only unique, but also simple and intu-
+                                                         used to balance the inﬂuence of segmentation and recogni-
+itive, we believe that the default choice of 0.5 is reasonable.
+                                                                   tion errors on the ﬁnal metric. In a similar spirit, one could
+SQ vs. RQ balance.  Our RQ deﬁnition is equivalent to      also add a parameter β to balance inﬂuence of FPs vs. FNs.
+the F1 score. However, other choices are possible. Inspired
+by the generalized Fβ score [45], we can introduce a param-     7. Machine Performance Baselines
+eter α that enables tuning the penalty for recognition errors:
+                                          We now present simple machine baselines for panoptic
+                        |TP|                           segmentation. We are interested in three questions: (1) How
+        RQα =                                      .          (3)
+                |TP| + α|FP| + α|FN |               do heuristic combinations of top-performing instance and
+                                                          semantic segmentation systems perform on panoptic seg-
+By default α is 0.5.  Lowering α reduces the penalty of     mentation? (2) How does PQ compare to existing metrics
+unmatched segments and thus increases RQ (SQ is not af-      like AP and IoU? (3) How do the machine results compare
+fected). Since PQ=SQ×RQ, this changes the relative effect      to the human results that we presented previously?
+
+
+                                                 7
+
+======================== PDF 第 8 页 ========================
+ Cityscapes            AP  APNO  PQTh  SQTh  RQTh          Cityscapes             IoU   PQSt   SQSt   RQSt
+ Mask R-CNN+COCO [14]  36.4   33.1   54.0   79.4   67.8         PSPNet multi-scale [54]    80.6   66.6   82.2   79.3
+ Mask R-CNN [14]          31.5   28.0   49.6   78.7   63.0         PSPNet single-scale [54]   79.6   65.2   81.6   78.0
+
+ADE20k             AP  APNO  PQTh  SQTh  RQTh       ADE20k               IoU   PQSt   SQSt   RQSt
+ Megvii [31]                30.1   24.8   41.1   81.6   49.6        CASIA IVA JD [12]       32.3   27.4   61.9   33.7
+ G-RMI [10]                24.6   20.6   35.3   79.3   43.2        G-RMI [11]               30.6   19.3   58.7   24.3
+
+Table 3: Machine results on instance segmentation (stuff classes      Table 4:  Machine results on semantic segmentation (thing
+ignored). Non-overlapping predictions are obtained using the pro-      classes ignored). Methods with better mean IoU also show better
+posed heuristic. APNO is AP of the non-overlapping predictions.    PQ results. Note that G-RMI has quite low PQ. We found this is
+As expected, removing overlaps harms AP as detectors beneﬁt      because it hallucinates many small patches of classes not present
+from predicting multiple overlapping hypotheses. Methods with      in an image. While this only slightly affects IoU which counts
+better AP also have better APNO and likewise improved PQ.             pixel errors it severely degrades PQ which counts instance errors.
+
+
+Algorithms and data.  We want to understand panoptic      directly compute PQ. In Table 4 we compare mean IoU,
+segmentation in terms of existing well-established methods.     a standard metric for this task, to PQ. For Cityscapes, the
+Therefore, we create a basic PS system by applying reason-    PQ gap between methods corresponds to the IoU gap. For
+able heuristics (described shortly) to the output of existing    ADE20k, the gap is much larger. This is because whereas
+top instance and semantic segmentation systems.            IoU counts correctly predicted pixel, PQ operates at the
+  We obtained algorithm output for three datasets.  For      level of instances. See the Table 4 caption for details.
+Cityscapes, we use the val set output generated by the cur-     Panoptic segmentation.  To produce algorithm outputs
+rent leading algorithms (PSPNet [54] and Mask R-CNN      for PS, we start from the non-overlapping instance seg-
+[14] for semantic and instance segmentation, respectively).     ments from the NMS-like procedure described previously.
+For ADE20k, we received output for the winners of both     Then, we combine those segments with semantic segmenta-
+the semantic [12, 11] and instance [31, 10] segmentation      tion results by resolving any overlap between thing and stuff
+tracks on a 1k subset of test images from the 2017 Places      classes in favor of the thing class (i.e., a pixel with a thing
+Challenge. For Vistas, which is used for the LSUN’17 Seg-     and stuff label is assigned the thing label and its instance
+mentation Challenge, the organizers provide us with 1k test       id). This heuristic is imperfect but sufﬁcient as a baseline.
+images and results from the winning entries for the instance        Table 5 compares PQSt and PQTh computed on the com-
+and semantic segmentation tracks [29, 53].                    bined (‘panoptic’) results to the performance achieved from
+   Using this data, we start by analyzing PQ for the instance      the separate predictions discussed above. For these results
+and semantic segmentation tasks separately, and then exam-    we use the winning entries from each respective competi-
+ine the full panoptic segmentation task. Note that our ‘base-      tion for both the instance and semantic tasks. Since overlaps
+lines’ are very powerful and that simpler baselines may be      are resolved in favor of things, PQTh is constant while PQSt
+more reasonable for fair comparison in papers on PS.              is slightly lower for the panoptic predictions. Visualizations
+Instance  segmentation.  Instance  segmentation  algo-     of panoptic outputs are shown in Figure 9.
+rithms produce overlapping segments. To measure PQ, we    Human vs. machine panoptic segmentation.  To com-
+must ﬁrst resolve these overlaps. To do so we develop a sim-     pare human vs. machine PQ, we use the machine panoptic
+ple non-maximum suppression (NMS)-like procedure. We      predictions described above. For human results, we use the
+ﬁrst sort the predicted segments by their conﬁdence scores     dual-annotated images described in §6 and use bootstrap-
+and remove instances with low scores. Then, we iterate over     ping to obtain conﬁdence intervals since these image sets
+sorted instances, starting from the most conﬁdent. For each      are small. These comparisons are imperfect as they use dif-
+instance we ﬁrst remove pixels which have been assigned to      ferent test images and are averaged over different classes
+previous segments, then, if a sufﬁcient fraction of the seg-     (some classes without matches in the dual-annotated tests
+ment remains, we accept the non-overlapping portion, oth-      sets are omitted), but they can still give some useful signal.
+erwise we discard the entire segment. All thresholds are se-     We present the comparison in Table 6.  For SQ, ma-
+lected by grid search to optimize PQ. Results on Cityscapes     chines trail humans only slightly. On the other hand, ma-
+and ADE20k are shown in Table 3 (Vistas is omitted as it     chine RQ is dramatically lower than human RQ, especially
+only had one entry to the 2017 instance challenge). Most     on ADE20k and Vistas. This implies that recognition, i.e.,
+importantly, AP and PQ track closely, and we expect im-      classiﬁcation, is the main challenge for current methods.
+provements in a detector’s AP will also improve its PQ.         Overall, there is a signiﬁcant gap between human and ma-
+Semantic segmentation.  Semantic segmentations have     chine performance. We hope that this gap will inspire future
+no overlapping segments by design, and therefore we can     research for the proposed panoptic segmentation task.
+
+
+                                                 8
+
+======================== PDF 第 9 页 ========================
+image
+
+
+truth
+ground
+
+prediction
+
+
+Figure 9: Panoptic segmentation results on Cityscapes (left two) and ADE20k (right three). Predictions are based on the merged outputs
+of state-of-the-art instance and semantic segmentation algorithms (see Tables 3 and 4). Colors for matched segments (IoU>0.5) match
+(crosshatch pattern indicates unmatched regions and black indicates unlabeled regions). Best viewed in color and with zoom.
+
+
+    Cityscapes           PQ         PQSt        PQTh           Cityscapes  PQ     SQ    RQ       PQSt     PQTh
+    machine-separate           n/a          66.6          54.0         human       69.6 +2.5−2.7   84.1 +0.8−0.8   82.0 +2.7−2.9   71.2 +2.3−2.5   67.4 +4.6−4.9
+    machine-panoptic         61.2         66.4          54.0          machine      61.2      80.9      74.4      66.4      54.0
+
+   ADE20k            PQ         PQSt        PQTh        ADE20k    PQ     SQ    RQ       PQSt     PQTh
+    machine-separate           n/a          27.4          41.1         human       67.6 +2.0−2.0   85.7 +0.6−0.6   78.6 +2.1−2.1   71.0 +3.7−3.2   66.4 +2.3−2.4
+    machine-panoptic         35.6         24.5          41.1          machine      35.6      74.4      43.2      24.5      41.1
+
+    Vistas              PQ         PQSt        PQTh           Vistas     PQ     SQ    RQ       PQSt     PQTh
+    machine-separate           n/a          43.7          35.7         human       57.7 +1.9−2.0   79.7 +0.8−0.7   71.6 +2.2−2.3   62.7 +2.8−2.8   53.6 +2.7−2.8
+    machine-panoptic         38.3         41.8          35.7          machine      38.3      73.6      47.7      41.8      35.7
+
+Table 5: Panoptic vs. independent predictions. The ‘machine-      Table 6: Human vs. machine performance. On each of the con-
+separate’ rows show PQ of semantic and instance segmentation      sidered datasets human consistency is much higher than machine
+methods computed independently (see also Tables 3 and 4). For     performance (approximate comparison, see text for details). This
+‘machine-panoptic’, we merge the non-overlapping thing and stuff        is especially true for RQ, while SQ is closer. The gap is largest on
+predictions obtained from state-of-the-art methods into a true    ADE20k and smallest on Cityscapes. Note that as only a small set
+panoptic segmentation of the image. Due to the merging heuristic      of human annotations is available, we use bootstrapping and show
+used, PQTh stays the same while PQSt is slightly degraded.             the the 5th and 95th percentiles error ranges for human results.
+
+
+8. Future of Panoptic Segmentation                  dual stuff-and-thing nature of PS. A number of instance seg-
+                                                           mentation approaches including [28, 2, 3, 18] are designed
+  Our goal is to drive research in novel directions by invit-      to produce non-overlapping instance predictions and could
+ing the community to explore the new panoptic segmenta-     serve as the foundation of such a system.  (2) Since a PS
+tion task. We believe that the proposed task can lead to     cannot have overlapping segments, some form of higher-
+expected and unexpected innovations. We conclude by dis-      level ‘reasoning’ may be beneﬁcial, for example, based on
+cussing some of these possibilities and our future plans.        extending learnable NMS [7, 16] to PS. We hope that the
+   Motivated by simplicity, the PS ‘algorithm’ in this paper     panoptic segmentation task will invigorate research in these
+is based on the heuristic combination of outputs from top-     areas leading to exciting new breakthroughs in vision.
+performing instance and semantic segmentation systems.         Finally we note that the panoptic segmentation task was
+This approach is a basic ﬁrst step, but we expect more inter-      featured as a challenge track by both the COCO [25] and
+esting algorithms to be introduced. Speciﬁcally, we hope to     Mapillary Vistas [35] recognition challenges and that the
+see PS drive innovation in at least two areas: (1) Deeply in-     proposed task has already begun to gain traction in the com-
+tegrated end-to-end models that simultaneously address the     munity (e.g. [23, 48, 49, 27, 22, 21, 17] address PS).
+
+
+                                                 9
+
+======================== PDF 第 10 页 ========================
+References                                                             [29]  S. Liu, L. Qi, H. Qin, J. Shi, and J. Jia. LSUN’17: insatnce segmen-
+                                                                                            tation task, UCenter winner team. 2017. 8
+ [1] E. H. Adelson. On seeing stuff: the perception of materials by hu-       [30]  J. Long, E. Shelhamer, and T. Darrell. Fully convolutional networks
+    mans and machines. In Human Vision and Electronic Imaging, 2001.             for semantic segmentation. In CVPR, 2015. 1, 2, 5
+     1                                                                       [31] R. Luo, B. Jiang, T. Xiao, C. Peng, Y. Jiang, Z. Li, X. Zhang, G. Yu,
+ [2] A. Arnab and P. H. Torr.  Pixelwise instance segmentation with a            Y. Mu, and J. Sun. Places challenge 2017: instance segmentation,
+     dynamically instantiated network. In CVPR, 2017. 2, 3, 9                   Megvii (Face++) team. 2017. 8
+ [3] M. Bai and R. Urtasun. Deep watershed transform for instance seg-       [32]  J. Malik,  P. Arbel´aez,  J. Carreira, K. Fragkiadaki, R. Girshick,
+     mentation. In CVPR, 2017. 3, 9                                        G. Gkioxari, S. Gupta, B. Hariharan, A. Kar, and S. Tulsiani. The
+ [4] H. Caesar, J. Uijlings, and V. Ferrari. COCO-Stuff: Thing and stuff             three R’s of computer vision: Recognition, reconstruction and reor-
+      classes in context. In CVPR, 2018. 2, 5                                          ganization. PRL, 2016. 3
+ [5] L.-C. Chen, G. Papandreou,  I. Kokkinos, K. Murphy, and A. L.       [33] D. R. Martin, C. C. Fowlkes, and J. Malik. Learning to detect natu-
+      Yuille. DeepLab: Semantic image segmentation with deep convo-               ral image boundaries using local brightness, color, and texture cues.
+      lutional nets, atrous convolution, and fully connected CRFs. PAMI,          PAMI, 2004. 5
+     2018. 1                                                                 [34]  I. Misra, A. Shrivastava, A. Gupta, and M. Hebert. Cross-stitch net-
+ [6] M. Cordts, M. Omran, S. Ramos, T. Rehfeld, M. Enzweiler, R. Be-           works for multi-task learning. In CVPR, 2016. 3
+     nenson, U. Franke, S. Roth, and B. Schiele. The cityscapes dataset       [35] G. Neuhold, T. Ollmann, S. Rota Bul`o, and P. Kontschieder. The
+      for semantic urban scene understanding. In CVPR, 2016. 2, 3, 5, 6              mapillary vistas dataset for semantic understanding of street scenes.
+ [7] C. Desai, D. Ramanan, and C. C. Fowlkes. Discriminative models            In CVPR, 2017. 2, 3, 5, 6, 9
+      for multi-class object layout. IJCV, 2011. 9                              [36]  P. O. Pinheiro, R. Collobert, and P. Doll´ar.  Learning to segment
+ [8]  P. Doll´ar, C. Wojek, B. Schiele, and P. Perona. Pedestrian detection:             object candidates. In NIPS, 2015. 2
+    An evaluation of the state of the art. PAMI, 2012. 2                       [37]  S. Ren, K. He, R. Girshick, and J. Sun. Faster R-CNN: Towards real-
+ [9] M. Everingham, S. A. Eslami, L. Van Gool, C. K. Williams, J. Winn,            time object detection with region proposal networks. In NIPS, 2015.
+     and A. Zisserman. The PASCAL visual object classes challenge: A          1
+      retrospective. IJCV, 2015. 2                                             [38] O. Russakovsky, J. Deng, H. Su, J. Krause, S. Satheesh, S. Ma,
+[10] A. Fathi, N. Kanazawa, and K. Murphy. Places challenge 2017: in-            Z. Huang, A. Karpathy, A. Khosla, M. Bernstein, A. C. Berg, and
+      stance segmentation, G-RMI team. 2017. 8                                   L. Fei-Fei.  ImageNet Large Scale Visual Recognition Challenge.
+[11] A. Fathi, K. Yang, and K. Murphy.  Places challenge 2017: scene           IJCV, 2015. 2
+      parsing, G-RMI team. 2017. 8                                           [39]  J. Shotton, J. Winn, C. Rother, and A. Criminisi. Textonboost: Joint
+[12]  J. Fu, J. Liu, L. Guo, H. Tian, F. Liu, H. Lu, Y. Li, Y. Bao, and W. Yan.            appearance, shape and context modeling for multi-class object recog.
+     Places challenge 2017: scene parsing, CASIA IVA JD team. 2017.           and segm. In ECCV, 2006. 2
+     8                                                                       [40] M. Sun, B. Kim, P. Kohli, and S. Savarese. Relating things and stuff
+[13] B. Hariharan, P. Arbel´aez, R. Girshick, and J. Malik. Simultaneous             via object property interactions. PAMI, 2014. 3, 4
+      detection and segmentation. In ECCV, 2014. 4, 5                         [41]  J. Tighe and S. Lazebnik. Finding things: Image parsing with regions
+[14] K. He, G. Gkioxari, P. Doll´ar, and R. Girshick. Mask R-CNN. In           and per-exemplar detectors. In CVPR, 2013. 3, 4
+     ICCV, 2017. 1, 2, 8                                                      [42]  J. Tighe, M. Niethammer, and S. Lazebnik. Scene parsing with object
+[15]  J. Hosang, R. Benenson, P. Doll´ar, and B. Schiele. What makes for             instances and occlusion ordering. In CVPR, 2014. 2, 3, 4
+      effective detection proposals? PAMI, 2015. 1                             [43] Z. Tu, X. Chen, A. L. Yuille, and S.-C. Zhu. Image parsing: Unifying
+[16]  J. Hosang, R. Benenson, and B. Schiele.  Learning non-maximum            segmentation, detection, and recognition. IJCV, 2005. 2, 3
+      suppression. PAMI, 2017. 9                                             [44] R. Vaillant, C. Monrocq, and Y. LeCun. Original approach for the
+[17] A. Kirillov, R. Girshick, K. He, and P. Doll´ar. Panoptic feature pyra-             localisation of objects in images. IEE Proc. on Vision, Image, and
+    mid networks. In CVPR, 2019. 9                                             Signal Processing, 1994. 2
+[18] A. Kirillov, E. Levinkov, B. Andres, B. Savchynskyy, and C. Rother.       [45] C. Van Rijsbergen.  Information retrieval. London: Butterworths,
+     InstanceCut: from edges to instances with multicut. In CVPR, 2017.           1979. 5, 7
+      2, 3, 9                                                                  [46]  P. Viola and M. Jones. Rapid object detection using a boosted cas-
+                                                                            cade of simple features. In CVPR, 2001. 2[19]  I. Kokkinos. UberNet: Training a universal convolutional neural net-
+    work for low-, mid-, and high-level vision using diverse datasets and       [47] D. B. West. Introduction to graph theory, volume 2. Prentice hall
+      limited memory. In CVPR, 2017. 3                                     Upper Saddle River, 2001. 7
+[20] A. Krizhevsky, I. Sutskever, and G. Hinton. ImageNet classiﬁcation       [48] Y. Xiong, R. Liao, H. Zhao, R. Hu, M. Bai, E. Yumer, and
+     with deep convolutional neural networks. In NIPS, 2012. 2                   R. Urtasun.  UPSNet: A uniﬁed panoptic segmentation network.
+                                                                              arXiv:1901.03784, 2019. 9[21]  J. Li, A. Raventos, A. Bhargava, T. Tagawa, and A. Gaidon. Learning
+                                                                              [49]  T.-J. Yang, M. D. Collins, Y. Zhu, J.-J. Hwang, T. Liu, X. Zhang,      to fuse things and stuff. arXiv:1812.01192, 2018. 9
+                                                                                  V. Sze, G. Papandreou, and L.-C. Chen.  DeeperLab: Single-shot[22] Q. Li, A. Arnab, and P. H. Torr. Weakly-and semi-supervised panop-
+                                                                       image parser. arXiv:1902.05093, 2019. 9       tic segmentation. In ECCV, 2018. 9
+                                                                              [50] Y. Yang, S. Hallman, D. Ramanan, and C. C. Fowlkes.  Layered
+[23] Y.  Li,  X. Chen,  Z. Zhu,  L.  Xie,  G. Huang,  D. Du,  and
+                                                                                     object models for image segmentation. PAMI, 2012. 4
+     X. Wang.  Attention-guided uniﬁed network for panoptic segmen-
+                                                                              [51]  J. Yao, S. Fidler, and R. Urtasun. Describing the scene as a whole:      tation. arXiv:1812.03904, 2018. 9
+                                                                                         Joint object detection, scene classiﬁcation and semantic segmenta-
+[24] Y. Li, H. Qi, J. Dai, X. Ji, and Y. Wei. Fully convolutional instance-
+                                                                                                tion. In CVPR, 2012. 2, 3, 4
+     aware semantic segmentation. In CVPR, 2017. 2
+                                                                              [52]  F. Yu and V. Koltun. Multi-scale context aggregation by dilated con-
+[25]  T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ramanan,
+                                                                                        volutions. In ICLR, 2016. 1
+       P. Doll´ar, and C. L. Zitnick. Microsoft COCO: Common objects in
+                                                                              [53] Y. Zhang, H. Zhao, and J. Shi. LSUN’17: semantic segmentation
+      context. In ECCV, 2014. 2, 5, 9
+                                                                                             task, PSPNet winner team. 2017. 8
+[26] C. Liu, J. Yuen, and A. Torralba. SIFT ﬂow: Dense correspondence
+                                                                              [54] H. Zhao, J. Shi, X. Qi, X. Wang, and J. Jia. Pyramid scene parsing
+      across scenes and its applications. PAMI, 2011. 2
+                                                                               network. In CVPR, 2017. 8
+[27] H. Liu, C. Peng, C. Yu, J. Wang, X. Liu, G. Yu, and W. Jiang. An
+                                                                              [55] B. Zhou, H. Zhao, X. Puig, S. Fidler, A. Barriuso, and A. Torralba.
+     end-to-end network for panoptic segmentation. arXiv:1903.05027,
+                                                                         Scene parsing through ADE20K dataset. In CVPR, 2017. 2, 3, 5, 6
+     2019. 9
+                                                                              [56] Y. Zhu, Y. Tian, D. Mexatas, and P. Doll´ar. Semantic amodal seg-
+[28]  S. Liu, J. Jia, S. Fidler, and R. Urtasun. SGN: Sequential grouping                                                                                  mentation. In CVPR, 2017. 3
+     networks for instance segmentation. In CVPR, 2017. 2, 3, 9
+
+
+                                                 10

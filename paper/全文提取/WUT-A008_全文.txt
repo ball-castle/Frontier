@@ -1,0 +1,564 @@
+WUT-A008 | Refined Semantic Enhancement towards Frequency Diffusion for Video Captioning
+来源：https://ojs.aaai.org/index.php/AAAI/article/view/25484
+本地PDF：专题文献/武汉理工AI_CCF-A/WUT-A008_Frequency_Diffusion_arXiv2022.pdf
+SHA-256：72fb3c664d5c83d67f2055a7644dced9570faf500f5e864c8624c9bb1f3ac203
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+          Reﬁned Semantic Enhancement towards Frequency Diffusion for Video
+                                      Captioning
+
+              Xian Zhong,1 Zipeng Li,1 Shuqin Chen,2,* Kui Jiang,3,∗Chen Chen,4 and Mang Ye 3
+                                 1 School of Computer Science and Artiﬁcial Intelligence, Wuhan University of Technology
+                                                     2 College of Computer, Hubei University of Education
+                                                        3 School of Computer Science, Wuhan University
+                                           4 Center for Research in Computer Vision, University of Central Florida
+            {zhongx, lizipeng, csqcwx0801}@whut.edu.cn, kuijiang@whu.edu.cn, chen.chen@crcv.ucf.edu, mangye16@gmail.com
+
+
+                               Abstract2022                                                                                                        Training
+             Video captioning aims to generate natural language sentences
+               that describe the given video accurately. Existing methods
+              obtain favorable generation by exploring richer visual repre-
+                                                                                     a man is playing the keyboard.                   insufficientDec       sentations in encode phase or improving the decoding ability.
+            However, the long-tailed problem hinders these attempts at              a person is singing into a microphone.         occurrence
+             low-frequency                              tokens,                               which                                              rarely                                              occur but                                                           carry critical                                                                             se-              a man is singing a cover of a song in a studio.       cause18              mantics, playing                             a vital                                        role in                                             the detailed                                                         generation.                                                                   In this
+              paper, we introduce a novel Reﬁned Semantic enhancement
+                                                                                                                   Testing            method towards Frequency Diffusion (RSFD), a captioning
+            model that constantly perceives the linguistic representation of
+              the infrequent tokens. Concretely, a Frequency-Aware Diffu-
+              sion (FAD) module is proposed to comprehend the semantics                                                no generation of the word
+              of low-frequency tokens to break through generation limita-              a person is playing a video game.           'keyboard'[cs.CV]        tions. In this way, the caption is reﬁned by promoting the
+              absorption of tokens with insufﬁcient occurrence. Based on
+           FAD, we design a Divergent Semantic Supervisor (DSS) mod-        Figure 1: Illustration of existing models limitations: the in-
+              ule to compensate for the information loss of high-frequency         sufﬁcient occurrence of low-frequency tokens affects the in-
+             tokens brought by the diffusion process, where the seman-        formation extraction during training, thus failing to generate
+                 tics of low-frequency tokens is further emphasized to allevi-                                                                   reﬁned low-frequency words in the testing phase.
+               ate the long-tailed problem. Extensive experiments indicate
+               that RSFD outperforms the state-of-the-art methods on two
+            benchmark datasets, i.e., MSR-VTT and MSVD, demonstrate
+                that the enhancement of low-frequency tokens semantics can         2017). Some efforts (Hu et al. 2022a,b; Jia et al. 2022; Liao
+              obtain a competitive generation effect. Code is available at          et al. 2022b; Xu et al. 2022) are developed to explore richer
+              https://github.com/lzp870/RSFD.                                   visual features. Prior works (Zhang and Peng 2019; Pan et al.
+                                                                   2020; Zhang et al. 2020) enhance the spatio-temporal rep-
+                                                                            resentations between objects, while others (Jin et al. 2020;                    1  Introduction
+                                                       Gao et al. 2022) tend to improve the architecture of the de-
+         Video captioning is the task of understanding video con-      coder to obtain better linguistic representations. However,
+            tent and describing it accurately. It has considerable applica-      they either focus on the enhancement of visual representa-arXiv:2211.15076v2    tion value in social networks, human-computer interaction,       tions or the generation ability of the model, ignoring the to-
+         and other ﬁelds. Despite recent progress in this ﬁeld, it re-      kens with insufﬁcient occurrence in the training phase. Many
+         mains a challenging task as existing models prefer to generate      low-frequency tokens, as a critical factor to prove caption
+         commonly-used words disregarding many infrequent tokens      performance, have not received adequate attention, thus chal-
+           that carry critical semantics of video content, limiting the      lenging for the model to express similar information in other
+         reﬁned semantic generation in the testing phase.                 videos in the testing phase like the instance in Fig. 1. Con-
+          The existing methods generally adopt the encoder-decoder       cretely, a man is playing the keyboard and the model has
+         framework (Venugopalan et al. 2015), where the encoder       partially generated “a person is playing a video game”. The
+          generates visual representation by receiving a set of consecu-       result commonly occurs when the low-frequency token “key-
+            tive frames as input, and the decoder generates captions via      board” is of insufﬁcient occurrence in the given video.
+           recurrent neural networks (RNNs) or Transformer (Hori et al.                                                             To deal with the challenges of token imbalance, the ap-
+              *Corresponding authors.                                    proach (Wu et al. 2016) in neural machine translation splits
+          Copyright © 2023, Association for the Advancement of Artiﬁcial      words into more ﬁne-grained units. However, the token imbal-
+            Intelligence (www.aaai.org). All rights reserved.                     ance phenomenon is not fundamentally eliminated. BMI (Xu
+
+======================== PDF 第 2 页 ========================
+ Encoder                                               HEL  Highway Embedding Layer   Divergent Semantic Supervisor
+                                                                                      Concatenation
+                                                                                                                        Train          L     Original Loss
+                                        ...      HEL                                                                       CNN 2D    I
+                                                                                                                                Test         DL    Divergent Loss                                                                    ...
+                                                                       CNN   M                                                  3D     ...      HEL                                                                        Output Captions
+  Frequency-Aware Diffusion                             Train           Test  Decoder                            Linear          Linear
+  Ground-truth                      Semantic Space                            Diffusion    Caption                                                                Caption                                                                                                                                                                                                                                                                                                                                character             Softmax
+                                                                                                                                                            is                                                                      driving                                                                                                                                                                shared                                                                                                                                character
+   character                                                                                                                                       is                                  character                                                                                                                                                                                                                                                                                                                                                                                                                                                               character                                                                    driving
+                                                                                                                                                                                                                                                       e.g.
+                                                                                                                                       is         is                                                                              a  window                                                       airplane                                                                                                                                                                                                                                                                                                                 Linear              Softmax                         Word                     truck                                                                                                                                                                                   Feed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             driving                                                                                                                                                                                                                                      size = 3                                                                                                                                                                                                                                                                                           Frequency
+                                        is                  vehicle                                                  a
+     driving                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  vehicle                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        driving                               a       trailer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         Self-Attention                                Cross-Attention               Forward
+                                                                   a                      Latter                                                       Embedding                                                                                                                                                                                                                                                                                                                                                        shared     L                                                                                                                                                                                                                                                                                           Diffusion                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             vehicle         Predict      a                       High-Frequency Token     Unmarked Token
+                                                                                                                                            Ground                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        vehicle       Trurh                             Low-Frequency Token        Similar Semantic
+                                                                                                       DL                                                                                                                                                                                                                                                                                                  Linear          Linear              Softmax      Former     vehicle                                                                                                                                                                    Predict
+
+Figure 2: Overview of the proposed RSFD architecture. It mainly consists of the encoder in the top-left box and the decoder with
+FAD and DSS modules in another box. In the training phase, FAD promotes the model comprehending the reﬁned information
+by mapping the ground-truth caption to the semantic space and fusing it in frequency diffusion. DSS supervises the central word
+to obtain its distinctive semantics. In the testing phase, only the transformer-based parts are implemented for sentence generation.
+
+
+et al. 2021) has been dedicated to assigning adaptive weights       tokens, the model develops the ability to absorb the semantics
+to target tokens in light of the token frequency. Although       of low-frequency tokens. Afterward, to alleviate the semantic
+they increase the exposure of low-frequency tokens during       loss of high-frequency tokens (Pure high-frequency words
+training, they potentially damage the information of high-     can be entirely trained, whereas they carry low-frequency
+frequency ones. In video captioning, few researchers fo-      semantics that disturbs the model’s learning of them) by
+cus on the learning effect of low-frequency tokens. ORG-      the diffusion process and further excavate the low-frequency
+TRL (Zhang et al. 2020) introduces an external language       information, we further design a Divergent Semantic Supervi-
+model to extend the low-frequency tokens, which depends       sor (DSS) module to exploit adjacency words to supervise the
+heavily on external knowledge. Taking the above attempts       central word. With the adjacent supervisory information, the
+as a reference, the motivation of our design can be depicted       central high-frequency token can obtain the semantics from
+as follows: 1) With the help of high-frequency tokens more       multiple teachers adapted to itself for compensation, and the
+times trained by the model, low-frequency tokens entrust       central low-frequency one can further promote its genera-
+their semantics to high-frequency ones obtaining adequate        tion. We concentrate on the representation of low-frequency
+exposure to alleviate the effect of token imbalance. 2) Instruc-      tokens, which helps the model capture information about
+tion from multiple teachers to high-frequency tokens boosts       relatively rare but vital words in the testing phase. The im-
+speciﬁc semantics suitable for them as compensation due to      provement of low-frequency tokens enables the generation
+information loss by the previous stage, and low-frequency      caption to have a reﬁned description.
+tokens further enhance their generation.                       Our main contributions are summarized threefold:
+
+                                                                              • We put the emphasis on token imbalance that has not  In this work, we propose a novel method named Reﬁned
+                                                          been focused seriously in video captioning and dedicateSemantic enhancement towards Frequency Diffusion (RSFD)
+                                                                         to concentrating on infrequent but vital tokens to enhancefor video captioning to address the mentioned issue. In RSFD,
+                                                                     the reﬁned semantics of generated captions.unlike previous effort (Zhang et al. 2020) that with the help
+of external modules, we propose a module named Frequency-         • We devise a unique module, termed Frequency-Aware
+Aware Diffusion (FAD) to explore the semantics of low-         Diffusion (FAD), in the form of diffusion to learn tokens
+frequency tokens inside our model. Firstly, in light of the         with insufﬁcient occurrence that are most likely to carry
+occurrence numbers of each token in the whole corpus and           critical semantics. To the best of our knowledge, this is
+in each video they appear, we split them into three cate-         the ﬁrst time that the frequency of tokens is attached to
+gories (high-frequency, low-frequency, and unmarked). Sec-          great importance in video captioning.
+ondly, we exploit the diffusion process to comprehend low-         • We further design a Divergent Semantic Supervisor (DSS)
+frequency tokens by integrating them with high-frequency        module as a constraint for balancing different frequent
+ones. With the assistance of the diffusion of low-frequency         tokens by leveraging distinctive semantics adapted to the
+
+======================== PDF 第 3 页 ========================
+   token itself, and quantitatively validating its effectiveness.               3  Proposed Method
+                                        We devise our Reﬁned Semantic enhancement towards Fre-
+            2  Related Works                     quency Diffusion (RSFD) for video captioning. As shown in
+                                                                  Fig. 2, our overall framework follows the encoder-decoder
+2.1  RNN- and Transformer-Based Methods
+                                                                        structure. During the training process, Frequency-Aware Dif-
+With the development of deep learning, researchers extract      fusion (FAD) encourages the model to add low-frequency
+video features through deep convolution neural networks      token noise to learn its semantics. Then the diffusion features
+and combine them with RNNs or Transformer (Hori et al.      of tokens are fused with the corresponding visual features
+2017) to make the generated words more accurate. Early      according to the cross-attention mechanism. At the head of
+in (Venugopalan et al. 2015), the encoder-decoder framework      the decoder, Divergent Semantic Supervisor (DSS) obtains
+is applied ﬁrst to the captioning model, where visual fea-       distinctive semantic features by updating the gradient that
+tures are leveraged by performing mean-pooling over each      adapts to the token itself. In the testing phase, only the origi-
+frame, and long short-term memory (LSTM) (Hochreiter       nal Transformer architecture is retained to generate captions.
+and Schmidhuber 1997) is adopted to generate sentences.
+Beneﬁting from parallel computing ability and scalability      3.1  Encoder-Decoder Framework
+of Transformer (Vaswani et al. 2017), it is applied to many      Encoder.  Image and motion features are processed by two
+multi-modal tasks. Inspired by it, Transformer has been in-      separate encoders, which give a set of consecutive video
+troduced for video captioning (Chen et al. 2018a). SBAT (Jin       clips of length K. Here we use V ∈RK×dv to represent
+et al. 2020) is intended to reduce the redundancy of consecu-      the features of these two types, where dv denotes dimen-
+tive frames. D2 (Gao et al. 2022) utilizes the syntactic prior      sion of each feature. We feed them into highway embed-
+to measuring the contribution of visual features and syntactic      ding layer (HEL) to obtain representations R ∈RK×dh,
+prior information for each word.                                              i.e., R = fHEL(V ), where dh is output dimension of HEL,
+                                                       and fHEL can be trained directly through simple gradient de-
+                                                                 scent (Srivastava, Greff, and Schmidhuber 2015), thus it can2.2  Diffusion Model
+                                                         be formulated as:
+Some efforts (Li  et  al. 2022a; Ye  et  al. 2022b) have
+                                                                fHEL(V ) = BN (T (V ) ◦H (V ) + (1 −T (V )) ◦P (V )) ,  (1)
+been conducted on data noise. In recent years, Diffusion
+model (Sohl-Dickstein et al. 2015) has made remarkable      where H(V ) = V Weh, P(V ) = tanh(H(V )Wep), and
+progress. DDPM (Ho, Jain, and Abbeel 2020) develops the     T(V ) = φ(H(V )Wet). BN denotes batch normalization
+denoising ability by artiﬁcially adding noise in the diffusion      operation (Ioffe and Szegedy 2015), ◦is the element-wise
+process and matching each small step of the inverse pro-      product, and φ is the sigmoid function. Weh ∈Rdv×dh,
+cess corresponding to the forward process. TimeGrad (Rasul      and {Wep, Wet} ∈Rdh×dh. The multi-modalities, e.g., im-
+et al. 2021) integrates the diffusion model with the autore-     age and motion features are applied concatenation to obtain
+gressive model by sampling from the data distribution at    R ∈R2K×dh to feed into the decoder.
+each time step by estimating its gradient. The diffusion ap-                                                          Decoder.  The decoder block consists of self-attention,
+proaches (Liao et al. 2022a; Zhu et al. 2022) have obtained       cross-attention, and feed-forward layer. The self-attention
+signiﬁcant progress in computer vision. Inspired by the po-      layer is formulated as:
+tential of learning noise by noise addition that is just aiming
+                                                                                  SelfAtt (E<t) = MultiHead (E<t, E<t, E<t)
+at learning the noise purely, RSFD regards the information on                                                                         (2)
+                                                  = Concat (head1:h) Wh,low-frequency tokens as noise and adds it to high-frequency
+tokens, developing the model’s ability to comprehend low-      where E<t ∈RT ×dh denotes the feature vector of embedded
+frequency tokens.                                                 captions, T represents the length of caption. Concat denotes
+                                                               concatenation operation, and h denotes the number of multi-
+2.3  Translation Methods with Frequency                 ple attention heads. Wh ∈Rdh×dh is a trainable parameter.
+     Modeling                                            Residual connection and layer normalization are adopted
+                                                                         after the self-attention layer:
+In neural machine translation, the token imbalance data drive                                 ′
+the model preferentially generates high-frequency words          E <t = LayerNorm (E<t + SelfAtt (E<t)) ,        (3)
+while ignoring the rarely-used words. GNMT (Wu et al. 2016)                                                      where LayerNorm smooths the size relationship between
+proposes to divide words into a limited set of common sub-                                                                      different samples.
+word units to handle the rare words naturally. BMI (Xu et al.                                                    So far, the self-attention process has been completed, and
+2021) assigns an adaptive weight to promote token-level                                  ′
+                                                                  the result E <t is employed for cross-attention as a query:adaptive training. In video captioning, the large-scale train-
+ing corpus demonstrates the phenomenon of the imbalance       D<t = LayerNorm E <t′ + MultiHead E <t,′  R, R     ,   (4)
+occurrence of tokens. External language model (Zhang et al.
+2020) is introduced to extend the ground-truth tokens to deal      where D<t denotes the sentence feature of cross-attention
+with the token imbalance problem, which heavily depends on       output. We adopt a feed-forward network (FFN) that employs
+external knowledge. In contrast, RSFD highlight relatively       non-linear transformation, and apply LayerNorm to calculate
+                                                                  the probability distribution of words by Softmax:rare words that are most likely reﬁned semantics in the sen-
+tence, alleviating token imbalance inside our model.                    Dt = LayerNorm (D<t + FFN (D<t)) ,          (5)
+
+======================== PDF 第 4 页 ========================
+            Pt (yt|y<t, R) = Softmax (DtWp) ,            (6)      while the intra-frequency is greater than the γ, it shows that
+ where R denotes the encoded video features, Wp ∈Rdh×de      even though it is not a frequent token, it can be adequately
+                                                     comprehended by the video to which it belongs. Thus itis a trainable variable. The objective is to minimize the cross-
+entropy loss:                                                               is divided into UMT for it can be self-sufﬁcient without
+                                                                   disturbing other high-frequency words; Instead, when both of
+                      T                                 them are below their respective hyper-parameters, the token
+             Lt = − X log Pt (y∗t |y∗<t, R) ,              (7)                                                                                is obviously classiﬁed as LFT, for it requires more trains.
+                       t=1
+                                                          Noising Frequency Diffusion.  Our diffusion is an intu-
+ where y∗t denotes the ground-truth token at time step t.                                                                            itive diffusion exploiting one noise addition step rather than
+                                                                   the vanilla Markov chain with multiple adding noise steps. In-
+3.2  Frequency-Aware Diffusion                                                                  spired by denoising after adding noise (Ho, Jain, and Abbeel
+ORG-TRL (Zhang et al. 2020) introduces an external lan-      2020), we regard low-frequency tokens as noise and add them
+guage model to extend the ground-truth tokens to cope with       to high-frequency tokens so that our diffusion is a process
+the token imbalance problem. However, it needs to be trained     from low-frequency to high-frequency. We respectively de-
+in large-scale corpus in advance, divorced from the caption-     ﬁne TokenL = {tokenL1 , tokenL2 , · · · , tokenLm}, TokenH =
+ing model, and the external model consumes additional com-     {tokenH1 , tokenH2 , · · · , tokenHn } as low-frequency and high-
+puting resources and memory. Instead, we propose an FAD      frequency token features list. A similarity matrix S is con-
+module inside captioning model to sufﬁciently grasp low-      structed to measure the similarity semantics between i-th
+frequency semantics. We ﬁrst introduce our split method of     LFT and j-th HFT:
+high-frequency and low-frequency tokens and present a rea-                              exp sij
+                                                                                           Sij =                      ,                 (10)
+sonable explanation for it. Then we elaborate on the diffusion                  Pnj=1 exp sij
+process to learn the semantics of low-frequency tokens.
+                                                      where Sij is the (i, j)-th element of S ∈Rm×n. We adoptSplit of Distinct Frequency Words.  Due to the severe im-
+                                                         softmax function as the normalization function, sij denotesbalance of tokens in the corpus, a small number of high-
+                                                                the cosine similarity score between two tokens. We choosefrequency tokens occupy many occurrences while a large
+                                                                   j-th HFT corresponding to max value in each line as thenumber of low-frequency tokens appear rarely. Here we indi-
+                                                                   diffusion object of i-th LFT:cate HFT for high-frequency tokens, LFT for low-frequency
+ones, and UMT for unmarked tokens. Then we deﬁne a token                                                            LoH = arg max (S, dim = 1) ,             (11)
+belongs to different categories of frequency as:
+                                                      where LoH denotes the list of high-frequency tokens cor-
+             |vid (tok)|           HFT,       ≥γ                            responding to low-frequency tokens one by one, and the
+                                               |tok|              |vidall (tok)|                                                       ,                                 ≥δ,          (8)      value of LoH represents the index of TokenH. In this way,
+                       |vid (tok)|           |cap|                we have established the corresponding relationship between
+       LFT, |vidall (tok)| < γ                            low-frequency tokens and their semantically most similar
+                                                              high-frequency token. Afterward, we obtain the parameter of
+                       |vid (tok)|                       ≥γ                               the noise according to the similarity:          UMT,
+               |vidall (tok)|           |tok|                                                        ,     < δ,         (9)                       |vid (tok)|           |cap|                                     exp σ tokenLi , tokenHloh
+       LFT, |vidall (tok)| < γ                                         αi = Pi∈N exp σ tokenLi , tokenHloh  ,         (12)
+ where δ and γ represent hyper-parameter to decide which                                                        where loh denotes i-th value of LoH, αi represents the signif-
+category of the frequency the token belongs to. In video cap-      icance of i-th noise, N denotes the indexes of low-frequency
+tioning, a video has multiple ground-truth captions. |vid(·)|      words corresponding to one high-frequency word, σ denotes
+and |vidall(·)| respectively represent the occurrence numbers       the cosine similarity of semantic between these two tokens,
+of the token in the corresponding video and the sum number      then we obtain the diffusion tokenHloh of high-frequency:
+of tokens in all captions of its video. |tok| denotes the number
+of occurrences of this token in all ground-truth captions of the                  tokenHloh = tokenHloh + X αi ◦tokenLi .         (13)
+whole corpus, and |cap| indicates the number of all captions                                   i∈N
+in the dataset.
+                                                      Note that unlike DDPM (Ho, Jain, and Abbeel 2020) and  We use γ to assess the frequency of the token in intra-
+                                                     TimeGrad (Rasul et al. 2021), which learns the noise ﬁrst andvideo, for it only indicates the frequency inside its located
+                                                              then denoising, our model only learns low-frequency tokensvideo (termed intra-frequency), and δ evaluates the frequency
+                                                                 regardless of how to remove them. By adding appropriateof the token in inter-video for it expresses the frequency in
+                                                             low-frequency tokens as noise to high-frequency ones, RSFDthe whole dataset (termed inter-frequency). We split tokens
+                                                          can generate relatively rarely used but more reﬁned words.into three kinds of frequency tokens in four cases: When
+inter-frequency exceeds the δ, if the token has higher intra-
+                                                          3.3  Divergent Semantic Supervisorfrequency, it is divided into HFT owing to its universality;
+Otherwise, proving that it cannot integrate sufﬁciently with     Due to the noise semantics of low-frequency in FAD, the
+the corresponding video and be divided into LFT, even if      semantics of high-frequency is constrained to some extent.
+it is a common token; When inter-frequency is below the δ     To complement the semantics of the central high-frequency
+
+======================== PDF 第 5 页 ========================
+tokens and to further encourage the formation of the cen-      4.2  Implementation Details
+tral low-frequency tokens, DSS offers the contextual cue of
+                                                                 In our experiments, we follow (Pei et al. 2019) to extract im-
+adjacent tokens to the central tokens.
+                                                           age and motion features to encode video information. Speciﬁ-
+  Skip-gram (Mikolov et al. 2013) designs a window cen-
+                                                                             cally, we use ImageNet (Deng et al. 2009) pre-trained ResNet-
+tered on the central word and supervises the generation of
+                                                    101 (He et al. 2016) to extract 2D scene features for each
+the central word using the contextual words. Motivated by
+                                                              frame. We also utilize Kinetics (Kay et al. 2017) pre-trained
+it, we design a DSS obtaining the gradient that adapts to the
+                                                    ResNeXt-101 with 3D convolutions (Hara, Kataoka, and
+token itself to understand the word adequately.
+                                                           Satoh 2018).  As shown in Fig. 2, we project the hidden features to the
+new feature space before the last linear layer and then project         In our implementation, size of video feature dv and the
+new features to the space of the dimension of corpus size:        hidden size dh are set to 2,048 and 512. Empirically, we
+                                            ′                                             set the sampled frames K = 8 for each video clip. We set
+            Dt = DtWaWp,                   (14)
+                              ′                                               ′                maximum sequence length T to 30 on MSR-VTT, whereas
+          P t (yt|y<t, R) = Softmax Dt   ,           (15)     T = 20 on MSVD. Transformer decoder has a decoder layer,
+                                                    8 attention heads, 0.5 dropout ratio, and 0.0005 ℓ2 weight where Dt is the result of Eq. (5), Wa ∈Rdh×dh is a trainable                                                              decay. We implement word embeddings by trainable 512
+variable, Wp ∈Rdh×de is also a trainable variable shared                                            ′              ′                             dimensions of embedding layers. In the training phase, we
+with Eq. (6). We use Dtf and Dtl to respectively represent      adopt Adam (Kingma and Ba 2015) with an initial learning
+the former and the latter linear layer of the same layer as the                                                                       rate of 0.005 to optimize our model. The batch size is set to
+original last union linear projection:                                                                 64, and the training epoch is set to 50. During testing, we use
+                           ′                                                                               ′
+                                                                        ,          (16)       the beam-search method with size 5 to generate the predicted         P tf                (yt|y<t−1, R) = Softmax Dtf
+                           ′                                                   ′                      sentences. γ and δ for deciding the category of the token
+         P tl (yt|y<t+1, R) = Softmax Dtl   .          (17)       are respectively set to 0.015 and 0.0015. We set λ = 0.07
+                                                    on MSR-VTT and λ = 0.4 on MSVD to demonstrate the The divergent loss is calculated as:
+          T                       T                          signiﬁcance of the divergent loss. All our experiments are
+ Ldiv = − X log P tf(y∗′   t |y∗<t−1, R) − X log P tl(y∗′   t |y∗<t+1, R),       conducted on two NVIDIA Tesla PH402 SKU 200.
+          t=1                       t=1
+                                                            (18)      4.3  Comparison with the State-of-the-Arts
+ where two items denote the former and the latter divergent
+losses, respectively. The ﬁnal loss is calculated as:            The comparison results with the state-of-the-arts in Table 1
+                                                                           illustrate that RSFD achieves a signiﬁcant performance im-              L = Lt + λLdiv,                    (19)
+                                                          provement. On MSR-VTT, RSFD achieves the best results
+ where λ is a variable parameter to decide the signiﬁcance                                                          under 3 out of 4 metrics. Speciﬁcally, RSFD outperforms
+of Ldiv. In the above example, we only use one word before                                                                  existing methods except for ORG-TRL (Zhang et al. 2020)
+and after to supervise the central word. In the experimental                                                            under all the metrics on MSR-VTT, proving that our focus on
+results section, we display the number of words selected as                                                               solving the insufﬁcient occurrence of low-frequency words
+the supervisor to achieve the best generation effect.                                                                               is practical. In particular, RSFD achieves 53.1% and 96.7%
+                                                            under CIDEr on MSR-VTT and MSVD, respectively, making
+         4  Experimental Results                                                        an improvement of 2.0% and 5.3% over AR-B (Yang et al.
+4.1  Datasets and Evaluation Metrics                    2021). As CIDEr captures human judgment of consensus
+MSR-VTT (Xu et al. 2016) consists of 10,000 video clips,       better than other metrics, superior performance under CIDEr
+each annotated with 20 English captions and a category.      indicates that RSFD can generate semantically more similar
+MSVD (Chen and Dolan 2011) is a widely-used benchmark       to human understanding. The boost in performance demon-
+video captioning dataset collected from YouTube, composed       strates the advantages of RSFD, which exploits FAD and
+of 1,970 video clips and roughly 80,000 English sentences.     DSS, and models the low-frequency token for detailed and
+Following the standard split, we use the same setup as pre-     comprehensive textual representations.
+vious works (Pan et al. 2020; Ye et al. 2022a), which takes      RSFD is slightly lower than ORG-TRL under BLEU-4 on
+6,513 video clips for training, 497 video clips for validation,    MSR-VTT, which uses an external language model to inte-
+and 2,990 video clips for testing on MSR-VTT, as well as       grate linguistic knowledge. But it is undeniable that RSFD is
+1,200, 100, and 670 videos for training, validation, and test-      second only to it, demonstrating the superiority of RSFD. OA-
+ing on MSVD. The vocabulary size of MSR-VTT is 10,547,    BTG (Zhang and Peng 2019), STG-KD (Pan et al. 2020), and
+whereas that of MSVD is 9,468.                      ORG-TRL perform better under METEOR and ROUGE L
+  We present the results on four commonly used metrics      on MSVD. They either capture the temporal interaction of ob-
+to evaluate caption generation quality: BLEU-4 (B-4) (Pap-       jects well in a small dataset or bring complementary represen-
+ineni et al. 2002), METEOR (M) (Banerjee and Lavie 2005),       tation by considering video semantics. Despite not exploring
+ROUGE L (R) (Lin 2004), and CIDEr (C) (Vedantam, Zit-      the above information, RSFD focuses on generating reﬁned
+nick, and Parikh 2015). BLEU-4, METEOR, and ROUGE L      descriptions and outperforms other methods under CIDEr,
+are generally used in machine translation. CIDEr is proposed      beneﬁting from its emphasis on reﬁned low-frequency to-
+for captioning tasks speciﬁcally and is considered more con-      kens. Indicated that CIDEr best matches human consensus
+sistent with human judgment.                                 judgment.
+
+======================== PDF 第 6 页 ========================
+                                                 MSR-VTT            MSVD
+          Method                            Venue
+                                                       B-4  M   R    C    B-4  M   R    C
+
+         M3-VC (Wang et al. 2018b)        CVPR ’18    38.1   26.6      -        -     51.8   32.5      -        -
+           RecNet (Wang et al. 2018a)        CVPR ’18    39.1   26.6   59.3   42.7   52.3   34.1   69.8   80.3
+            PickNet (Chen et al. 2018b)        ECCV ’18    41.3   27.7   59.8   44.1   52.3   33.3   69.6   76.5
+         OA-BTG (Zhang and Peng 2019)     CVPR ’19    41.4   28.2      -     46.9   56.9   36.2      -     90.6
+       MARN (Pei et al. 2019)          CVPR ’19    40.4   28.1   60.7   47.1   48.6   35.1   71.9   92.2
+       MGSA (Chen and Jiang 2019)       AAAI ’19    42.4   27.6      -     47.5   53.4   35.0      -     86.7
+         GRU-EVE (Aafaq et al. 2019)       CVPR ’19    38.3   28.4   60.7   48.1   47.9   35.0   71.5   78.1
+         POS-CG (Wang et al. 2019)         ICCV ’19    42.0   28.2   61.6   48.7   52.5   34.1   71.3   88.7
+         STG-KD (Pan et al. 2020)         CVPR ’20    40.5   28.3   60.9   47.1   52.2   36.9   73.9   93.0
+         SAAT (Zheng, Wang, and Tao 2020)   CVPR ’20    40.5   28.2   60.9   49.1   46.5   33.5   69.4   81.0
+         ORG-TRL (Zhang et al. 2020)      CVPR ’20    43.6   28.8   62.1   50.9   54.3   36.4   73.9   95.2
+         SBAT (Jin et al. 2020)                IJCAI ’20    42.9   28.9   61.5   51.6   53.1   35.3   72.3   89.5
+         TTA (Tu et al. 2021)               PR ’21     41.4   27.7   61.1   46.7   51.8   35.5   72.4   87.7
+           SibNet (Liu, Ren, and Yuan 2021)    TPAMI ’21   41.2   27.8   60.8   48.6   55.7   35.5   72.6   88.8
+        SGN (Ryu et al. 2021)            AAAI ’21    40.8   28.3   60.8   49.5   52.8   35.5   72.9   94.3
+         AR-B (Yang et al. 2021) (Baseline) †   AAAI ’21    42.1   29.1   61.2   51.1   49.2   35.3   72.1   91.4
+           FrameSel (Li et al. 2022b)         TCSVT ’22   38.4   27.2   59.7   44.1   50.4   34.2   70.4   73.7
+        TVRD (Wu et al. 2022)           TCSVT ’22   43.0   28.7   62.2   51.8   50.5   34.5   71.7   84.3
+
+         RSFD (Ours)                                       43.4   29.3   62.3   53.1   51.2   35.7   72.9   96.7
+
+Table 1: Performance (%) comparison with the state-of-the-arts on MSR-VTT and MSVD. † indicates the reproduced method.
+The best results are shown in bold.
+
+
+          Dataset     size   B-4  M   R    C                the worst performances. Thus it can be concluded again that
+                                                          adding divergent loss boosts the performance of the cap-                    3    42.5   29.2   61.6   52.2
+                                                                 tioning model, which beneﬁted from gradient correction of                    5    43.4   29.3   62.3   53.1
+      MSR-VTT                    7    42.9   29.2   61.5   51.9              adjacent words to central words. Considering all the metrics
+                    9    42.7   29.1   61.4   51.6              comprehensively, we empirically set λ = 0.07 on MSR-VTT.
+                    3    50.9   35.3   72.5   94.1             Trade-off Hyper-Parameter γ and δ.  We conduct experi-
+                    5    51.2   35.7   72.9   96.7      MSVD                                           ments on MSR-VTT to explore the effect of hyper-parameter
+                    7    50.6   35.4   72.6   93.8
+                                                    γ for the intra-frequency and hyper-parameter δ for the inter-
+                    9    50.7   35.3   72.4   93.0
+                                                               frequency. All metrics scores of different settings are illus-
+                                                                       trated in Figs. 3(b) and 3(c). If δ is too high, the reduction of
+Table 2: Performance (%) comparison of different conﬁgu-                                                                  the number of high-frequency tokens makes the information
+rations of window size in DSS module on MSR-VTT and                                                                 of low-frequency tokens cannot be well absorbed and fully in-
+MSVD. The best results are shown in bold.                                                                    tegrated with visual features. Similarly, if γ is too high, some
+                                                       words that should not be split into low-frequency tokens are
+                                                               divided into them, causing the overﬁtting of these words. In
+4.4  Study on Trade-off Parameter                                                                     contrast, if γ is set too low, low-frequency tokens that need
+Trade-off Parameter of Supervision Window.  To ex-       to be sufﬁciently trained are ignored. Considering the above
+plore the impact of the number of words, we design a su-      discussion, we set γ and δ as 0.015 and 0.0015, respectively.
+pervision window of different sizes to extract adjacent su-
+pervision information shown in Table 2. It shows that when      4.5  Ablation Study
+the window size increases, the overall performance shows an
+                                                               Effectiveness of Different Components.  The results areupward trend, but when the size exceeds 5, the performance
+                                                               presented in Table 3. The ﬁrst line method AR-B (Yang et al.begins to decline. When the supervision window is too small,
+                                                         2021) (baseline) only applies a Transformer-based model toinsufﬁcient adjacent information cannot play a supervisory
+                                                                  the encoder-decoder framework. The methods in the secondrole. And in an oversized supervision window, not only low-
+                                                       and third rows refer to methods with FAD and DSS, respec-frequency tokens, all tokens receive unique gradient updates,
+                                                                            tively. It can be observed that FAD, through sufﬁciently ex-causing overﬁtting of other tokens that have been trained
+                                                                     ploiting the semantics of low-frequency tokens, outperformsenough.
+                                              AR-B under popular metrics, particularly bringing signiﬁcant
+Trade-off Hyper-Parameter λ.  To evaluate the effective-     CIDEr improvements. Although FAD slightly affects the se-
+ness of λ and ﬁnd an appropriate value for λ, we adjust the      mantics of high-frequency tokens, we integrate it with DSS,
+value of Eq. (19) under all metrics on MSR-VTT are given     which makes up the information of high-frequency tokens
+in Fig. 3(a). Note that only using original loss (λ = 0) shows       to some extent. Our complete method RSFD results demon-
+
+======================== PDF 第 7 页 ========================
+      1.5       BLEU@4                                                          1.5                                  BLEU@4             1.5                                  BLEU@4
+            METEOR                                                                      METEOR                                           METEOR Metrics 1.0      ROUGE                                                                                           Metrics 1.0                                 ROUGE                 Metrics 1.0                                 ROUGE
+               CIDEr                                                                                             CIDEr                                                          CIDEr
+      0.5                                                                              0.5                                                                              0.5  Relative                                                                                                                                                  Relative                                                                                                                                                  Relative
+      0.0                                                                              0.0                                                                              0.0
+           0.00   0.01   0.02   0.03   0.04   0.05   0.06   0.07   0.08                0.005    0.010    0.015    0.020    0.025    0.030    0.035              0.0005   0.0010   0.0015   0.0020   0.0025   0.0030   0.0035
+                                    (a)                                                                (b)                                                                   (c)
+
+Figure 3: Analysis of (a) different parameter λ for the signiﬁcance of divergent semantic supervisor, (b) different parameter γ
+deciding intra-frequency, and (c) different parameter δ determining inter-frequency on MSR-VTT. We show the relative results
+on all metrics.
+
+
+
+    Dataset    Method          B-4  M   R    C
+
+           AR-B (Baseline)   42.1   29.1   61.2   51.1
+                                                                         GT:   a person making a paper airplane.   GT:   person playing a keyboard.           RSFD w FAD      43.0   29.2   62.0   52.9
+ MSR-VTT                                                                AR-B: a person is folding paper.          AR-B: a person is playing a video game.
+           RSFD w DSS      42.5   29.2   61.6   52.2                                                                          RSFD: a person is folding a paper airplane.  RSFD: a person is playing the keyboard.
+           RSFD (Ours)      43.4   29.3   62.3   53.1
+
+           AR-B (Baseline)   49.2   35.3   72.1   91.4
+           RSFD w FAD      50.9   35.5   72.7   94.1
+  MSVD                                                              GT:   a car driving on a race track.       GT:   a man is playing minecraft.
+           RSFD w DSS      50.6   35.5   72.3   93.1                                                                              AR-B: a car is driving down the road.      AR-B: a person is playing a video game.
+           RSFD (Ours)      51.2   35.7   72.9   96.7          RSFD: a car is driving down a track.      RSFD: a person is playing minecraft.
+
+Table 3: Performance (%) comparison of different compo-      Figure 5: Qualitative results generated on the testing sets of
+nents in RSFD on MSR-VTT and MSVD. The best results    MSR-VTT with AR-B (baseline) and RSFD. The red words
+are shown in bold.                                                indicate the reﬁned information in the ground truth as well
+                                                                as the generated sentences of RSFD.
+
+
+                                                          reﬁned captions owing to our focus on low-frequency tokens
+                                                      and effectively alleviates the long-tailed problem in video
+      GT: a surfer swims out in to the ocean to catch a ride back in.              captioning, demonstrating a competitive generation effect.
+ swims  moves   wears   shows   talks    beach   water    boat   drown  wave
+  0.627    0.084   0.072   0.060  0.053    0.532    0.076   0.066   0.035  0.002       4.6  Qualitative Results
+ swims  moves   wears   shows   talks    ocean   beach   water    boat  drown
+  0.579    0.065   0.052   0.015  0.008    0.682    0.102   0.036   0.005  0.001    We present some results generated on MSR-VTT in Fig. 5.
+ swims  moves   wears   shows   talks    ocean   beach   water    boat  drown
+  0.656    0.080   0.062   0.025  0.008    0.697    0.092   0.046   0.005  0.001          It can be observed that the content of captions generated by
+                                          RSFD is more reﬁned than AR-B (Yang et al. 2021) (base-
+Figure 4: Instances of AR-B (baseline), RSFD with FAD,       line). Taking the ﬁrst result as an example, AR-B only un-
+and RSFD model in the testing phase. The yellow and blue      derstands the rough meaning of the video, e.g., “folding”,
+words indicate the high-frequency and low-frequency words      missing the abundant description, e.g., “airplane”. By con-
+to be predicted. The yellow box on the left corresponds to        trast, our model captures more details and generates them
+the three methods predicting the yellow word, while the blue       accurately, demonstrating that RSFD produces relatively less
+box on the right generates the blue word.                  common but critical words. The rest of the results have simi-
+                                                                            lar characteristics.
+
+strate that combining the above two modules can achieve the                  5  Conclusion
+best performance.
+                                                               In this paper, we present a Reﬁned Semantic enhancement
+Evaluation of FAD and DSS. We analyze the effect of      towards Frequency Diffusion (RSFD) for video captioning.
+each component in the testing phase shown in Fig. 4. It can    RSFD addresses the problem of the Transformer-based or
+be seen that FAD generates “ocean” shown in the second line,     RNN-based architecture on the insufﬁcient occurrence of
+which as an infrequent token, carries critical semantics but      low-frequency tokens that limits the capability of compre-
+is challenging to predict by AR-B (Yang et al. 2021). FAD      hensive semantic generation. Our method incorporates the
+helps the model comprehend low-frequency tokens relative      Frequency-Aware Diffusion (FAD) and Divergent Semantic
+to video content. Although FAD slightly narrows the high-      Supervisor (DSS), which capture more detailed semantics of
+frequency token “swims” probability from 0.627 to 0.579,       relatively less common but critical tokens to provide reﬁned
+DSS compensates for it to 0.656 and further enhances the      semantic enhancement with the help of low-frequency tokens.
+semantics of the low-frequency token “ocean” from 0.682    RSFD achieves competitive performances by outperforming
+to 0.697. In general, our method promotes the generation of       baselines by large margins of 2.0% and 5.3% in terms of
+
+======================== PDF 第 8 页 ========================
+CIDEr on MSR-VTT and MSVD, respectively.                Hu, M.; Jiang, K.; Liao, L.; Nie, Z.; Xiao, J.; and Wang, Z.
+                                                            2022a. Progressive Spatial-temporal Collaborative Network
+            Acknowledgments                         for Video Frame Interpolation.  In Proc. ACM Int. Conf.
+                                                            Multimedia, 2145–2153.
+This work was supported in part by the National Natural
+Science Foundation of China under Grants 62271361 and     Hu, M.; Jiang, K.; Liao, L.; Xiao, J.; Jiang, J.; and Wang,
+62066021, the Department of Science and Technology, Hubei      Z. 2022b. Spatial-Temporal Space Hand-in-Hand: Spatial-
+Provincial People’s Government under Grant 2021CFB513,     Temporal Video Super-Resolution via Cycle-Projected Mu-
+and the Hubei Province Educational Science Planning Special       tual Learning. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern
+Funding Project under Grant 2022ZA41.                         Recognit., 3564–3573.
+                                                                           Ioffe, S.; and Szegedy, C. 2015. Batch Normalization: Accel-
+                 References                              erating Deep Network Training by Reducing Internal Covari-
+                                                                     ate Shift. In Proc. JMLR Int. Conf. Mach. Learn., 448–456.Aafaq, N.; Akhtar, N.; Liu, W.; Gilani, S. Z.; and Mian, A.
+2019. Spatio-Temporal Dynamics and Semantic Attribute        Jia, X.; Zhong, X.; Ye, M.; Liu, W.; and Huang, W. 2022.
+Enriched Visual Encoding for Video Captioning. In Proc.     Complementary Data Augmentation for Cloth-Changing Per-
+IEEE/CVF Conf. Comput. Vis. Pattern Recognit., 12487–      son Re-Identiﬁcation. IEEE Trans. Image Process., 31: 4227–
+12496.                                                     4239.
+Banerjee, S.; and Lavie, A. 2005. METEOR: An Automatic       Jin, T.; Huang, S.; Chen, M.; Li, Y.; and Zhang, Z. 2020.
+Metric for MT Evaluation with Improved Correlation with     SBAT: Video Captioning with Sparse Boundary-Aware Trans-
+Human Judgments.  In Proc. ACL Annu. Meeting Assoc.      former. In Proc. IJCAI Int. Joint Conf. Artif. Intell., 630–636.
+Comput. Linguistics Workshop, 65–72.                        Kay, W.; Carreira, J.; Simonyan, K.; Zhang, B.; Hillier, C.;
+Chen, D. L.; and Dolan, W. B. 2011.  Collecting Highly      Vijayanarasimhan, S.; Viola, F.; Green, T.; Back, T.; Natsev,
+Parallel Data for Paraphrase Evaluation. In Proc. ACL Annu.        P.; et al. 2017. The Kinetics Human Action Video Dataset.
+Meeting Assoc. Comput. Linguistics, 190–200.                  arXiv:1705.06950.
+Chen, M.; Li, Y.; Zhang, Z.; and Huang, S. 2018a. TVT:     Kingma, D. P.; and Ba, J. 2015. Adam: A Method for Stochas-
+Two-View Transformer Network for Video Captioning. In        tic Optimization. In Proc. Int. Conf. Learn. Represent. Work-
+Proc. PMLR Asian Conf. Mach. Learn., 847–862.                shop.
+Chen, S.; and Jiang, Y. 2019. Motion Guided Spatial Atten-       Li, J.; Zha, S.; Chen, C.; Ding, M.; Zhang, T.; and Yu, H.
+tion for Video Captioning. In Proc. AAAI Conf. Artif. Intell.,      2022a. Attention Guided Global Enhancement and Local Re-
+8191–8198.                                           ﬁnement Network for Semantic Segmentation. IEEE Trans.
+Chen, Y.; Wang, S.; Zhang, W.; and Huang, Q. 2018b. Less     Image Process., 31: 3211–3223.
+Is More: Picking Informative Frames for Video Captioning.       Li, L.; Zhang, Y.; Tang, S.; Xie, L.; Li, X.; and Tian, Q.
+In Proc. Springer Eur. Conf. Comput. Vis., 367–384.            2022b. Adaptive Spatial Location with Balanced Loss for
+Deng, J.; Dong, W.; Socher, R.; Li, L.; Li, K.; and Li, F. 2009.     Video Captioning. IEEE Trans. Circuits Syst. Video Technol.,
+ImageNet: A Large-Scale Hierarchical Image Database. In      17–30.
+Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit., 248–      Liao, L.; Chen, W.; Xiao, J.; Wang, Z.; Lin, C.; and Satoh,
+255.                                                             S. 2022a. Unsupervised Foggy Scene Understanding via
+Gao, Y.; Hou, X.; Suo, W.; Sun, M.; Ge, T.; Jiang, Y.; and       Self Spatial-Temporal Label Diffusion. IEEE Trans. Image
+Wang, P. 2022. Dual-Level Decoupled Transformer for Video       Process., 31: 3525–3540.
+Captioning. In Proc. ACM Int. Conf. Multimedia Retr., 219–      Liao, L.; Xu, K.; Wu, H.; Chen, C.; Sun, W.; Yan, Q.; and Lin,
+228.                                            W. 2022b. Exploring the Effectiveness of Video Perceptual
+Hara, K.; Kataoka, H.; and Satoh, Y. 2018. Can Spatiotempo-      Representation in Blind Video Quality Assessment. In Proc.
+ral 3D CNNs Retrace the History of 2D CNNs and ImageNet?    ACM Int. Conf. Multimedia, 837–846.
+In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit.,      Lin, C. 2004. ROUGE: A Package for Automatic Evaluation
+6546–6555.                                                     of Summaries. In Proc. ACL Annu. Meeting Assoc. Comput.
+He, K.; Zhang, X.; Ren, S.; and Sun, J. 2016. Deep Residual       Linguistics Workshop, 74–81.
+Learning for Image Recognition. In Proc. IEEE/CVF Conf.      Liu, S.; Ren, Z.; and Yuan, J. 2021. SibNet: Sibling Convolu-
+Comput. Vis. Pattern Recognit., 770–778.                          tional Encoder for Video Captioning. IEEE Trans. Pattern
+Ho, J.; Jain, A.; and Abbeel, P. 2020. Denoising Diffusion      Anal. Mach. Intell., 3259–3272.
+Probabilistic Models. In Adv. Neural Inf. Process. Syst.          Mikolov, T.; Chen, K.; Corrado, G.; and Dean, J. 2013. Ef-
+Hochreiter, S.; and Schmidhuber, J. 1997. Long Short-Term      ﬁcient Estimation of Word Representations in Vector Space.
+Memory. Neural Comput., 9(8): 1735–1780.                     In Proc. Int. Conf. Learn. Represent. Workshop.
+Hori, C.; Hori, T.; Lee, T.; Zhang, Z.; Harsham, B.; Hershey,      Pan, B.; Cai, H.; Huang, D.; Lee, K.; Gaidon, A.; Adeli, E.;
+J. R.; Marks, T. K.; and Sumi, K. 2017. Attention-Based Mul-     and Niebles, J. C. 2020. Spatio-Temporal Graph for Video
+timodal Fusion for Video Description. In Proc. IEEE/CVF      Captioning with Knowledge Distillation. In Proc. IEEE/CVF
+Int. Conf. Comput. Vis., 4203–4212.                            Conf. Comput. Vis. Pattern Recognit., 10867–10876.
+
+======================== PDF 第 9 页 ========================
+Papineni, K.; Roukos, S.; Ward, T.; and Zhu, W. 2002. BLEU:      Kurian, G.; Patil, N.; Wang, W.; Young, C.; Smith, J.; Riesa,
+A Method for Automatic Evaluation of Machine Translation.        J.; Rudnick, A.; Vinyals, O.; Corrado, G.; Hughes, M.; and
+In Proc. ACL Annu. Meeting Assoc. Comput. Linguistics,      Dean, J. 2016. Google’s Neural Machine Translation System:
+311–318.                                                    Bridging the Gap between Human and Machine Translation.
+Pei, W.; Zhang, J.; Wang, X.; Ke, L.; Shen, X.; and Tai,      arXiv:1609.08144.
+Y. 2019. Memory-Attended Recurrent Network for Video     Xu, J.; Mei, T.; Yao, T.; and Rui, Y. 2016. MSR-VTT: A
+Captioning. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern      Large Video Description Dataset for Bridging Video and
+Recognit., 8347–8356.                                     Language. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern
+Rasul, K.; Seward, C.; Schuster, I.; and Vollgraf, R. 2021.      Recognit., 5288–5296.
+Autoregressive Denoising Diffusion Models for Multivariate     Xu, X.; Liu, W.; Wang, Z.; Hu, R.; and Tian, Q. 2022.
+Probabilistic Time Series Forecasting. In Proc. JMLR Int.     Towards Generalizable Person Re-Identiﬁcation with a Bi-
+Conf. Mach. Learn., 8857–8868.                             Stream Generative Model. Pattern Recognit., 132: 108954.
+Ryu, H.; Kang, S.; Kang, H.; and Yoo, C. D. 2021. Semantic      Xu, Y.; Liu, Y.; Meng, F.; Zhang, J.; Xu, J.; and Zhou, J. 2021.
+Grouping Network for Video Captioning.  In Proc. AAAI      Bilingual Mutual Information Based Adaptive Training for
+Conf. Artif. Intell., 2514–2522.                               Neural Machine Translation. In Proc. ACL Annu. Meeting
+Sohl-Dickstein, J.; Weiss, E. A.; Maheswaranathan, N.; and      Assoc. Comput. Linguistics, 511–516.
+Ganguli, S. 2015.  Deep Unsupervised Learning Using      Yang, B.; Zou, Y.; Liu, F.; and Zhang, C. 2021.  Non-
+Nonequilibrium Thermodynamics. In Proc. JMLR Int. Conf.      Autoregressive Coarse-to-Fine Video Captioning. In Proc.
+Mach. Learn., 2256–2265.                              AAAI Conf. Artif. Intell., 3119–3127.
+Srivastava, R. K.; Greff, K.; and Schmidhuber, J. 2015. Train-      Ye, H.; Li, G.; Qi, Y.; Wang, S.; Huang, Q.; and Yang, M.-H.
+ing Very Deep Networks. In Adv. Neural Inf. Process. Syst.,      2022a. Hierarchical Modular Network for Video Captioning.
+2377–2385.                                                    In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit.,
+Tu, Y.; Zhou, C.; Guo, J.; Gao, S.; and Yu, Z. 2021. Enhanc-     17939–17948.
+ing the Alignment between Target Words and Corresponding      Ye, M.; Li, H.; Du, B.; Shen, J.; Shao, L.; and Hoi, S. C. H.
+Frames for Video Captioning. Pattern Recognit., 107702.        2022b. Collaborative Reﬁning for Person Re-Identiﬁcation
+Vaswani, A.; Shazeer, N.; Parmar, N.; Uszkoreit, J.; Jones, L.;      with Label Noise. IEEE Trans. Image Process., 31: 379–391.
+Gomez, A. N.; Kaiser, L.; and Polosukhin, I. 2017. Attention      Zhang, J.; and Peng, Y. 2019. Object-Aware Aggregation
+Is All You Need. In Adv. Neural Inf. Process. Syst., 5998–      with Bidirectional Temporal Graph for Video Captioning.
+6008.                                                         In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit.,
+Vedantam, R.; Zitnick, C. L.; and Parikh, D. 2015. CIDEr:     8327–8336.
+Consensus-Based Image Description Evaluation. In Proc.     Zhang, Z.; Shi, Y.; Yuan, C.; Li, B.; Wang, P.; Hu, W.;
+IEEE/CVF Conf. Comput. Vis. Pattern Recognit., 4566–4575.     and Zha, Z. 2020. Object Relational Graph with Teacher-
+Venugopalan,  S.; Xu, H.; Donahue,  J.; Rohrbach, M.;     Recommended Learning for Video Captioning.  In Proc.
+Mooney, R. J.; and Saenko, K. 2015.  Translating Videos     IEEE/CVF Conf. Comput. Vis. Pattern Recognit., 13275–
+to Natural Language Using Deep Recurrent Neural Networks.     13285.
+In Proc. ACL Conf. North Am. Chapter Assoc. Comput. Lin-      Zheng, Q.; Wang, C.; and Tao, D. 2020. Syntax-Aware Action
+guistics, 1494–1504.                                           Targeting for Video Captioning. In Proc. IEEE/CVF Conf.
+Wang, B.; Ma, L.; Zhang, W.; Jiang, W.; Wang, J.; and     Comput. Vis. Pattern Recognit., 13093–13102.
+Liu, W. 2019.  Controllable Video Captioning with POS      Zhu, H.; Yuan, J.; Yang, Z.; Zhong, X.; and Wang, Z. 2022.
+Sequence Guidance Based on Gated Fusion Network.  In      Fine-Grained Fragment Diffusion for Cross Domain Crowd
+Proc. IEEE/CVF Int. Conf. Comput. Vis., 2641–2650.            Counting. In Proc. ACM Int. Conf. Multimedia, 5659–5668.
+Wang, B.; Ma, L.; Zhang, W.; and Liu, W. 2018a. Recon-
+struction Network for Video Captioning. In Proc. IEEE/CVF
+Conf. Comput. Vis. Pattern Recognit., 7622–7631.
+Wang, J.; Wang, W.; Huang, Y.; Wang, L.; and Tan, T. 2018b.
+M3: Multimodal Memory Modelling for Video Captioning.
+In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit.,
+7512–7520.
+Wu, B.; Niu, G.; Yu, J.; Xiao, X.; Zhang, J.; and Wu, H. 2022.
+Towards Knowledge-Aware Video Captioning via Transitive
+Visual Relationship Detection. IEEE Trans. Circuits Syst.
+Video Technol., 32: 6753–6765.
+Wu, Y.; Schuster, M.; Chen, Z.; Le, Q. V.; Norouzi, M.;
+Macherey, W.; Krikun, M.; Cao, Y.; Gao, Q.; Macherey, K.;
+Klingner, J.; Shah, A.; Johnson, M.; Liu, X.; Kaiser, L.;
+Gouws, S.; Kato, Y.; Kudo, T.; Kazawa, H.; Stevens, K.;

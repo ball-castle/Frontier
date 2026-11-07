@@ -1,0 +1,746 @@
+KH-A042 | A Multigrid Method for Efficiently Training Video Models
+来源：https://arxiv.org/abs/1912.00998
+本地PDF：专题文献/何恺明/KH-A042_A_Multigrid_Method_for_Efficiently_Training_Video_Models_CVPR2020.pdf
+SHA-256：09a06d17d0f8e9ddfa35658586c23b3c11fc8297deb8ec0611537edc3772d1db
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+          A Multigrid Method for Efﬁciently Training Video Models
+
+                       Chao-Yuan Wu1,2       Ross Girshick2       Kaiming He2
+                             Christoph Feichtenhofer2          Philipp Kr¨ahenb¨uhl1
+                    1The University of Texas at Austin   2Facebook AI Research (FAIR)
+
+
+                        Abstract                                  80      Multigrid2020                                                                                                           Baseline
+                                                                        4.5× faster, 76.4%
+            Training competitive deep video models is an order of                                     75.6%                                                                                                                                                                                                                                                                            accuracy
+        magnitude slower than training their counterpart image          75Jun   models. Slow training causes long research cycles, which              top-1
+
+                                                                                7010   hinderslowing standardprogresspracticein videoforunderstandingtraining imageresearch.models, videoFol-                                                                                                                                       Multigrid training (ours)
+        model training has used a ﬁxed mini-batch shape: a speciﬁc                                                     Baseline training                                                                                                                                                                                                                                                                                                                                               Validation
+        number of clips, frames, and spatial size. However, what is          65
+          the optimal shape? High resolution models perform well,             0       5      10      15      20      25      30
+         but train slowly. Low resolution models train faster, but are                       Wall-clock training time in hours
+           less accurate. Inspired by multigrid methods in numerical
+                                                                            Figure 1. Training time vs. top-1 accuracy on Kinetics-400 with[cs.CV]   optimization, we propose to use variable mini-batch shapes                                                                           a ResNet-50 SlowFast network. Each point corresponds to a model
+         with different spatial-temporal resolutions that are varied                                                                                    trained for a speciﬁc number of epochs. Multigrid training, the
+         according to a schedule. The different shapes arise from                                                                   method developed in this paper, obtains a signiﬁcantly better trade-
+         resampling the training data on multiple sampling grids.       off than baseline training.  For example, under default settings,
+         Training is accelerated by scaling up the mini-batch size      multigrid training is 4.5× faster while achieving higher (+0.8%
+        and learning rate when shrinking the other dimensions. We      absolute) top-1 accuracy.  All methods here, and throughout the
+         empirically demonstrate a general and robust grid sched-      paper, use the same hardware and software implementation.
+          ule that yields a signiﬁcant out-of-the-box training speedup
+         without a loss in accuracy for different models (I3D, non-
+                                                                      per iteration. The mini-batch shape B×T ×H×W 2 (mini-          local, SlowFast), datasets (Kinetics, Something-Something,
+                                                                     batch size × number of frames × height × width) is typ-         Charades), and training settings (with and without pre-
+                                                                                 ically constant throughout training. A variety of consid-          training, 128 GPUs or 1 GPU). As an illustrative example,
+                                                                           erations go into selecting this input shape, but a common          the proposed multigrid method trains a ResNet-50 SlowFast
+                                                                              heuristic is to make the T ×H×W dimensions large in or-         network 4.5× faster (wall-clock time, same hardware) while
+                                                                      der to improve accuracy, e.g., as observed in [9,45,47].         also improving accuracy (+0.8% absolute) on Kinetics-400
+                                                                      This heuristic is only one possible choice, however, andarXiv:1912.00998v2   compared to baseline training. Code is available online.1
+                                                                             in general there are trade-offs. For example, one may use
+                                                                   a smaller number of frames and/or spatial size while si-
+         1. Introduction                                                                  multaneously increasing the mini-batch size B. With such
+            Training deep networks (CNNs [27]) on video is more     an exchange, it is possible to process the same number of
+         computationally intensive than training 2D CNN image     epochs (passes over the dataset) with lower wall-clock time
+         models, potentially by an order of magnitude. Long training     because each iteration processes more examples. The re-
+         time slows progress in video understanding research, hin-      sulting trade-off is faster training with lower accuracy.
+         ders scaling out to real-world data sources, and consumes       The central idea of this paper is to avoid this trade-off—
+         signiﬁcant amounts of energy and hardware.  Is this slow        i.e., to have faster training without losing accuracy—by
+          training unavoidable, or might there be video-speciﬁc opti-    making the mini-batch shape variable during training. By
+         mization strategies that can accelerate training?               viewing the input video clips in a mini-batch as raw video
+        3D CNN video models are trained using mini-batch op-      signals that are sampled on a sampling grid (to be deﬁned),
+          timization methods (e.g., SGD) that process one mini-batch    we can draw a connection to multigrid methods for numeri-
+
+               1github.com/facebookresearch/SlowFast/blob/master/projects/multigrid       2We omit the channel dimension (3 for RGB) for clarity.
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+cal analysis [1]. These methods exploit coarse-to-ﬁne grids     with smaller, fully-trained ones. These methods can poten-
+to accelerate optimization. Intuitively, if we use large mini-       tially speed up training as well, and (as can be seen later)
+batches with relatively small time and space dimensions (a      are a special case of multigrid training.
+‘coarse grid’) early in training and small mini-batches with
+                                                            Multi-scale training in segmentation [16] and classiﬁca-large time and space dimensions (a ‘ﬁne grid’) later, then
+                                                                   tion [18, 38] uses multiple image crop sizes. However, theSGD may be able to scan through the data more quickly
+                                                            mini-batch shape remains ﬁxed [16,18,38]. Multigrid train-on average while ﬁnally solving for a high accuracy model,
+                                                             ing on the other hand uses variable mini-batch shapes. He etakin to how coarse grids enable solving problems on ﬁner
+                                                                           al. [17] change the input shapes, but ﬁx the mini-batch size.grids more rapidly in multigrid numerical solvers [1].
+                                                      These methods shows that training with variable scales can
+   Multigrid training is possible because video models are
+                                                       be beneﬁcial. Multigrid training enjoys the same property.
+compatible with input data of variable space and time di-
+mensions due to weight sharing operations (e.g., convolu-     Multigrid methods were originally proposed for numeri-
+tions). In addition, CNNs are effective at learning patterns      cal boundary value problems, and later developed into an
+at multiple scales, e.g., as observed when training with data      entire ﬁeld in computational mathematics [1]. They typ-
+augmentation [18, 26, 38]. We observe similar multi-scale      ically involve iterating through cycles of coarse and ﬁne
+robustness and generalization with multigrid training.          problems, and exploit the fact that a coarse problem can
+  Our proposed multigrid training method is simple and     be solved efﬁciently to speed up the overall problem solv-
+effective.  It is easy to implement and typically only re-      ing. He and Xu [15] connect multigrid methods to deep
+quires small changes to a data loader. Empirically, it works     networks through identifying the correspondence between
+with default learning rate schedules and hyper-parameters     steps in traditional multigrid methods and operators in a
+already in use. No tuning is required.  Moreover, multi-     convolutional neural network. In this paper, we take inspi-
+grid training works robustly out-of-the-box for different      ration from multigrid concepts from a more abstract view to
+models (I3D [3], non-local [47], SlowFast [9]), datasets      accelerate video model training.
+(Kinetics-400 [23], Something-Something V2 [14], and
+Charades [36]), initializations (random and pre-trained),     3. Multigrid Training for Video Models
+and hardware scales (e.g., 128 GPUs or 1 GPU). We ob-
+serve a consistent speedup and performance gain in all cases       To develop our multigrid training method we will con-
+without tuning. As an example, we train a SlowFast net-      sider a reference video model (e.g., C3D [43], I3D [3])
+work ∼4.5× faster in wall-clock time on the large-scale Ki-      that is trained by a baseline mini-batch optimizer (e.g.,
+netics dataset (Fig. 1) while also reaching a higher accu-    SGD) that operates on mini-batches of shape B×T ×H×W
+racy (+0.8% absolute). We hope these beneﬁts provided by     (mini-batch size × number of frames × height × width) for
+multigrid training will make research on video understand-    some number of epochs (e.g., 100). The spatial-temporal
+ing more accessible, scalable, and economical.                 shape, T ×H×W, arises from resampling source videos
+                                                                   in the training dataset according to a sampling grid that
+2. Related Work                                                     is speciﬁed by a temporal span, a spatial span, a tempo-
+                                                                         ral stride, and a spatial stride (deﬁned in §3.1). These con-
+3D CNN video models extend 2D CNNs to model both     cepts intuitively correspond to a grid’s duration/area (span)
+spatial and temporal patterns. They are currently the state     and sampling rate (stride). The baseline optimizer holds the
+of the art for video understanding [3,9,12,19,30–32,34,43–     mini-batch shape constant across all training iterations.
+45, 47–49]. These methods are computationally expensive,
+                                                    Proposed Multigrid Method. Inspired by multigrid meth-both for training and inference [43,49]. Some recent studies
+                                                        ods in numerical analysis, which solve optimization prob-propose lighter weight models that use efﬁcient temporal
+                                                       lems on alternating coarse and ﬁne grids, the core observa-modules [2,5,19,21,28–30,32,34,40,44,46] and/or exploit
+                                                                   tion in this paper is that the underlying sampling grid that istemporal redundancy [9,51]. In this paper, we show that the
+                                                         used to train video models need not be constant during train-training time of state-of-the-art efﬁcient models [9] can still
+                                                                    ing. In fact, we will show in experiments that by varyingbe reduced signiﬁcantly.
+                                                               the sampling grid and the mini-batch size during training
+Efﬁcient training can also be advanced through, e.g., opti-        it is possible to reduce training complexity substantially (in
+mization methods (e.g., [8,24,33,39]), pre-training [3,11],     terms of total FLOPs and wall-clock time) while achieving
+distributed training [13, 50], or advances in hardware [22]      similar accuracy in comparison with the baseline.
+and software design [4, 6].  In this paper, we propose a       The fundamental concept that enables multigrid training
+complementary direction that exploits variable mini-batch       is the balance between computation allocated to processing
+shapes for fast training. Related to our method, Wang et    more examples per mini-batch vs. the computation allocated
+al. [47] and Feichtenhofer et al. [10] initialize larger models      to processing larger time and space dimensions. To control
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+this balance, we will consider temporal and spatial shapes     the span by the stride gives the number of points in the grid,
+t×w×h that are formed by resampling source videos with a     which determines the shape of the input data. Note that dif-
+new sampling grid that has its own spans and strides. When      ferent grids can yield the same data shape, which implies
+changing the input shape we use a scaled mini-batch size b      that the mini-batch size will only change (Equation (1)) if a
+satisfying the relation b·t·h·w = B·T ·H·W, or               change in the sampling grid also changes the data shape.
+                                          We note that spatial sampling grids already appear in
+                    T H W                                                               the baseline optimizer if  it uses multi-scale spatial data                    b = B             ,                   (1)
+                                t h w                         augmentation [7, 26, 37]. Under our multigrid perspective,
+                                                                multi-scale spatial data augmentation changes the spatial
+which yields computation (in FLOPs) that is roughly equal
+                                                          spans and strides of the resampling grid proportionally so
+to the computation of the aforementioned baseline mini-
+                                                                     that the resulting mini-batch always has the same H×Wbatch for typical 3D CNNs.3
+                                                                      spatial shape. In contrast, we will change spans and strides
+  Our multigrid method uses a set of sampling grids and
+                                                    by different factors, which results in a different spatial shape
+a grid schedule that determines which grid to use in each
+                                      h×w for each grid (and likewise for the time dimension).
+training iteration. If training is run for a similar number of
+epochs regardless of the choice of grids,4 then by making    Grid Scheduling. We use mini-batch optimizers, which
+b>B on average the entire training process can use fewer     have as their most basic scheduling unit a single mini-batch
+total FLOPs and have a lower wall-clock time.                    iteration in which one model update is performed.  The
+  We will experimentally investigate two questions: (i) is      training schedule consists of some number of mini-batch
+there a set of grids with a grid schedule that can lead to      iterations and is often expressed in terms of epochs. For
+faster training without a loss in accuracy? and, (ii) if so,     example, training may consist of 100 or 200 epochs worth
+does it robustly generalize to new models and datasets with-     of iterations. Within this overall training schedule it is com-
+out modiﬁcation? In the following we will develop the core    mon to let the learning rate vary, such as annealing it accord-
+multigrid training concepts in detail (§3.1), provide an im-     ing to a schedule deﬁned in terms of iterations or epochs.
+plementation (i.e., a set of grids and a grid schedule) that        Scheduling other training properties is also possible.
+work well in practice (§3.2), and then explore ablation and     Central to our multigrid method is the idea of scheduling
+generalization experiments (§4).                                the sampling grids that are used throughout training. When
+                                                        changing grids, the mini-batch size is always scaled ac-
+3.1. Multigrid Training Concepts                        cording to Equation (1) so that mini-batch FLOPs are held
+                                                          roughly constant.  Grid scheduling is highly ﬂexible, ad-Sampling Grids. Each video in a dataset is a discrete sig-
+                                                               mitting a large design space from simply cycling throughnal that was sampled from an underlying continuous signal
+                                                          a sequence of pre-deﬁned grids to using randomized grids.generated by the physical world. The video has some num-
+                                                              In §3.2 we will present a randomized, hierarchical scheduleber of frames and pixels per frame, which are related to the
+                                                                     that works well in practice.physical world by the temporal and spatial resolution of the
+recording device (which depends on a number of camera     Multigrid Properties. Multigrid training relies on two
+properties). When using one of these source videos in a      properties of the data and model. First, resampling the data
+training mini-batch, a sampling grid is used to resample it.     on different grids requires a suitable operator. For video,
+  A sampling grid in one dimension (space or time) is de-      this operator can be a reconstruction ﬁlter applied to the
+ﬁned by two quantities: a span and a stride. Their units are     source discrete signal followed by computing the values at
+deﬁned w.r.t. the source video being resampled.5 For the      the points speciﬁed by the grid (e.g., bilinear interpolation).
+time dimension, the units are frames while for the spatial di-        Second, the model must be compatible with inputs that
+mensions the units are pixels. The span is the support size of      are resampled on different grids, and therefore might have
+the grid and deﬁnes the duration or area that the grid covers.      different shapes during training. Models that are composed
+The stride is the spacing between sampling points. Dividing     of functions that use weight sharing across the dimensions
+                                                                     that are resampled, e.g., 2D and 3D convolutions, recurrent
+    3 In practice, the computation is not exactly equal, because of rounding
+       W                                                   functions, and self-attention, are compatible and cover most
+(e.g., w can be √ 2), padding, and, e.g., fully connected or non-local layers.
+                                                              of the commonly used architectures; fully-connected layers,We ignore these subtleties and only use approximate FLOPs as a rough
+design principle. All speedups are measured by wall-clock time.             unless their inputs are pooled to a ﬁxed size, are not com-
+   4In practice, a similar number of epochs (e.g., within a factor of 2) are      patible.6 We will focus on models that use 2D and 3D con-
+typically used for a given dataset, even for very different models.
+   5Between two videos these units may have different physical meanings           6If an appropriate operator exists for ‘resampling’ model parameters so
+if the videos were captured by cameras with different properties (e.g., a 24        that they are compatible with new input shapes, then these parameters may
+frame span from a 24 FPS video vs. a 24 frame span from a 30 FPS video).          still be usable with multigrid training. This concept can be combined with
+These properties may be unknown and therefore we deﬁne grid units with      weight sharing, e.g., by dilating or resizing model ﬁlters to mirror the data
+respect to source videos, not the physical world.                             sampling grid, though preliminary experiments did not improve results.
+
+
+                                                 3
+
+======================== PDF 第 4 页 ========================
+   16×                16×                       16×                 16×
+                                                                        )                                                                                                                                                                                                                                                                 • • •                                                                                                                                                                                                                                                                                                                 •                                                                                                                                                                                                                                                                                                                   • •                                                4 ,                               √H                                                                               , √W                                                    2                                                        2
+                                                               8× size 8×                8×  ( T                                             8×
+                                                                                                   •                                           T                                  H                                                                                                     • •(                                                                                                                                                                                                                                                                             • • •                                                                                                                                                                                                                                                                                                                             • • •                                                     2                                                                                 , √                                                         2                                                                                       , √W2 )                      • • •                                                                                                                                                                                                    )                                                                                                        (T , H2 , W2 )                                                                                                                                                   (T , H2 , W                                                                                                                                                          2                                                               4×                                             4×   4×                4×                       • • •
+                                                                          ( T2 ,H,W )                         • • •                                                                                                                                                                                                       )                                                                                                         (T , √H2 , √W2 )                                                                                                                                                                                                                                                                                         • • •    (T , √H2 , √W2                                                               2×   2×                                             2×                                                                                                                                                                                                                   • • •                     2×                                   • • •
+                                                                 (T ,H,W                                                                                            )                                                                                                                                                                                                                                                                                                     •                                                                                                                                                                                                                                                                                                       • •  Mini-batch                    (T, H, W )                                                                                                          (T                                                                                       ,H,W )                                                                                                                                                    (T                                                                                                                                         • • •                                                                 • • •
+   1×                1×                      1×                1×                      ,H,W )
+
+                 Iterations                          Iterations                          Iterations                          Iterations
+
+             (a) Baseline                           (b) Long cycles                        (c) Short cycles                   (d) Long + short cycles
+
+Figure 2. A general and robust grid schedule (§3.2). We contrast multigrid training with standard baseline training. (a) Baseline training
+methods typically use a ﬁxed mini-batch shape throughout training. (b) Multigrid long cycles loop over inputs from small shapes (with
+large mini-batch sizes) to large shapes (with small mini-batch sizes), staying on each shape for several epochs. (c) Multigrid short cycles
+rapidly move through a variety of spatial shapes, changing at each iteration.  (d) Multigrid long + short cycles (our default setting)
+combines long and short cycles, and moves through shapes at two frequencies simultaneously. Dark green points in (b), (c), and (d)
+correspond to one full period of a long cycle, a full short cycle, and a long+short cycle, respectively.
+
+
+volutions, as well as self-attention operations in the form of    Long Cycle. We use sampling grids that result in an or-
+non-local blocks [47]; all models end with global average     dered sequence of S=4 base mini-batch shapes of non-
+                                                                                              T  H  W
+pooling and a single full-connected layer as the classiﬁer,     decreasing size along each dimension: 8B× 4 × √ 2× √ 2,
+as is common practice.                                        T  H  W       T                                     4B× 2 × √2× √2, 2B× 2 ×H×W,  and B×T ×H×W.
+Training and Testing Distributions. The focus of this     These four shapes cover an intuitive range and work well
+work is on multigrid methods for training and therefore we      in practice. The long cycle is synchronized with the step-
+use a standard inference method that uses a single shape for     wise learning rate decay schedule: a full cycle over the S
+the testing data. This choice, however, may introduce a mis-     shapes occurs exactly once for each learning rate stage. We
+match between the data distribution used to train the model      train on each shape for the same number of iterations.
+and the data distribution used at test time. To close this gap,     We use a simple randomized strategy to generate a mini-
+training may be ﬁnished with some number of ‘ﬁne-tuning’     batch with the target input shape for each training iteration.
+iterations that use grids more closely aligned with the test-     For each video to be used in the mini-batch, we select a ran-
+ing distribution, e.g., see [42]. We ﬁnd that this ﬁne-tuning    dom span from a speciﬁed range and set the stride such that
+gives a small, but consistent improvement.                      the desired shape is produced when sampling on the result-
+                                                             ing grid. For the spatial dimensions, this strategy amounts
+3.2. Implementation Details                                  to resizing a random crop to the desired shape using bilin-
+                                                                ear interpolation (similar to random cropping used in image
+   Multigrid training involves a choice of sampling grids
+                                                                 classiﬁcation [18,26,38]). For the temporal dimension, this
+and a grid schedule, which leads to a rich design space.
+                                                                  strategy amounts to selecting a random temporal crop and
+We use a hierarchical schedule that involves alternating be-
+                                                        subsampling its frames. The sampling range for spans is
+tween mini-batch shapes at two different frequencies: a
+                                                          speciﬁed in each experimental section.
+long cycle that moves through a set of base shapes, gener-
+ated by a variety of grids, staying on each shape for several     Short Cycle. The short cycle rapidly moves through a vari-
+epochs, and a short cycle that moves through a set of shapes      ety of spatial shapes, changing at each iteration. By default,
+that are ‘nearby’ the current base shape, staying on each    we use the following 3-shape short cycle. For iteration i,
+one for a single iteration. This hierarchical grid schedule is       let m = i (mod 3); if m=0, then we set the spatial shape
+                                         H W            H  W
+described in more detail shortly and illustrated in Fig. 2.         to 2 × 2 ; if m=1, we use √2× √2; otherwise, the current
+  The remainder of this subsection provides details for this     base spatial shape from the long cycle is used.
+design, which we have found to work well in practice. After       The short cycle can be applied on its own or in conjunc-
+presenting these details, we will explore what design deci-      tion with the long cycle. The mini-batch size is again scaled
+sions are important in ablation experiments.                   using Equation (1). The same randomized grid strategy is
+                                                             applied to sample data for the target mini-batch shape.
+Optimizer. We use SGD with momentum and a step-
+wise learning rate decay schedule since these are common     Learning Rate Scaling. When the mini-batch size changes
+choices in practice [9,18,26,43]. Using other learning rate     due to the long cycle, we apply the linear scaling rule [13] to
+schedules and optimizers is also possible. Speciﬁc sched-      adjust the learning rate by the mini-batch size scaling factor
+ules are given in each experimental section.                     (thus either 8×, 4×, 2×, or 1×). We found that this adjust-
+
+
+                                                 4
+
+======================== PDF 第 5 页 ========================
+ment is harmful if applied to mini-batch size changes due      testing by default [25,48] and present results with other set-
+to the short cycle and therefore we only adjust the learning      tings in the Appendix.
+rate when the long cycle base shape changes.              We select these training and inference procedures based
+                                                    on validation accuracy using the baseline training method.
+Fine-tuning Phase. If the baseline optimizer uses L learn-
+                                        We adopt the exact same recipe for multigrid training exper-
+ing rate (LR) stages, then we apply the long and short cycles
+                                                              iments, aside from multigrid speciﬁc changes. This choice
+in the ﬁrst L−1 LR stages. We use the corresponding L-th
+                                             may put multigrid training at a disadvantage, but it reﬂects
+stage for ﬁne-tuning to help match the training and testing
+                                                               the realistic scenario in which one wants to apply multigrid
+distributions, similar to [42].  In the ﬁrst half of the ﬁne-
+                                                                  training to accelerate an already known training schedule
+tuning iterations we use the L−1-st learning rate and in the
+                                                           without further tuning.
+second half we use the ﬁnal (L-th) learning rate.  While
+ﬁne-tuning we use the short cycle (as data augmentation),     Evaluation. Speedup factors are wall-clock GPU training
+but not the long cycle.                                      time on P100 GPUs with CUDA 9.2 and cuDNN 7.6.3. For
+                                                                           fair comparison, the same hardware and software imple-
+Batch Normalization. The behavior of Batch Normaliza-
+                                                          mentation is used for all methods. We note that multigrid
+tion (BN) [20] depends on mini-batch statistics.  In tradi-
+                                                                  training exploits larger mini-batches, which increases data
+tional trainers, the constant mini-batch size is also a hyper-
+                                                            loading throughput requirements. Training may become IO
+parameter that impacts BN behaviors (e.g., the noisiness of
+                                                   bound if the data loader is not optimized appropriately or if
+the statistics). As our multigrid method uses variable mini-
+                                                        remote data access is used. With sufﬁcient local disk and an
+batch sizes, it is desirable to decouple its impact on BN from
+                                                          optimized data loader, training is typically not IO bound.
+that of training speedup. The following heuristic works well
+in practice: we compute BN statistics with a standardized     Multigrid Training Details. To sample data with spatial
+sub-mini-batch of size 8; when the short cycle increases the     shape h×w that is smaller than H×W, we change the de-
+overall mini-batch size by 2× or 4×, we likewise increase      fault random short-side interval to [256 Hh , 340], noting that
+the BN sub-mini-batch size to 16 and 32, respectively.      w=h in our experiments. For the temporal dimension, we
+                                                                                               T
+                                                               take t (t<T ) frames with random stride in [2, 2 t ].
+4. Experiments on Kinetics
+                                                               4.1. Main Results
+  We  conduct  ablation  studies  on  the  Kinetics-400
+                                          We compare multigrid training to baseline training indataset [23], which is used in prior research and requires
+                                                                 Fig. 3. In addition to the default baseline, one could speedclassifying each video into one of 400 categories.  It con-
+                                                    up training by using a smaller spatial-temporal shape with atains ∼240k training videos and ∼20k validation videos on
+                                                                   larger mini-batch size and learning rate, so we also comparewhich we report results. Performance is measured by top-1
+                                                                   to this baseline variant. For each method, we experimentand top-5 accuracy.
+                                                          with training schedules that range from 0.25× to 3× the
+Baseline Model and Training. We use a ResNet-50 (R50)    number of baseline epochs (∼239) to study the trade-off be-
+SlowFast network [9, 18] with a 32-frame fast pathway,     tween training time and accuracy. Overall, multigrid train-
+speed ratio α=4, and channel ratio β=1/8 as our default     ing always achieves a better trade-off than baseline training.
+model. Input frames are sampled at a temporal stride of 2.      For example, multigrid training with both the long and short
+  Our baseline training recipe follows Feichtenhofer et     cycles can iterate through 1.5× more epochs than baseline
+al. [9]. We run synchronous SGD for 112k iterations on     method, while only requiring 1/3.4× the number of itera-
+128 GPUs with a mini-batch size of 4 clips per GPU (∼239      tions, 1/4.5× training time, and achieving higher accuracy
+epochs) with initial learning rate of 0.8. (We perform sin-     (75.6% →76.4%). The wall-clock speedup is greater than
+gle GPU experiments in §5.) The learning rate is decreased     the iteration reduction factor, as a larger mini-batch with
+by 10× at iterations 44k, 72k, and 92k.7 We use a weight     smaller space/time dimensions is more parallelism-friendly
+decay of 10−4, momentum of 0.9, and a linear learning rate    on modern GPUs. Both the long and short cycles improve
+warm-up [13] from 0.002 over 16k iterations. Input clips     the trade-off and using both together performs the best.
+are random 224×224 spatial crops from clips that are ran-        In Fig. 3 we also observe that baseline training suffers a
+domly resized such that the shorter side ∈[256, 340] pixels.     decline in accuracy when training for ≥1.5× epochs. With
+  At test time, we sample 10 clips per video with uniform      either long and/or short cycles, a decrease in accuracy is not
+temporal spacing and combine the predictions with average     observed for schedules up to 2.0× epochs, indicating that
+pooling following [9,25,47]. We use 224×224 center crop      variable grids can help prevent overﬁtting.
+                                                                 In the following we use multigrid training with long and  7We use the stepwise learning rate schedule rather than the cosine
+schedule used in Feichtenhofer et al. [9] because it is still more common.      short cycles and 1.5× more epochs than the baseline as our
+Results with a cosine schedule are available in the Appendix.                default since it obtains a good trade-off.
+
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+                Default multigrid
+                                                                  2.0×
+                           1.5×  2.0×                1.5×                                       3.0×
+                     1.0×             1.0×
+     75                                                    2.0×                                                                                       1.0×                                                                                                                             1.5×                             1.0×      1.5×                                                                                                                                                                    2.0×  accuracy                                                                     Default                                                                                baseline
+                                                   0.5×
+                      0.5×               0.5× top-1                                                                                                Multigrid (default: long+short cycle)
+     70          1.5×    0.5×                                                                        Multigrid (long cycle only)                1.0×
+                      2.0×                                                                            Multigrid (short cycle only)
+
+                                                                                                   T                             0.25×                                                                           Baseline                                                                                                                          (constant                                                                                                                             shape: 8B×                                                                                                                          4 × √H2 × √W2 )   Validation        0.5×                                                                                                           Baseline                                                                                                                                 (default constant                                                                                                                                     shape:                                                                        B×T ×H×W)
+     65
+        0     2     4     6     8    10    12    14    16    18    20    22    24    26    28    30    32    34    36    38    40
+
+                   Wall-clock time in hours (same hardware and software implementation for all methods)
+Figure 3. Multigrid vs. baseline training. Each point corresponds to one model trained with a speciﬁc schedule choice. Annotations
+denote training epochs relative to the baseline 1.0× schedule. For example, ‘1.5×’ denotes training for 1.5× more epochs than the default
+‘1.0×’ baseline schedule (112k iterations or ∼239 epochs). We see that all variants of multigrid training achieve a better trade-off
+than baseline training, which uses a constant mini-batch shape. Also note that multigrid training can iterate through the same number
+of epochs more efﬁciently.
+
+
+4.2. Ablation Experiments                                  similar speedup and performance gain. (We will present
+                                                  more results on ImageNet-pre-trained models in §4.4.)
+Long Cycle Design. By default, we use S=4 long cycle
+shapes with a 1.5× epoch schedule. In Table 1a, we explore
+                                                  Temporal Shape. Next we show generalization of multi-
+using fewer shapes, where we take the last S′<S shapes, for
+                                                                grid training for models of different temporal shapes T . We
+S′∈{1, 2, 3}. The short cycle is used in these experiments,
+                                                    compare models that use 16-frame, 32-frame (default), and
+and the S′=1 setting is equivalent to using the short cycle                                                        64-frame input clips.8  In all cases (Table 2b), multigrid
+only. We run all variants for the same number of training
+                                                                  training achieves a consistent accuracy gain and speedup.
+iterations (to roughly preserve total training FLOPs), not-
+                                                  The 64-frame model enjoys the largest performance gain
+ing that methods which use fewer shapes will process fewer
+                                                     (75.9% →77.6%) and the best speedup (5.5×).
+epochs due to having smaller mini-batches on average com-
+pared to the S=4 design.
+                                                            Spatial Shape. We also demonstrate generalization of our
+  We see that using each additional shape improves accu-
+                                                    method for models of different spatial shapes H×W. We
+racy and saturates at S=4 (default). The improvement in
+                                                               increase the baseline shape from 224×224 (default) to
+accuracy is possibly due to the more examples seen by the
+                                                320×320 and study the impact. Inference for the 320×320
+model given the same amount of iterations. Compared with
+                                                    model is analogous to the 224×224 case; we resize shorter
+S=1 (i.e., short cycle only), our default choice improves the
+                                                                side to 352 pixels and test on center 320×320 crops.  In
+top-1 accuracy by absolute 2.4% (74.0% →76.4%), while
+                                                           Table 2c, we see that multigrid training leads to an even
+being slightly faster (4.0× →4.5×). All results use the ﬁne-
+                                                                   larger performance gain (75.1% →76.8%) and a more sig-
+tuning phase, which we ﬁnd is beneﬁcial to varying degrees
+                                                            niﬁcant speedup (6.5×) in the 320×320 case. Also note
+in different settings. With the default schedule, it leads to
+                                                          with the baseline method 320×320 does not work better
+0.4% absolute gain (76.0% →76.4%; not shown in table).
+                                                            than 224×224, possibly due to overﬁtting, similar to what
+Short Cycle Design. Adding each input shape to the short       is reported in Tan et al. [41]. On the other hand, with multi-
+cycle leads to a clear accuracy improvement, Table 1b. Our      grid training, spatial scaling brings improvement, possibly
+default short cycle design (3-shape) improves over 1-shape     due to the data augmentation brought by multigrid training.
+(i.e., no short cycle / long-cycle only) by absolute 1.9%
+(74.5% →76.4%) in top-1 accuracy.                           4.4. Generalization to Different Models
+
+4.3. Generalization to Different Training Settings        So far we have focused on state-of-the-art SlowFast net-
+                                                   work [9] for analysis. We next demonstrate generalization
+  Next we study how multigrid training generalizes to dif-
+                                                              of multigrid training to different networks by presenting re-
+ferent training settings that are common in practice.
+                                                                       sults using a standard R50-I3D model [3,18] and its exten-
+Pre-training. In our main results, we train models from     sion with non-local blocks (I3D-NL) [47].
+random initialization. We see in Table 2a that with Im-
+ageNet [35] pre-training, our multigrid method obtains a       8α=2 in the 16-frame model to avoid a degenerated slow pathway.
+
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+                   long cycle design         speedup  top-1   top-5                      short cycle design        speedup  top-1   top-5
+         Baseline   -                                    -      75.6    91.9          Baseline   -                                   -      75.6    91.9
+                   1-shape (short cycle only)  4.0×    74.0    91.4                    1-shape (long cycle only)  4.2×    74.5    91.6
+                   2-shape                4.3×    75.5    92.1           Multigrid 2-shape                4.3×    75.5    92.1
+         Multigrid
+                   3-shape                4.4×    76.2    92.4                   3-shape (default)        4.5×    76.4    92.4
+                  4-shape (default)        4.5×    76.4    92.4
+
+                  (a) Long cycle design (with default short cycle)                        (b) Short cycle design (with default long cycle)
+
+Table 1. Ablation Study. We perform ablations on Kinetics-400 using an R50-SlowFast network. We analyze the impact of the long cycle
+(Table 1a) and short cycle (Table 1b) designs. All variants of multigrid training use the same number of training iterations as our default
+1.5× epoch schedule; this roughly preserves the total training FLOPs. We report wall-clock speedup relative to the baseline trained for
+1.0× epochs.
+
+
+             pre-train?  speedup   top-1    top-5    T               speedup   top-1    top-5  H×W             speedup   top-1    top-5
+Baseline                       -      75.6     91.9     16    Baseline         -      74.8     91.4     224    Baseline         -      75.6     91.9
+Multigrid            4.5×    76.4     92.4     16    Multigrid  4.0×    75.2     91.9     224    Multigrid  4.5×    76.4     92.4
+Baseline    ✓           -      75.4     91.9     32    Baseline         -      75.6     91.9     320    Baseline         -      75.1     91.8
+Multigrid   ✓      4.5×    76.0     92.4     32    Multigrid  4.5×    76.4     92.4     320    Multigrid  6.5×    76.8     92.8
+                                             64    Baseline         -      75.9     92.1
+                                             64    Multigrid  5.5×    77.6     93.2
+                   (a) Pre-training                                  (b) Temporal shape T                              (c) Spatial shape H×W
+
+Table 2. Generalization Analysis. We study how multigrid training generalizes to models both with and without ImageNet pre-training
+(Table 2a) and models of different temporal (Table 2b) and spatial (Table 2c) shapes. All experiments use R50-SlowFast with results on
+Kinetics-400. We use the default setting for multigrid training (1.5× more epochs, corresponding to 3.4× fewer iterations than baseline)
+in all settings. We observe that the default choice brings consistent speedup and performance gain in all cases.
+
+
+Implementation Details. Both models are ImageNet-pre-           model                    speedup     top-1      top-5
+trained with 3D convolutions inﬂated from 2D convolutions          I3D        Baseline  1           -        74.4       91.4
+                                                                    I3D        Baseline 3.3     3.3×      71.1       89.9following common practice [3,10,47]. Each input clip con-
+                                                                    I3D       Multigrid      3.9×      74.8       91.7
+sists of 16 frames, sampled at a stride of 4. I3D-NL ad-
+                                                                 I3D-NL    Baseline               -        75.5       92.1
+ditionally contains 5 (dot product) non-local blocks [47] in                                1                                                                 I3D-NL    Baseline 3.3     3.3×      72.3       90.6
+res3 and res4 stages. The exact model speciﬁcation is given          I3D-NL    Multigrid      3.3×      75.5       92.4
+in the Appendix.
+                                                                  Table 3. Kinetics-400 accuracy with I3D and I3D-NL. While de-
+  The baseline recipe trains for 100k iterations using 128
+                                                                veloped on SlowFast [9], multigrid training provides a consistent
+GPUs, with a mini-batch size of 2 clips per GPU (∼106     speedup and performance gain with I3D [3] and I3D-NL [47].
+epochs) and a learning rate of 0.04, which is decreased by
+a factor of 10 at iteration 37.5k and 75k. We do not use
+learning rate warm-up [13] following prior work [47]. Other     serve consistent improvements with larger backbone mod-
+training details are analogous to SlowFast training. We note      els (R101); see the Appendix.
+again that this training recipe is selected to be the best for
+the baseline training method and we apply multigrid train-     5. Case Study: 1-GPU Training on Kinetics
+ing on top without further tuning.
+                                                    Our experiments thus far use a large number of GPUs
+                                                           (128) in parallel. However, a more common training recipe
+Evaluation. We summarize the results in Table 3. For both
+                                             may use far fewer GPUs (e.g., 1 to 8) and given that one
+I3D and I3D-NL, multigrid training with the default sched-
+                                                              of our goals is to make video research more accessible by
+ule (1.5× epoch) obtains similar or better accuracy, while
+                                                           reducing computational requirements it is important to ex-
+being up to 3.9× faster. We also experiment with a shorter
+                              1                                 plore the application of our multigrid method in the few-
+baseline schedule (‘baseline 3.3’ in table), which trains for
+                                       GPU regime, without any tuning.
+the same number of iterations as the multigrid training. The
+                                                 As a case study, we use a single GPU to train an I3D
+shorter baseline schedule obtains a lower accuracy (3.7%
+                                                    model on Kinetics-400 using the quick training recipe from
+and 3.2% absolute top-1 lower than multigrid). We also
+                                                               the public repository9 of Wang et al. [47]. We apply multi-
+see that I3D-NL has a lower speedup than I3D. This is in
+                                                                grid training on top without further tuning. This schedule
+part due to the less optimized NL operator than convolu-
+tion, consuming a large portion of the training time. We ob-       9https://github.com/facebookresearch/video-nonlocal-net
+
+
+                                                 7
+
+======================== PDF 第 8 页 ========================
+                        training time (days)     top-1      top-5                                            speedup       top-1       top-5
+       Baseline              6.7             72.5       90.4                   Baseline                                -          60.9±0.31    87.2±0.13
+       Multigrid             2.0             72.5       90.4                   Baseline 5.21                5.2×        54.6±0.13    83.0±0.14
+                                                                          Multigrid                                                                          1.0×             8.3×        60.0±0.31    86.8±0.05Table 4. Case study: 1-GPU training on Kinetics-400. Multigrid                                                                                   1
+                                                                                Baseline 3.4                3.4×        57.3±0.13    84.7±0.15training reduces the training time from nearly 1 week to 2 days on
+                                                                          Multigrid                                                                          1.5× (default)      5.6×        61.2±0.18    87.4±0.12a single GPU. We hope the reduced training time will make video                                                                                   1
+                                                                                Baseline 2.6                2.6×        58.7±0.06    85.8±0.15understanding research more accessible and economical.
+                                                                          Multigrid 2.0×             4.2×        61.7±0.20    87.8±0.12
+                                                                  Table 5. Results on Something-Something V2. Multigrid train-
+trains for 1200k iterations (after adjusting with the linear      ing achieves a better trade-off than baseline training. Results are
+scaling rule [13]) on one GPU with 8 clips (∼40 epochs).      the mean and standard deviation over 5 runs.
+The learning rate is 0.00125, which is decreased by a fac-
+tor of 10 at iteration 600k and 1000k. Dropout and ran-                                        speedup      mAP (%)
+dom scaling are disabled to accelerate convergence given           Baseline                                     -               38.0±0.18
+the short schedule. Each input clip consists of 8 frames,           Baseline 5.31                    5.3×             27.5±0.15
+sampled at a stride of 8, when using the baseline optimizer.          Multigrid 1.0×                8.6×             36.8±0.31
+Other training details are the same as the I3D experiments.           Baseline 3.51                    3.5×             31.5±0.26
+                                                                          Multigrid                                                                          1.5× (default)         5.7×             38.2±0.06   Table 4 shows that multigrid training generalizes well                                                                                    1
+                                                                                Baseline 2.6                   2.6×             33.6±0.13out-of-the-box to a few-GPU, short-schedule setting. With
+                                                                          Multigrid 2.0×                4.3×             37.4±0.15multigrid training we are able to achieve 72.5% (73.1% with
+30-crop testing [47]) top-1 accuracy in 2 days using only      Table 6. Results on Charades. Multigrid training shows consis-
+1 GPU, while the baseline method would need nearly 1       tent speedups compared with the other datasets. Results are the
+                                                     mean and standard deviation over 5 runs.
+week. (When using a small model, we observe a smaller
+wall-clock speedup of ∼3.3× compared to a larger model,
+which typically yields a ∼4.5× speedup). We hope the re-     7. Experiments on Charades
+duced training time with multigrid training will make video
+                                          We  ﬁnally  evaluate  our method on  the  Charadesunderstanding research more accessible and economical.
+                                                                 dataset [36], which is relatively small, consisting of only
+                                                         9,848 videos in 157 action classes. The task is to predict all6. Experiments on Something-Something V2
+                                                                actions in a video. Performance is measured by mAP.
+  We next evaluate multigrid training on the Something-                                                     Implementation Details. We use the same R50-SlowFast
+Something V2 dataset [14], which contains 169k training,                                                    model [9, 18], with the same Kinetics pre-training as the
+and 25k validation videos. Each video shows an interaction                                                       Something-Something experiments.  Training details are
+with everyday objects. The task is classiﬁcation with 174                                                                 available in the Appendix.
+action classes. Performance is evaluated by top-1 and top-
+                                                              Results. Overall we observe consistent results compared5 accuracy. This task is known to require more ‘temporal
+                                                          with Kinetics and Something-Something V2 (Table 6). Themodeling’ to solve than Kinetics [49].
+                                                                 default multigrid training  is 5.7×  faster, while achiev-
+Implementation  Details. We  use  an  R50-SlowFast     ing slightly better mAP.  Overall, we see that even for
+model [9, 18] with 64-frame fast pathway with speed ratio      the smaller Charades dataset, with strong large-scale pre-
+α=4 and channel ratio β=1/8. The model is pre-trained      training, multigrid training is beneﬁcial.
+on Kinetics-400 following prior work [29]. The baseline
+training recipe trains for 230k iterations on 8 GPUs, with a     8. Conclusion
+mini-batch size of 2 clips per GPU and a learning rate of
+                                          We propose a multigrid method for fast training of video0.03, which is decreased by a factor of 10 at iteration 150k
+                                                          models. Our method varies the sampling grid and the mini-and 190k. Other training details are analogous to Kinetics
+                                                            batch size during training, and can process the same num-experiments; see the Appendix for details.
+                                                             ber of epochs using a small fraction of the computation of
+Results. Similar to what we observe on Kinetics, multigrid     the baseline trainer.  With a single out-of-the-box setting,
+training obtains a better trade-off than baseline training on        it works on multiple datasets and models, and consistently
+Something-Something V2 (Table 5). With the default 1.5×-     brings a ∼3-6× speedup with comparable or higher accu-
+epoch training, multigrid training is 5.6× faster while ob-      racy. It works across a spectrum of hardware settings from
+taining a slightly higher accuracy.  Multigrid training be-    128 GPU distributed training to single GPU training. We
+haves consistently for the ‘spatial heavy’ Kinetics dataset     hope the reduced training time will make video understand-
+and the ‘temporal heavy’ Something-Something V2 dataset.     ing research more accessible, scalable, and economical.
+
+
+                                                 8
+
+======================== PDF 第 9 页 ========================
+A. Appendix                                               schedule. The lower accuracy is possibly due to the rel-
+                                                                    atively smaller learning rates used in larger (later) shapes
+A.1. Supplementary Experiments                                                              as the LR is monotonically decreasing in a cosine sched-
+R101-SlowFast Results. We demonstrate generalization      ule. However, it still obtains a consistent speedup and a
+of multigrid training to deeper backbones by extending our     comparable accuracy to baseline, suggesting robustness of
+default R50-SlowFast network to R101-SlowFast. All other     the multigrid strategy. The two long-cycle designs obtain a
+designs and training procedures remain unchanged.              similar accuracy.
+
+                                                           Testing Settings Next we present results with additional        backbone               speedup   top-1     top-5
+       R50 (default)  Baseline         -       75.6     91.9               test-time settings that are common in the literature. Here
+       R50 (default)  Multigrid   4.5×     76.4     92.4          we use the 64-frame R50-SlowFast due to its high accuracy.
+       R101         Baseline         -       76.5     92.4           Our multigrid method trains this model 5.5× faster than the
+       R101         Multigrid   4.4×     77.0     92.9               baseline.
+
+                                                                                                    center 2242      3-crop 2242     3-crop 2562  As expected, R101-SlowFast outperforms R50-SlowFast
+                                                                                               top-1    top-5    top-1    top-5    top-1    top-5
+and we observe a consistent speedup and accuracy gain over
+                                                                                 Baseline     75.9    92.1    76.5    92.2    77.2    92.5
+the baseline with multigrid training.                                                                           Multigrid   77.6    93.2    78.1    93.5    78.1    93.4
+
+Long Cycle Design. By default we use multiple long cy-
+cles that are synchronized with the stepwise learning rate      As expected, using 3-crop (left-center-right) testing im-
+(LR) schedule (i.e., one long cycle period per LR stage).     proves accuracy for both baseline and multigrid training.
+We compare our default design (‘multi-cycle’) with an al-
+ternative that uses only a single long cycle period (‘single-     A.2. Supplementary Implementation Details
+cycle’) throughout all of training. Note that the single-cycle
+                                                    The I3D and I3D-NL architectures used in generalizationdesign does not use a ﬁne-tuning phase as it is unclear how
+                                                                analysis are shown below (assuming 16×224×224 inputs):to incorporate it into this design.
+
+                                                                            Layer            Speciﬁcation             Output size
+                long cycle design     speedup   top-1    top-5
+                                                                            conv1     1×7×7, 64, stride 1, 2, 2     16×112×112
+      Baseline   -                               -       75.6     91.9                                                                                pool1    1×3×3 max, stride 1, 2, 2      16×56×56
+                 single-cycle          5.2×     74.4     91.8
+      Multigrid                multi-cycle (default)  4.5×     76.4     92.4                    1×1×1, 64                                                                                          res2        1×3×3, 64              16×56×56
+                                                          1×1×1, 256  ×3
+  We observe that our default, multi-cycle design works                1×1×1, 128                                                                                          res3        1×3×3, 128             16×28×28
+better. In the multi-cycle design, the later shapes, which are                1×1×1, 512  ×4
+closer to the ﬁnal testing distribution, are used with each
+                                                                                           256                                                                                                                             3×1×1,LR. We conjecture that exposing the model to these shapes              res4                                                                                             16×14×14                                                                         1×3×3,                                                                                           256
+with the larger (earlier) LRs is important for generalizing to                1×1×1, 1024 ×6
+the testing distribution. In contrast, the single-cycle design                3×1×1, 512                                                                                          res5        1×3×3, 512             16×7×7
+only uses the later shapes with relatively low LRs.                      1×1×1, 2048 ×3
+Cosine Learning Rate Schedule. We develop multigrid
+training assuming a stepwise LR schedule. Next we experi-       ‘I3D-NL’ additionally uses non-local operators [47] after
+ment with a cosine LR schedule. We experiment with both     blocks 1 and 3 of res3, and blocks 1, 3, and 5 of res4.
+the multi-cycle and the single-cycle design for long cycles.
+No further modiﬁcations are applied to multigrid training.      Something-Something V2 Training. We use a  linear
+                                                  warm-up [13] for 2k iterations from 0.0001 and a weight
+LR schedule                               speedup  top-1    top-5     decay of 10−6. As Something-Something V2 requires dis-
+                   Baseline                             -      75.6    91.9      tinguishing between directions, we disable random ﬂipping
+Stepwise (default)
+                   Multigrid                4.5×    76.4    92.4      during training. Following [29], we use segment-based in-
+                   Baseline                             -      75.8    92.0      put frame sampling, i.e., we split each video into segments,Cosine
+                   Multigrid (single long cyc.)  5.2×    75.4    92.1                                                      and from each of them, sample one frame to form a clip.
+                   Multigrid (multi long cyc.)   4.2×    75.3    92.1
+                                                  Charades Training. The baseline method trains for 28k it-
+  We observe that multigrid training on a cosine schedule      erations with a learning rate of 0.0375, which is decreased
+obtains a slightly lower accuracy than the default stepwise     by a factor of 10 at iteration 20k and 24k.
+
+
+                                                 9
+
+======================== PDF 第 10 页 ========================
+Acknowledgments. We would like to thank Haoqi Fan for      [15] Juncai He and Jinchao Xu. MgNet: A uniﬁed framework of
+helping with the code release and Ishan Nigam, Santhosh K.           multigrid and convolutional neural network. Science China
+Ramakrishnan, and Xingyi Zhou for helpful comments on           Mathematics, 2019. 2
+an earlier draft. This material is partially supported by the      [16] Kaiming He, Georgia Gkioxari, Piotr Doll´ar, and Ross Gir-
+National Science Foundation under Grant No. IIS-1845485            shick. Mask R-CNN. In ICCV, 2017. 2
+and the Facebook Fellowship to C-Y Wu.                         [17] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+                                                                              Spatial pyramid pooling in deep convolutional networks for
+References                                                               visual recognition. PAMI, 2015. 2
+                                                                      [18] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+ [1] WF Briggs, VE Henson, and Stephen F McCormick.  A         Deep residual learning for image recognition.  In CVPR,
+     Multigrid Tutorial, 2nd Edition. SIAM, 2000. 2                      2016. 2, 4, 5, 6, 8
+ [2] Joao Carreira, Viorica Patraucean, Laurent Mazare, Andrew      [19] Noureldien Hussein, Efstratios Gavves, and Arnold WM
+     Zisserman, and Simon Osindero.  Massively parallel video           Smeulders. Timeception for complex action recognition. In
+     networks. In ECCV, 2018. 2                               CVPR, 2019. 2
+ [3] Joao Carreira and Andrew Zisserman.  Quo vadis, action      [20] Sergey Ioffe and Christian Szegedy.  Batch normalization:
+     recognition? a new model and the kinetics dataset. In CVPR,           Accelerating deep network training by reducing internal co-
+     2017. 2, 6, 7                                                              variate shift. In ICML, 2015. 5
+ [4] Tianqi Chen, Thierry Moreau, Ziheng Jiang, Lianmin Zheng,                                                                      [21] Boyuan Jiang, MengMeng Wang, Weihao Gan, Wei Wu, and
+     Eddie Yan, Haichen Shen, Meghan Cowan, Leyuan Wang,                                                                              Junjie Yan. STM: Spatiotemporal and motion encoding for
+    Yuwei Hu, Luis Ceze, et al. TVM: An automated end-to-end                                                                            action recognition. In ICCV, 2019. 2
+     optimizing compiler for deep learning. In OSDI, 2018. 2                                                                      [22] Norman P Jouppi, Cliff Young, Nishant Patil, David Patter-
+ [5] Yunpeng Chen, Yannis Kalantidis, Jianshu Li, Shuicheng                                                                            son, Gaurav Agrawal, Raminder Bajwa, Sarah Bates, Suresh
+     Yan, and Jiashi Feng. Multi-ﬁber networks for video recog-                                                                            Bhatia, Nan Boden, Al Borchers, et al. In-datacenter perfor-
+      nition. In ECCV, 2018. 2                                                            mance analysis of a tensor processing unit. In ISCA, 2017.
+ [6] Sharan  Chetlur,  Cliff Woolley,  Philippe Vandermersch,                                                              2
+     Jonathan Cohen, John Tran, Bryan Catanzaro, and Evan
+                                                                      [23] Will Kay, Joao Carreira, Karen Simonyan, Brian Zhang,
+     Shelhamer.  cudnn: Efﬁcient primitives for deep learning.
+                                                                 Chloe Hillier, Sudheendra Vijayanarasimhan, Fabio Viola,
+     arXiv preprint arXiv:1410.0759, 2014. 2
+                                                         Tim Green, Trevor Back, Paul Natsev, et al. The Kinetics hu-
+ [7] Dan C Cires¸an, Ueli Meier, Jonathan Masci, Luca M Gam-                                                      man action video dataset. arXiv preprint arXiv:1705.06950,
+      bardella, and J¨urgen Schmidhuber. High-performance neu-                                                                      2017. 2, 5
+      ral networks for visual object classiﬁcation. arXiv preprint
+                                                                      [24] Diederik P Kingma and Jimmy Ba. Adam: A method for
+     arXiv:1102.0183, 2011. 3
+                                                                               stochastic optimization.  arXiv preprint arXiv:1412.6980,
+ [8] John Duchi, Elad Hazan, and Yoram Singer. Adaptive sub-
+                                                                      2014. 2
+     gradient methods for online learning and stochastic opti-
+                                                                      [25] Bruno Korbar, Du Tran, and Lorenzo Torresani. SCSampler:
+     mization. JMLR, 2011. 2
+                                                                 Sampling salient clips from video for efﬁcient action recog-
+ [9] Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and
+                                                                                    nition. In ICCV, 2019. 5
+    Kaiming He. SlowFast networks for video recognition. In
+                                                                      [26] Alex Krizhevsky, Ilya Sutskever, and Geoffrey E Hinton.    ICCV, 2019. 1, 2, 4, 5, 6, 7, 8
+                                                               ImageNet classiﬁcation with deep convolutional neural net-[10] Christoph Feichtenhofer, Axel Pinz, and Richard Wildes.
+                                                                      works. In NIPS, 2012. 2, 3, 4
+     Spatiotemporal residual networks for video action recogni-
+                                                                      [27] Yann LeCun, Bernhard Boser, John S Denker, Donnie      tion. In NIPS, 2016. 2, 7
+                                                                    Henderson,  Richard E Howard, Wayne Hubbard,  and[11] Deepti Ghadiyaram, Du Tran, and Dhruv Mahajan. Large-
+                                                               Lawrence D Jackel. Backpropagation applied to handwrit-      scale weakly-supervised pre-training for video action recog-
+                                                                            ten zip code recognition. Neural computation, 1989. 1      nition. In CVPR, 2019. 2
+                                                                      [28] Myunggi Lee, Seungeui Lee, Sungjoon Son, Gyutae Park,[12] Rohit Girdhar, Joao Carreira, Carl Doersch, and Andrew Zis-
+                                                                 and Nojun Kwak.  Motion feature network: Fixed motion     serman. Video action transformer network. In CVPR, 2019.
+                                                                                  ﬁlter for action recognition. In ECCV, 2018. 2    2
+[13] Priya Goyal,  Piotr Doll´ar, Ross Girshick, Pieter Noord-      [29]  Ji Lin, Chuang Gan, and Song Han. Temporal shift module
+      huis, Lukasz Wesolowski, Aapo Kyrola, Andrew Tulloch,            for efﬁcient video understanding. In ICCV, 2019. 2, 8, 9
+     Yangqing  Jia, and Kaiming He.   Accurate,  large mini-      [30] Chenxu Luo and Alan L Yuille. Grouped spatial-temporal
+     batch SGD: Training ImageNet in 1 hour.  arXiv preprint           aggregation for efﬁcient action recognition. In ICCV, 2019.
+     arXiv:1706.02677, 2017. 2, 4, 5, 7, 8, 9                          2
+[14] Raghav Goyal, Samira Ebrahimi Kahou, Vincent Michal-      [31] Brais Martinez, Davide Modolo, Yuanjun Xiong, and Joseph
+      ski, Joanna Materzynska, Susanne Westphal, Heuna Kim,           Tighe. Action recognition with spatial-temporal discrimina-
+     Valentin  Haenel,  Ingo  Fruend,  Peter  Yianilos,  Moritz             tive ﬁlter banks. In ICCV, 2019. 2
+     Mueller-Freitag, et al. The “Something Something” video      [32] AJ Piergiovanni, Anelia Angelova, Alexander Toshev, and
+     database for learning and evaluating visual common sense.          Michael S Ryoo. Evolving space-time neural architectures
+     In ICCV, 2017. 2, 8                                                      for videos. In ICCV, 2019. 2
+
+
+                                                10
+
+======================== PDF 第 11 页 ========================
+[33] Siyuan Qiao, Zhe Lin, Jianming Zhang, and Alan L Yuille.      [50] Yang You, Zhao Zhang, Cho-Jui Hsieh, James Demmel, and
+     Neural rejuvenation: Improving deep network training by          Kurt Keutzer. ImageNet training in minutes. In ICPP, 2018.
+     enhancing computational resource utilization.   In CVPR,         2
+     2019. 2                                                         [51] Mohammadreza Zolfaghari, Kamaljeet Singh, and Thomas
+[34] Zhaofan Qiu, Ting Yao, and Tao Mei.  Learning spatio-           Brox. ECO: Efﬁcient convolutional network for online video
+     temporal representation with pseudo-3D residual networks.           understanding. In ECCV, 2018. 2
+     In ICCV, 2017. 2
+[35] Olga Russakovsky, Jia Deng, Hao Su, Jonathan Krause, San-
+     jeev Satheesh, Sean Ma, Zhiheng Huang, Andrej Karpathy,
+     Aditya Khosla, Michael Bernstein, Alexander C. Berg, and
+     Li Fei-Fei. ImageNet Large Scale Visual Recognition Chal-
+      lenge. IJCV, 2015. 6
+[36] Gunnar A Sigurdsson,  G¨ul Varol, Xiaolong Wang,  Ali
+     Farhadi, Ivan Laptev, and Abhinav Gupta.  Hollywood in
+     homes: Crowdsourcing data collection for activity under-
+      standing. In ECCV, 2016. 2, 8
+[37] Patrice Y Simard, David Steinkraus, and John C Platt. Best
+      practices for convolutional neural networks applied to visual
+     document analysis. In ICDAR, 2003. 3
+[38] Karen Simonyan and Andrew Zisserman. Very deep convo-
+      lutional networks for large-scale image recognition. In ICLR,
+     2015. 2, 4
+[39] Samuel L Smith, Pieter-Jan Kindermans, Chris Ying, and
+    Quoc V Le. Don’t decay the learning rate, increase the batch
+      size. In ICLR, 2018. 2
+[40] Lin Sun, Kui Jia, Dit-Yan Yeung, and Bertram E Shi. Human
+     action recognition using factorized spatio-temporal convolu-
+      tional networks. In ICCV, 2015. 2
+[41] Mingxing Tan and Quoc V Le.  EfﬁcientNet: Rethinking
+    model scaling for convolutional neural networks. In ICML,
+     2019. 6
+[42] Hugo Touvron, Andrea Vedaldi, Matthijs Douze, and Herv´e
+      J´egou.   Fixing the train-test resolution discrepancy.   In
+     NeurIPS, 2019. 4, 5
+[43] Du Tran, Lubomir Bourdev, Rob Fergus, Lorenzo Torresani,
+     and Manohar Paluri. Learning spatiotemporal features with
+    3D convolutional networks. In ICCV, 2015. 2, 4
+[44] Du Tran, Heng Wang, Lorenzo Torresani, and Matt Feis-
+       zli.  Video classiﬁcation with channel-separated convolu-
+      tional networks. In ICCV, 2019. 2
+[45] Du Tran, Heng Wang, Lorenzo Torresani, Jamie Ray, Yann
+    LeCun, and Manohar Paluri. A closer look at spatiotemporal
+     convolutions for action recognition. In CVPR, 2018. 1, 2
+[46] Limin Wang,  Wei  Li, Wen  Li,  and Luc Van  Gool.
+     Appearance-and-relation networks for video classiﬁcation.
+     In CVPR, 2018. 2
+[47] Xiaolong Wang, Ross Girshick, Abhinav Gupta, and Kaim-
+     ing He. Non-local neural networks. In CVPR, 2018. 1, 2, 4,
+      5, 6, 7, 8, 9
+[48] Chao-Yuan Wu, Christoph Feichtenhofer, Haoqi Fan, Kaim-
+     ing He, Philipp Kr¨ahenb¨uhl, and Ross Girshick. Long-term
+      feature banks for detailed video understanding.  In CVPR,
+     2019. 2, 5
+[49] Saining Xie, Chen Sun, Jonathan Huang, Zhuowen Tu, and
+     Kevin Murphy. Rethinking spatiotemporal feature learning:
+     Speed-accuracy trade-offs in video classiﬁcation. In ECCV,
+     2018. 2, 8
+
+
+                                                11

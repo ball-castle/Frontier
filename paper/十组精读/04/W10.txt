@@ -1,0 +1,963 @@
+
+=== PDF PAGE 1 ===
+  HorNet: Efficient High-Order Spatial Interactions
+        with Recursive Gated Convolutions
+
+
+
+                Yongming Rao1∗Wenliang Zhao1∗Yansong Tang1
+                           Jie Zhou1†  Ser-Nam Lim2†  Jiwen Lu1†
+                            1Tsinghua University  2Meta AI
+
+
+                                Abstract
+
+        Recent progress in vision Transformers exhibits great success in various tasks
+         driven by the new spatial modeling mechanism based on dot-product self-attention.
+         In this paper, we show that the key ingredients behind the vision Transformers,
+       namely input-adaptive, long-range and high-order spatial interactions, can also
+        be efficiently implemented with a convolution-based framework. We present the
+        Recursive Gated Convolution (gnConv) that performs high-order spatial interac-
+         tions with gated convolutions and recursive designs. The new operation is highly
+          flexible and customizable, which is compatible with various variants of convolution
+        and extends the two-order interactions in self-attention to arbitrary orders without
+        introducing significant extra computation. gnConv can serve as a plug-and-play
+       module to improve various vision Transformers and convolution-based models.
+       Based on the operation, we construct a new family of generic vision backbones
+       named HorNet. Extensive experiments on ImageNet classification, COCO object
+         detection and ADE20K semantic segmentation show HorNet outperform Swin
+        Transformers and ConvNeXt by a significant margin with similar overall archi-
+         tecture and training configurations. HorNet also shows favorable scalability to
+       more training data and a larger model size. Apart from the effectiveness in vi-
+         sual encoders, we also show gnConv can be applied to task-specific decoders and
+         consistently improve dense prediction performance with less computation. Our
+          results demonstrate that gnConv can be a new basic module for visual modeling
+          that effectively combines the merits of both vision Transformers and CNNs. Code
+           is available at https://github.com/raoyongming/HorNet.
+
+
+1  Introduction
+
+Convolutional neural networks (CNN) have driven remarkable progress in deep learning and compu-
+tation vision since the introduction of AlexNet [31] in the last decade. There are quite a few nice
+properties of CNNs making them naturally suitable for a wide range of vision applications. Transla-
+tion equivariance introduces useful inductive biases to major vision tasks and enables transferability
+across different input resolutions. The highly optimized implementation makes it efficient on both
+high-performance GPUs and edge devices. The evolution of architectures [32, 31, 49, 50, 22, 24, 51]
+further increases its popularity on various vision tasks.
+
+The emergence of Transformer-based architectures [16, 52, 42] greatly challenges the dominance
+of CNNs. By combining some successful designs in CNN architectures and the new self-attention
+mechanism, vision Transformers have shown leading performance on various vision tasks such
+as image classification [12, 42, 48], object detection [70, 41], semantic segmentation [6, 8] and
+video understanding [64, 18]. What makes vision Transformers more powerful than CNNs? Some
+efforts have been made to improve the CNN architectures by learning from the new designs in vision
+
+   ∗Equal contribution.  †Corresponding authors.
+
+
+36th Conference on Neural Information Processing Systems (NeurIPS 2022).
+
+=== PDF PAGE 2 ===
+                                                                                          MulMul                                                  MatMul
+
+                                                                                     MulMulMul
+
+                                                 Softmax                           MulMulMulMul
+                                          MatMulMatmul
+
+
+      (a)                 (b)                          (c)                                    (d)
+
+Figure 1: Illustration of our main idea. We show representative spatial modeling operations that perform
+different orders of interactions. In this paper, we focus on studying explicit spatial interactions between a feature
+(red) and its neighboring region (light gray). (a) The standard convolution operation does not explicitly consider
+the spatial interaction. (b) Dynamic convolution [28, 4] and SE [25] introduce the dynamic weights to improve
+the modeling power of convolutions with extra spatial interactions. (c) The self-attention operation [56] performs
+two-order spatial interactions with two successive matrix multiplications. (d) gnConv realizes arbitrary-order
+spatial interactions using a highly efficient implementation with gated convolutions and recursive deigns.
+
+Transformers. [43] presents a thorough study to adopt the meta architecture of vision Transformer
+to improve CNNs and proposes to use a large 7×7 kernel to construct a modern CNN. [46] and
+[14] propose to use even larger kernels to learn long-range relations with global filters and up
+to 31×31 convolutions, respectively. [20] shows that the input-adaptive weights play a key role
+in vision Transformers and achieve similar performance with Swin Transformers with dynamic
+convolutions [4, 28]. However, the effectiveness of dot-product self-attention in vision tasks has not
+been analyzed from the prospective of high-order spatial interactions.
+
+While there exists complex and often high-order interactions between two spatial locations in a deep
+model due to the non-linearity, the success of self-attention and other dynamic networks suggests that
+the explicit and high-order spatial interactions introduced by the architectural designs are beneficial
+to improving the modeling power of vision models. As illustrated in Figure 1, the plain convolution
+operation does not explicitly consider the spatial interactions between a spatial location (i.e., the red
+feature) and its neighboring region (i.e., the light gray region). Enhanced convolution operations
+like dynamic convolution [4, 28, 20] introduce explicit spatial interaction by generating dynamic
+weights. The dot-product self-attention operation in Transformers [56] consists of two successive
+spatial interactions by performing matrix multiplication among queries, keys and values. The trend
+of the basic operations for visual modeling indicates that the network capacity can be improved by
+increasing the order of spatial interactions.
+
+In this paper, we summarize that the key ingredient behind the success of vision Transformers is the
+new way of spatial modeling with input-adaptive, long-range and high-order spatial interactions
+performed by the self-attention operation. While previous work has successfully migrated the meta
+architecture [43, 20, 46, 14], input-adaptive weight generation strategy [20] and large-range modeling
+ability [46, 14] of vision Transformers to CNN models, a higher-order spatial interaction mechanism
+has not been studied. We show that all the three key ingredients can be efficiently implemented
+using a convolution-based framework. We propose the Recursive Gated Convolution (gnConv) that
+performs high-order spatial interactions with gated convolutions and recursive deigns. Instead of
+simply imitating the successful designs in self-attention, gnConv has several extra favorable properties:
+1) Efficient. The convolution-based implementation avoids the quadratic complexity of self-attention.
+The design that progressively increases the channel width during performing spatial interactions also
+enables us to achieve higher-order interactions with bounded complexity; 2) Extendable. We extend
+the two-order interaction in self-attention to arbitrary orders to further improve the modeling power.
+Since we do not make assumptions on the type of spatial convolution, gnConv is compatible with
+various kernel size and spatial mixing strategies like [46, 14]; 3) Translation-equivariant. gnConv
+fully inherits the translation equivariance of the standard convolution, which introduces beneficial
+inductive biases to major vision tasks and avoids the asymmetry brought by local attention [42, 34].
+Based on gnConv, we construct a new family of generic vision backbones named HorNet. We
+conduct extensive experiments on ImageNet classification [13], COCO object detection [38] and
+ADE20K semantic segmentation [71] to verify the effectiveness of our models. With the same 7×7
+kernel/window and similar overall architecture and training configurations, HorNet outperforms Swin
+
+
+                                       2
+
+=== PDF PAGE 3 ===
+and ConvNeXt by a large margin on all tasks at different levels of complexity. The gap can be further
+enlarged by using a global kernel size [46]. HorNet also shows favorable scalability to more training
+data and larger model size, attaining 87.7% top-1 accuracy on ImageNet, 57.9% mIoU on ADE20K
+val and 59.2% bounding box AP on COCO val with ImageNet-22K pre-training. Apart from applying
+gnConv in visual encoders, we further test the generality of our designs on task-specific decoders.
+By adding gConv to the widely used feature fusion model FPN [36], we develop HorFPN to model
+the high-order spatial relationships of features from different hierarchical levels. We observe that
+HorFPN can also consistently improve various dense prediction models with lower computational
+costs. Our results demonstrate that gnConv can be a promising alternative to self-attention for visual
+modeling and effectively combine the merits of both vision Transformers and CNNs.
+
+2  Related Work
+
+Vision Transformers.  The Transformer architecture [56] is originally designed for the natural
+language processing tasks. Since Dosovitskiy et al. [16] show that vision models constructed only
+by the Transformer blocks and a patch embedding layer can also achieve competitive performance
+to CNNs, many new models have been proposed to modify the Transformer-based architecture
+and make it more suitable for various vision tasks [42, 58, 60, 9, 66, 55].  Different from the
+original designs in [16], state-of-the-art vision Transformers usually utilize a CNN-like hierarchical
+architecture and change the global self-attention among all patches to local self-attention to avoid the
+quadratic complexity. In this paper, we follow the overall architecture of the previous hierarchical
+vision Transformers [42] and replace the self-attention sub-layer with our proposed gnConv to fairly
+compare with the previous Transformer-based models.
+
+Convolution-based models.  Inspired by the recent success of vision Transformers, several papers
+propose to adopt the Transformer-style architecture and spatial convolutions with a large kernel size
+to improve the performance of CNNs. Han et al. [20] replace the window self-attention in Swin
+Transformers with large-kernel dynamic convolutions and achieve better performance. GFNet [46]
+proposes to perform the global spatial interactions like vision Transformers with global filters in the
+frequency domain, which are equivalent to depth-wise convolutions with a global kernel size and
+circular padding. ConvNeXt [43] thoroughly analyzes the designs in recent vision Transformers and
+presents a strong convolutional model with 7×7 depth-wise convolutions. RepLKNet [14] explores
+CNN models with very large kernels (up to 31×31), showing good scalability as vision Transformers.
+VAN [19] and FocalNet [65] use gated convolutions to perform input-adaptive attention and adopts
+large-kernel dilated convolutions and multiple successive 3×3 convolutions respectively to produce
+the weights. Previous work focuses on the meta architecture [67], large-kernel designs and input-
+adaptive weights to improve CNNs by learning from vision Transformers. In this paper, we offer
+a new perspective of high-order spatial attention to analyze the merits of vision Transformers. We
+show that the proposed HorNet that combines the advantages of both CNNs and vision Transformers
+is a better architecture for various vision tasks.
+
+Hybrid models. Combining vision Transformers and CNNs to develop hybrid architectures is a new
+direction in various visual recognition problems. Recently, several efforts have been made to integrate
+the two types of blocks into a unified model with a sequential [12, 29, 68, 63] or parallel [45, 11]
+design. Many enhanced vision Transformers also use lightweight convolutions in the basic building
+block to efficiently capture neighboring patterns [15, 60, 17] or relax the quadratic complexity of
+self-attention [9, 58, 18]. Different from these hybrid models, we aim to develop a self-attention free
+model while combining the favorable properties of both vision Transformers and CNNs.
+
+3  Method
+
+3.1  gnConv: Recursive Gated Convolutions
+
+In this section, we will present gnConv, an efficient operation to achieve long-term and high-order
+spatial interactions. The gnConv is built with standard convolutions, linear projections and element-
+wise multiplications, but has a similar function of input-adaptive spatial mixing to self-attention.
+
+Input-adaptive interactions with gated convolution.  Recent success in vision Transformers
+mainly depends on the proper modeling of the spatial interactions in visual data. Unlike CNNs
+
+
+                                       3
+
+=== PDF PAGE 4 ===
+that simply use the static convolution kernel to aggregate neighboring features, vision Transformers
+apply multi-head self-attention to dynamically generate the weights to mix spatial tokens. However,
+the quadratic complexity w.r.t. the input size of the self-attention largely hinders the application of
+vision Transformers, especially on downstream tasks including segmentation and detection where
+higher-resolution feature maps are required. In this work, instead of reducing the complexity of
+self-attention like previous methods [42, 9, 57], we seek a more efficient and effective way to perform
+spatial interactions with simple operations like convolution and fully-connected layers.
+The basic operation of our method is the gated convolution (gConv). Let x ∈RHW ×C be the input
+feature, the output of the gated convolution y =gConv(x) can be written as:
+                        [pHW0  ×C , qHW0  ×C ] = ϕin(x) ∈RHW ×2C,
+                                                                                                   (3.1)
+               p1 = f(q0) ⊙p0 ∈RHW ×C,  y = ϕout(p1) ∈RHW ×C,
+
+where ϕin, ϕout are linear projection layers to perform channel mixing and f is a depth-wise con-
+volution. Note that p(i,c)1  = Pj∈Ωi wci→jq(j,c)0    p(i,c)0     , where Ωi is the local window centered at i and
+w represents the convolution weight of f. Therefore, the above formulation explicitly introduce
+interactions among the neighboring features p(i)0  and q(j)0  through the element-wise multiplication.
+We consider the interaction in gConv as 1-order interaction as each p(i)0  has interacted with its
+neighbor feature q(j)0  only once.
+
+High-order interactions with recursive gating.   After achieving an efficient 1-order spatial
+interactions with the gConv, we then design the gnConv, a recursive gated convolution to further
+enhance the model capacity by introducing higher-order interactions. Formally, we first use ϕin to
+obtain a set of projected features p0 and {qk}n−1k=0:
+
+
+                                                                     0≤k≤n−1                                                                                   Ck).     (3.2)        h pHW0  ×C0 , qHW0  ×C0 , . . . , qHWn−1 ×Cn−1 i = ϕin(x) ∈RHW ×(C0+P
+
+We then perform the gated convolution recursively by
+
+                 pk+1 = fk(qk) ⊙gk(pk)/α,    k = 0, 1, . . . , n −1,                  (3.3)
+
+where we scale the output by 1/α to stabilize the training. {fk} are a set of depth-wise convolution
+layers and {gk} are used to match the dimension in different orders:
+
+                                     Identity,           k = 0,
+                        gk =                                                                  (3.4)
+                                Linear (Ck−1, Ck) ,  1 ≤k ≤n −1.
+
+Finally, we feed the output of the last recursion step qn to the projection layer ϕout to obtain the result
+of the gnConv. From the recursive formula Equation (3.3), it is easy to show that the interaction-order
+of pk will be increased by 1 after each step. As a result, we can see that the gnConv achieves
+n-order spatial interactions. It is also worth noting that we need only a single f to perform depth-
+wise convolution to the concatenation of the features {qk}n−1k=0 together instead of computing the
+convolution in each recursive step as in Equation (3.3), which can further simplify the implementation
+and improve the efficiency on GPUs. To ensure that the high-order interactions do not introduce too
+much computational overhead, we set the channel dimension in each order as:
+
+                       C
+                      Ck =             ,    0 ≤k ≤n −1.                            (3.5)
+                              2n−k−1
+This design indicates that we perform the interactions in a coarse-to-fine manner, where lower orders
+are computed with fewer channels. Besides, the channel dimension of ϕin(x) is exactly 2C and the
+total FLOPs can be strictly bounded even with n increasing. It can be proved that (see Appendix A):
+                  FLOPs(gnConv) < HWC(2K2 + 11/3 × C + 2),                    (3.6)
+where K is the kernel size of the depth-wise convolution. Therefore, our gnConv achieves high-order
+interactions with a similar computational cost to a convolutional layer.
+
+Long-term interactions with large kernel convolutions.   Another difference between vision
+Transformers and conventional CNNs is the receptive field. Conventional CNNs [49, 22] often use
+3×3 convolution through the whole network, while vision Transformers calculate self-attention on
+the whole feature maps [16, 52] or inside a relatively large local window (e.g., 7×7). The large
+
+
+                                       4
+
+=== PDF PAGE 5 ===
+                            gnConv                          PyTorch-style code for gnConv                                                                  Proj, C
+                                                                                 class gnconv(nn.Module):
+          MLP                             Mul                     def __init__(self, dim, order, dwtype):
+                                                                                        super().__init__()
+           Layer Norm                             Proj, C                                 self.orderself.dims = =[dimorder// 2 ** i for i in range(order)].reverse()
+                                                                                        self.proj_in = nn.Conv2d(dim, 2*dim, 1)
+  FFN                               Mul                                  self.projsself.dwconv==nn.ModuleList(dwconv(sum(self.dims), type=dwtype)
+                                                                                           [nn.Conv2d(self.dims[i], self.dims[i+1], 1)
+                                               Proj, C/2                                          for i in range(order-1)])
+                                                                                        self.proj_out = nn.Conv2d(dim, dim, 1)
+                                 Mul
+         gnConv                                        (C/4, *)     (C/2, *)         (C, *)           def forward(self,x = self.proj_in(x)x):
+                                       DWConv, 2C-C/4                    y, x = torch.split(x, (self.dims[0], sum(self.dims)), dim=1)
+                                                                                        x = self.dwconv(x)
+           Layer Norm                           (C/4, *)                                         x_list = torch.split(x, self.dims, dim=1)
+                                                              Proj, 2C                           xfor= yi *inx_list[0]range(self.order -1):
+  HorBlock                                                                            x = self.projs[i](x) * x_list[i+1]
+                                                                                   (C, *)                           return self.proj_out(x)
+
+Figure 2: Overview of the basic building block in HorNet with gnConv. We adopt the block design of
+Transformers [56] and replace the self-attention sub-layer with gnConv to develop our HorNet (left). We also
+provide the detailed implementation of g3Conv (middle) and the Pytorch-style code for an arbitrary order (right).
+
+receptive field in vision Transformers makes it easier to capture long-term dependencies, which is
+also recognized as one of the key advantages of vision Transformers. Inspired by this design, there
+are some efforts to introduce large kernel convolutions to CNNs recently [14, 43, 46]. To make our
+gnConv capable of capturing long-term interactions, we adopt two implementations for the depth-wise
+convolution f:
+
+        • 7×7 Convolution. 7×7 is the default window/kernel size of Swin Transformers [42] and
+       ConvNext [43]. Studies in [43] show that the kernel size produces good performance on
+        ImageNet classification and various downstream tasks. We follow this configuration to fairly
+       compare with representative work of vision Transformers and modern CNNs.
+        • Global Filter (GF). The GF layer [46] multiplies the frequency domain features with
+         learnable global filters, which is equivalent to a convolution in the spatial domain with
+        a global kernel size and circular padding. We use a modified version of the GF layer by
+         processing half of the channels with the global filter and the other half with 3×3 depth-wise
+         convolutions and only use GF layers in late stages to preserve more local details.
+
+Spatial interactions in vision models. We review some representative vision model designs from
+the perspective of spatial interactions, as shown in Figure 1. Specifically, we are interested in the
+interactions between a feature xi and its neighboring feature xj, j ∈Ωi. By using the tool designed
+for explaining the interaction effect (IE) in [33, 1], we provide an intuitive analysis of the order of
+explicit spatial interactions in Appendix B. Our analysis reveals a key difference between vision
+Transformers and previous architectures from a new view, i.e., vision Transformers have higher-order
+spatial interactions in each basic block. The result inspires us to explore an architecture that can
+realize more efficient and effective spatial interactions with more than two orders. As discussed
+above, our proposed gnConv can achieve arbitrary-order interactions with bounded complexity. It is
+also worth noting that similar to other scaling factors in deep models like width [69] and depth [22],
+simply increasing the order of spatial interactions without considering the overall model capacity will
+not lead to a good trade-off [51]. In this paper, we focus on developing a stronger visual modeling
+architecture based on the analysis of the spatial interaction orders of well-designed models. We
+believe a more thorough and formal discussion on the high-order spatial interactions can be an
+important future direction.
+
+Relation to dot-product self-attention. Although the computation of our gnConv largely differs
+from dot-product self-attention, we will show that gnConv also accomplishes the goal of input-
+adaptive spatial mixing. Let M be the attention matrix obtained by multi-head self-attention (MHSA),
+we write M as (mcij) since the mixing weight may vary across the channels. The spatial mixing
+result (before the final channel mixing projection) of the c-th channel at location i is
+
+                                        C
+                          x(i,c)MHSA = X mcijv(i,j) = X X mcijw(c′,c)V    x(j,c′),                  (3.7)
+                              j∈Ωi            j∈Ωi c′=1
+
+
+                                       5
+
+=== PDF PAGE 6 ===
+where wV is the weight of the V-projection layer. Note that mij obtained by the dot-product operation
+contains 1-order interaction. On the other hand, the output of our gnConv (before the ϕout) can be
+written as
+
+                     C                           C
+     x(i,c)gnConv = p(i,c)n  = X X wcn−1,i→jg(i,c)n−1w(c′,c)ϕin   x(j,c′) ≜ X X hcijw(c′,c)ϕin   x(j,c′),     (3.8)
+                     j∈Ωi c′=1                             j∈Ωi c′=1
+
+where wn−1 is the convolutional weight for fn−1, wϕin is the linear weight of ϕin, and gn−1 =
+gn−1(pn−1) is a projection of pn−1. From the formulation in Equation (3.8) we find our gnConv also
+achieves input-adaptive spatial mixing with {hcij} as the weights. Observing that hij is computed
+from pn−1 which contains n −1 order interactions, we can regard our gnConv as an extension of the
+self-attention in terms of the order of the spatial mixing weight. Therefore, our gnConv can better
+model more complex spatial interactions.
+The details of gnConv and our implementation are summarized in Figure 2.
+
+3.2  Model Architectures
+
+HorNet. The gnConv can be a drop-in replacement of the spatial mixing layer in vision Transform-
+ers [52, 42] or modern CNNs [43]. We follow the same meta-architecture as [56, 42] to construct
+HorNet, where the basic block contains a spatial mixing layer and a feed-forward network (FFN).
+Depending on the model size and the implementation of the depth-wise convolution fk in our gnConv,
+we have two series of model variants named HorNet-T/S/B/L7×7 and HorNet-T/S/B/LGF. We con-
+sider the popular Swin Transformer [42] and ConvNeXt [43] as the vision Transformer and CNN
+baselines since our models are implemented based on a convolution-based framework while having
+high-order interactions like vision Transformers. To fairly compare with the baselines, we directly
+follow the number of blocks of Swin Transformers-S/B/L [42] but insert an extra block to the stage 2
+to make the overall complexity close, resulting in [2, 3, 18, 2] blocks in each stage in all of the model
+variants. We simply adjust the base number of channels C to construct models with different sizes
+and set the number of channels in 4 stages as [C, 2C, 4C, 8C] following common practice. We use
+C = 64, 96, 128, 192 for HorNet-T/S/B/L, respectively. We set the interaction orders (i.e., the n in
+gnConv) for each stage as 2,3,4,5 by default, such that the channels of the coarsest order C0 is the
+same across different stages.
+
+HorFPN. Apart from using gnConv in visual encoders, we find our gnConv can be an enhanced
+alternative for standard convolution that considers higher-order spatial interactions in a wide range of
+convolution-based models. Thus, we replace spatial convolutions for feature fusion in the FPN [37]
+with our gnConv to improve spatial interactions for downstream tasks. Specifically, we add our
+gnConv after the fusion of features from different pyramid levels. For object detection, we replace
+the 3×3 convolution after the top-down pathway with the gnConv in each level. For semantic
+segmentation, we simply replace the 3×3 convolution after the concatenation of the multi-level
+feature maps with gnConv since the final results are directly predicted from this concatenated feature.
+We also have two implementations called HorFPN7×7 and HorFPNGF decided by the choice of fk.
+
+4  Experiments
+
+We conduct extensive experiments to verify the effectiveness of our method. We present the main
+results on ImageNet [13] and compare them with various architectures. We also test our models
+on the downstream dense prediction tasks on commonly used semantic segmentation benchmark
+ADE20K [71] and object detection dataset COCO [38]. Lastly, we provide ablation studies of our
+designs and analyze the effectiveness of gnConv on a wide range of models.
+
+4.1  ImageNet Classification
+
+Setups. We conduct image classification experiments on the widely used ImageNet [13] dataset. We
+train our HorNet-T/S/B models using the standard ImageNet-1K dataset following common practice.
+To fairly compare with previous work, we directly use the training configurations of [43, 42, 52]
+to train our models. We train the models for 300 epochs with 224 × 224 input. To evaluate the
+scaling ability of our designs, we further train the HorNet-L models on the ImageNet-22K dataset
+that contains over 10× images and more categories. We follow previous practice [42, 43] to train
+our models for 90 epochs and use a similar data augmentation strategy as ImageNet-1K experiments.
+
+
+                                       6
+
+=== PDF PAGE 7 ===
+Table 1: ImageNet classification results. We compare our models with state-of-the-art vision Transformers
+and CNNs that have comparable FLOPs and parameters. We report the top-1 accuracy on the validation set
+of ImageNet as well as the number of parameters and FLOPs. We also show the improvements over Swin
+Trasnformers that have similar overall architectures and training configurations to our models. “↑384” indicates
+that the model is fine-tuned on 384×384 images for 30 epochs. Our models are highlighted in gray.
+                          Image   Params FLOPs Top-1                                Image   Params FLOPs Top-1
+ Model                       Size    (M)    (G)    Acc. (%)     Model                       Size    (M)    (G)    Acc. (%)
+
+  ImageNet-1K trained models                                    ImageNet-1K trained models (fine-tuned at 384×384)
+  EfficientNet-B4 [51]         3802    19      4.2     82.9        Swin-B↑384 [42]           3842    89     47.1    84.5
+  EfficientNet-B5 [51]         4562    30      9.9     83.6        ConvNeXt-B↑384 [43]       3842    88     45.0     85.1(+0.6)
+  EfficientNet-B6 [51]         5282    43     19.0    84.0         HorNet-B7×7↑384          3842    87     45.8     85.3(+0.8)
+  EfficientNetV2-S [51]       3002    24      8.8     83.9        HorNet-BGF↑384           3842    92     45.4     85.6(+1.1)
+ RepLKNet-31B [14]         2242    79     15.3    83.5
+ VAN-B [19]                2242    27      5.0     82.8         ImageNet-22K trained models (fine-tuned to ImageNet-1K)
+ VAN-L [19]                2242    45      9.0     83.9                                                            R-101x3 [30]               3842    388    204.6   84.4
+ CSWin-T [15]              2242    23      4.3     82.7                                                            R-152x4 [30]               4802    937    840.5   85.4
+ CSWin-S [15]              2242    35      6.9     83.6                                                                ViT-B/16 [16]              3842    87     55.5    84.0
+ CSWin-B [15]              2242    78     15.0    84.2                                                                 ViT-L/16 [16]              3842    305    191.1   85.2
+  Swin-T [42]                2242    28      4.5     81.3          EfficientNetV2-L [51]       3802    121    53.0    86.8
+ ConvNeXt-T [43]           2242    29      4.5      82.1(+0.7)     CSWin-L [15]              3842    173    96.8    87.5
+  HorNet-T7×7               2242    22      4.0      82.8(+1.5)     SwinV2-L [41]             3842    197    115.4   87.6
+  HorNet-TGF               2242    23      3.9      83.0(+1.7)     RepLKNet-31L [14]         3842    172    96.0    86.6
+  Swin-S [42]                2242    50      8.7     83.0         Swin-L [42]                2242    197    34.5    86.3
+ ConvNeXt-S [43]           2242    50      8.7      83.1(+0.1)     ConvNeXt-L [43]           2242    198    34.4     86.6(+0.3)
+  HorNet-S7×7               2242    50      8.8      83.8(+0.8)     HorNet-L7×7               2242    195    34.8     86.8(+0.5)
+  HorNet-SGF                2242    50      8.7      84.0(+1.0)     HorNet-LGF               2242    196    34.6     87.0(+0.7)
+  Swin-B [42]                2242    89     15.4    83.5         Swin-L↑384 [42]            3842    197    103.9   87.3
+ ConvNeXt-B [43]           2242    88     15.4     83.8(+0.3)     ConvNeXt-L↑384 [43]       3842    198    101.0   87.5(+0.2)
+  HorNet-B7×7               2242    87     15.6     84.2(+0.7)     HorNet-L7×7↑384           3842    195    102.3   87.6(+0.3)
+ HorNet-BGF               2242    88     15.5     84.3(+0.8)     HorNet-LGF↑384           3842    202    101.8   87.7(+0.4)
+
+
+We fine-tune the models pre-trained on ImageNet-22K or at the 224×224 resolution to ImageNet-1K
+or/and 384×384 resolution for 30 epochs following [43]. When adapting the ImageNet-22K models
+to ImageNet-1K, we initialize the classifier with the pre-trained class centers to stabilize the training
+process. More details can be found in Appendix C.
+
+Results. The results of our ImageNet classification experiments are summarized in Table 1. We see
+that our models achieve very competitive performance with state-of-the-art vision Transformers and
+CNNs. Notably, HorNet surpasses Swin Transformers and ConvNeXt which have similar overall
+architectures and training configurations by a healthy margin on various model sizes and settings.
+Our models also generalize well to a larger image resolution, larger model sizes and more training
+data. These results clearly demonstrate the effectiveness and generality of our designs.
+
+4.2  Dense Prediction Tasks
+
+HorNet for semantic segmentation. We evaluate our HorNet for semantic segmentation task on
+ADE20K [71] dataset using the commonly used UperNet [62] framework. All the models are trained
+for 160k iterations using AdamW [44] optimizer with a global batch size of 16. The image size during
+training is 512 × 512 for ImagNet-1k (HorNet-T/S/B) pre-trained models and 640 × 640 for the
+ImageNet-22K pre-trained models (HorNet-L). The results are summarized in the left part of Table 2,
+where we report both the single-scale (SS) and multi-scale (MS) mIoU on the validation set. Both our
+HorNet7×7 and HorNetGF models outperform Swin [42] and ConvNeXt [43] models with similar
+model sizes and FLOPs. Specifically, HorNetGF models achieve better results than HorNet7×7 and
+ConvNeXt series by large margins in single-scale mIoU, indicating the global interactions captured
+by the global filter are helpful for semantic segmentation. Notably, we find both our HorNet-L7×7
+and HorNet-LGF even outperform ConvNeXt-XL with ∼25% fewer FLOPs. These results clearly
+demonstrate the effectiveness and scalability of our HorNet on semantic segmentation.
+
+HorNet for object detection. We also evaluate our models on the COCO [38] dataset. We adopt
+the cascade Mask R-CNN framework [21, 2] to perform object detection and instance segmentation
+using HorNet-T/S/B/L backbones. Following Swin [42] and ConvNeXt [43], we use 3× schedule
+with multi-scale training. The right part of Table 2 compares the box AP and mask AP of our HorNet
+models and Swin/ConvNeXt models. Similarly, we show our HorNet models achieve consistently
+and significantly better performance than the Swin/ConvNeXt counterparts, in both box AP and mask
+AP. The HorNetGF series obtain +1.2∼2.0 box AP and +1.0∼1.9 mask AP compared with ConvNeXt.
+
+
+                                       7
+
+=== PDF PAGE 8 ===
+Table 2: Object detection and semantic segmentation results with different backbones. We use UperNet [62]
+for semantic segmentation and Cascade Mask R-CNN [2] for object detection. ‡ indicates that the model is
+pre-trained on ImageNet-22K. For semantic segmentation, we report both single-scale (SS) and multi-scale (MS)
+mIoU. The FLOPs are calculated with image size (2048, 512) for ImageNet-1K pre-trained models and (2560,
+640) for ImageNet-22K pre-trained models. For object detection, we report the box AP and the mask AP. FLOPs
+are measured on input sizes of (1280, 800). Our models are highlighted in gray.
+                                 Semantic Segmentation with UperNet 160K         Object Detection with Cascade Mask R-CNN 3×
+  Backbone
+                             mIoUss     mIoUms     Params     FLOPs      APbox      APmask      Params     FLOPs
+
+  Swin-T [42]                     44.5         45.8      60M       945G        50.4         43.7      86M       745G
+  ConvNeXt-T [43]                46.0         46.7      60M       939G        50.4         43.7      86M       741G
+  HorNet-T7×7                    48.1         48.9      52M       926G        51.7         44.8      80M       730G
+  HorNet-TGF                    49.2         49.3      55M       924G        52.4         45.6      80M       728G
+
+  Swin-S [42]                     47.6         49.5      81M      1038G        51.9         45.0      107M      838G
+  ConvNeXt-S [43]                48.7         49.6      82M      1027G        51.9         45.0      108M      827G
+  HorNet-S7×7                    49.2         49.8      81M      1030G        52.7         45.6      107M      830G
+  HorNet-SGF                    50.0         50.5      85M      1027G        53.3         46.3      108M      827G
+
+  Swin-B [42]                     48.1         49.7      121M      1188G        51.9         45.0      145M      982G
+  ConvNeXt-B [43]                49.1         49.9      122M      1170G        52.7         45.6      146M      964G
+  HorNet-B7×7                    50.0         50.5      121M      1174G        53.3         46.1      144M      969G
+  HorNet-BGF                    50.5         50.9      126M      1171G        54.0         46.9      146M      965G
+
+  Swin-L‡ [42]                    52.1         53.5      234M      2468G        53.9         46.7      253M      1382G
+  ConvNeXt-L‡ [43]               53.2         53.7      235M      2458G        54.8         47.6      255M      1354G
+  ConvNeXt-XL‡ [43]             53.6         54.0      391M      3335G        55.2         47.7      407M      1898G
+  HorNet-L‡7×7                    54.1         54.5      232M      2473G        55.4         48.0      251M      1363G
+  HorNet-L‡GF                    55.0         55.2      239M      2465G        56.0         48.6      259M      1358G
+
+Table 3: Comparisons of HorFPN with standard FPN on different backbones. We use UperNet 160K and
+Mask R-CNN 1× schedule for semantic segmentation and object detection, respectively. We find our HorFPN
+consistently outperforms standard FPN with various of backbones on both the two tasks.
+  Backbone         Fusion           Semantic Segmentation with UperNet 160K              Object Detection with Mask R-CNN 1×
+                 Module       mIoUss     mIoUms     Params     FLOPs      APbox      APmask      Params     FLOPs
+
+              FPN [37]        40.7         41.8      66M       947G        38.2         34.7      44M       260G
+  ResNet-50 [22]   HorFPN7×7      41.8         44.1      60M       499G        38.7         35.1      43M       226G
+                HorFPNGF       43.2         44.5      60M       497G        39.1         35.5      43M       224G
+
+              FPN [37]        42.9         44.0      85M      1025G        40.0         36.1      63M       336G
+  ResNet-101 [22]  HorFPN7×7      44.1         45.5      79M       577G        40.3         36.4      62M       302G
+                HorFPNGF       44.5         46.4      79M       574G        40.5         36.7      62M       300G
+
+              FPN [37]        47.6         49.5      81M      1038G        45.5         40.9      69M       354G
+  Swin-S [42]      HorFPN7×7      48.0         49.2      74M       580G        46.3         41.1      68M       325G
+                HorFPNGF       49.0         49.9      75M       578G        46.8         41.9      69M       323G
+
+              FPN [37]        49.2         49.8      81M      1030G        47.1         42.2      69M       351G
+  HorNet-S       HorFPN7×7      49.4         50.1      74M       577G        47.4         42.3      68M       322G
+                HorFPNGF       49.7         50.3      75M       575G        47.7         42.4      68M       321G
+
+
+Again, our large model HorNet-L7×7 and HorNetGF can outperform ConvNeXt-XL, which further
+validates the favorable transferability with a larger model size and larger pre-trained dataset.
+
+HorFPN for dense prediction. We  Table 4: Object detection results with recent state-of-the-art
+now show another application of the  frameworks. We report the single-scale APbox and APmask on the
+proposed gnConv, i.e., to serve as a   validation set of COCO. Our models are highlighted in gray.
+better fusion module that can better
+capture the higher-order interactions         Backbone           Framework        APbox       APmask
+among different levels of features in        Swin-L [42]        HTC++ [3]          57.1          49.5
+dense prediction tasks.  Specifically,      ViT-Adapter-LHorNet-LGF[5]      HTC++HTC++ [3][3]          58.157.9          50.550.2
+we directly modify the FPN [37] as de-                                                 Swin-L [42]        DINO [70]           58.5               -
+scribed in Section 3.2 in UperNet [62]        HorNet-LGF        DINO [70]           59.2               -
+and Mask R-CNN [21] for semantic
+segmentation and object detection, re-  Table 5: Semantic Segmentation results with recent state-of-the-
+spectively.We show the results in Ta-  art frameworks. We report the single-scale (SS) and multi-scale
+ble 3, where we compare the perfor-  (MS) mIoU on the validation set of ADE20K. Our models are
+                                           highlighted in gray.mance of our HorFPN and standard
+FPN on different backbones includ-         Backbone           Framework        mIoUss      mIoUms
+ing ResNet-50/101 [22], Swin-S [42]        Swin-L [42]       Mask2Former [7]        56.1          57.3
+and HorNet-S7×7. For semantic seg-     Swin-L-FaPNHorNet-LGF[27]     Mask2FormerMask2Former [7][7]        56.457.5          57.757.9
+mentation, we find our HorFPN can
+significantly reduce the FLOPs (∼50%) while achieving better validation mIoU. For object detection,
+
+
+                                       8
+
+=== PDF PAGE 9 ===
+ Table 6: Ablation study and results of applying gnConv to other models/operations. We provide
+ the ablation study of our designs in (a). [*] indicates the baseline of our model. The baseline and
+ our final models are highlighted in gray. In (b) and (c), we apply the proposed gnConv to isotropic
+ models that have a similar level of complexity with ViT/DeiT-S [16, 52] and other spatial mixing
+ operations including the 3×3 depth-wise convolution and 3×3 pooling used in [67].
+                         (a) Ablation study.                                 (b) Results on isotropic models.
+  Model                            Params  FLOPs   Acc. (%)      Model              FLOPs   Acc. (%)
+  Swin-T [42]                  28M     4.5G      81.3(+0.1)       DeiT-S [52]             4.6G      79.8
+    - Self-Attention + DWConv7×7 [*]    29M     4.5G     81.2         ConvNeXt-S (iso.) [43]   4.3G      79.7
+  + SE [25]                    30M     4.5G      81.5(+0.3)      HorNet-S7×7 (iso.)       4.5G      80.6
+    - SE + g{1,1,1,1}Conv             28M     4.3G      81.7(+0.5)      HorNet-SGF (iso.)       4.5G      81.0
+  + g{2,2,2,2}Conv                28M     4.3G      82.2(+1.0)
+  + g{3,3,3,3}Conv                28M     4.3G      82.5(+1.3)            (c) gnConv for other operations.
+  + g{4,4,4,4}Conv                28M     4.3G      82.5(+1.3)
+                                                            Model              FLOPs   Acc. (%)  + g{1,2,3,4}Conv                28M     4.3G      82.5(+1.3)
+  + g{2,3,4,5}Conv                28M     4.3G      82.6(+1.4)     DWConv3×3            4.0G      80.7
+  + Deeper & Narrower (HorNet-T7×7)  22M     4.0G      82.8(+1.6)      gnConv3×3              3.9G      82.1
+  + Global Filters [46] (HorNet-TGF)   23M     3.9G      83.0(+1.8)       Pool [67]               3.9G      78.1
+                                                                     gnConvpool              3.8G      79.3  ConvNeXt [43]                28M     4.5G      82.1(+0.9)
+
+     84.5                                          HorNet-B  84.5                                         HorNet-B  84.5          (a)                                             (b)                                                (c)                                  HorNet-B
+(%) 84.0                     HorNet-S           ConvNeXt-B 84.0                    HorNet-S           ConvNeXt-B  84.0                      HorNet-S                                                                                                                                                  ConvNeXt-B
+                                                                      83.5Acc 83.5                                                                          ConvNeXt-S                  Swin-B   83.5                                           Swin-B                     ConvNeXt-S                    Swin-B
+
+              HorNet-T                                                                      HorNet-TTop-1 83.082.5                     Swin-S                             83.0                      Swin-S                            83.0  HorNet-T   ConvNeXt-S  Swin-S                                                                      82.5                                                                                                                                      82.5
+
+     82.0 ConvNeXt-T                                              Swin                                                                      82.0 ConvNeXt-T                           Swin         82.0 ConvNeXt-T                           Swin
+     81.5                                    ConvNeXt    81.5                                    ConvNeXt    81.5                                    ConvNeXtImageNet             Swin-T                        HorNet                  Swin-T                        HorNet                   Swin-T                        HorNet
+     81.0                                                            81.0                                                            81.0
+          20    30    40    50    60    70    80    90              4      6      8      10     12     14     16             150       200       250       300       350
+                  Params (M)                             FLOPs (G)                              Latency (ms)
+
+ Figure 3: Comparisons of trade-offs of Swin, ConvNeXt and HorNet. We compare the trade-offs of the
+ models via the top-1 accuracy on ImageNet w.r.t. (a) number of parameters; (b) FLOPs; (c) latency. The latency
+ is measured with a single NVIDIA RTX 3090 GPU with a batch size of 128.
+
+ our HorFPN can also outperform standard FPN in terms of both box AP and mask AP on different
+ backbones with about 30G fewer FLOPs. Besides, we observe that the HorFPNGF is consistently
+ better than HorFPN7×7, indicating that global interactions are also important when fusing hierarchical
+ features.
+
+ Results with state-of-the-art frameworks. To further show the effectiveness our backbone, we
+ conduct experiments to combine our large HorNet model with recent state-of-the-art dense prediction
+ frameworks including HTC++ [3], DINO [70] and Mask2Former [7]. For HTC++ and DINO, we
+ train our models on COCO for 36 epochs (3× schedule) and does not introduce extra pre-training data
+ like Object365 in [70]. We report the single-scale performance on the validation set and compared
+ with several state-of-the-art methods in Table 4. For Mask2Former, we train our models on ADE20K
+ with 640 × 640. We report the mIoU of both single-scale and multi-scale testing on the validation set
+ in Table 5.
+
+ 4.3  Analysis
+
+ Ablation study. We provide detailed ablation studies of the gnConv and our HorNet in Table 6. We
+ first study the model designs of our HorNet in Table 6a. Our baseline ([*]) is obtained by simply
+ replacing the self-attention with 7×7 depth-wise convolution in Swin-T [42]. We first show that
+ both SE [25] and our gnConv with n = 1 (g{1,1,1,1}Conv) can improve over the baseline model [*],
+ and g{1,1,1,1}Conv is slightly better. We then perform ablations on the interaction order n for each
+ stage and find: (1) if n is shared across the 4 stages, the accuracy will increase with larger n but
+ saturate at 82.5 when n = 4; (2) progressively increased order (g{2,3,4,5}Conv) can further improve the
+ accuracy. Our final models are built on g{2,3,4,5}Conv by adjusting the depth and width of the networks
+ (HorNet-T7×7) and applying Global Filter [46] for the depth-wise convolution (HorNet-TGF). These
+ results clearly show that our gnConv is an efficient and extendable operation that can better capture
+ high-order spatial interactions than both self-attention and depth-wise convolution.
+
+
+                                        9
+
+=== PDF PAGE 10 ===
+Figure 4: Visualization of the adaptive weights generated by gnConv. We see that the spatial mixing weights of
+our gnConv are adaptive both to input samples and spatial locations, which further indicates that gnConv shares
+these two desirable characteristics with the self-attention operation.
+
+gnConv for isotropic models. We also evaluate gnConv on isotropic architectures (with constant
+spatial resolutions). We replace the self-attention in DeiT-S [52] with our gnConv and adjust the
+number of blocks to 13 to obtain the isotropic HorNet-S7×7 and HorNet-SGF. We compare DeiT-S,
+isotropic ConvNeXt-S and isotropic HorNet-S in Table 6b. While isotropic ConvNeXt-S cannot
+improve DeiT-S, our isotropic HorNet surpasses DeiT-S by a large margin. These results indicate that
+our gnConv can better realize the functions of self-attention compared to plain convolutions and have
+better ability to model the complex spatial interactions.
+
+gnConv for other operations. To further demonstrate the universality of gnConv, we use 3×3
+depth-wise convolution and 3×3 pooling [67] as the basic operation in the gnConv. The results in
+Table 6c show that gnConv can also improve these two operations by large margins, indicating our
+gnConv is potentially more powerful when equipped with some better basic operations.
+
+Accuracy-complexity trade-offs. We visualize accuracy-complexity trade-offs of Swin, ConvNeXt
+and HorNet series in Figure 3. For fair comparisons, we fix the input image size to 224 × 224 and use
+HorNet7×7 such that all the compared models are based on 7×7 local window. We see HorNet can
+achieve better trade-offs than the representative vision Transformers and modern CNNs with regards
+to model size, FLOPs and GPU latency.
+
+Visualization.  We provide some visualizations of the adaptive weights learned by gnConv in
+Figure 4. For each sample, we show the value of C1 PCc=1 hcij (see Equation (3.8) or the definition
+of hcij) for two random spatial locations i from layer {1, 3, 5, 7, 8, 12} of the isotropic HorNet-S
+model. Figure 4 demonstrates that the spatial mixing weights of our gnConv are adaptive both to
+input samples and spatial locations, which further indicates that gnConv shares these two desirable
+characteristics with the self-attention operation.
+
+Limitations. While HorNet shows better overall latency-accuracy trade-offs, we notice that HorNet
+is slower than ConvNeXt with similar FLOPs on GPU, which may be caused by the more complex
+designs to perform the high-order interactions. We think that developing a more hardware-friendly
+operation for high-order spatial interactions is an interesting future direction to improve our work.
+
+5  Conclusion
+
+We have presented the Recursive Gated Convolution (gnConv) that performs efficient, extendable, and
+translation-equivariant high-order spatial interactions with gated convolutions and recursive deigns.
+gnConv can serve as a drop-in replace of the spatial mixing layer in various vision Transformers and
+convolution-based models. Based on the operation, we have constructed a new family of generic
+vision backbones HorNet. Extensive experiments demonstrate the effectiveness of gnConv and
+HorNet on commonly used visual recognition benchmarks. We hope our attempt can inspire future
+work to further explore the high-order spatial interactions in vision models.
+
+
+Acknowledgments
+
+Jiwen Lu was supported in part by the National Key Research and Development Program of China
+under Grant 2017YFA0700802, the National Natural Science Foundation of China under Grant
+62125603 and Grant U1813218, and a grant from the Beijing Academy of Artificial Intelligence
+(BAAI).
+
+
+                                       10
+
+=== PDF PAGE 11 ===
+References
+
+ [1] Chunrong Ai and Edward C Norton. Interaction terms in logit and probit models. Economics letters,
+     80(1):123–129, 2003. 5, 15
+
+ [2] Zhaowei Cai and Nuno Vasconcelos. Cascade r-cnn: Delving into high quality object detection. In CVPR,
+     pages 6154–6162, 2018. 7, 8, 17
+
+ [3] Kai Chen, Jiangmiao Pang, Jiaqi Wang, Yu Xiong, Xiaoxiao Li, Shuyang Sun, Wansen Feng, Ziwei Liu,
+     Jianping Shi, Wanli Ouyang, et al. Hybrid task cascade for instance segmentation.  In CVPR, pages
+     4974–4983, 2019. 8, 9
+
+ [4] Yinpeng Chen, Xiyang Dai, Mengchen Liu, Dongdong Chen, Lu Yuan, and Zicheng Liu. Dynamic
+     convolution: Attention over convolution kernels. In CVPR, pages 11030–11039, 2020. 2
+
+ [5] Zhe Chen, Yuchen Duan, Wenhai Wang, Junjun He, Tong Lu, Jifeng Dai, and Yu Qiao. Vision transformer
+     adapter for dense predictions. arXiv preprint arXiv:2205.08534, 2022. 8
+
+ [6] Bowen Cheng, Ishan Misra, Alexander G Schwing, Alexander Kirillov, and Rohit Girdhar. Masked-
+      attention mask transformer for universal image segmentation. arXiv preprint arXiv:2112.01527, 2021.
+    1
+
+ [7] Bowen Cheng, Ishan Misra, Alexander G Schwing, Alexander Kirillov, and Rohit Girdhar. Masked-
+      attention mask transformer for universal image segmentation. In CVPR, pages 1290–1299, 2022.  8,
+    9
+
+ [8] Bowen Cheng, Alex Schwing, and Alexander Kirillov. Per-pixel classification is not all you need for
+     semantic segmentation. NeurIPS, 34, 2021. 1
+
+ [9] Xiangxiang Chu, Zhi Tian, Yuqing Wang, Bo Zhang, Haibing Ren, Xiaolin Wei, Huaxia Xia, and Chunhua
+     Shen. Twins: Revisiting the design of spatial attention in vision transformers. NeurIPS, 34, 2021. 3, 4
+
+[10] Ekin D Cubuk, Barret Zoph, Jonathon Shlens, and Quoc V Le. Randaugment: Practical automated data
+     augmentation with a reduced search space. In CVPRW, pages 702–703, 2020. 16
+
+[11] Yutao Cui, Jiang Cheng, Limin Wang, and Gangshan Wu. Mixformer: End-to-end tracking with iterative
+    mixed attention. CVPR, 2022. 3
+
+[12] Zihang Dai, Hanxiao Liu, Quoc V Le, and Mingxing Tan. Coatnet: Marrying convolution and attention for
+       all data sizes. NeurIPS, 34:3965–3977, 2021. 1, 3
+
+[13]  Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li Fei-Fei. Imagenet: A large-scale hierarchical
+     image database. In CVPR, pages 248–255, 2009. 2, 6, 16, 17
+
+[14] Xiaohan Ding, Xiangyu Zhang, Yizhuang Zhou, Jungong Han, Guiguang Ding, and Jian Sun. Scaling up
+     your kernels to 31x31: Revisiting large kernel design in cnns. CVPR, 2022. 2, 3, 5, 7
+
+[15] Xiaoyi Dong, Jianmin Bao, Dongdong Chen, Weiming Zhang, Nenghai Yu, Lu Yuan, Dong Chen, and
+     Baining Guo. Cswin transformer: A general vision transformer backbone with cross-shaped windows.
+    CVPR, 2022. 3, 7
+
+[16] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas
+     Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, Jakob Uszkoreit, and
+     Neil Houlsby. An image is worth 16x16 words: Transformers for image recognition at scale. arXiv preprint
+     arXiv:2010.11929, 2020. 1, 3, 4, 7, 9
+
+[17] Stéphane d’Ascoli, Hugo Touvron, Matthew L Leavitt, Ari S Morcos, Giulio Biroli, and Levent Sagun.
+     Convit: Improving vision transformers with soft convolutional inductive biases. In ICML, pages 2286–2296,
+     2021. 3
+
+[18] Haoqi Fan, Bo Xiong, Karttikeya Mangalam, Yanghao Li, Zhicheng Yan, Jitendra Malik, and Christoph
+     Feichtenhofer. Multiscale vision transformers. In ICCV, pages 6824–6835, 2021. 1, 3
+
+[19] Meng-Hao Guo, Cheng-Ze Lu, Zheng-Ning Liu, Ming-Ming Cheng, and Shi-Min Hu. Visual attention
+     network. arXiv preprint arXiv:2202.09741, 2022. 3, 7
+
+[20] Qi Han, Zejia Fan, Qi Dai, Lei Sun, Ming-Ming Cheng, Jiaying Liu, and Jingdong Wang. Demystifying
+      local vision transformer: Sparse connectivity, weight sharing, and dynamic weight.  arXiv preprint
+     arXiv:2106.04263, 2021. 2, 3
+
+[21] Kaiming He, Georgia Gkioxari, Piotr Dollar, and Ross Girshick. Mask r-cnn. In ICCV, 2017. 7, 8
+
+[22] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition.
+     In CVPR, pages 770–778, 2016. 1, 4, 5, 8, 16
+
+[23] Sepp Hochreiter and Jürgen Schmidhuber. Long short-term memory. Neural computation, 9(8):1735–1780,
+     1997. 16
+
+
+                                       11
+
+=== PDF PAGE 12 ===
+[24] Andrew G Howard, Menglong Zhu, Bo Chen, Dmitry Kalenichenko, Weijun Wang, Tobias Weyand, Marco
+     Andreetto, and Hartwig Adam. Mobilenets: Efficient convolutional neural networks for mobile vision
+      applications. arXiv preprint arXiv:1704.04861, 2017. 1
+
+[25]  Jie Hu, Li Shen, and Gang Sun. Squeeze-and-excitation networks. In CVPR, pages 7132–7141, 2018. 2, 9,
+    18
+
+[26] Gao Huang, Yu Sun, Zhuang Liu, Daniel Sedra, and Kilian Q Weinberger. Deep networks with stochastic
+     depth. In ECCV, pages 646–661, 2016. 17
+
+[27] Shihua Huang, Zhichao Lu, Ran Cheng, and Cheng He. Fapn: Feature-aligned pyramid network for dense
+     image prediction. In ICCV, pages 864–873, 2021. 8
+
+[28] Xu Jia, Bert De Brabandere, Tinne Tuytelaars, and Luc V Gool. Dynamic filter networks. NeurIPS, 29,
+     2016. 2
+
+[29] Zihang Jiang, Qibin Hou, Li Yuan, Daquan Zhou, Xiaojie Jin, Anran Wang, and Jiashi Feng. Token
+      labeling: Training a 85.5% top-1 accuracy vision transformer with 56m parameters on imagenet. arXiv
+     preprint arXiv:2104.10858, 2021. 3
+
+[30] Alexander Kolesnikov, Lucas Beyer, Xiaohua Zhai, Joan Puigcerver, Jessica Yung, Sylvain Gelly, and Neil
+     Houlsby. Big transfer (bit): General visual representation learning. In ECCV, pages 491–507. Springer,
+     2020. 7
+
+[31] Alex Krizhevsky, Ilya Sutskever, and Geoffrey E Hinton. Imagenet classification with deep convolutional
+     neural networks. NeurIPS, 25:1097–1105, 2012. 1
+
+[32] Yann LeCun, Bernhard Boser, John S Denker, Donnie Henderson, Richard E Howard, Wayne Hubbard, and
+    Lawrence D Jackel. Backpropagation applied to handwritten zip code recognition. Neural computation,
+     1(4):541–551, 1989. 1
+
+[33] Samuel Lerman, Charles Venuto, Henry Kautz, and Chenliang Xu. Explaining local, global, and higher-
+     order interactions in deep learning. In ICCV, pages 1224–1233, 2021. 5, 15
+
+[34] Yanghao Li, Hanzi Mao, Ross Girshick, and Kaiming He. Exploring plain vision transformer backbones
+      for object detection. arXiv preprint arXiv:2203.16527, 2022. 2
+
+[35] Yanghao Li, Chao-Yuan Wu, Haoqi Fan, Karttikeya Mangalam, Bo Xiong, Jitendra Malik, and Christoph
+      Feichtenhofer. Mvitv2: Improved multiscale vision transformers for classification and detection. In CVPR,
+     pages 4804–4814, 2022. 17, 18
+
+[36] Tsung-Yi Lin, Piotr Dollár, Ross Girshick, Kaiming He, Bharath Hariharan, and Serge Belongie. Feature
+     pyramid networks for object detection. In CVPR, pages 2117–2125, 2017. 3
+
+[37] Tsung-Yi Lin, Piotr Dollár, Ross Girshick, Kaiming He, Bharath Hariharan, and Serge Belongie. Feature
+     pyramid networks for object detection. In CVPR, pages 2117–2125, 2017. 6, 8
+
+[38] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays, Pietro Perona, Deva Ramanan, Piotr Dollár,
+     and C Lawrence Zitnick. Microsoft coco: Common objects in context. In ECCV, pages 740–755. Springer,
+     2014. 2, 6, 7
+
+[39] Hanxiao Liu, Zihang Dai, David So, and Quoc V Le. Pay attention to mlps. NeurIPS, 34:9204–9215, 2021.
+    16
+
+[40] Kai Liu, Tianyi Wu, Cong Liu, and Guodong Guo. Dynamic group transformer: A general vision
+     transformer backbone with dynamic group attention. IJCAI, 2022. 18
+
+[41] Ze Liu, Han Hu, Yutong Lin, Zhuliang Yao, Zhenda Xie, Yixuan Wei, Jia Ning, Yue Cao, Zheng Zhang,
+     Li Dong, et al. Swin transformer v2: Scaling up capacity and resolution. arXiv preprint arXiv:2111.09883,
+     2021. 1, 7
+
+[42] Ze Liu, Yutong Lin, Yue Cao, Han Hu, Yixuan Wei, Zheng Zhang, Stephen Lin, and Baining Guo. Swin
+     transformer: Hierarchical vision transformer using shifted windows. arXiv preprint arXiv:2103.14030,
+     2021. 1, 2, 3, 4, 5, 6, 7, 8, 9, 16, 17
+
+[43] Zhuang Liu, Hanzi Mao, Chao-Yuan Wu, Christoph Feichtenhofer, Trevor Darrell, and Saining Xie. A
+     convnet for the 2020s. CVPR, 2022. 2, 3, 5, 6, 7, 8, 9, 16, 17
+
+[44] Ilya Loshchilov and Frank  Hutter.   Decoupled weight decay  regularization.   arXiv  preprint
+     arXiv:1711.05101, 2017. 7, 17
+
+[45] Xuran Pan, Chunjiang Ge, Rui Lu, Shiji Song, Guanfu Chen, Zeyi Huang, and Gao Huang. On the
+      integration of self-attention and convolution. arXiv preprint arXiv:2111.14556, 2021. 3
+
+[46] Yongming Rao, Wenliang Zhao, Zheng Zhu, Jiwen Lu, and Jie Zhou. Global filter networks for image
+      classification. In NeurIPS, 2021. 2, 3, 5, 9
+
+[47] Tal Ridnik, Emanuel Ben-Baruch, Asaf Noy, and Lihi Zelnik-Manor. Imagenet-21k pretraining for the
+     masses. arXiv:2104.10972, 2021. 17
+
+
+                                       12
+
+=== PDF PAGE 13 ===
+[48] Carlos Riquelme, Joan Puigcerver, Basil Mustafa, Maxim Neumann, Rodolphe Jenatton, André Su-
+     sano Pinto, Daniel Keysers, and Neil Houlsby. Scaling vision with sparse mixture of experts. NeurIPS, 34,
+     2021. 1
+
+[49] Karen Simonyan and Andrew Zisserman. Very deep convolutional networks for large-scale image recogni-
+      tion. arXiv preprint arXiv:1409.1556, 2014. 1, 4
+
+[50] Christian Szegedy, Wei Liu, Yangqing Jia, Pierre Sermanet, Scott Reed, Dragomir Anguelov, Dumitru
+     Erhan, Vincent Vanhoucke, and Andrew Rabinovich. Going deeper with convolutions. In CVPR, pages
+     1–9, 2015. 1
+
+[51] Mingxing Tan and Quoc Le. Efficientnet: Rethinking model scaling for convolutional neural networks. In
+    ICML, pages 6105–6114, 2019. 1, 5, 7
+
+[52] Hugo Touvron, Matthieu Cord, Matthijs Douze, Francisco Massa, Alexandre Sablayrolles, and Hervé
+     Jégou.  Training data-efficient image transformers & distillation through attention.  arXiv preprint
+     arXiv:2012.12877, 2020. 1, 4, 6, 9, 10
+
+[53] Hugo Touvron, Matthieu Cord, Alexandre Sablayrolles, Gabriel Synnaeve, and Hervé Jégou. Going deeper
+     with image transformers. arXiv preprint arXiv:2103.17239, 2021. 16
+
+[54] Zhengzhong Tu, Hossein Talebi, Han Zhang, Feng Yang, Peyman Milanfar, Alan Bovik, and Yinxiao Li.
+    Maxim: Multi-axis mlp for image processing. In CVPR, pages 5769–5780, 2022. 16
+
+[55] Zhengzhong Tu, Hossein Talebi, Han Zhang, Feng Yang, Peyman Milanfar, Alan Bovik, and Yinxiao Li.
+     Maxvit: Multi-axis vision transformer. ECCV, 2022. 3
+
+[56] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez, Lukasz
+      Kaiser, and Illia Polosukhin. Attention is all you need. In NeurIPS, pages 5998–6008, 2017. 2, 3, 5, 6
+
+[57] Sinong Wang, Belinda Z Li, Madian Khabsa, Han Fang, and Hao Ma. Linformer: Self-attention with linear
+     complexity. arXiv preprint arXiv:2006.04768, 2020. 4
+
+[58] Wenhai Wang, Enze Xie, Xiang Li, Deng-Ping Fan, Kaitao Song, Ding Liang, Tong Lu, Ping Luo, and
+     Ling Shao. Pyramid vision transformer: A versatile backbone for dense prediction without convolutions.
+     In ICCV, 2021. 3
+
+[59] Yan Wang, Lingxi Xie, Chenxi Liu, Siyuan Qiao, Ya Zhang, Wenjun Zhang, Qi Tian, and Alan L. Yuille.
+    SORT: second-order response transform for visual recognition. In IEEE International Conference on
+    Computer Vision, ICCV 2017, Venice, Italy, October 22-29, 2017, pages 1368–1377. IEEE Computer
+      Society, 2017. 16
+
+[60] Haiping Wu, Bin Xiao, Noel Codella, Mengchen Liu, Xiyang Dai, Lu Yuan, and Lei Zhang.  Cvt:
+     Introducing convolutions to vision transformers. arXiv preprint arXiv:2103.15808, 2021. 3
+
+[61] Sitong Wu, Tianyi Wu, Haoru Tan, and Guodong Guo. Pale transformer: A general vision transformer
+     backbone with pale-shaped attention. In AAAI, volume 36, pages 2731–2739, 2022. 18
+
+[62] Tete Xiao, Yingcheng Liu, Bolei Zhou, Yuning Jiang, and Jian Sun. Unified perceptual parsing for scene
+     understanding. In ECCV, pages 418–434, 2018. 7, 8, 17
+
+[63] Tete Xiao, Mannat Singh, Eric Mintun, Trevor Darrell, Piotr Dollár, and Ross Girshick. Early convolutions
+     help transformers see better. NeurIPS, 34:30392–30400, 2021. 3
+
+[64] Shen Yan, Xuehan Xiong, Anurag Arnab, Zhichao Lu, Mi Zhang, Chen Sun, and Cordelia Schmid.
+     Multiview transformers for video recognition. arXiv preprint arXiv:2201.04288, 2022. 1
+[65] Jianwei Yang, Chunyuan Li, and Jianfeng Gao.   Focal modulation networks.   arXiv preprint
+     arXiv:2203.11926, 2022. 3
+
+[66] Jianwei Yang, Chunyuan Li, Pengchuan Zhang, Xiyang Dai, Bin Xiao, Lu Yuan, and Jianfeng Gao. Focal
+      attention for long-range interactions in vision transformers. NeurIPS, 34, 2021. 3
+
+[67] Weihao Yu, Mi Luo, Pan Zhou, Chenyang Si, Yichen Zhou, Xinchao Wang, Jiashi Feng, and Shuicheng
+     Yan. Metaformer is actually what you need for vision. arXiv preprint arXiv:2111.11418, 2021. 3, 9, 10
+
+[68] Li Yuan, Yunpeng Chen, Tao Wang, Weihao Yu, Yujun Shi, Zihang Jiang, Francis EH Tay, Jiashi
+     Feng, and Shuicheng Yan. Tokens-to-token vit: Training vision transformers from scratch on imagenet.
+     arXiv:2101.11986, 2021. 3
+[69] Sergey Zagoruyko and Nikos Komodakis. Wide residual networks. arXiv preprint arXiv:1605.07146,
+     2016. 5
+
+[70] Hao Zhang, Feng Li, Shilong Liu, Lei Zhang, Hang Su, Jun Zhu, Lionel M Ni, and Heung-Yeung
+    Shum. Dino: Detr with improved denoising anchor boxes for end-to-end object detection. arXiv preprint
+     arXiv:2203.03605, 2022. 1, 8, 9
+
+[71] Bolei Zhou, Hang Zhao, Xavier Puig, Sanja Fidler, Adela Barriuso, and Antonio Torralba. Scene parsing
+     through ade20k dataset. In CVPR, pages 633–641, 2017. 2, 6, 7
+
+
+                                       13
+
+=== PDF PAGE 14 ===
+Checklist
+
+      1. For all authors...
+           (a) Do the main claims made in the abstract and introduction accurately reflect the paper’s
+              contributions and scope? [Yes]
+          (b) Did you describe the limitations of your work? [Yes] See our analysis in Section 4.3.
+           (c) Did you discuss any potential negative societal impacts of your work? [N/A] We
+            propose a general framework for visual recognition. Our method is not for specific
+              applications, which does not directly involve societal issues.
+          (d) Have you read the ethics review guidelines and ensured that your paper conforms to
+           them? [Yes]
+      2.  If you are including theoretical results...
+           (a) Did you state the full set of assumptions of all theoretical results? [N/A]
+          (b) Did you include complete proofs of all theoretical results? [N/A]
+      3.  If you ran experiments...
+           (a) Did you include the code, data, and instructions needed to reproduce the main experi-
+            mental results (either in the supplemental material or as a URL)? [Yes]
+          (b) Did you specify all the training details (e.g., data splits, hyperparameters, how they
+           were chosen)? [Yes]
+           (c) Did you report error bars (e.g., with respect to the random seed after running experi-
+            ments multiple times)? [No] We follow the common practice in previous papers, where
+             they didn’t report the error bars.
+          (d) Did you include the total amount of compute and the type of resources used (e.g., type
+             of GPUs, internal cluster, or cloud provider)? [Yes] See our implementation details
+             provided in the supplemental material.
+      4.  If you are using existing assets (e.g., code, data, models) or curating/releasing new assets...
+           (a)  If your work uses existing assets, did you cite the creators? [Yes]
+          (b) Did you mention the license of the assets? [N/A]
+           (c) Did you include any new assets either in the supplemental material or as a URL? [No]
+          (d) Did you discuss whether and how consent was obtained from people whose data you’re
+              using/curating? [N/A]
+           (e) Did you discuss whether the data you are using/curating contains personally identifiable
+             information or offensive content? [N/A]
+      5.  If you used crowdsourcing or conducted research with human subjects...
+           (a) Did you include the full text of instructions given to participants and screenshots, if
+              applicable? [N/A]
+          (b) Did you describe any potential participant risks, with links to Institutional Review
+           Board (IRB) approvals, if applicable? [N/A]
+           (c) Did you include the estimated hourly wage paid to participants and the total amount
+             spent on participant compensation? [N/A]
+
+
+
+
+
+                                       14

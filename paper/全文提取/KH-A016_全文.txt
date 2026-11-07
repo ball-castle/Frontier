@@ -1,0 +1,566 @@
+KH-A016 | Efficient and Accurate Approximations of Nonlinear Convolutional Networks
+来源：https://arxiv.org/abs/1411.4229
+本地PDF：专题文献/何恺明/KH-A016_Efficient_and_Accurate_Approximations_of_Nonlinear_Convolutional_Networks_CVPR2015.pdf
+SHA-256：61c29b45c4de7465b8eba83597d0dd00b94cc9d34114c9d3174eeb1feb8477b2
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+        Efﬁcient and Accurate Approximations of Nonlinear Convolutional Networks
+
+
+            Xiangyu Zhang1∗    Jianhua Zou1     Xiang Ming1∗     Kaiming He2      Jian Sun2
+                     1Xi’an Jiaotong University                        2Microsoft Research
+
+
+                        Abstract                             the original ﬁlters can be approximately decomposed into
+                                                                   a series of smaller ﬁlters, and the complexity is reduced.
+            This paper aims to accelerate the test-time computation     These methods have shown promising speedup ratios on a
+          of deep convolutional neural networks (CNNs). Unlike ex-      single [3] or a few layers [10] with some degradation of2014
+           isting methods that are designed for approximating linear     accuracy.
+          ﬁlters or linear responses, our method takes the nonlinear       The algorithms and approximations in the previous work
+          units into account. We minimize the reconstruction error      are developed for reconstructing linear ﬁlters [3, 10] andNov
+          of the nonlinear responses, subject to a low-rank constraint      linear responses [10]. However, the nonlinearity like the
+                                                                  Rectiﬁed Linear Units (ReLU) [14, 11] is not involved in16   which helps to reduce the complexity of ﬁlters. We develop
+        an effective solution to this constrained nonlinear optimiza-      their optimization.  Ignoring the nonlinearity will impact
+          tion problem. An algorithm is also presented for reducing      the quality of the approximated layers. Let us consider a
+          the accumulated error when multiple layers are approxi-     case that the ﬁlters are approximated by reconstructing the
+         mated. A whole-model speedup ratio of 4× is demonstrated      linear responses. Because the ReLU will follow, the model
+        on a large network trained for ImageNet, while the top-5 er-     accuracy is more sensitive to the reconstruction error of the
+          ror rate is only increased by 0.9%. Our accelerated model      positive responses than to that of the negative responses.[cs.CV]   has a comparably fast speed as the “AlexNet” [11], but is
+                                                                    Moreover,  it is a challenging task of accelerating the
+        4.7% more accurate.
+                                                             whole network (instead of just one or a very few layers).
+                                                          The errors will be accumulated if several layers are approx-
+                                                                      imated, especially when the model is deep. Actually, in the
+         1. Introduction                                                                         recent work [3, 10] the approximations are applied on a sin-
+            This paper addresses efﬁcient test-time computation of      gle layer of large CNN models, such as those trained on
+        deep convolutional neural networks (CNNs) [12, 11]. Since     ImageNet [2, 16].  It is insufﬁcient for practical usage to
+          the success of CNNs [11] for large-scale image classiﬁca-     speedup one or a few layers, especially for the deeper mod-
+           tion, the accuracy of the newly developed CNNs [24, 17,      els which have been shown very accurate [18, 19, 8].
+          8, 18, 19] has been continuously improving. However, the        In this paper, a method for accelerating nonlinear con-
+         computational cost of these networks (especially the more      volutional networks is proposed. It is based on minimizing
+         accurate but larger models) also increases signiﬁcantly. The      the reconstruction error of nonlinear responses, subject to a
+         expensive test-time evaluation of the models can make them     low-rank constraint that can be used to reduce computation.arXiv:1411.4229v1   impractical in real-world systems. For example, a cloud ser-    To solve the challenging constrained optimization problem,
+         vice needs to process thousands of new requests per sec-    we decompose it into two feasible subproblems and itera-
+         onds; portable devices such as phones and tablets mostly      tively solve them. We further propose to minimize an asym-
+        have CPUs or low-end GPUs only; some recognition tasks     metric reconstruction error, which effectively reduces the
+           like object detection [4, 8, 7] are still time-consuming for     accumulated error of multiple approximated layers.
+         processing a single image even on a high-end GPU. For                                                We evaluate our method on a 7-convolutional-layer
+          these reasons and others, it is of practical importance to ac-                                                            model trained on ImageNet. We investigate the cases of
+          celerate the test-time computation of CNNs.                                                                          accelerating each single layer and the whole model. Experi-
+           There have been a few studies on approximating deep                                                               ments show that our method is more accurate than the recent
+      CNNs for accelerating test-time evaluation [22, 3, 10]. A                                                            method of Jaderberg et al.’s [10] under the same speedup ra-
+       commonly used assumption is that the convolutional ﬁlters                                                                                        tios. A whole-model speedup ratio of 4× is demonstrated,
+          are approximately low-rank along certain dimensions. So                                                              and its degradation is merely 0.9%. When our model is ac-
+             ∗This work is done when Xiangyu Zhang and Xiang Ming are interns      celerated to have a comparably fast speed as the “AlexNet”
+              at Microsoft Research.                                                 [11], our accuracy is 4.7% higher.
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+2. Approaches                                           W
+
+2.1. Low-rank Approximation of Responses
+  Our observation is that the response at a position of a                    (a)
+convolutional feature map approximately lies on a low-rank
+subspace. The low-rank decomposition can reduce the com-                       W′            P
+plexity.  To ﬁnd the approximate low-rank subspace, we
+minimize the reconstruction error of the responses.
+                                                                                                                (b)
+  More formally, we consider a convolutional layer with a
+ﬁlter size of k × k × c, where k is the spatial size of the
+ﬁlter and c is the number of input channels of this layer. To                                                                                          𝑐channels           𝑑′ channels            𝑑channels
+compute a response, this ﬁlter is applied on a k × k × c
+volume of the layer input. We use x ∈Rk2c+1 to denote a                                                                  Figure 1. Illustration of the approximation. (a) An original layer
+vector that reshapes this volume (appending one as the last      with complexity O(dk2c). (b) An approximated layer with com-
+entry for the bias). A response y ∈Rd at a position of a      plexity reduced to O(d′k2c) + O(dd′).
+feature map is computed as:
+
+                                                                are used to reduce dimensions, while in our case they restore                y = Wx.                       (1)
+                                                           dimensions.
+where W is a d-by-(k2c+1) matrix, and d is the number       Note that the decomposition of M = PQ⊤can be arbi-
+of ﬁlters. Each row of W denotes the reshaped form of a       trary. It does not impact the value of y computed in Eqn.(3).
+k × k × c ﬁlter (appending the bias as the last entry). We   A simple decomposition is the Singular Vector Decomposi-
+will address the nonlinear case later.                             tion (SVD) [5]: M = Ud′Sd′Vd′⊤, where Ud′ and Vd′ are
+    If the vector y is on a low-rank subspace, we can write     d-by-d′ column-orthogonal matrices and Sd′ is a d′-by-d′
+y = M(y −¯y) + ¯y, where M is a d-by-d matrix of a rank     diagonal matrix. Then we can obtain P = Ud′S1/2d′  and
+d′ < d and ¯y is the mean vector of responses. Expanding   Q = Vd′S1/2d′  .
+this equation, we can compute a response by:                      In practice the low-rank assumption is an approximation,
+                                                      and the computation in Eqn.(3) is approximate. To ﬁnd an
+              y = MWx + b,                   (2)                                                         approximate low-rank subspace, we optimize the following
+                                                          problem:
+where b =  ¯y −M¯y is a new bias. The rank-d′ matrix
+M can be decomposed into two d-by-d′ matrices P and Q            min X ∥(yi −¯y) −M(yi −¯y)∥22,         (4)
+such that M = PQ⊤. We denote W′ = Q⊤W as a d′-by-          M    i
+(k2c+1) matrix, which is essentially a new set of d′ ﬁlters.                            s.t.  rank(M) ≤d′.
+Then we can compute (2) by:
+                                                     Here yi is a response sampled from the feature maps in the
+              y = PW′x + b.                   (3)      training set. This problem can be solved by SVD [5] or ac-
+                                                                    tually Principal Component Analysis (PCA): let Y be the d-
+The complexity of using Eqn.(3) is O(d′k2c) + O(dd′)  ,     by-n matrix concatenating n responses with the mean sub-
+while the complexity of using Eqn.(1) is O(dk2c).  For      tracted, compute the eigen-decomposition of the covariance
+many typical models/layers, we usually have O(dd′) ≪     matrix YY⊤= USU⊤where U is an orthogonal matrix
+O(d′k2c), so the computation in Eqn.(3) will reduce the     and S is diagonal, and M = Ud′Ud′⊤where Ud′ are the
+complexity to about d′/d.                                        ﬁrst d′ eigenvectors. With the matrix M computed, we can
+   Fig. 1 illustrates how to use Eqn.(3) in a network. We    ﬁnd P = Q = Ud′.
+replace the original layer (given by W) by two layers (given     How good is the low-rank assumption of the responses?
+by W′ and P). The matrix W′ is actually d′ ﬁlters whose   We sample the responses from a CNN model (with 7 con-
+sizes are k × k × c. These ﬁlters produce a d′-dimensional      volutional layers, detailed in Sec. 3) trained on ImageNet
+feature map. On this feature map, the d-by-d′ matrix P can      [2]. For the responses of a convolutional layer (from 3,000
+be implemented as d ﬁlters whose sizes are 1 × 1 × d′. So     randomly sampled training images), we compute the eigen-
+P corresponds to a convolutional layer with a 1×1 spatial     values of their covariance matrix and then plot the sum of
+support, which maps the d′-dimensional feature map to a      the largest eigenvalues (Fig. 2). We see that substantial en-
+d-dimensional one. The usage of 1 × 1 spatial ﬁlters to     ergy is in a small portion of the largest eigenvectors. For
+adjust dimensions has been adopted for designing network     example, in the Conv2 layer (d = 256) the ﬁrst 128 eigen-
+architectures [13, 19]. But in those papers, the 1 × 1 ﬁlters      vectors contribute over 99.9% energy; in the Conv7 layer
+
+======================== PDF 第 3 页 ========================
+                                         (a)                                         (b)                                           (c)
+                100                             100                             100               (%)
+                              Energy  80                              80                              80
+                 60                              60                              60
+                                                                                                 Conv3
+                 40                              40                              40                 Conv4
+                                                                                                 Conv5                                                           Accumulative  20                              20                              20                 Conv6
+               PCA   0                 Conv1        0                 Conv2        0                 Conv7
+                   0      32      64      96      0    64    128   192   256      0    128   256   384   512
+                                           d’                                            d’                                            d’
+
+Figure 2. PCA accumulative energy of the responses in each layer, presented as the sum of largest d′ eigenvalues (relative to the total
+energy when d′ = d). Here the ﬁlter number d is 96 for Conv1, 256 for Conv2, and 512 for Conv3-7 (detailed in Table 1).
+
+
+(d = 512), the ﬁrst 256 eigenvectors contribute over 95%      alternating solver, ﬁxing {zi} and solving for M, b and vice
+energy. This indicates that we can use a fraction of the ﬁl-      versa.
+ters to precisely approximate the original ﬁlters.
+                                                                                   (i) The subproblem of M, b. In this case, {zi} are ﬁxed. It  The low-rank behavior of the responses y is because
+                                                                              is easy to show b = ¯z −M¯y where ¯z is the sample mean ofof the low-rank behaviors of the ﬁlters W and the inputs
+                                                              {zi}. Substituting b into the objective function, we obtainx.  While the low-rank assumptions of ﬁlters have been
+                                                                the problem involving M:adopted in recent work [3, 10], we further adopt the low-
+rank assumptions of the ﬁlter input x, which is a local vol-
+                                                       min X ∥(zi −¯z) −M(yi −¯y)∥22,         (7)ume and should have correlations. The responses y will          M
+                                                                                                                     i
+have lower rank than W and x, so the approximation can be
+                                                                                                 s.t.  rank(M) ≤d′.more precise. In our optimization (4), we directly address
+the low-rank subspace of y.                                                          Let Z be the d-by-n matrix concatenating the vectors of
+                                                            {zi −¯z}. We rewrite the above problem as:2.2. The Nonlinear Case
+  Next we investigate the case of using nonlinear units.                   min ∥Z −MY∥2F,                  (8)
+                                                M
+We use r(·) to denote the nonlinear operator.  In this pa-
+                                                                                                 s.t.  rank(M) ≤d′.
+per we focus on the Rectiﬁed Linear Unit (ReLU) [14]:
+r(·) = max(·, 0). A nonlinear response is given by r(Wx)                                                     Here ∥· ∥F is the Frobenius norm. This optimization prob-
+or simply r(y). We minimize the reconstruction error of the                                                    lem is a Reduced Rank Regression problem [6, 21, 20], and
+nonlinear responses:                                                                                             it can be solved by a kind of Generalized Singular Vector
+                                                       Decomposition (GSVD) [6, 21, 20]. The solution is as fol-
+         min     X ∥r(yi) −r(Myi + b)∥22,          (5)     lows. Let ˆM = ZY⊤(YY⊤)−1. The GSVD is applied on ˆM           M,b
+                          i                                            as ˆM = USV⊤, such that U is a d-by-d orthogonal matrix
+                      s.t.  rank(M) ≤d′.                                                                   satisfying U⊤U = Id where Id is a d-by-d identity matrix,
+                                                      and V is a d-by-d matrix satisfying V⊤YY⊤V = Id (called
+Here b is a new bias to be optimized, and r(My + b) =
+                                                              generalized orthogonality). Then the solution M to (8) is
+r(MWx + b) is the nonlinear response computed by the
+                                                            given by M = Ud′Sd′Vd′⊤where Ud′ and Vd′ are the ﬁrst
+approximated ﬁlters.
+                                                                     d′ columns of U and V and Sd′ are the largest d′ singular
+  The above problem is challenging due to the nonlinearity
+                                                                 values. We can further show that if Z = Y (so the problem
+and the low-rank constraint. To ﬁnd a feasible solution, we
+                                                                   in (7) becomes (4)), this solution degrades to computing the
+relax it as:
+                                                           eigen-decomposition of YY⊤.
+   min X ∥r(yi) −r(zi)∥22 + λ∥zi −(Myi + b)∥22  M,b,{zi}                                                                       (ii) The subproblem of {zi}.  In this case, M and b are
+                 i                                              ﬁxed. Then in this subproblem each element zij of each
+                      s.t.  rank(M) ≤d′.                (6)                                                               vector zi is independent of any other. So we solve a 1-
+                                                          dimensional optimization problem as follows:
+Here {zi} is a set of auxiliary variables of the same size as
+{yi}. λ is a penalty parameter.  If λ →∞, the solution           min (r(yij) −r(zij))2 + λ(zij −y′ij)2,       (9)
+to (6) will converge to the solution to (5) [23]. We adopt an                    zij
+
+======================== PDF 第 4 页 ========================
+where y′ij is the j-th entry of Myi + b. We can separately                0                                                                                                                   Conv2
+consider zij ≥0 and zij < 0 and remove the ReLU opera-                                                      Conv3                                                                                       −0.1tor. Then we can derive the solution as follows: let                                                               Conv4
+                                        ′                                                                                            Conv5
+                  z ij = min(0, y′ij)                (10)             (%) −0.2                                     Conv6                                                                                                                   Conv7
+                            ′′        λ · y′ij + r(yij)
+            z ij = max(0,                 )         (11)                −0.3
+                       λ + 1                                                                                                                                                                                                                                                 Accuracy
+                        ′          ′                                                                   ′′     ∆ −0.4
+then zij = z ij if z ij gives a smaller value in (9) than z ij,
+and otherwise zij = z ij.′′                                                            −0.5
+   Although we focus on the ReLU, our method is appli-
+cable for other types of nonlinearities. The subproblem in
+(9) is a 1-dimensional nonlinear least squares problem, so                100      99       98       97       96       95                                                                          PCA Accumulative Energy (%)
+can be solved by gradient descent or simply line search. We
+plan to study this issue in the future.                                                                  Figure 3. PCA accumulative energy and the accuracy rates (top-
+                                                                                5). Here the accuracy is evaluated using the linear solution (the
+  We alternatively solve (i) and (ii). The initialization is      nonlinear solution has a similar trend). Each layer is evaluated
+given by the solution to the linear case (4). We warm up the      independently, with other layers not approximated. The accuracy
+solver by setting the penalty parameter λ = 0.01 and run        is shown as the difference to no approximation.
+25 iterations. Then we increase the value of λ. In theory, λ
+should be gradually increased to inﬁnity [23]. But we ﬁnd
+                                                               2.4. Rank Selection for Whole-Model Accelerationthat it is difﬁcult for the iterative solver to make progress if
+λ is too large. So we increase λ to 1, run 25 more iterations,        In the above, the optimization is based on a target d′ of
+and use the resulting M as our solution. Then we compute     each layer. d′ is the only parameter that determines the com-
+P and Q by SVD on M.                                          plexity of an accelerated layer. But given a desired speedup
+                                                                       ratio of the whole model, we need to determine the proper
+2.3. Asymmetric Reconstruction for Multi-Layer                                                          rank d′ used for each layer.
+  To accelerate a whole network, we apply the above       Our strategy is based on an empirical observation that the
+method sequentially on each layer, from the shallow lay-   PCA energy is related to the classiﬁcation accuracy after ap-
+ers to the deeper ones. If a previous layer is approximated,     proximations. To verify this observation, in Fig. 3 we show
+its error can be accumulated when the next layer is approx-      the classiﬁcation accuracy (represented as the difference to
+imated. We propose an asymmetric reconstruction method     no approximation) vs. the PCA energy. Each point in this
+to address this issue.                                      ﬁgure is empirically evaluated using a value of d′. 100%
+   Let us consider a layer whose input feature map  is     energy means no approximation and thus no degradation of
+not  precise due  to the approximation of the previous      classiﬁcation accuracy. Fig. 3 shows that the classiﬁcation
+layer/layers. We denote the approximate input to the cur-     accuracy is roughly linear on the PCA energy.
+rent layer as ˆx. For the training samples, we can still com-       To simultaneously determine the rank for each layer, we
+pute its non-approximate responses as y = Wx. So we can      further assume that the whole-model classiﬁcation accuracy
+optimize an “asymmetric” version of (5):                             is roughly related to the product of the PCA energy of all
+                                                                     layers. More formally, we consider this objective function:
+       min X ∥r(Wxi) −r(MWˆxi + b)∥22,      (12)
+         M,b                                                                                                                        d′l                       i
+                      s.t.  rank(M) ≤d′.                                   E = Y X σl,a                 (13)
+                                                                                                                                                  l a=1
+Here in the ﬁrst term xi is the non-approximate input, while
+                                                     Here σl,a is the a-th largest eigenvalue of the layer l, and
+in the second term ˆxi is the approximate input due to the
+                                              Pd′a=1 σl,a is the PCA energy of the largest d′l eigenvaluesprevious layer. We need not use ˆxi in the ﬁrst term, be-                l
+cause r(Wxi) is the real outcome of the original network      in the layer l. The product Ql is over all layers to be ap-
+and thus is more precise. On the other hand, we do not use     proximated. The objective E is assumed to be related to
+xi in the second term, because r(MWˆxi + b) is the ac-      the accuracy of the approximated whole network. Then we
+tual operation of the approximated layer. This asymmetric     optimize this problem:
+version       can           reduce the accumulative                                       errors                                 when multiple                                                                                                            d′l                                                                                     Cl ≤C.        (14)layers are         approximated.                    The optimization                                     problem                                                      in (12)            max E,      s.t. X
+                                                                                         {d′l}                    dl
+can be solved using the same algorithm as for (5).                                                                            l
+
+======================== PDF 第 5 页 ========================
+                    layer    ﬁlter size   # channels   # ﬁlters    stride   output size   complexity (%)   # of zeros
+              Conv1    7 × 7        3         96       2     109 × 109         3.8           0.49
+                 Pool1    3 × 3                          3      37 × 37
+              Conv2    5 × 5       96        256      1      35 × 35         17.3           0.62
+                 Pool2    2 × 2                          2      18 × 18
+              Conv3    3 × 3       256       512      1      18 × 18           8.8           0.60
+              Conv4    3 × 3       512       512      1      18 × 18         17.5           0.69
+              Conv5    3 × 3       512       512      1      18 × 18         17.5           0.69
+              Conv6    3 × 3       512       512      1      18 × 18         17.5           0.68
+              Conv7    3 × 3       512       512      1      18 × 18         17.5           0.95
+
+Table 1. The architecture of the model. Each convolutional layer is followed by ReLU. The ﬁnal convolutional layer is followed by a spatial
+pyramid pooling layer [8] that have 4 levels ({6 × 6, 3 × 3, 2 × 2, 1 × 1}, totally 50 bins). The resulting 50 × 512-d is fed into the 4096-d
+fc layer (fc6), followed by another 4096-d fc layer (fc7) and a 1000-way softmax layer. The convolutional complexity is the theoretical
+time complexity, shown as relative numbers to the total convolutional complexity. The (relative) number of zeros is the calculated on the
+responses of the layer, which shows the “sparsity” of the layer.
+
+
+Here dl is the original number of ﬁlters in the layer l, and     Large Scale Visual Recognition Challenge (ILSVRC) 2014
+                                                                     d′
+Cl is the original time complexity of the layer l. So                                                                                             l Cl      [16]. This model (detailed in Table 1) has a similar archi-                                                                   dl
+is the complexity after the approximation. C is the total      tecture to the Overfeat model [17], but has 7 convolutional
+complexity after the approximation, which is given by the      layers. A spatial pyramid pooling layer [8] is used after the
+desired speedup ratio. This problem means that we want       last convolutional layer, which improves the classiﬁcation
+to maximize the accumulated accuracy subject to the time     accuracy. We train the model on the 1000-class dataset of
+complexity constraint.                                   ImageNet 2012 [2, 16], following the details in [8].
+  The problem in (14) is a combinatorial problem [15].     We evaluate the “top-5 error” (or simply termed as “er-
+So we adopt a greedy strategy to solve  it. We initialize      ror”) using single-view testing.  The view is the center
+d′l as dl, and consider the set {σl,a}.  In each step we     224 × 224 region cropped from the resized image whose
+remove an eigenvalue σl,d′l from this set, chosen from a      shorter side is 256. The single-view error rate of the model
+certain layer l. The relative reduction of the objective is       is 12.51% on the ImageNet validation set, and the increased
+                                 l                                              error rates of the approximated models are all based on this△E/E = σl,d′/Pd′a=1 σl,a, and the reduction of complex-
+               1                             △E/E      number. For completeness, we report that this model hasity is △C =                  dl Cl. Then we deﬁne a measure as △C  .    11.1% error using 10-view test and 9.3% using 98-view test.
+The eigenvalue σl,d′l that has the smallest value of this mea-                                          We use this model due to the following reasons.  First,
+sure is removed. Intuitively, this measure favors a small re-
+                                                                                  its architecture is similar to many existing models [11, 24,
+duction of △E/E and a large reduction of complexity △C.
+                                                              17, 1] (such as the ﬁrst/second layers and the cascade us-
+This step is greedily iterated, until the constraint of the total
+                                                        age of 3×3 ﬁlters), so we believe most observations should
+complexity is achieved.
+                                                       be valid on other models. Second, on the other hand, this
+2.5. Discussion                                      model is deep (7-conv.) and the computation is more uni-
+                                                         formly distributed among the layers (see “complexity” in
+   In our formulation, we focus on reducing the number of                                                           Table 1). A similar behavior exhibits on the compelling
+ﬁlters (from d to d′). There are algorithmic advantages of                                                 VGG-16/19 models [18]. The uniformly distributed com-
+operating on the “d” dimension. Firstly, this dimension can                                                               putation indicates that most layers should be accelerated for
+be easily controlled by the rank constraint rank(M) ≤d′.                                                       an overall speedup.
+This constraint enables closed-form solutions, e.g., PCA to                                                           For the training of the approximations as in (4), (6), and
+the problem (4) or GSVD to the subproblem (7). Secondly,                                                                    (12), we randomly sample 3,000 images from the ImageNet
+the optimized low-rank projection M can be exactly de-                                                                   training set and use their responses as the training samples.
+composed into low-dimensional ﬁlters (P and Q) by SVD.
+These simple and close-form solutions can produce good     3.1. Single-Layer: Linear vs. Nonlinear
+results using a very small subset of training images (3,000
+                                                                 In this subsection we evaluate the single-layer perfor-
+out of one million).
+                                                      mance. When evaluating a single approximated layer, the
+                                                                        rest layers are unchanged and not approximated.  The3. Experiments
+                                                       speedup ratio (involving that single layer only) is shown as
+  We evaluate on the “SPPnet (Overfeat-7)” model [8],      the theoretical ratio computed by the complexity.
+which is one of the state-of-the-art models for ImageNet        In Fig. 4 we compare the performance of our linear so-
+
+======================== PDF 第 6 页 ========================
+             5                           2                           2                           4
+            (%) 4          Linear                           Linear                           Linear                           Linear                          Nonlinear                       Nonlinear                       Nonlinear           3         Nonlinear
+                    Error 3
+        in                            1                           1                           2
+             2
+                                                                                                1             1                               Increase
+             0                           0                           0                           0
+              0      1      2      3      1    2    3    4    5      1      3      5      7      1      3      5      7
+                  Conv1 Speedup              Conv2 Speedup              Conv3 Speedup              Conv4 Speedup
+
+                           4                           4                           6
+                             (%)            Linear                           Linear                           Linear
+                           3          Nonlinear           3         Nonlinear                       Nonlinear
+                                                Error                                                        4
+                   in 2                           2
+                                                                                  2
+                           1                           1                                                                            Increase
+                           0                           0                           0
+                            1      3      5      7      1      3      5      7      1      3      5      7
+                               Conv5 Speedup              Conv6 Speedup              Conv7 Speedup
+
+
+Figure 4. Linear vs. Nonlinear: single-layer performance of accelerating Conv1 to Conv7. The speedup ratios are computed by the
+theoretical complexity, but is nearly the same as the actual speedup ratios in our CPU/GPU implementation. The error rates are top-5
+single-view, and shown as the increase of error rates compared with no approximation (smaller is better).
+
+                  3                                    3                                    5
+                             Symmetric                              Symmetric                              Symmetric
+                    2.5         Asymmetric   2.4                2.5         Asymmetric   2.3              4         Asymmetric   3.7                (%)
+                  2                                                             1.8            2                                1.7            3                           Error                                                                                                                                                                             2.6                                                1.5
+           of 1.5                                          1.5                                                                           2.2
+                                                   1.2                                                  1.2                     2
+                  1                                    1                      1.0                                                     1.5
+                                     0.6                                            Increase                                                                                             1        0.8                    0.5                                        0.4                              0.5        0.4 0.3                                                                                                                                                        0.5
+
+                  0                                    0                                    0
+                           2x     3x     4x                      2x     3x     4x                      2x      3x     4x
+                             Speedup                             Speedup                             Speedup
+                                (a) 2−layer (Conv6 and 7)                     (b) 3−layer (Conv2, 3 and 4)                     (c) 3−layer (Conv5, 6 and 7)
+
+
+Figure 5. Symmetric vs. Asymmetric: the cases of 2-layer and 3-layer approximation. The speedup is computed by the complexity of the
+layers approximated. (a) Approximation of Conv6 & 7. (b) Approximation of Conv2, 3 & 4. (c) Approximation of Conv5, 6 & 7.
+
+
+lution (4) and nonlinear solution (6). The performance is      error rate is increased by < 0.2%.
+displayed as increase of error rates (decrease of accuracy)     We also notice that for Conv1, the degradation is ig-
+vs. the speedup ratio of that layer.  Fig. 4 shows that the     norable on or below 2× speedup (1.8× corresponds to
+nonlinear solution consistently performs better than the lin-      d′ = 32).  This can be explained by Fig. 2(a): the PCA
+ear solution. In Table 1, we show the sparsity (the portion     energy has almost no loss when d′ ≥32. But the degrada-
+of zero activations after ReLU) of each layer. A zero acti-      tion can grow quickly for larger speedup ratios, because in
+vation is due to the truncation of ReLU. The sparsity is over      this layer the channel number c = 3 is small and d′ needs
+60% for Conv2-7, indicating that the ReLU takes effect on a      to be reduced drastically to achieve the speedup ratio. So in
+substantial portion of activations. This explains the discrep-      the following, we will use d′ = 32 for Conv1.
+ancy between the linear and nonlinear solutions. Especially,
+the Conv7 layer has a sparsity of 95%, so the advantage of     3.2. Multi-Layer: Symmetric vs. Asymmetric
+the nonlinear solution is more obvious.
+                                                        Next we evaluate the performance of asymmetric recon-
+   Fig. 4 also shows that when accelerating only a single      struction as in the problem (12). We demonstrate approxi-
+layer by 2×, the increased error rates of our solutions are     mating 2 layers or 3 layers. In the case of 2 layers, we show
+rather marginal or ignorable. For the Conv2 layer, the error      the results of approximating Conv6 and 7; and in the case
+rate is increased by < 0.1%; for the Conv3-7 layers, the     of 3 layers, we show the results of approximating Conv5-7
+
+======================== PDF 第 7 页 ========================
+                speedup   rank sel.   Conv1   Conv2   Conv3   Conv4   Conv5   Conv6   Conv7    err. ↑%
+             2×       no       32     110     199     219     219     219     219      1.18
+             2×        yes      32      83     182     211     239     237     253      0.93
+                2.4×      no       32      96     174     191     191     191     191      1.77
+                2.4×       yes      32      74     162     187     207     205     219      1.35
+             3×       no       32      77     139     153     153     153     153      2.56
+             3×        yes      32      62     138     149     166     162     167      2.34
+             4×       no       32      57     104     115     115     115     115      4.32
+             4×        yes      32      50     112     114     122     117     119      4.20
+             5×       no       32      46      83      92      92      92      92       6.53
+             5×        yes      32      41      94      93      98      92      90       6.47
+
+Table 2. Whole-model acceleration with/without rank selection. The speedup ratios shown here involve all convolutional layers (Conv1-
+Conv7). We ﬁx d′ = 32 in Conv1. In the case of no rank selection, the speedup ratio of each other layer is the same. The solver is the
+asymmetric version. Each column of Conv1-7 shows the rank d′ used, which is the number of ﬁlters after approximation. The error rates
+are top-5 single-view, and shown as the increase of error rates compared with no approximation (smaller is better).
+
+
+or Conv2-4. The comparisons are consistently observed for     For example, when the speedup is 3×, the rank selection
+other cases of multi-layer.                                      assigns d′ = 167 to Conv7, while this layer only requires
+  We sequentially approximate the layers involved, from      d′ = 153 to achieve 3× single-layer speedup of itself. This
+a shallower one to a deeper one.  In the asymmetric ver-     can be explained by Fig. 2(c). The energy of Conv5-7 is less
+sion (12),  ˆx is from the output of the previous approxi-     concentrated, so these layers require higher ranks to achieve
+mated layer (if any), and x is from the output of the pre-     good approximations.
+vious non-approximate layer. In the symmetric version (5),
+the response y = Mx where x is from the output of the     3.4. Comparisons with Previous Work
+previous non-approximate layer. We have also tried another
+                                          We compare with Jaderberg et al.’s method [10], whichsymmetric version of y = Mˆx where ˆx is from the output
+                                                                              is a recent state-of-the-art solution to efﬁcient evaluation.of the previous approximated layer (if any), and found this
+                                                          This method mainly operates on the spatial domain. It de-symmetric version is even worse.
+                                                     composes a k×k spatial support into a cascade of k×1 and
+   Fig. 5 shows the comparisons between the symmetric
+                                       1×k spatial supports. This method focuses on the linear re-
+and asymmetric versions. The asymmetric solution has sig-
+                                                               construction error. The SGD solver is adopted for optimiza-
+niﬁcant improvement over the symmetric solution. For ex-
+                                                                        tion. In the paper of [10], their method is only evaluated on
+ample, when only 3 layers are approximated simultaneously
+                                                          a single layer of a model trained for ImageNet.
+(like Fig. 5 (c)), the improvement is over 1.0% when the
+                                                    Our comparisons are based on our re-implementation ofspeedup is 4×. This indicates that the accumulative error
+                                                                    [10]. We use the Scheme 2 decomposition in [10] and itsrate due to multi-layer approximation can be effectively re-
+                                                                     ﬁlter reconstruction version, which is the one used for Im-duced by the asymmetric version.
+                                                       ageNet as in [10]. Our re-implementation of [10] gives a
+  When more and all layers are approximated simultane-
+                                         2× single-layer speedup on Conv2 and < 0.2% increase
+ously (as below), if without the asymmetric solution, the
+                                                              of error. As a comparison, in [10] it reports 0.5% increase
+error rates will increase more drastically.
+                                                              of error on Conv2 under a 2× single-layer speedup, eval-
+                                                            uated on another Overfeat model [17].  For whole-model3.3. Whole-Model: with/without Rank Selection
+                                                           speedup, we adopt this method sequentially on Conv2-7 us-
+   In Table 2 we show the results of whole-model acceler-     ing the same speedup ratio. We do not apply this method on
+ation. The solver is the asymmetric version. For Conv1,     Conv1, because this layer has a small fraction of complexity
+we ﬁx d′ = 32. For other layers, when the rank selection is     while the spatial decomposition leads to considerable error
+not used, we adopt the same speedup ratio on each layer and     on this layer if using a speedup ratio similar to other layers.
+determine its desired rank d′ accordingly. When the rank se-        In Fig. 6 we compare our method with Jaderberg et
+lection is used, we apply it to select d′ for Conv2-7. Table 2       al.’s [10] for whole-model speedup.  The speedup ratios
+shows that the rank selection consistently outperforms the      are the theoretical complexity ratios involving all convolu-
+counterpart without rank selection. The advantage of rank      tional layers. Our method is the asymmetric version and
+selection is observed in both linear and nonlinear solutions.     with rank selection (denoted as “our asymmetric”). Fig. 6
+   In Table 2 we notice that the rank selection often chooses     shows that when the speedup ratios are large (4× and 5×),
+a higher rank d′ (than the no rank selection) in Conv5-7.     our method outperforms Jaderberg et al.’s method signif-
+
+======================== PDF 第 8 页 ========================
+         15                                                                                speedup         top-5 err.   top-5 err.   time
+                                                      13.8                      model                       Jaderberg et al. (our impl.)                                                                                                          solution         (1-view)   (10-view)  (ms)
+                     Our asymmetric
+                     Our asymmetric (3d)                                 AlexNet [11]              -            18.8      16.0    273
+       (%)
+         10                                                                                      [10], 4×         18.5      15.6    278
+            Error                                                        SPPnet       our asym., 4×      16.7      14.4    271
+     of                                                  6.5                        (Overfeat-7)                                      6.0                                                  our asym. (3d), 4×    14.1      12.0    267
+          5                           4.2                    Increase                                                         Table 3. Comparisons of network performance. The top-5 error is
+                   2.4  2.3                                       2.5
+                                               1.6                              absolute values (not the increased number). The running time is
+                            0.9                                                                    per view on a CPU (single thread, with SSE).
+          0
+                   3x             4x             5x
+                          Speedup Ratio
+                                        We set the speedup ratios of both mechanisms to be equal:
+Figure 6. Comparisons with Jaderberg et al.’s spatial decomposi-       e.g., if the speedup ratio of the whole model is r×, then we
+tion method [10]. The error rates are top-5 single-view, and shown     use √r× for both. Fig. 6 shows that this strategy leads to
+as the increase of error rates compared with no approximation     signiﬁcantly smaller increase of error. For example, when
+(smaller is better).                                               the speedup is 5×, the error is increased by only 2.5%. This
+                                                                              is because the speedup ratio is accounted by all three dimen-
+                                                                    sions, and the reduction of each dimension is lower. Our
+icantly.  For example, when the speedup ratio is 4×, the
+                                                        asymmetric solver effectively controls the accumulative er-
+increased error rate of our method is 4.2%, while Jaderberg
+                                                                   ror even if the multiple layers are decomposed extensively.
+et al.’s is 6.0%. Jaderberg et al.’s result degrades quickly
+                                                                        Finally, we compare the accelerated whole model with
+when the speedup ratio is getting large, while ours degrades
+                                                                the well-known “AlexNet” [11]. The comparison is based
+more slowly. This is indicates the effects of our method for
+                                                    on our re-implementation of AlexNet. The architecture is
+reducing accumulative error. In our CPU implementation,
+                                                                the same as in [11] except that the GPU splitting is ignored.
+both methods have similar actual speedup ratios for a given
+                                                          Besides the standard strategies used in [11], we train thistheoretical speedup, for example, 3.55× actual for 4× theo-
+                                                    model using the 224×224 views cropped from resized im-
+retical speedup. It is because the overhead for both methods
+                                                          ages whose shorter edge is 256 [9]. Our re-implementation
+mainly comes from the fully-connected and other layers.
+                                                              of this model has top-5 single-view error rate as 18.8% (10-
+   Because our asymmetric solution can effectively reduce
+                                                      view top-5 16.0% and top-1 37.6%). This is better than the
+the accumulated error, we can approximate a layer by the
+                                                      one reported in [11]1.
+two methods simultaneously, and the asymmetric recon-
+                                                              Table 3 shows the comparisons on the accelerated mod-struction of the next layer can reduce the error accumulated
+                                                                      els and AlexNet. The error rates in this table are the absoluteby the two methods. As discussed in Sec. 2.5, our method
+                                                             value (not the increased number). The time is the actual run-is based on the channel dimension (d), while Jaderberg et
+                                                          ning time per view, on a C++ implementation and Intel i7al.’s method mainly exploits the decomposition of the two
+                                        CPU (2.9GHz). The model accelerated by our asymmetricspatial dimensions. These two mechanisms are complemen-
+                                                                solver (channel-only) has 16.7% error, and by our asymmet-tary, so we conduct the following sequential strategy. The
+                                                                          ric solver (3d) has 14.1% error. This means that the accel-Conv1 layer is approximated using our model only. Then
+                                                                erated model is 4.7% more accurate than AlexNet, while itsfor the Conv2 layer, we ﬁrst apply our method. The approx-
+imated layer has d′ ﬁlters whose sizes are k×k×c followed     speed is nearly the same as AlexNet.
+by 1 × 1 ﬁlters (as in Fig. 1(b)). Next we apply Jaderberg      As a common practice [11], we also evaluate the 10-view
+et al.’s method to decompose the spatial support into a cas-     score of the models. Our accelerated model achieves 12.0%
+cade of k × 1 and 1 × k ﬁlters (Scheme 2 [10]). This gives a      error, which means only 0.9% increase of error with 4×
+3-dimensional approximation of Conv2. Then we apply our     speedup (the original one has 11.1% 10-view error).
+method on Conv3. Now the asymmetric solver will take
+the responses approximated by the two mechanisms as the     4. Conclusion and Future Work
+input, while the reconstruction target is still the responses
+of the original network. So while Conv2 has been approxi-      On the core of our algorithm is the low-rank constraint.
+mated twice, the asymmetric solver of Conv3 can partially     While this constraint is designed for speedup in this work,
+reduce the accumulated error. This process is sequentially        it can be considered as a regularizer on the convolutional
+adopted in the layers that follow.                                    ﬁlters. We plan to investigate this topic in the future.
+   In Fig. 6 we show the results of this 3-dimensional de-
+composition strategy (denoted as “our asymmetric (3d)”).          1In [11] the 10-view error is top-5 18.2% and top-1 40.7%.
+
+======================== PDF 第 9 页 ========================
+References                                                      [20] Y. Takane and H. Hwang. Regularized linear and kernel re-
+                                                                dundancy analysis. Computational Statistics & Data Analy-
+ [1] K. Chatﬁeld, K. Simonyan, A. Vedaldi, and A. Zisserman.                                                                                               sis, pages 394–405, 2007.
+     Return of the devil in the details: Delving deep into convo-
+                                                                     [21] Y. Takane and S. Jung. Generalized constrained redundancy
+      lutional nets. In BMVC, 2014.
+                                                                                 analysis. Behaviormetrika, pages 179–192, 2006.
+ [2]  J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li, and L. Fei-
+                                                                     [22] V. Vanhoucke, A. Senior, and M. Z. Mao.  Improving the
+      Fei. Imagenet: A large-scale hierarchical image database. In
+                                                                    speed of neural networks on CPUs.   In Deep Learning
+    CVPR, 2009.
+                                                              and Unsupervised Feature Learning Workshop, NIPS 2011,
+ [3] E. Denton, W. Zaremba, J. Bruna, Y. LeCun, and R. Fergus.                                                                     2011.
+     Exploiting linear structure within convolutional networks for
+                                                                     [23]  J. Wang, J. Yang, K. Yu, F. Lv, T. Huang, and Y. Gong.
+     efﬁcient evaluation. In NIPS, 2014.
+                                                                           Locality-constrained linear coding for image classiﬁcation.
+ [4] R. Girshick, J. Donahue, T. Darrell, and J. Malik. Rich fea-                                                                           In CVPR, 2010.
+      ture hierarchies for accurate object detection and semantic
+                                                                     [24] M. D. Zeiler and R. Fergus. Visualizing and understanding
+     segmentation. In CVPR, 2014.
+                                                                          convolutional neural networks. In ECCV, 2014.
+ [5] G. H. Golub and C. F. van Van Loan. Matrix computations.
+     1996.
+ [6]  J. C. Gower and G. B. Dijksterhuis.  Procrustes problems,
+    volume 3. Oxford University Press Oxford, 2004.
+ [7] B. Hariharan, P. Arbel´aez, R. Girshick, and J. Malik. Simul-
+     taneous detection and segmentation. In ECCV, pages 297–
+     312, 2014.
+ [8] K. He, X. Zhang, S. Ren, and J. Sun. Spatial pyramid pool-
+     ing in deep convolutional networks for visual recognition.
+     arXiv:1406.4729v2, 2014.
+ [9] A. G. Howard.   Some improvements on deep convo-
+      lutional neural network based image classiﬁcation.   In
+     arXiv:1312.5402, 2013.
+[10] M. Jaderberg, A. Vedaldi, and A. Zisserman. Speeding up
+     convolutional neural networks with low rank expansions. In
+    BMVC, 2014.
+[11] A. Krizhevsky, I. Sutskever, and G. Hinton. Imagenet clas-
+     siﬁcation with deep convolutional neural networks. In NIPS,
+     2012.
+[12] Y. LeCun, B. Boser,  J. S. Denker, D. Henderson, R. E.
+     Howard, W. Hubbard, and L. D. Jackel.  Backpropagation
+     applied to handwritten zip code recognition. Neural compu-
+      tation, 1989.
+[13] M. Lin, Q. Chen, and S. Yan.  Network in network.  In
+     arXiv:1312.4400, 2013.
+[14] V. Nair and G. E. Hinton.  Rectiﬁed linear units improve
+      restricted boltzmann machines.  In ICML, pages 807–814,
+     2010.
+[15] C. R. Reeves. Modern heuristic techniques for combinatorial
+     problems. John Wiley & Sons, Inc., 1993.
+[16] O. Russakovsky, J. Deng, H. Su, J. Krause, S. Satheesh,
+      S. Ma, Z. Huang, A. Karpathy, A. Khosla, M. Bernstein,
+      et al.  Imagenet large scale visual recognition challenge.
+     arXiv:1409.0575, 2014.
+[17]  P. Sermanet, D. Eigen, X. Zhang, M. Mathieu, R. Fergus,
+     and Y. LeCun. Overfeat: Integrated recognition, localization
+     and detection using convolutional networks. 2014.
+[18] K.  Simonyan  and  A.  Zisserman.    Very  deep  con-
+      volutional  networks  for  large-scale  image  recognition.
+     arXiv:1409.1556, 2014.
+[19] C.  Szegedy,  W.  Liu,  Y.  Jia,  P.  Sermanet,  S.  Reed,
+     D. Anguelov, D. Erhan, V. Vanhoucke, and A. Rabinovich.
+    Going deeper with convolutions. arXiv:1409.4842, 2014.

@@ -1,0 +1,647 @@
+WUT-A018 | Good Is Bad: Causality Inspired Cloth-Debiasing for Cloth-Changing Person Re-Identification
+来源：https://openaccess.thecvf.com/content/CVPR2023/html/Yang_Good_Is_Bad_Causality_Inspired_Cloth-Debiasing_for_Cloth-Changing_Person_Re-Identification_CVPR_2023_paper.html
+本地PDF：专题文献/武汉理工AI_CCF-A/WUT-A018_Good_Is_Bad_CVPR2023.pdf
+SHA-256：41a4cfd104cd82a9ba259bd8afeb12d5b085978b9196cb880be18c644ed8fb81
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                            This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                       Except for this watermark, it is identical to the accepted version;
+                                       the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+
+           Good is Bad: Causality Inspired Cloth-debiasing for
+                  Cloth-changing Person Re-identiﬁcation
+
+
+      Zhengwei Yang1,2,3,  Meng Lin1,2,3,   Xian Zhong4,  Yu Wu1,2,  Zheng Wang1,2,3, *
+  1 National Engineering Research Center for Multimedia Software, Institute of Artiﬁcial Intelligence
+                               2 School of Computer Science, Wuhan University
+            3 Hubei Key Laboratory of Multimedia and Network Communication Engineering
+       4 School of Computer Science and Artiﬁcial Intelligence, Wuhan University of Technology
+
+
+                 Abstract                                                         Camera #1       ID     Entangled          Entangled     ID          Camera #2
+                                                                                                                                          match
+                                                                                                                              Non-ID                                 Non-ID
+   Entangled representation of clothing and identity (ID)-                                         (Clothing, et al.)                                        (Clothing, et al.)
+                                                                                                                                                            Latent space
+intrinsic clues are potentially concomitant in conventional                      Person #1                                                                  Person #1                                                                                                                                 (a) Entangled representation of clothing and ID
+person Re-IDentiﬁcation (ReID). Nevertheless, eliminating                  Probe                             Gallery                      ID classification
+the negative impact of clothing on ID remains challenging                          match                                                            0.80.6
+due to the lack of theory and the difﬁculty of isolating the                                                                                                0.4
+exact implications. In this paper, a causality-based Auto-                                ID A          ID B          ID C             0.2
+Intervention Model, referred to as AIM1, is ﬁrst proposed to                 ID C           (b) Clothing affect person recognition
+mitigate clothing bias for robust cloth-changing person ReID      Figure 1. Illustration of the entangled representation of clothing
+(CC-ReID). Speciﬁcally, we analyze the effect of clothing     and ID and how clothing bias affects model prediction.
+on the model inference and adopt a dual-branch model to
+simulate causal intervention. Progressively, clothing bias    which leads to a growing need felt by the research commu-
+is eliminated automatically with model training. AIM is      nity to study CC-ReID task.
+encouraged to learn more discriminative ID clues that are      As one of the accompanying objects of people, clothing
+free from clothing bias. Extensive experiments on two stan-      is an essential factor in social life. There are two possible
+dard CC-ReID datasets demonstrate the superiority of the     responses when people identify others: confusing the per-
+proposed AIM over other state-of-the-art methods.             ception of identity (ID) or clearly distinguishing different
+                                                     IDs through immutable visual appearance (faces or soft-
+1. Introduction                                              biometrics). The former manifests as the mix-up of IDs due
+                                                                  to the similarity in ﬂexible visual appearance (e.g., cloth-
+   Short-term person Re-IDentiﬁcation (ReID) aims to      ing) of people, while the latter is caused by the high-level
+match a person within limited time and space conditions,     semantic (e.g., ID-clues) perceived by humans, transcending
+under the assumption that each individual maintains clothing      the similarity that comes with clothing. The above reactions
+consistency. Of both traditional and deep learning methods,     reﬂect that the relevance of clothing to ID is a double-edged
+the best way to deceive current ReID models is by having     sword. Traditionally, clothing is a helpful characteristic for
+pedestrians alter their clothing. This highlights the inade-    ReID, where people wearing the same clothes are likely
+quacy of existing short-term ReID methods [4,42,45]. To      to have the same ID. However, entangled representation of
+solve this issue, Cloth-Changing person ReID (CC-ReID) [2]     clothing and ID leads the statistical-based neural networks
+has been recently explored, which is increasingly critical in      to converge towards shallow clothing features that can be
+public security systems for tracking down disguised criminal      easily distinguished. This statistical association gives the
+suspects. For example, witnesses typically provide descrip-    ReID model a faulty perception that there is a strong rela-
+tive details (e.g., clothing, color, and stature) when describ-     tion between clothing and ID, which would undermine the
+ing suspects, but it is unlikely that criminals will wear the      ultimate prediction for seeking robust and sensible results.
+same clothes upon their reappearance. It follows that cloth-       Recent years have witnessed numerous deep learning at-
+ing information will disrupt the existing ReID system [40],     tempts to model discriminative clues for person distinguish-
+   *Corresponding author: wangzwhu@whu.edu.cn. 1 Codes will publicly     able learning. However, plenty of misleading information
+available at https://github.com/BoomShakaY/AIM-CCReID.       exists in these attempts, as some non-ID areas (e.g., clothing
+
+                                                     1472
+
+======================== PDF 第 2 页 ========================
+and background) may correlate highly with ID. As shown      tion by constantly mitigating the inﬂuence of clothing on ID
+in Fig. 1(a), conventional ReID methods focus on image      classiﬁcation. Further, to improve the accuracy of clothing
+regions with distinct discrimination characteristics [33,46],     bias distillation, as clothing has top-middle-bottom charac-
+leading to the entanglement of clothing and ID-intrinsic       teristics, this paper adopts pyramid matching strategy [8] to
+clues. In CC-ReID, this phenomenon will lead to biased     enhance the partial feature representation of clothing. Ad-
+classiﬁcation, misleading the ReID model to focus on the      ditionally, we introduce two learning objectives explicitly
+non-ID areas that appear to be ID-related. As shown in     designed to encourage clothing mitigation. A knowledge
+Fig. 1(b), clothing may mislead the classiﬁer by giving high      transfer objective is adopted to strengthen the perception of
+scores to person images with similar colors or patterns, but     clothing bias entangled with ID-intrinsic representation. A
+ignoring the faces and details that matter. To this end, if     bias elimination objective is utilized to cooperate with the
+clothing bias can be captured and removed from the exist-     causal auto-intervention for ID-intrinsic feature extraction.
+ing model, it will enhance the contribution of genuinely       Our contributions can be summarized threefold:
+ID-relevant features to ID discrimination.                              • We propose a novel causality-based Auto-Intervention
+   Lacking practical tools to alleviate clothing bias makes it        Model  (AIM)  for  Cloth-Changing  person  Re-
+challenging to correct the misleading attention of the current          IDentiﬁcation  (CC-ReID).  The  proposed AIM
+ReID model. Even knowing that clothing is a critical inﬂu-          guarantees that the learned representation is unaffected
+encing factor, it is not apparent how to intervene in clothing         by clothing bias. To the best of our knowledge, AIM is
+directly in the representation space. Not to mention that          the ﬁrst model to introduce causality into CC-ReID.
+rough negligence on clothing will damage the integrity of          • A dual-branch model is proposed to simulate the causal
+person representation, e.g., the mask-based [12,16,41] and           intervention. Clothing bias is gradually stripped from
+gait-based methods [6,17] try to obtain cloth-agnostic rep-          the entangled ID-clothing representation without de-
+resentations by forcibly covering up or neglecting clothing          stroying semantic integrity, which optimizes the ID-
+information. While effective, these straightforward methods            intrinsic feature learning.
+lose a plethora of semantic information and overlook the          • We comprehensively demonstrate how clothing bias
+factual relation between clothing and real ID.                           affects the current ReID model and highlight the signif-
+   Causal inference is a recently emerging theory [19]          icance of causal inference in CC-ReID. The experimen-
+widely used to extract causality [10] and explore the true             tal results on two CC-ReID datasets, PRCC-ReID [38]
+association between two events [25]. Thanks to causal in-         and LTCC-ReID [26], show that AIM outperforms state-
+ference, we can revisit the issue of clothing bias from a           of-the-art methods.
+causal perspective. The ladder of causality [7] divides cogni-
+tive abilities into three levels from low to high: association,     2. Related Work
+intervention, and counterfactual analysis. Many aforemen-
+                                                               2.1. Cloth-changing Person ReIDtioned research works explore CC-ReID from the surface
+level of data association, while more advanced cognitive is       The quest for developing a ReID system that is simul-
+not covered. Intervention allows us to incorporate clothing     taneously robust and discriminative has led to extensive
+knowledge into the model prediction and eliminate the cor-     research on ReID. The mainstream person ReID methods
+responding effects, in contrast to counterfactual data, which      generally follow the paradigm that clothing is a stationary at-
+are difﬁcult to obtain under strict variable control. Therefore,      tribute [39], leading the statistic-based neural network to
+this paper attempts to start with intervention by examining     form an erroneous correlation between clothing and ID,
+the perturbation of clothing on the results and removing such    known as clothing bias. Although clothing is helpful for
+perturbation from model predictions. Through the causal      traditional person ReID [46], it poses a signiﬁcant obstacle
+intervention, we attempt to remove the effect of clothing      in obtaining unbiased ID-intrinsic features for robust ReID.
+without destroying semantic integrity and further optimizing       To exclude the impact of clothing, many scholars [12,29,
+the learned discriminative features.                           41] have attempted to use coercion by crude clothing masks
+  To bring the theoretical intervention into practice, we de-     to learn features beyond clothing. Others perform biometric
+sign a dual-branch model to capture clothing bias and ID     learning by using shapes [3,20], contour sketches [38], or
+clues separately and strip clothing inference from ID repre-      gait [6,17] to obtain cloth-agnostic representations. Speciﬁ-
+sentation learning to simulate the entire intervention process.      cally, Hong et al. [12] attempt to obtain the coarse ID mask
+The clothing branch represents the model’s perception of     with structure-related details, incorporating ID-relevant in-
+clothing, breaking the false association between clothing and     formation for discriminative structural feature extraction.
+ID brought by the entangled representation. Subsequently,      Jin et al. [17] use gait to capture biometric motions and con-
+while maintaining semantic integrity, this paper achieves bias      centrate on dynamic motion clues. Despite the remarkable
+elimination and improves the robustness of ID representa-     progress these methods have made, they usually suffer from
+
+                                                     1473
+
+======================== PDF 第 3 页 ========================
+                                   N Blocks                                              Eq.(6)           Causal Intervention  Eq.(2)
+                                                                                         Knowledge Transfer         Query Images           Clothing Branch                ܨ஼                   Cloth
+                                                                                                  C        ܼ௑ǡ஼
+                                                                                                                               Classifier  ߜ஼                                         Clothing       ۩
+                                                                                                             ID-Cloth                                      EncoderE               ٔ
+                                                                                                                  Eq.(8)                                                                                                                               Classifier      ID: 0     ڮ       ܧ஼                                                                                           X         ܻ௓ǡ௑ǡ஼                                                                           ߜ୍ୈᇱ
+                                                Pyramid Matching
+   ڮ                                                                                            Share    ٓ ܮܮ ஼௔௟  ܮ ௄௅   െ     െ
+                                  ID Branch                ܨூ஽                                     Eq.(7)
+                                                                           ߜ୍ୈ                C         ܼ஼
+      ID: n     ڮ       ܧ             Feature Extraction                                   ClassifierID
+                                     ID                         ൌ
+                                      Encoder
+                                                                                                                         Assist  ߜ஺                ܺ஼         ܻ௓ǡ஼                                                                                                                               Classifier
+                                                                                                                                           Intervention
+              ْ Combination Operation ٔ Fusion Operation ٓ SubtractionS          Operation
+
+Figure 2. Structure of the proposed AIM. It consists of two branches, clothing branch (Orange) and ID branch (Green), which are training
+simultaneously. Such structure is to simulate causal intervention and distills clothing bias from the entangled representation automatically.
+The causal intervention is represented on the right. The XC stands for the intervention on X, letting X = c. ZX,C and ZC represent the
+feature of the entangled and the bias representation, respectively. YZ,X,C and YZ,C are the corresponding prediction.
+
+estimation errors by overlooking the factual relationship     3. Proposed Method
+between clothing and ID. In contrast, AIM utilizes causal
+                                                               3.1. CC-ReID form Causal Viewauto-intervention to eliminate clothing bias and save the
+potential semantics.                                    The proposed AIM is trying to automatically eliminate
+                                                              clothing bias through causal intervention without destroy-
+2.2. Causality in Computer Vision                       ing the semantic integrity within images. Fig. 2 shows the
+                                                     framework of AIM. Given a batch of person images, cloth-
+   Causality helps to provide better learning and explain-     ing knowledge is extracted with the assistance of pyramid
+able models, within the broader context of computer vision,     matching strategy, while the ID branch is the ReID model for
+there is growing interest in causal discovery [32], causality      ID-intrinsic feature learning. With the knowledge transfer in
+distilling [14,50], incorporating causality within scene under-     training process, the clothing branch is gradually strength-
+standing downstream tasks [24,27], stable learning [21,43],    ened to perceive the clothing bias entangled with the ID
+disentanglement learning [36,37], and debiasing [5,22].         representation.  Subsequently, causal intervention is con-
+   Causality models are designed to identify and analyze     ducted by a simple subtraction operation between two ID
+causal relationships among data, while conventional mod-     classiﬁers to remove the effects of bias indirectly, which does
+els focus on association. Theoretically, causal relationships     not destroy semantic integrity. Finally, under the constraint
+are constructed on a deeper understanding of data, a higher     of causality, the ID branch learns features unrelated to cloth-
+dimensional abstraction of data relationships. Although ran-     ing as training continues, focusing the model’s attention on
+domized controlled experiments are a crucial criterion for      ID-intrinsic features, without external cost.
+establishing causal inference, controlling the speciﬁcs of
+feature extraction is challenging, making such experiments     Causal Analysis.  Discovering causal relations from head-
+impractical. As a consequence, numerous approaches have      less randomized controlled trials typically involves inter-
+surfaced to distill causality from the existing observational     ventions [22] on data. Due to the severe entanglement of
+data. Recently, Tang et al. [31] alleviate context bias based     numerous inﬂuencing factors with the original data, it is ei-
+on total direct effect (TDE) in causal inference for unbi-     ther difﬁcult or impossible to distill speciﬁc factors solely in
+ased scene graph generation. CAL [27] leverages random      the observational representation space. Causal theory sheds
+attention to formulate counterfactual causality for visual      light on distilling speciﬁc effects without knowing all inﬂu-
+categorization. CF-VQA [24] analyses the causal effect of     encing factors, attributed to do-operation [7]. The do(X)
+questions on answers in visual question answering and miti-     denotes the do-operation on variable X, also known as mak-
+gates language bias by subtracting the direct language effect     ing causal intervention upon X. Performing do(X) allows
+from the total causal effect.                                  us to specify the exact value of X and isolate its cause.
+   However, to our knowledge, no one has applied causality       Before further analysis, we ﬁrst construct a CC-ReID
+to CC-ReID. Enlightened by previous excellent works, we     based causal graph as the theoretical basis, as shown in
+introduce causality into CC-ReID to separate the clothing      Fig. 3(a). A causal graph is a directed acyclic graph showing
+bias and the ID-intrinsic clues. By utilizing causal auto-    how variables interact through causal paths, which provides
+intervention, the clothing bias can be reasonably mitigated     a sketch of the causal relations behind the data. We begin
+without compromising the integrity of the original semantics.     with a brief description of the rationale behind the nodes and
+
+                                                     1474
+
+======================== PDF 第 4 页 ========================
+                                                           Pooling&Conv         be aware of the speciﬁc impact of all clothing that appears,                                                     Clothing
+   Entangled knowledge  Feature
+                                                       Feature             ࡲ ௖        which remains difﬁcult to implement.
+       C          Z               ܧ஼                                 Fortunately, TDE serves as a way to remove speciﬁc
+                                                             Clothing
+                                                        Encoder                          inﬂuences in causal inference [31], aligns with our goal,
+      X        Y                                     and provides guidance for the construction of AIM. For the
+                                        Backbone
+       ID-intrinsic clues     Identity                                  model to separate the entangled representation and make
+                                     N Blocks                  predictions from the ID-intrinsic feature, an intuitive idea
+        (a) Causal graph for CC-ReID      (b) Illustration of the pyramid matching
+                                                                            is to consistently eliminate the inﬂuence of clothing. To
+Figure 3. Causal graph for CC-ReID and the detailed illustration of
+                                                                       this end, given the observed outcome Yx,c(z) and the bias-the pyramid matching strategy.
+                                                            speciﬁc prediction Yc(z), TDE can be formulated as:
+
+paths to further elaborate on how the existing ReID models              TDE = Yx,c (z) −Yc (z) ,              (2)
+are misled by clothing bias.
+  Two nodes connected by a directed edge in a causal    where the ﬁrst term is from the regular prediction and the
+graph indicate that there are causalities between them, e.g.,     second is from the intervention by P(Y |X = c)P(C = c).
+(X→Y ) stands for Y is caused by X. In the causal graph        Letting the clothing bias as the main effect, through a
+of CC-ReID, we denote X as the ID-intrinsic clues that only     simple subtraction, we are able to remove the inﬂuence of the
+related to person; Y as the ID prediction by the ReID model,     biased effect C→Z from the direct effect of X→Z. Finally,
+whose expectation value is equivalent to the ground truth; Z      the ﬁnal prediction Y can be more robust by revealing the
+represents the feature produced by ReID model; C is term      true relationship between unbiased feature Z and X.
+as the entangled knowledge that affect X. Many potential
+                                                               3.2. Model Constructionelements are responsible for the entangled knowledge, where
+clothing, as part of a person’s intuitive understanding, has       Following the TDE in causal theory, we build AIM, as
+a greater impact on ReID than others. The concomitant of    shown in Fig. 2, which consists of two branches. The ID
+clothing to people makes it closely entangled with intrinsic     branch is to simulate Yx,c(z) to obtain the observed ID fea-
+ID clues, which is the main concern of this paper.                 ture. The clothing branch is the realization of Yc(z). Further,
+  (C, X)→Z→Y shows the complete calculation process,     the challenge lies in distilling clothing bias from the obser-
+which can be divided into two paths. The ﬁrst is ideal path     vation features. As preparation, we combine the samples’
+X→Z→Y , representing the ideal CC-ReID is performed    ID and the suit category as a separate clothing label for each
+through the feature of factual related to ID. Z→Y denotes       suit, which denotes YC. The number of suits of all samples
+that the extracted feature determines the ﬁnal person recogni-      is summarised as NC. Please note that this is a rough catego-
+tion. Z appears as a mediator, which is inevitable for existing      rization strategy, and pedestrians are not necessarily sharing
+deep learning models. The second path is C→X→Z→Y ,     the same clothing label even if they wear similar clothes.
+where C→X is the entangled representation contributing to        In the ID branch, the biased ID feature can be obtained
+the faulty association between clothing and ID.                through the ID encoder FID = E(xi) by minimizing the
+   Additionally, the dashed arrow means there exists statisti-     identiﬁcation loss LID as:
+cal dependence. As in C→Y and X→Y , neither ID clues
+                                                        N
+nor clothing bias of the person has a direct impact on the                                                                 LID = −    yi log pID  yi|xi    ,          (3)
+prediction results of the deep learning model.
+                                                                                 i=1
+
+                                                    where pID(yi|xi) is the probability of the i-th ID from theCausal Intervention.  Clothing bias stems from the entan-
+                                                 ID classiﬁer δID for image xi.gled knowledge intertwined with ID-intrinsic clues, which
+                                                                 In the clothing branch, two objectives are the basis of itscan be challenging to discern and distinguish accurately.
+                                                              design. Firstly, clothing information needs to be preciselyCausal intervention provides an opportunity to incorporate
+                                                                 extracted. Secondly, knowledge transfer learning from theclothing knowledge into the model’s prediction through back-
+                                                 ID branch is also required to understand how clothing biasdoor adjustment without destroying semantic integrity:
+                                                                     affects the ID branch.
+  P (Y |do (X)) =   P (Y |X, C = c) P (C = c) ,   (1)       For the ﬁrst purpose, we concentrate on the intrinsic top-
+               C                                     middle-bottom characteristics of clothing (i.e., shirts, pants,
+                                                     and shoes) and adopt pyramid matching strategy [8] to en-
+where do(X) is do-calculate, which is used for cutting the ef-    hance the partial feature representation of clothing. Speciﬁ-
+fect of C→X. Speciﬁcally, through do(X), we can separate      cally, as shown in Fig. 3(b), pyramid features are extracted
+the effect of clothing bias and ID-intrinsic clues. However,    by dividing the deep features into different numbers of par-
+P(C = c) in the conventional backdoor adjustment needs to       tial feature blocks. By incorporating feature blocks with
+
+                                                     1475
+
+======================== PDF 第 5 页 ========================
+diverse scales, the model can effectively capture both global     without destroying semantic integrity. The right of Fig. 2
+and local information at varying spatial scales, resulting in      illustrates the intervention in graph view and the variation
+more precise sensing of clothing details. The ﬁnal cloth-     of the feature heatmap at each step. The green and orange
+ing feature can be obtained from the clothing encoder with     arrows denote the normal and the biased routes, respectively.
+pyramid matching strategy as FC = PM(EC(xi)).             In summary, the clothing bias learned through model infer-
+   Then, we adopt a cloth classiﬁer δC trained by cloth clas-     ence and knowledge transfer is automatically eliminated by
+siﬁcation loss LC to leverage the ground-truth clothing la-     causal constraints through training, resulting in unbiased ID
+bels while maintaining clothing information in feature space,     representations for robust ReID.
+which can be formulated as:
+                                                               3.3. Objective Function
+               NC
+        LC = −    yiC log pC  yiC|xi    ,          (4)        In clothing branch, clothing representation is trained by
+                    i=1                                  minimizing LC. The ReID model of ID branch is trained
+                                                   by minimizing LID. LKL is minimized to perceive clothing
+where pC(yiC|xi) is the probability of the i-th clothing, yiC      bias in ReID training. The causal intervention of eliminating
+is the corresponding clothing label.                            clothing bias is produced by minimizing LCAL The total
+   For the second purpose, to enable FC to perceive clothing      objective function is a weighted sum of all the above losses:
+bias in FID, we adopt Kullback Leibler (KL) Divergence as
+                                                                                  LTotal = LC + LID + λCALLCAL + λKLLKL,     (9)in mutual learning [44] to ﬁt the distribution of clothing bias
+entangled with ID representation. To this end, we utilize an                                                    where λCAL is the weight of causal auto-intervention loss
+additional classiﬁer δA trained by cloth classiﬁcation loss in                                                                   to strengthen the effect of bias elimination, and λKL is used
+the ID branch. The clothing inference is distilled by δA and                                                             as the weight to control the transfer intensity of clothing
+then transferred to the clothing branch for knowledge migra-                                                       knowledge. A detailed analysis of the hyper-parameters
+tion. The KL distance DKL from FC to FID is computed as:                                                                 selection of λ can be referred to Sec. 4.3. The weights of
+                                                               other loss terms are basic terms [9] and set as 1. We ﬁx the
+      ˆpC = exp (δC (FC)) ,   ˆpID = exp (δA (FID)) ,   (5)     above weights during the training process in all experiments.
+                                                    Both branches are trained simultaneously, while only ID
+                 M
+                                       ˆpmC ,          (6)     branch is employed for testing.         DKL (ˆpC∥ˆpID) =                                ˆpmC log
+                                       ˆpmID                     m=1                                                          4. Experimental Results
+where M denotes the number of samples in a mini-batch. To
+                                                               4.1. Datasets and Metrics
+be noticed, due to the asymmetry of Kullback–Leibler (KL)
+Divergence, we compute DKL(ˆpID∥ˆpC) as well. The total     We evaluate AIM on two standard cloth-changing
+KL Divergence can be formulated as:                            datasets, PRCC-ReID [38] and LTCC-ReID [26]. PRCC-
+                                               ReID [38] consists of 221 IDs with three camera views, in-
+       LKL = DKL (ˆpC∥ˆpID) + DKL (ˆpID∥ˆpC) .       (7)     cluding 33,698 images. Each person wears the same clothes
+                                                                  in camera A and camera B, and different clothes in camera
+   With the above preparations, to transfer TDE from theory                                   A and camera C. LTCC-ReID [26] is a long-term person
+to reality, (2) can be transferred into a causality loss:                                                 ReID dataset with frequent changes in clothing and multiple
+         N                                             environmental changes. It is captured indoors with 12 cam-
+ LCAL = −    yi log  δID (FID) −δ ID′ (FC ⊗FID)   ,  (8)     era views, containing 152 IDs and 478 outﬁts with 17,119
+            i=1                                              labeled images. Additionally, we follow the previous stud-
+                                                                     ies [9,12] and leverage rank-K (R@K) and mean average
+where δ ID′  is the ID-Cloth classiﬁer sharing weight with δID.     precision (mAP) for evaluation.
+FC ⊗FID stands for the bilinear pooling to fuse both features.                                                               4.2. Implementation Details
+As bias and ID features are entangled, the model pays simi-
+lar attention to both features, while clothing branch focuses     We conduct experiments on both cloth-changing and stan-
+only on the distillation of bias. Fusing both features can     dard settings. The default settings of datasets [26,38] with
+enhance the expression of same-located bias and suppress     multi-shot matching strategy are employed for training and
+the attention on ID to achieve accurate intervention. It also      evaluation. In standard setting, images with the same ID and
+promotes separating both features, whose effects on feature     camera view in the testing set are discarded when evaluating.
+variation can be seen in ablation studies in Sec. 4.5. We     In contrast, in cloth-changing setting, images with the same
+perform P(Y |X = c)P(C = c) as making clothing bias     ID, camera view, and clothing are discarded during testing
+the source of ID prediction to remove it in the latent space      to evaluate the model performance on unseen clothing.
+
+                                                     1476
+
+======================== PDF 第 6 页 ========================
+Table 1. Comparison of R@K (%) and mAP (%) performance with the state-of-the-arts on PRCC-ReID and LTCC-ReID dataset. “†”
+denotes the methods that are designed for CC-ReID. “‡” indicates the reproduced results. “*” represent the single-shot result. Bold and
+underline numbers are the best and second-best results, same as the following. Type “RGB” means only RGB modality is utilized.
+
+                                                               PRCC-ReID                   LTCC-ReID
+                                                   Type
+  Method                Venue        Size                           Standard      Cloth-Changing      Standard      Cloth-Changing
+
+                                 RGB    Hybrid   R@1  mAP   R@1   mAP  R@1  mAP  R@1   mAP
+
+  PCB [30]          ECCV 18   384×192                    -       99.8     97.0     41.8     38.7    65.1    30.6    23.5     10.0
+  OSNet [48]          ICCV 19   384×192                    -            -          -           -           -      67.9    32.1    23.9     10.8
+  HPM [8]           AAAI 19   384×128                    -       99.4     96.9     40.4     37.2        -          -          -           -
+   IANet [13]         CVPR 19   384×192                    -       99.4     98.3     46.3     46.9    63.7    31.0    25.0     12.6
+   ISP [49]          ECCV 20   256×128                    -       92.8        -       36.6         -      66.3    29.6    27.8     11.9
+
+  3DSL [3] †         CVPR 21   256×128       -     +Shape        -          -       51.3         -          -          -      31.2     14.8
+  FSAM [12] †        CVPR 21   256×128       -     +Mask     98.8        -       54.5*       -      73.2    35.4    38.5     16.2
+   GI-ReID [17] †      CVPR 22   256×128       -      +Gait     86.0        -       33.3         -      63.2    29.4    23.7     10.4
+  UCAD [35] †          IJCAI 22   384×192       -     +Mask     96.5        -       45.3         -      74.4    34.8    32.5     15.1
+  ViT-VIBE [1] †     WACV 22          -             -     +Shape    99.7        -       47.0         -      71.4    35.8        -           -
+  IRANet [28] †         IVC 22    384×128       -      +Pose     99.7     97.8     54.9     53.0        -          -          -           -
+  AFD-Net [34] †        IJCAI 21   256×128                    -       95.7        -       42.8         -          -          -          -           -
+  RCSANet [15] †      ICCV 21   336×336                    -       99.6     96.6     48.6     50.2        -          -          -           -
+
+  CAL [9] (Baseline) ‡   CVPR 22   256×128                    -       100.0    99.7     53.4     53.1    74.4    39.0    34.4     16.0
+  CAL [9] (Baseline) ‡   CVPR 22   384×192                    -       100.0    99.8     54.4     54.4    73.4    39.4    38.0     17.2
+  AIM (Ours)                    256×128                    -       100.0    99.9     54.7     55.0    76.1    39.1    38.3     17.0
+  AIM (Ours)                    384×192                    -       100.0    99.9     57.9     58.3    76.3    41.1    40.6     19.1
+
+
+         Decline   Rise                             Decline  Rise    Decline             presented in Fig. 4. The results on two datasets demonstrate
+                                                                       that when λCAL is ﬁxed, an increase of λKL does not improve
+                                                              accuracy. When λKL is ﬁxed, an increase of λCAL leads to
+                                                         Rise          Decline          an increase and then a decrease in accuracy.  Finally, we
+          Rise         Decline                                          leverage the value of (0.1, 0.01) and (1, 1) for (λCAL, λKL)
+                                                   on PRCC-ReID and LTCC-ReID, respectively. The results
+        (a) Performance on PRCC-ReID           (b) Performance on LTCC-ReID       show that λCAL, as a proxy for the ability of bias elimination,
+Figure 4. R@1 accuracy for different hyper-parameters on two      prefers a medium value, while λKL depends on different data
+datasets. Different colors indicate different loss terms.              environments and is therefore chosen accordingly.
+
+                                                               4.4. Comparison with State-of-the-art Methods   Following CAL [9], ResNet50 [11] pre-trained on Im-
+ageNet is involved as the encoder of AIM, where the last     We conduct comparative experiments with conventional
+two pooling layer and fully connected layer are removed.     short-term ReID and novel CC-ReID state-of-the-art meth-
+Following the top-middle-bottom characteristic of clothing,     ods on two standard CC-ReID datasets. Since CC-ReID is in
+we adopt the maximum split number of N = 4 in the       its infancy, most methods are hybrids, consisting of multiple
+pyramid matching strategy. Following [26], in the train-     modalities, e.g., sketch, keypoint, pose, mask, and gait. In
+ing phase, the input images are regularized as 384×192 with      contrast, only a few methods, including AIM, make their
+random horizontal ﬂipping, random cropping, and random      efforts to explore discriminative features from pure RGB
+erasing [47]. We adopt Adam [18] optimizer for the training     modality. As shown in Table 1, the results of AIM show a
+of both branches. The learning rate is initialized to 3.5e−4     signiﬁcant improvement over hybrid and RGB state-of-the-
+and divided by 10 after every 20 epochs, totaling 80 epochs.      art methods by causal auto-intervention.
+LCAL is used for training after the 25th epoch.                     Speciﬁcally, we compare AIM with 5 conventional
+                                                     methods in short-term ReID and 8 methods explicitly de-
+4.3. Parameter Analysis
+                                                           signed for CC-ReID. For PRCC-ReID, in the standard set-
+  The hyper-parameters of AIM including λCAL and λKL      ting, AIM achieves the same metrics as the baseline [9]
+in (9). These two parameters control the intensity of causal    method and maintains a high level; In the cloth-changing
+auto-intervention and knowledge transferring. Inspired by      setting, AIM surpasses the baseline with 3.5%/3.9% of
+the Gibbs sampling strategy, we ﬁrst ﬁx the initial value    R@1/mAP, and it also outperforms the second-best method
+of λCAL to 1 and determine λKL by iterative experiments.    IRANet [28], which leverages keypoint as external knowl-
+Then, the λKL is ﬁxed and reversely determines the value of     edge, by 3.0%/5.3% of R@1/mAP. The result demonstrates
+the λCAL by the same iterative experiments. The results are      that AIM works well compared to existing CC-ReID meth-
+
+                                                     1477
+
+======================== PDF 第 7 页 ========================
+Table 2. Ablation studies of each component of AIM in cloth-     Table 3. Ablation studies of the backbone of each branch of AIM
+changing setting on PRCC-ReID and LTCC-ReID.                      in cloth-changing setting on PRCC-ReID and LTCC-ReID.
+
+       Basic         Causality    PRCC-ReID     LTCC-ReID                Baseline       Debias      PRCC-ReID     LTCC-ReID
+
+  B/L    Debias  ⊗   KL   R@1   mAP   R@1   mAP           Res  PM    Res  PM   R@1   mAP   R@1   mAP
+
+                                  54.4     54.4     38.0     17.2                             -         -         -      54.4     54.4     38.0     17.2
+                                  55.1     56.2     39.3     17.9                                           55.8     56.9     39.3     18.1
+                                  56.1     56.4     38.0     18.2                                           57.1     57.6     37.0     16.8
+                                  55.2     56.4     40.1     18.0                                           56.2     56.6     35.7     16.7
+                                  57.9     58.3     40.6     19.1                                           57.9     58.3     40.6     19.1
+
+                                                                                                           Probe       Heatmap of ID-branch        Heatmap of Clothing-branch
+ods with unbiased ID-intrinsic feature learning. For LTCC-
+ReID, AIM improves by 2.9%/2.6% of R@1 and 1.7%/1.9%           ID:A                                             N\A
+                                                                                                              Cloth: A
+of mAP to the baseline method in two settings. The second-
+best method on LTCC-ReID is FSAM [12], which leverages
+                                                                                                                    B/L    +C   +C+ ٔ +C+ ٔ+KL  B/L    +C   +C+ ٔ +C+ ٔ+KL
+ﬁne-grained mask and multi-branch learning strategy for
+appearance and structure features. Compared to it, we attain
+                                                                                         ID:A
+3.1%/2.1% of R@1 and 5.7%/2.9% of mAP in two settings.             Cloth: B                                         N\A
+The results show that even under complex scenarios (resolu-
+tion, illumination, viewpoint, et al.), AIM can still capture                              B/L    +C   +C+ ٔ +C+ ٔ+KL  B/L    +C   +C+ ٔ +C+ ٔ+KL
+the existing discriminative features rather than being mis-      Figure 5. Visualization of the ID feature and the clothing feature.
+led by the noticeable clothing bias. We also compare the
+conventional ReID methods (rows 1-5) and ﬁnd that AIM    ID branch (rows 3 & 4) or the clothing branch (rows 3 &
+signiﬁcantly outperforms them. This is because capturing ID-     5) can improve the ReID accuracy. While, the combination
+intrinsic information becomes challenging under complex     of ResNet (R) + PM, which only adds PM for the clothing
+conditions, which increases the probability of the entangled     branch, gives the best results. A possible reason is that the
+representation misleading the conventional model.           model with PM has better clothing sensitivity through the
+                                                         top-middle-bottom structures, which increases the partial
+4.5. Ablation Studies                                                                 representation. For ID branch, although more detailed in-
+Component Analysis.  To verify the validity of the AIM     formation is extracted, it somehow exacerbates the clothing
+                                                                     bias, which violates the purpose to optimize ID-intrinsicmodel and each component, we perform ablation studies in
+                                                                representation for robust ReID.Table 2. Speciﬁcally, there are two basic components, “B/L”
+is for baseline, and “Debias” is for the pure dual-branched
+                                                               4.6. Qualitative Results
+causal intervention structure without other components. “⊗”
+stands for the fusion operation in (8). “KL” denotes the     Analysis of Robust Representation.  Fig. 5 shows how
+knowledge transfer process, speciﬁed as the KL Divergence      the heatmap of the ID and the clothing change as each com-
+loss in (7). The solid black dot indicates that the correspond-     ponent is added. The details of notations can be referred to
+ing module is being used for training. By comparing rows     Sec. 4.5. More components indicate more accurate clothing
+1-2, we observe that the causal auto-intervention has a certain      bias distillation and more robust ID-intrinsic representation
+effect but is still unsatisfactory. By comparing rows 2 with      learning. The comparison from left to right clearly shows the
+3-4, the results indicate the effectiveness of feature fusion      variation of feature attention areas. For the same person with
+and clothing knowledge migration. Each component en-     cloth changing, the ID features of the baseline [9] method
+hances the ability to distill clothing bias from the entangled      are misled by clothing bias, which has faulty attention on the
+representation. The last row demonstrates that AIM with     wearings. While AIM successfully mitigates the impact of
+all components gives the best performance. These results      clothing bias, redirects the model’s attention to the intrinsic
+indicate that by auto-intervention and clothing bias distilla-     areas (e.g., head) and weakens for regions of the body that
+tion, the unbiased ID-intrinsic representation is exploited for     are not associated with the ID (e.g., bag, shoes, and shoul-
+better identiﬁcation, and each component contributes equally      der). Through continuous reﬁnement of the clothing bias
+to the ﬁnal result.                                                       distillation, the clothing features become more concentrated
+                                                    on areas that affect the learning of ID-intrinsic information.
+
+Inﬂuence of Pyramid Matching.  We evaluate the effect
+of adding pyramid matching (PM) strategy to the backbone     Clothing Bias Elimination.  As mentioned, the entangled
+of each branch. Table 3 shows the performance changes on      representation of clothing and ID-intrinsic clues is an obsta-
+two datasets. The results show that either adding PM to the      cle to the existing CC-ReID methods. The solution to this
+
+                                                     1478
+
+======================== PDF 第 8 页 ========================
+            Rank@5 Retrieved Images              Rank@5 Retrieved Images                        scattered                           assembled
+  Probe                                    Probe
+
+        B/L                                  B/L
+
+
+
+        Ours                                   Ours
+
+
+         (a) Retrieval of dataset images         (b) Retrieval of real world same-cloth images                      (a) t-SNE of Baseline                               (b) t-SNE of AIM
+Figure 6. Retrieval results of dataset images and real-world images.     Figure 8. Visualization of 10 classes randomly selected from PRCC-
+The green bar at the bottom represents the correct matching, while     ReID. Our AIM separates different classes while effectively reduc-
+the red bar is the opposite.                                           ing the inter-class variance.
+
+       Clothing                                        Clothing
+ Probe         Rank@5 Retrieved Images     Probe         Rank@5 Retrieved Images
+      Heatmap                                  Heatmap                          categories on PRCC-ReID, which compares the feature dis-
+                                                                   tributions in the latent space of the baseline [9] and AIM.
+                                                   The results show that AIM can reduce the intra-class distance
+           (a) Similar appearance                        (b) Similar pattern            and make the feature distribution more aggregated (as shown
+Figure 7. Visualization of the clothing heatmap and top-5 retrieval      in the red dashed circle). The blue dashed circles in Fig. 8(a)
+results by feature of clothing branch in AIM.                      enclose three groups of yellow points with very scattered
+                                                                  distances, which are better clustered together in Fig. 8(b).
+problem emphasizes eliminating the inﬂuence of clothing
+and focusing on the intrinsic properties of people. To no-     5. Conclusion
+tice the difference between the baseline [9] and ours and                                                             Clothing is an essential aspect of human identity and is
+further demonstrate the ability of AIM to eliminate clothing                                                                  crucial in general person ReID. However, it also poses a
+bias, Fig. 6 illustrates the results of the retrieval ranks at                                                             signiﬁcant challenge in Cloth-Changing person ReID (CC-
+the laboratory and real-world level. Five candidate gallery                                                   ReID) due to its confounding nature.  In this paper, we
+images with the highest similarity to the probe image are                                                             analyze the effect of clothing on model prediction and adopt
+displayed. The results in Fig. 6(a) demonstrate that simi-                                                             causal intervention to eliminate this effect automatically.
+lar clothing patterns or colors mislead the baseline method,                                                              Speciﬁcally, a causality-based Auto-Intervention Model
+while AIM captures ID information and yields the correct                                                 (AIM) is ﬁrst proposed to mitigate clothing bias for robust
+retrieval results, despite the dramatic shift in dressing style.                                                  CC-ReID. A dual-branch structure of clothing and ID is
+As there are no samples for different people wearing the                                                                    utilized to simulate the causal intervention process and pe-
+same cloth, we collect samples in DeepFashion [23] for eval-
+                                                                nalized by a causality loss. AIM is eventually encouraged to
+uation, where all people wear the same kind of white dress.                                                                  learn ID-intrinsic clues free from clothing bias. Furthermore,
+Fig. 6(b) demonstrates that AIM performs well even with                                                            experimental results on two CC-ReID datasets demonstrate
+interference of identical clothing. The above results reveal                                                                the effectiveness and the ability of clothing bias distillation
+that the proposed AIM is more robust to clothing bias and                                                              of AIM, which achieves state-of-the-art performance.
+accurately captures the correct candidates.                                                         Although causal theory provides sufﬁcient guidance for
+                                              AIM, limitations remain. In the entangled representation,
+Clothing Knowledge Distillation.  Additionally, to verify     clothing is merely one of several intuitive factors, and many
+that the clothing branch indeed distills the knowledge of     other confounding factors are worth investigating. The de-
+clothing and learns the representation of clothing bias, we     sign of the clothing branch requires the perception of cloth-
+also visualize the feature of the clothing branch and use     ing as a prerequisite, which is limited by clothing annotations
+such features as probes to produce retrieval in the database.    and sample numbers. Besides, as bias is widely present in
+Note that all clothing in the gallery is not identical to the    ReID tasks, a stronger backbone might lead to greater boosts.
+probe. The heatmap of clothing and the top 5 images with
+the highest similarity scores are displayed. Fig. 7(a) shows    Acknowledgments
+the similarity of the striped plaid shirt, while Fig. 7(b) shows
+                                                             This work was supported by National Key R&D Project
+the similarity of the clothing with similar color style and
+                                                    (2021YFC3320301), National Natural Science Founda-
+logo on the chest. The results demonstrate that the clothing
+                                                                  tion of China (62171325, 62271361), Hubei Key R&D
+branch of AIM captures the clothing knowledge as expected.
+                                                  (2022BAA033) and CAAI-Huawei MindSpore Open Fund.
+                                                  The numerical calculations in this paper have been done on
+Features Distribution Analysis.  Moreover, to evaluate     the supercomputing system in the Supercomputing Center
+the methodology of AIM from another dimension, Fig. 8     of Wuhan University.
+visualizes the feature distributions of 10 randomly selected
+
+                                                     1479
+
+======================== PDF 第 9 页 ========================
+References                                                      [14] Xinting Hu, Kaihua Tang, Chunyan Miao, Xian-Sheng Hua,
+                                                                 and Hanwang Zhang. Distilling causal effect of data in class-
+ [1] Vaibhav Bansal, Gian Luca Foresti, and Niki Martinel. Cloth-                                                                         incremental learning. In Proc. IEEE/CVF Conf. Comput. Vis.
+     changing person re-identiﬁcation with self-attention. In Proc.                                                                          Pattern Recognit., pages 3957–3966, 2021. 3
+    IEEE/CVF Winter Conf. Appl. Comput. Vis. Workshops, pages
+                                                                     [15] Yan Huang, Qiang Wu, Jingsong Xu, Yi Zhong, and Zhaoxi-
+     602–610, 2022. 6
+                                                               ang Zhang. Clothing status awareness for long-term person
+ [2] Igor Barros Barbosa, Marco Cristani, Alessio Del Bue, Loris
+                                                                                re-identiﬁcation. In Proc. IEEE/CVF Int. Conf. Comput. Vis.,
+     Bazzani, and Vittorio Murino. Re-identiﬁcation with RGB-D
+                                                                    pages 11875–11884, 2021. 6
+     sensors. In Proc. Eur. Conf. Comput. Vis. Workshops, pages
+                                                                     [16] Xuemei Jia, Xian Zhong, Mang Ye, Wenxuan Liu, and     433–442, 2012. 1
+                                                             Wenxin Huang. Complementary data augmentation for cloth-
+ [3] Jiaxing Chen, Xinyang Jiang, Fudong Wang, Jun Zhang, Feng
+                                                                  changing person re-identiﬁcation. IEEE Trans. Image Pro-
+     Zheng, Xing Sun, and Wei-Shi Zheng. Learning 3d shape
+                                                                                      cess., 2022. 2
+     feature for texture-insensitive person re-identiﬁcation.  In
+     Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit., pages      [17] Xin Jin, Tianyu He, Kecheng Zheng, Zhiheng Yin, Xu Shen,
+     8146–8155, 2021. 2, 6                                      Zhen Huang, Ruoyu Feng, Jianqiang Huang, Zhibo Chen,
+                                                                  and Xian-Sheng Hua. Cloth-changing person re-identiﬁcation [4] Xiumei Chen, Xiangtao Zheng, and Xiaoqiang Lu. Bidirec-
+                                                               from A single image with gait prediction and regularization.      tional interaction network for person re-identiﬁcation. IEEE
+                                                                         In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit.,     Trans. Image Process., 30:1935–1948, 2021. 1
+                                                                    pages 14258–14267, 2022. 2, 6 [5] Saloni Dash, Vineeth N. Balasubramanian, and Amit Sharma.
+     Evaluating and mitigating bias in image classiﬁers: A causal      [18] Diederik P. Kingma and Jimmy Ba. Adam: A method for
+      perspective using counterfactuals. In Proc. IEEE/CVF Winter            stochastic optimization. In Proc. Int. Conf. Learn. Represent.,
+     Conference on Appl. Comput. Vis., pages 3879–3888, 2022. 3          pages 1–15, 2015. 6
+ [6] Chao Fan, Yunjie Peng, Chunshui Cao, Xu Liu, Saihui Hou,      [19] Kun Kuang, Lian Li, Zhi Geng, Lei Xu, Kun Zhang, Beishui
+     Jiannan Chi, Yongzhen Huang, Qing Li, and Zhiqiang He.           Liao, Huaxin Huang, Peng Ding, Wang Miao, and Zhichao
+      GaitPart: temporal part-based model for gait recognition. In            Jiang. Causal inference. Eng., 6(3):253–263, 2020. 2
+     Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit., pages      [20] Yu-Jhe Li, Zhengyi Luo, Xinshuo Weng, and Kris M. Ki-
+    14213–14221, 2020. 2                                                        tani. Learning shape representations for clothing variations
+ [7] Norman E. Fenton, Martin Neil, and Anthony C. Constanti-            in person re-identiﬁcation. arXiv:2003.07340, 2020. 2
+     nou. The book of why: The new science of cause and effect,      [21] Jiashuo Liu, Zheyan Shen, Peng Cui, Linjun Zhou, Kun
+     judea pearl, dana mackenzie. basic books (2018). Artif. Intell.,         Kuang, Bo Li, and Yishi Lin.  Stable adversarial learning
+     284:103286, 2020. 2, 3                                          under distributional shifts. In Proc. AAAI Conf. Artif. Intell.,
+ [8] Yang Fu, Yunchao Wei, Yuqian Zhou, Honghui Shi, Gao          pages 8662–8670, 2021. 3
+     Huang, Xinchao Wang, Zhiqiang Yao, and Thomas S. Huang.                                                                     [22] Ruyang Liu, Hao Liu, Ge Li, Haodi Hou, Tinghao Yu, and
+     Horizontal pyramid matching for person re-identiﬁcation. In                                                              Tao Yang. Contextual debiasing for visual recognition with
+     Proc. AAAI Conf. Artif. Intell., pages 8295–8302, 2019. 2, 4,                                                                         causal mechanisms. In Proc. IEEE/CVF Conf. Comput. Vis.
+    6                                                                          Pattern Recognit., pages 12745–12755, 2022. 3
+ [9] Xinqian Gu, Hong Chang, Bingpeng Ma, Shutao Bai,                                                                     [23] Ziwei Liu, Ping Luo, Shi Qiu, Xiaogang Wang, and Xiaoou
+     Shiguang Shan, and Xilin Chen. Clothes-changing person                                                                    Tang.  DeepFashion: powering robust clothes recognition
+      re-identiﬁcation with RGB modality only. In Proc. IEEE/CVF                                                                 and retrieval with rich annotations. In Proc. IEEE/CVF Conf.
+     Conf. Comput. Vis. Pattern Recognit., pages 1050–1059, 2022.                                                                Comput. Vis. Pattern Recognit., pages 1096–1104, 2016. 8
+      5, 6, 7, 8
+                                                                     [24] Yulei Niu, Kaihua Tang, Hanwang Zhang, Zhiwu Lu, Xian-
+[10] Ruocheng Guo, Lu Cheng, Jundong Li, P. Richard Hahn, and
+                                                               Sheng Hua, and Ji-Rong Wen. Counterfactual VQA: A cause-
+    Huan Liu. A survey of learning causality with data: Problems
+                                                                                   effect look at language bias. In Proc. IEEE/CVF Conf. Com-
+     and methods. ACM Comput. Surv., 53(4):75:1–75:37, 2020.
+                                                                                 put. Vis. Pattern Recognit., pages 12700–12710, 2021. 3
+    2
+                                                                     [25] Judea Pearl. Direct and indirect effects. arXiv:1301.2300,[11] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+                                                                     2013. 2    Deep residual learning for image recognition.   In Proc.
+    IEEE/CVF Conf. Comput. Vis. Pattern Recognit., pages 770–      [26] Xuelin Qian, Wenxuan Wang, Li Zhang, Fangrui Zhu, Yanwei
+     778, 2016. 6                                                      Fu, Tao Xiang, Yu-Gang Jiang, and Xiangyang Xue. Long-
+[12] Peixian Hong, Tao Wu, Ancong Wu, Xintong Han, and Wei-          term cloth-changing person re-identiﬁcation. In Proc. Asian
+     Shi Zheng.  Fine-grained shape-appearance mutual learn-          Conf. Comput. Vis., pages 71–88, 2020. 2, 5, 6
+     ing for cloth-changing person re-identiﬁcation.  In Proc.      [27] Yongming Rao, Guangyi Chen, Jiwen Lu, and Jie Zhou. Coun-
+    IEEE/CVF Conf. Comput. Vis. Pattern Recognit., pages            terfactual attention learning for ﬁne-grained visual catego-
+    10513–10522, 2021. 2, 5, 6, 7                                           rization and re-identiﬁcation. In Proc. IEEE/CVF Int. Conf.
+[13] Ruibing Hou, Bingpeng Ma, Hong Chang, Xinqian Gu,         Comput. Vis., pages 1005–1014, 2021. 3
+     Shiguang Shan, and Xilin Chen. Interaction-and-aggregation      [28] Wei Shi, Hong Liu, and Mengyuan Liu. IRANet: identity-
+     network for person re-identiﬁcation. In Proc. IEEE/CVF Conf.           relevance aware representation for cloth-changing person re-
+    Comput. Vis. Pattern Recognit., pages 9317–9326, 2019. 6              identiﬁcation. Image Vis. Comput., 117:104335, 2022. 6
+
+                                                     1480
+
+======================== PDF 第 10 页 ========================
+[29] Xiujun Shu, Ge Li, Xiao Wang, Weijian Ruan, and Qi Tian.            generalization. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern
+     Semantic-guided pixel sampling for cloth-changing person            Recognit., pages 5372–5382, 2021. 3
+      re-identiﬁcation. IEEE Signal Process. Lett., 28:1365–1369,      [44] Ying Zhang, Tao Xiang, Timothy M. Hospedales, and
+     2021. 2                                                   Huchuan Lu. Deep mutual learning. In Proc. IEEE/CVF Conf.
+[30] Yifan Sun, Liang Zheng, Yi Yang, Qi Tian, and Shengjin          Comput. Vis. Pattern Recognit., pages 4320–4328, 2018. 5
+    Wang. Beyond part models: Person retrieval with reﬁned part      [45] Zhizheng Zhang, Cuiling Lan, Wenjun Zeng, Xin Jin, and
+     pooling (and A strong convolutional baseline). In Proc. Eur.         Zhibo Chen. Relation-aware global attention for person re-
+     Conf. Comput. Vis., pages 501–518, 2018. 6                             identiﬁcation. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern
+[31] Kaihua Tang, Yulei Niu, Jianqiang Huang, Jiaxin Shi, and            Recognit., pages 3183–3192, 2020. 1
+    Hanwang Zhang. Unbiased scene graph generation from bi-      [46] Zhedong Zheng, Xiaodong Yang, Zhiding Yu, Liang Zheng,
+     ased training. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern          Yi Yang, and Jan Kautz. Joint discriminative and generative
+     Recognit., pages 3713–3722, 2020. 3, 4                                learning for person re-identiﬁcation. In Proc. IEEE/CVF Conf.
+[32] Lan Wang and Vishnu Naresh Boddeti. Do learned represen-         Comput. Vis. Pattern Recognit., pages 2138–2147, 2019. 2
+      tations respect causal relationships? In Proc. IEEE/CVF Conf.      [47] Zhun Zhong, Liang Zheng, Guoliang Kang, Shaozi Li, and
+    Comput. Vis. Pattern Recognit., pages 264–274, 2022. 3              Yi Yang. Random erasing data augmentation. In Proc. AAAI
+[33] Xiao Wang, Jun Chen, Zheng Wang, Wu Liu, Shin’ichi Satoh,          Conf. Artif. Intell., pages 13001–13008, 2020. 6
+    Chao Liang, and Chia-Wen Lin. When pedestrian detection      [48] Kaiyang Zhou, Yongxin Yang, Andrea Cavallaro, and Tao Xi-
+     meets nighttime surveillance: A new benchmark. In Proc.           ang. Omni-scale feature learning for person re-identiﬁcation.
+     IJCAI Int. Joint Conf. Artif. Intell., pages 509–515, 2020. 2             In Proc. IEEE/CVF Int. Conf. Comput. Vis., pages 3701–3711,
+[34] Wanlu Xu, Hong Liu, Wei Shi, Ziling Miao, Zhisheng Lu,          2019. 6
+     and Feihu Chen.  Adversarial feature disentanglement for      [49] Kuan Zhu, Haiyun Guo, Zhiwei Liu, Ming Tang, and Jinqiao
+     long-term person re-identiﬁcation. In Proc. IJCAI Int. Joint         Wang. Identity-guided human semantic parsing for person
+     Conf. Artif. Intell., pages 1201–1207, 2021. 6                           re-identiﬁcation.  In Proc. Eur. Conf. Comput. Vis., pages
+[35] Yuming Yan, Huimin Yu, Shuzhao Li, Zhaohui Lu, Jianfeng          346–363, 2020. 6
+     He, Haozhuo Zhang, and Runfa Wang. Weakening the inﬂu-      [50] Shengyu Zhu, Ignavier Ng, and Zhitang Chen. Causal discov-
+     ence of clothing: Universal clothing attribute disentanglement           ery with reinforcement learning. In Proc. Int. Conf. Learn.
+      for person re-identiﬁcation. In Proc. IJCAI Int. Joint Conf.           Represent., pages 1–16, 2020. 3
+      Artif. Intell., pages 1523–1529, 2022. 6
+[36] Kaiwen Yang and Xinmei Tian. Domain-class correlation de-
+     composition for generalizable person re-identiﬁcation. IEEE
+     Trans. Multimedia, 2022. 3
+[37] Mengyue Yang, Furui Liu, Zhitang Chen, Xinwei Shen,
+     Jianye Hao, and Jun Wang. CausalVAE: disentangled rep-
+     resentation learning via neural structural causal models. In
+     Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit., pages
+     9593–9602, 2021. 3
+[38] Qize Yang, Ancong Wu, and Wei-Shi Zheng.  Person re-
+     identiﬁcation by contour sketch under moderate clothing
+     change. IEEE Trans. Pattern Anal. Mach. Intell., 43(6):2029–
+     2046, 2021. 2, 5
+[39] Zhengwei Yang, Xian Zhong, Hong Liu, Zhun Zhong, and
+    Zheng Wang.   Attentive decoupling network for cloth-
+     changing re-identiﬁcation.  In Proc. IEEE Int. Conf. Mul-
+     timedia Expo, pages 1–6, 2022. 2
+[40] Zhengwei Yang, Xian Zhong, Zhun Zhong, Hong Liu,
+    Zheng Wang, and Shin’ichi Satoh. Win-win by competi-
+      tion: Auxiliary-free cloth-changing person re-identiﬁcation.
+    IEEE Trans. Image Process., 2023. 1
+[41] Shijie Yu, Shihua Li, Dapeng Chen, Rui Zhao, Junjie Yan,
+     and Yu Qiao. COCAS: A large-scale clothes changing per-
+     son dataset for re-identiﬁcation. In Proc. IEEE/CVF Conf.
+    Comput. Vis. Pattern Recognit., pages 3397–3406, 2020. 2
+[42] Jianfu Zhang, Li Niu, and Liqing Zhang.   Person re-
+     identiﬁcation with reinforced attribute attention selection.
+    IEEE Trans. Image Process., 30:603–616, 2021. 1
+[43] Xingxuan Zhang, Peng Cui, Renzhe Xu, Linjun Zhou, Yue He,
+     and Zheyan Shen. Deep stable learning for out-of-distribution
+
+                                                     1481

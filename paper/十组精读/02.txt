@@ -1,0 +1,58 @@
+第02组独立截图论文精读：开放基础模型、异常检测与图网络汇总定位
+日期：2026-11-05。资源口径：4–8张高端GPU、2–4人。只读原论文与项目证据；未训练、未改原仓库或manifest。以下页码均为本地PDF页序。已用view_image核对截图3；三张完整卡片无漏项，最上方只残留上一张卡片的公众号名，无可读标题。
+
+W04｜ZGCM-1: A Fully Open and Extremely Efficient Foundation Model for Math and Agentic Search
+
+身份与贡献。量子位“7名博士生、3个月、从零7B”卡片对应ZGCM团队48页技术报告arXiv:2609.13356v2（2026-09-20），没有已确认的会议录用。一句话：用开放的架构、数值系统、分阶段数据与工具协议配方，让7.39B模型具备强数学和检索代理能力。其价值首先是可追踪工程配方，不是首次提出局部/全局混合。
+
+机制。32层中27层为128-token滑窗、5层全局注意力；局部输出为W_o[A_SWA(q,k,v)⊙sigmoid(W_g h)]，全局层保留完整历史。5:1比例沿用Gemma3，另有QK归一化、部分RoPE、FP8-Muon和TWEO抑制异常激活。4.19T预训练后，以600.51B token按16K→64K→256K扩展上下文；工具轨迹被改写为“任务+历史+当前反馈→下一行动”。这是MDP式监督组织，没有证明压缩后的状态充分性。中训仍对动作和观测做全序列预测，SFT才仅监督assistant。主体评测用256K SFT检查点，不能归因于另述GRPO。
+
+证据。p5图4：256K吞吐为全注意力3.94倍；batch1/BF16的KV由32.0降至5.0GiB。p16表2：MATH-50097.13、AIME2026 75.00、HMMT2025 70.42；但MMLU73.88低于Qwen3-8B85.40。p18表4的二进制搜索31/50=62%亮眼，p40–41通用工程任务仅2/50和2/89；后者是“最佳已审计ZGCM家族”内部结果。多数非代理分数为32次pass@1均值，生成预算最高258048 token；网页基线多取其他报告，不能作等成本全面领先结论。
+
+资源与边界。p30表6的TP/PP/CP/DP乘积推算192张H100，8卡仅是10B-token架构探索。4.2倍效率来自p7的1.4×1.5×1.8×1.1估算，非完整同预算端到端消融。全训练GPU小时、教师API成本未知。官方代码、权重、数据及日志有链接，GitHub仓库与README已核验。自治评级来自9名贡献者的99次主观评分：设计L2、实验/部署L4，不能把宣传中的几百Agent等同科研自治实证。
+
+迁移判断【推断】。适合借鉴同预算证据和状态核算：固定视觉编码，在延迟事件决策中比较完整KV、周期全局KV、同字节ESN状态及FIFO，扫证据延迟，同时测证据保留、任务准确率和总存储；三种子、同历史可见性，出现稳定差异才扩展。全局KV仍随历史增长，不能宣传恒定记忆，也不能把ESN线性覆盖证书直接外推到Transformer。P2配方参照；4–8卡适合7B推理/短程适配和小模型探针，不适合从头复制该工程。
+
+一手来源：https://arxiv.org/abs/2609.13356v2
+代码：https://github.com/zgcagi/ZGCM-1
+本地全文：C:/Users/CAI BIN/Desktop/1/paper/W04_ZGCM-1_2026.pdf
+
+W05｜PromptMoE: Generalizable Zero-Shot Anomaly Detection via Visually-Guided Prompt Mixtures
+
+身份与贡献。CV论文研习社“AAAI2026｜让提示词成为可组合的异常语义专家”与Shao等人的论文精确匹配；AAAI40(11):8878–8886，一手网页已核验，本地14页含附录。勿与CVPR同名工作混淆。一句话：冻结CLIP，用图像路由组合正常/异常软prompt字典，提高未见类别异常识别。零样本仅指目标类别未见，辅助训练仍需图像标签和像素mask。
+
+机制。在视觉层6/12/18/24，以8个query对patch及CLS交叉注意力，均值送两层MLP；从每池8个专家取top4，S_agg=Σw_i s_i。正常与异常各有独立池；T_n=[S_n][class][Q]，T_a=[S_n][S_a][class][Q]。专家是嵌入段，正常/异常长度5/6，共享context长度8。除BCE、Dice和Focal外，用平均路由概率均衡损失及||S_hat S_hat^T−I||²抑制塌缩。逐层patch-text相似度生成异常图，图像分数混合全局相似度与图中最大值。相比AnomalyCLIP单prompt、AdaCLIP动态prompt及FAPrompt细粒度prompt，增量在稀疏可组合字典及双正则。
+
+证据。p6表1：工业图像AUROC均值92.4，FAPrompt91.7；MVTec93.8，AdaCLIP92.0。HeadCT98.2对94.8，但p12表7只有200幅图。像素AUROC工业96.2、医疗85.6均与FAPrompt持平，PRO分别多1.2/0.6点；SDD图像识别反而低1.2点。p7表2静态prompt→静态ensemble→VGMoP→完整模型的MVTec I-AUC为91.7→92.2→93.1→93.8；表3去掉均衡损失降至92.1。p10表5共享两类专家池后降至91.4，说明分离设计有效，却尚不能排除参数量差异。
+
+资源与局限。冻结CLIP ViT-L/14，输入518²、batch16、Adam、15epoch，单3090完成（p5/p10），4–8卡适合并行种子及跨域消融。训练小时、峰值显存及总可学参数未知；一手材料未给代码链接，定向搜索未确认作者仓库。MVTec训练测试其他14集，测MVTec则用VisA。没有多seed置信区间；图6路由频率与图8 t-SNE不足以证明可组合的因果语义。附录VisA AP88.1与主表88.2有0.1点差异，主要结论不依赖它。
+
+迁移判断【推断】。可借ESN的覆盖/可训练性分离思路检验prompt池覆盖与路由误差：冻结视觉编码、配平参数，比较静态平均、随机top-k、真实路由、跨图像打乱路由及dense混合，加入FAPrompt和等容量MLP动态prompt。固定池换路由、固定路由换池，测oracle可达分数与实际差距；3seed、按类bootstrap。若真实路由不胜打乱路由，停止语义组合假说。CLIP文本编码非线性，不能套现成ESN投影恒等式。P1精读/机制探针；作为新ICML/ECCV主线仍为P2，须得到留出异常机制或组合泛化的新证据。
+
+一手来源：https://ojs.aaai.org/index.php/AAAI/article/view/37842
+预印本：https://arxiv.org/abs/2511.18116
+本地全文：C:/Users/CAI BIN/Desktop/1/paper/W05_PromptMoE_AAAI2026.pdf
+
+W06｜GNN与Transformer融合专题：11篇代表论文
+
+source_url：null
+
+status：按用户要求围绕主题独立补齐11篇论文与精读
+
+screenshot_check：截图3指向GNN＋Transformer的11种方法汇总。用户后续要求直接找相关论文，本专题独立选文，不再追溯公众号名单。
+
+problem：如何同时利用局部图结构与长程交互，并控制图预处理、注意力、训练和推理成本。
+
+mechanism：专题覆盖Graphormer结构偏置；GraphTrans串联GNN与Transformer；GraphGPS局部/全局并行；TokenGT节点边token化；NodeFormer潜在图学习；NAGphormer多跳token；Exphormer稀疏通信；SGFormer简化线性注意力；Polynormer多项式交互；HubGT预处理解耦；GTLM结构偏置注入语言模型。逐篇公式与证据见05专题。
+
+evidence：[{"claim": "GraphGPS将位置/结构编码、局部消息传递和全局注意力作为可组合组件；线性成本依赖具体全局模块。", "page_or_table": "G02 PDF §3；https://arxiv.org/abs/2205.12454"}, {"claim": "NAGphormer将各hop的邻域摘要变为每节点短序列，从而可进行mini-batch训练。", "page_or_table": "G06 PDF §3；https://arxiv.org/abs/2206.04910"}, {"claim": "HubGT将层级hub标签与距离相关计算移入预处理，训练阶段消除图相关操作。", "page_or_table": "G10 PDF摘要及方法；11篇专题提供完整成本条件。"}]
+
+compute：按11篇各自条件评估。专题特别计入图结构预处理与CPU内存；线性注意力、少量可训结构参数不等于整个系统低成本。
+
+limits：["专题是代表选文，非原公众号目录还原。", "图分类、节点分类和文本属性图的任务及复杂度不能直接横向比较。"]
+
+transfer_hypothesis：待测：借SSSP/图算法积累研究结构编码的维护成本；只有在实际图更新负载、同精度与完整成本下产生可重复收益，才值得进入方法开发。
+
+pilot：先读GraphGPS建立模块框架，再读NAGphormer/HubGT分析预处理；测静态与边更新情况下的预处理时间、峰值CPU内存、训练时间和任务精度。GTLM留作连接图与LLM的后续阅读。
+
+priority：专题精读优先；新方法投入需先查动态图Transformer和增量索引近邻。

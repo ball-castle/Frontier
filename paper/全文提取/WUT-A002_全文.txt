@@ -1,0 +1,656 @@
+WUT-A002 | Robust Machine Unlearning for Quantized Neural Networks via Adaptive Gradient Reweighting with Similar Labels
+来源：https://openaccess.thecvf.com/content/ICCV2025/html/Tong_Robust_Machine_Unlearning_for_Quantized_Neural_Networks_via_Adaptive_Gradient_ICCV_2025_paper.html
+本地PDF：专题文献/武汉理工AI_CCF-A/WUT-A002_Robust_Machine_Unlearning_ICCV2025.pdf
+SHA-256：c3e2dac86fe91f8366fc6fd9cb3fd535cfcfec269793f269633dda7bd3804975
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                      This ICCV paper is the Open Access version, provided by the Computer Vision Foundation.
+                                 Except for this watermark, it is identical to the accepted version;
+                                the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+
+   Robust Machine Unlearning for Quantized Neural Networks via Adaptive
+                 Gradient Reweighting with Similar Labels
+
+
+                       Yujia Tong1, Yuze Wang1, Jingling Yuan1*, Chuang Hu2
+                           1 Wuhan University of Technology, 2 University of Macau
+                   {tyjjjj, hbtmwyz, yjl}@whut.edu.cn, chuanghu@um.edu.mo
+
+
+
+
+
+                                                                                                                                                                                                                   Model                 Abstract
+                                                                                                                                                                                               FP Model                                                                                                                                                     FP Model                                                                                                                                                                       Model          Retain 3                                Quantized                                                                                                                                                                                                                                                                                 Norms 4.0                                Quantized
+                                                                                                                                                                         3.5                                                                             with 2Model quantization enables efﬁcient deployment of deep                                                         Gradient                                                             Gap
+neural networks on edge devices through low-bit parame-              of 3.0
+                                                                                                                                                                                                                                                                                 Ratio                                               1ter representation, yet raises critical challenges for imple-                         2.5                                                                                                                                                                    The                                                                                                                                                                                                                               Performance
+menting machine unlearning (MU) under data privacy reg-                               2         4         6         8        10      0    FA     RA      TA     MIA    AG
+ulations. Existing MU methods designed for full-precision                             Epoch                                         Metrics
+models fail to address two fundamental limitations in quan-              (a) Comparison of gradient.    (b) Comparison of performance.
+tized networks: 1) Noise ampliﬁcation from label mismatch
+                                                                  Figure 1. We conduct Random Labels [11] on the full-precisionduring data processing, and 2) Gradient imbalance be-
+                                                            and quantized models. (a) The ratio of gradient norms between the
+tween forgotten and retained data during training. These
+                                                                       forgotten data and the retained data in the loss. (b) Performance
+issues are exacerbated by quantized models’ constrained                                                               gaps of FA, RA, TA, and MIA with Retrain, AG is the average gap.
+parameter space and discrete optimization. We propose Q-                                                        The observations are from ResNet18 on CIFAR-10.
+MUL, the ﬁrst dedicated unlearning framework for quan-
+tized models. Our method introduces two key innovations:
+1) Similar Labels assignment replaces random labels with      regulations such as GDPR [15], users have the right to re-
+semantically consistent alternatives to minimize noise in-     quest the deletion of their uploaded data, which involves
+jection, and 2) Adaptive Gradient Reweighting dynamically     not only removing data from databases but also ensuring
+aligns parameter update contributions from forgotten and      that speciﬁc samples no longer inﬂuence the trained mod-
+retained data.  Through systematic analysis of quantized       els. This raises a new challenge: How to eliminate the in-
+model vulnerabilities, we establish theoretical foundations     ﬂuence of speciﬁc data samples on quantized models?
+for these mechanisms.  Extensive evaluations on bench-       Machine unlearning (MU) provides a potential pathway
+mark datasets demonstrate Q-MUL’s superiority over ex-      to implement the right to be forgotten through parametric
+isting approaches.                                         inﬂuence removal. Existing MU approaches fall into two
+                                                                  categories: 1) Exact unlearning [3] achieves ideal perfor-
+                                                  mance by retraining the model from scratch after remov-
+1. Introduction                                           ing the data to be forgotten, but it requires a high compu-
+                                                                     tational cost. 2) Approximate unlearning [5] achieves com-
+Deep neural networks (DNNs) have achieved signiﬁcant
+                                                              parable unlearning performance by adjusting the parame-
+success in ﬁelds such as computer vision [14] and natural
+                                                                        ters of a pre-trained model, requiring fewer computational
+language processing [28], but their high demand for com-
+                                                                 resources. We focus on approximate unlearning due to its
+putation and memory limits their deployment on resource-
+                                                         speed and efﬁciency making it particularly well-suited for
+constrained edge devices. Model quantization [9, 22, 32]
+                                                        deployment on edge devices.
+reduces the storage requirements and computational com-
+                                                                 Existing MU methods face two main limitations when
+plexity by lowering the bit-width of model weights and ac-
+                                                              applied to quantized models since they [8, 11] are primarily
+tivations, making them more suitable for edge devices. To
+                                                          designed for full-precision models and do not adequately
+enhance performance, user-provided data can be utilized for
+                                                             address the impact of quantization.  Consequently, when
+periodic online ﬁne-tuning of quantized models on edge de-
+                                                               these methods (e.g., Random Labels [11] and SalUn [8])
+vices. However, with the implementation of data privacy
+                                                                are directly applied to quantized models, their effectiveness
+   *Corresponding author                                                     is reduced, particularly in two key stages: data processing
+
+
+
+                                                     20603
+
+======================== PDF 第 2 页 ========================
+and unlearning training. During the data processing phase,        to evaluate the performance of Q-MUL. The  results
+existing methods [8, 11] simulate the forgetting process by       demonstrate that Q-MUL outperforms existing MU meth-
+assigning random labels to samples in the forgotten dataset.        ods, making it more suitable for quantized models.
+However, the introduction of random labels introduces sub-
+stantial noise that is inconsistent with the original data. Us-     2. Related Work
+ing these noisy samples in subsequent unlearning training
+                                                  Our work bridges two distinct research domains: machinecan cause signiﬁcant deviations in the direction of model
+                                                           unlearning for privacy compliance and model quantizationparameter updates, thereby impairing the model’s robust-
+                                                                   for efﬁcient deployment. We analyze their intersection andness. This issue is exacerbated in quantized models, as their
+                                                                   identify critical gaps in existing literature.limited parameter representation space makes them more
+                                                 Machine Unlearning has evolved from theoretical frame-sensitive to noise than full-precision models.
+                                                     works to practical implementations. The seminal work by
+   Furthermore, in the unlearning training phase, we ob-
+                                                             Ginart et al.  [10] formalized unlearning requirements for
+served a substantial discrepancy in the gradient norms when
+                                                      k-means clustering, while Bourtoule et al.  [3] introduced
+training with forgotten versus retained data. This discrep-
+                                                                the ”SISA” framework for deep neural networks through
+ancy results in uneven contributions from the two datasets
+                                                          sharded training.  Recent advances focus on approximate
+to the model’s parameter updates, thereby reducing the ef-
+                                                             unlearning paradigms: Sekhari et al. [25] established theo-
+fectiveness of unlearning. While this issue is present in full-
+                                                                         retical guarantees for gradient-based updates, and Golatkar
+precision models, it is more pronounced in quantized mod-
+                                                                        et al.  [11] proposed noise injection in parameter space
+els. As shown in Figure 1, the y-axis represents the ratio
+                                                                   for inﬂuence removal.  However, these methods assume
+of gradient norms when using forgotten data to the gradient
+                                                           continuous parameter spaces (32-bit FP) and unrestricted
+norms when using retained data. After unlearning, the aver-
+                                                               gradient dynamics – assumptions invalidated by quantized
+age performance gap of quantized models compared to Re-
+                                                        models’ discrete optimization landscapes.  Notably, exist-
+train is 1.92%, which is signiﬁcantly higher than the 1.05%
+                                                             ing MU techniques exhibit three limitations in quantized
+gap observed in full-precision models (a smaller gap indi-
+                                                                 contexts: 1) Random label assignment [8] introduces catas-
+cates a more effective forgetting process).  This suggests
+                                                                trophic noise in low-bit regimes, 2) Uniform gradient treat-
+that current methods lead to a degradation in the effective-
+                                                    ment [11] fails to address the ampliﬁed imbalance caused by
+ness of unlearning when applied to quantized models.
+                                                            quantized representations, and 3) No existing work consid-
+  To address these challenges, we propose Q-MUL—a                                                                   ers the interaction between backpropagation through quan-
+quantization-aware unlearning framework with dual inno-                                                                        tizers and machine unlearning.
+vations. During the data processing phase, we select the                                                Model Quantization [4, 30, 31] is a key method in deep
+label closest to the true label as the label (that we term Sim-                                                               learning model compression technology, which reduces the
+ilar Labels) for the samples in the forgotten dataset. During                                                                   size and computational requirements of the model by low-
+the unlearning training process, we adaptively weight the                                                               ering the bit width of model parameters. Model quantiza-
+loss of the forgotten data and the retained data to balance                                                                   tion research has progressed along two main paths: Post-
+their contributions to the updates of model parameters. We                                                             Training Quantization (PTQ) [22] that adjusts pre-trained
+have conducted extensive experiments to validate the effec-                                                          models, and Quantization-Aware Training (QAT) [7] that
+tiveness of Q-MUL, and when applied to quantized models,                                                   embeds quantization during learning. PTQ directly quan-
+its performance is superior to existing methods. We sum-                                                                       tizes the model after training without additional training,
+marize our contributions below:                                                              but it can lead to a signiﬁcant degradation in model per-
+• To the best of our knowledge, we are the ﬁrst to apply     formance. QAT simulates quantization operations during
+  unlearning techniques directly to quantized models. We      the model training process, allowing the model to adapt to
+  analyze the challenges involved, including the noise intro-      the errors introduced by quantization from the outset, which
+  duced during the data processing phase and the excessive     can alleviate the decline in model performance. PACT [6]
+  gradient discrepancy between forgotten and retained data     employs a learnable clipping threshold optimized during
+  during unlearning training.                                     training for low-precision quantization. DSQ [12] intro-
+• We propose Q-MUL, a method that uses Similar Labels     duces a differentiable soft tanh function to approximate
+  to replace the labels of forgotten data samples during the     standard quantization steps. As the most widely used and
+  data processing phase, thereby reducing noise.  In the      representative QAT method, LSQ+ [2] uses learnable quan-
+  unlearning training phase, we adaptively adjust the loss      tization parameters to achieve better accuracy. Since MU
+  weights for forgotten and retained data based on the gra-     methods typically require training with data, unlearning
+  dients, ensuring a balanced contribution to the model pa-      training can be viewed as a process of Quantization-Aware
+  rameter updates.                                              Training. This paper is committed to proposing an unlearn-
+• We conduct extensive experiments on benchmark datasets     ing approach suitable for Quantization-Aware Training.
+
+
+
+                                                     20604
+
+======================== PDF 第 3 页 ========================
+3. Preliminaries
+
+In this section, we ﬁrst revisit the concept of machine un-          \label    {eq2} &\ t ex t   { F orwar d :}    \quad.,
+learning. Subsequently, we introduce the fundamental com-
+putational process of Quantization-Aware Training.
+
+3.1. Revisiting Machine Unlearning
+
+Let the complete (training) dataset  { D}=\{        (x_i,y_i)\}_{i=1}^{N}    be
+with N number of samples, in which   x _ i    \in\mathbb{R}^d is the     {i}^{th}    where  is the loss function,      q(\cdotis used during forward
+sample with the associated class label   y _ i  \ in  \{1 ,2,...,K\}.     propagation, and the straight-through estimator (STE) [1]
+The forgotten dataset   { D }_f\subseteq{D}represents a subset of the       is employed for gradient derivation during backward prop-
+complete dataset D, typically denoting the data that requires      agation. In image classiﬁcation tasks, neural networks map
+deletion from the trained model. And we denote its com-     input images xto predicted probability distributions  p(x ;
+plement as retained dataset     D_r, which represents the data viathe forward function  f(x ;  . For any sample  (x_ i,y_i) in
+we want to retain,   i.e. ,   D _ f \  cap,   D _ f \ cupD_r{D}.    the dataset  { D}=\{        (x_i,y_i)\}_{i=1}^{N}     , the quantized model’s out-
+Based on the composition of D_f, machine unlearning (MU)     put probability distribution (logits) is:
+in image classiﬁcation can be divided into two categories:
+class-wise forgetting and random data forgetting. In class-                       \lab e l { e q3} p _ {\mathbf{Q}}(x_i^q;w^q)=f(x_i^q;w^q),            (3)
+wise forgetting, the data in    D_f consists entirely of sam-
+                                                                 In order to simplify the notation, we will use    x_ito denoteples from the same class, with the purpose of eliminating
+                                                                the input and wto denote the quantized model weights inthe inﬂuence of an entire class on the model.  In random
+                                                                the following text.data forgetting, the data in D_f may include random sam-
+ples from one or multiple classes, with the purpose of elim-
+                                                          4. Methodologyinating the inﬂuence of randomly selected data points from
+   D_f on the model. Prior to unlearning, we denote the                              \mathcal{M}_0     In this section, we provide a comprehensive introduction to
+as the original model. In the context of MU, we denote re-      the proposed Q-MUL. We ﬁrst introduce the overview of Q-
+trained model              \mathcal{M}_{r}as the model trained from scratch solely    MUL. Subsequently, we provide a detailed description of
+on the retained dataset, which is regarded as the “golden     two components of Q-MUL: Similar Labels and Adaptive
+standard” [24].  Nonetheless, retraining entails a substan-     Gradient Reweighting.
+tial computational overhead.  Therefore, approximate un-
+learning was proposed, with the primary goal of obtaining     4.1. The Overview of Q-MUL
+unlearned model             \mathcal{M}_{u}by eliminating the inﬂuence of for-     In Figure 2, we present an overview of Q-MUL, which is di-
+gotten dataset    D_ffrom the original model                             \mathcal{M}_{0}, thereby ap-     vided into two stages: data processing and unlearning train-
+proximating retrained model               \mathcal{M}_{r} with less computational      ing. During the data processing stage, Q-MUL selects the
+overhead.                                                                   label closest to the true label ( Similar Labels) as the train-
+                                                             ing label for the samples in the forgotten dataset Df, while
+3.2. Quantization-Aware Training                                                          keeping the labels of the samples in the retained dataset Dr
+Quantization-Aware Training (QAT) employs fake quanti-     unchanged, resulting in the processed datasets D′f and D′r
+zation nodes to simulate quantization error during infer-      for the next stage of training.  In the unlearning training
+ence. These nodes perform quantization and dequantiza-      stage, for each epoch, Q-MUL ﬁrst calculates the gradient
+tion operations on ﬂoating-point numbers. For n-bit signed     norms of the loss function on datasets D′f and D′r, and then
+quantization, given the scale factor  s, we can deﬁne a quan-     adaptively calculates their weights based on the gradient
+tization function     q(\cdotto represent the operations within the     norms and incorporates them into the loss function. After
+fake quantization node:                                          several epochs of training, an unlearned model is obtained.
+                                                              In the next two subsections of this section, we will provide
+                                                          a detailed introduction to the two stages of Q-MUL.
+               a    eq1        =         =
+   \ small   \ l  bel  {    x^q   q(x^ r )  (1)     4.2. Similar Labels
+                            }
+                                                              In MU, to achieve the forgetting of speciﬁc samples (sam-
+where           \leftrounds   to   the   nearest   integer,   and      ples in the forgotten dataset), it is common to train by ran-
+ \text  { clamp }(x,        r_{\textensures   x is  within   [r_{\t ext   {low}},r_{\text{high}}].    domly shufﬂing the labels of the samples in the forgotten
+In neural networks with quantized activations and weights,      dataset [8, 11]. However, this method has some obvious
+forward and backward propagation can be summarized as:     shortcomings. Random labels (RL) do not take into account
+
+
+
+                                                     20605
+
+======================== PDF 第 4 页 ========================
+                                         Unlearning for                                    Unlearning for
+                    obtaining                                     Quantized Model  ......    obtaining          Quantized Model        ......
+                   D'(0)                                      on D'(0)                  D'(t)               on D'(t)                                                                                                 Repeat E times
+
+
+
+                                               Similar Label                                           ′                             Forgotten
+                                                      ܦ௙௧               ܦ௙௧                                                                                                            dataset                                             True Label
+
+                                                                                                          Retained
+        "CAT"                                  "DOG"                                                                                                            dataset
+
+
+                                                                                                                  Fixed Model
+       "DOG"                                             𝜃′௢ "CAT"    obtaining
+                                                                            weight
+                                                                                                                                                          ′
+                                                                           ௙௧                                                                                              Updated Model               ܦ௥௧                     ܦ௥௧′                       of ܦ
+
+                         Labels remain
+       "DOG"        unchanged      "DOG"
+                                                                               ℒ௪௘௜௚ℎ௧௘ௗ
+                                                                            obtaining
+                                                                   weight of ܦ௥௧′
+        "CAT"                    "CAT"
+
+
+Figure 2. The overview of Q-MUL. Before performing the unlearning process on the model, Q-MUL ﬁrst selects the label that is closest
+to the true label in the current output of the model as the new label for the data samples that need to be forgotten. During the unlearning
+process, we adaptively calculate the weights of the forgotten and retained data based on their gradient norms.
+
+
+the potential relationships between data, introducing a large      bility predicted by the model corresponding to the true label
+amount of noise inconsistent with the original data.  As-       is   p_ { \text  {gt }}. For each class k   \in  \ {1,2 ,...,K\}of
+sume that the true label of the data to be forgotten is “cat”.      the model output, we calculate the distance between its pre-
+If we use a random label, such as “car”, which is clearly      dicted probability and the true label probability  d(k) :
+unrelated to the original data, this may lead to a signiﬁ-
+                                                                      \l a bel { e q4}  d ( k) =     \leftp_{\mathbf{Q}}(k\mid{x}_i;wp_{\text{gt}}\right(4)cant difference in the direction of parameter updates when
+the model is trained on these data compared to using the
+                                                        Then, we ﬁnd the similar label     k_{sl}that minimizes the dis-
+original label, thereby affecting the overall stability and Ro-                                                              tance  d(k) :
+bustness of the model, causing it to forget information that
+                                                                                                                                         \ l abe l { k_{sl}\underset{k\neqy_i}{\arg\min\;d(k).                (5)
+should not be forgotten.                                                                           eq5}
+  To address these issues, we propose Similar Labels (SL).      Finally, we use these similar labels     k_{sl}instead of the origi-
+SL selects labels that are closest to the original label,      nal labels    y_i. To better understand the selection of Similar
+thereby achieving the forgetting of speciﬁc data while re-     Labels, we provide the pseudocode of the selection process
+ducing the negative impact on model performance.  This      in Algorithm 1.
+method helps to maintain the consistency and logic of the     We conduct a theoretical analysis by comparing the dif-
+data because it reduces the amount of noise introduced and     ferences in gradient update directions between SL and RL.
+can better maintain the model’s predictive ability for simi-     Let the model parameters be w, the original label of sample
+lar samples. Moreover, SL can more precisely control the               x_i be    y_i, the similar label be     k_{sl}, and the random label be
+forgetting process because it aligns the direction of model                k_{rl}. During the training process, the cross-entropy loss can
+parameter updates (gradient direction) with the true labels,     be expressed as:
+thereby avoiding the introduction of substantial random
+noise. This helps to mitigate the potential over-adjustment       m  }
+                                        \               \sum _{ (x_i ,   y_ i)(6)of the model during the unlearning process.
+                                                                                                 athcal {L =  -
+   Speciﬁcally, we ﬁrst input the forgetting data into the
+model. For a forgetting instance (x_i , y _ i)\inD_f, the model’s     where    y_{i,k}is the one-hot encoding of the true label    y_i, i.e.,
+predicted probability distribution is  p_{\m athbf. The proba-         y_{ i  ,k}if and only if  k   =y_i, otherwise  y_{ i  ,k}. There-
+
+
+
+                                                     20606
+
+======================== PDF 第 5 页 ========================
+Algorithm 1 Similar Labels                                            is due to the large gradient differences between the forgot-
+                                                                ten and retained data during the unlearning process, lead-Input: Original complete dataset  { D}=\{ (x_i,y_i)\}_{i=1}^{N}, The quan-
+    tized model                   \mathcal{M}_{t}with parameters {w}_{t}at epoch t                  ing to inconsistent contributions to model parameter up-
+Output: Training dataset         D' for unlearning                          dates. As shown in Figure 1, we apply the RL method to
+                          D                                         D
+              _          {r}^{'}={\emptyset;                                 both full-precision and 4-bit quantized models for unlearn-         _          {f}^{'}={\emptyset, { } 1: initialize { }
+ 2: for i \i n [1 , do                                        ing and compared the gradient norms of model parameters
+ 3:     if  (x_ i,y _ i)\in{D}_fthen                             when trained with forgetting and retained data in each epoch
+ 4:      Calculate predicted probability  p_{\m athbfby eq.(3);         (the y-axis represents the gradient norm when using forgot-
+ 5:      Calculate distance  d(k) following eq.(4);                   ten data divided by the gradient norm when using retained
+ 6:      Calculate class label                                                                          k_{sl}by eq.(5) ;                          data). Due to the limited parameter representation range,                                               {
+ 7:     Add  (x_ i,k_{sl}) to              D}_{f}^{'};                                     the differences in gradient norms when training with forgot-
+ 8:    else                            {                                       ten and retained data are larger in quantized models than in
+ 9:     Add  (x_ i,y_i) to              D}_{r}^{'};                                                                   full-precision models, leading to inconsistent contributions
+10:   end if
+                                                                   to model parameter updates. Therefore, the performance of
+11: end forD         r                                                               these methods degrades when applied to quantized models.12: D'={ } _ { }^{'}\cup{D}_{f}^{'};
+13: return           D'                                          To address this issue, we propose Adaptive Gradient
+                                                        Reweighting (AGR). AGR adaptively adjusts the contribu-
+                                                                   tions of forgotten data and retained data to model updates
+fore, the loss function can be simpliﬁed as follows:              to achieve balance. Speciﬁcally, we use a weighted cross-
+                                                            entropy loss function to adjust sample weights:      m
+         \              } = -\su m   _{ (x_i,(7)          a                                                                       m
+                        athcal {L                                                          \label {eq 10 } \              xt  {weight ed} }(x,y;w)\frac{1}{|D'|}\sum_{(x_i,y_i)\inD'}\alpha_i\cdot\mathcal{L}_{\text{CE}}(x_i,y_i;w),                                                                                   athc
+                                                                                                                       l {L}_{\te
+where  p_\m a thb f is the probability that the model pre-                                                          (10)
+dicts the true class     y_i for the sample     x_i.  For the sample     where  \protect\mathcal{L}_{\text{CE}}is the cross-entropy loss function used to cal-
+(x_i ,   y_i) , the gradient of the loss function is:                      culate the loss of each sample, D' is the training dataset for
+                                                               unlearning, y is the true label and \alpha_{i}are the weights of each
+          \ n abl a _ w  \ma t hca l (8)     sample used to adjust the contribution of each sample to the
+                                                                         total loss. To achieve adaptive adjustment, we design a gra-
+We measure the difference in gradient directions using co-      dient norm balancing strategy. Before each training epoch,
+sine similarity. The cosine of the angle    \theta_{sl}between the gra-      the expected gradient norms of the two types of data are
+dients when using SL and the original label is:                  calculated separately:
+
+      l  \co s  \th e ta _{ s l} = \frac  { \na bl           \ label {eq1 1}  G_f &= \mat hb b   {E}_{(x,y){forget}}(x,y;w)\|_2{eq12}&={E}_{(x,y){retain}}(x,y;w)\|_2]   \ sma l
+         a _ w \ log  p _ {\m ath b f { Q}} (y_i \ m id  x_i;w)
+                                                                                                                   (12)                                                                 (9)
+The cosine of the angle     \theta_{rl} between the gradients when                                                     where \protect\mathcal{L}_{\text{forget}}and \protect\mathcal{L}_{\text{retain}}are the loss functions for the forgot-
+using RL and the original label has an approximate form.                                                                ten and retained data, respectively. The weight coefﬁcients
+Since the selection of     k_{sl} makes  p_{\m  a thb f close to                                                                are dynamically allocated based on the gradient norms:
+    p_{\text{gt}}, the angle    \theta_{sl}between the gradient directions of SL and
+the true label is small, hence \c os \   theta. This indicates that                   la        }
+                                         \               e  q1 3                  (13)
+the gradient update direction of similar labels is highly con-                be l   {       \a l pha_f\frac{G_r}{G_fG_r},\quad\alpha_r\frac{G_f}{G_fG_r}
+sistent with the gradient direction of the true label, avoiding
+                                                       During the forgetting training process, when using Stochas-the gradient conﬂicts that may arise from random labels.
+                                                                              tic Gradient Descent (SGD) to update the model parameters,From the perspective of gradient update directions, this en-
+                                                                the parameter update at time t can be expressed as:sures the robustness of quantized models after unlearning.
+4.3. Adaptive Gradient Reweighting                         \l a be l {eq14} \math b f {w}_{t+1}(14)
+
+In methods based on RL [8, 11], the model is trained us-     In SGD, model parameters are updated based on the gra-
+ing the forgotten data with labels randomly shufﬂed and      dient direction, while the gradient magnitude (norm) de-
+the retained data with labels unchanged. However, these     termines the update step size.  If the gradient magnitudes
+methods are designed for full-precision models, and their     of different data points vary signiﬁcantly, the model may
+performance signiﬁcantly degrades when applied to quan-     overemphasize certain data points while neglecting others,
+tized models. Our experiments reveal that the degradation     leading to instability.  Therefore, the weighted gradient
+
+
+
+                                                     20607
+
+======================== PDF 第 6 页 ========================
+Algorithm 2 The overall pipeline of Q-MUL                   Train on the complete dataset after assigning random labels
+Input: The original quantized model Mo with parameters  {w}_0  ,      to the targets in the forgotten dataset. ℓ1-sparse [21]: Infuse
+    Original complete dataset  { D}=\{ (x_i,y_i)\}_{i=1}^{N}, Total training     weight sparsity into approximate unlearning through model
+    epochs T                                                  pruning. SalUn [8]:  Integrate the gradient-based weight
+Output: The unlearned quantized model Mu with parameters      saliency map with the RL method.
+       {w}_u                                                  Evaluation Metrics.  Consistent with ℓ1-sparse [21] and
+ 1: for t ∈[0, . . . , T −1] do                                                    SalUn [8], we select multiple evaluation metrics, as follows:
+ 2:    Process the original dataset  to obtain the training dataset                              D'                                                    Forget Accuracy (FA), which evaluates the model’s accu-
+          following Algorithm 1;
+                                                             racy on the forget dataset after undergoing machine unlearn-
+ 3:    Calculate gradient norms G_f by eq.(11);
+                                                                    ing. Retain Accuracy (RA), which evaluates the model’s ac- 4:    Calculate gradient norms G_r by eq.(12);
+ 5:    Calculate weight of     { D'}_rand     { D'}_fby eq.(13);                curacy on the retained dataset after undergoing machine un-
+ 6:   Update the parameters            w_t of quantized model Mt by      learning. Test Accuracy (TA), which measures the model’s
+       eq.(14);                                               accuracy on the testing dataset, which can be used to as-
+ 7: end for                                                      sess the generalization ability of the model after undergoing
+ 8: return Unlearned quantized model Mu with parameters {w}_u    MU. Membership Inference Attack (MIA)  [26], which is
+                                                       an attack method aimed at determining whether a particu-
+                                                                          lar data sample was used to train a given machine learning
+∇Lweighted is obtained by combining the gradients of the     model. MIA can be used to assess whether a model still
+forgotten and retained data with their respective weights. If      retains residual information of certain data after attempt-
+the gradient norm of the forgotten data is greater than that     ing to forget them. Please note that the above four metrics
+of the retained data, then the weight for the forgotten data      are not simply the higher the better or the lower the better,
+will be relatively smaller, and vice versa. This complemen-     but rather, they should have as little gap as possible com-
+tarity ensures a more balanced contribution of both types of     pared to the Retrain.  Finally, we introduce the Average
+data in the model parameter updates, thereby enhancing the    Gap (AG), which calculates the average gaps between the
+robustness of the quantized model after unlearning.             baseline method and Retrain in terms of the four metrics:
+  To help better understand the unlearning process, we     FA, RA, TA, and MIA after unlearning. The closer the AG
+provide the overall pipeline of Q-MUL in Algorithm 2.            is to 0, the better the unlearning effect.
+                                                     Implementation details. We use the LSQ+ [2] quantiza-
+5. Experiments                                               tion method unless speciﬁed. The original model is trained
+                                                     from scratch for 182 epochs using SGD with a cosine-
+5.1. Experimental Setup                                 annealed learning rate (initial 0.1). The Retrain method fol-
+                                                        lows the same optimizer conﬁguration but reduces trainingDatasets and Networks.  We choose CIFAR-10 [19],
+                                                                   to 160 epochs. We conduct experiments under two unlearn-CIFAR-100 [19], SVHN [23] and Tiny-Imagenet [20] as the
+                                                             ing scenarios: random data forgetting and class-wise forget-datasets. We evaluate our method on two mainstream deep
+                                                                        ting, with a primary focus on random data forgetting due toneural networks, MobileNetV2 [16] and ResNet-18 [14].
+                                                                                  its prevalence in real-world applications. Other MU train-We quantize the weights of MobileNetV2 to 2 bits, while
+                                                             ing details and additional experimental results are providedkeeping the activations in full-precision, and quantize both
+                                                                   in the Appendix.the weights and activations of ResNet-18 to 4 bits.
+Baselines. To demonstrate the superiority of Q-MUL, we
+                                                               5.2. Performance Evaluation
+choose different types of baselines, which can be classi-
+ﬁed as: Retrain: Using the retained dataset to retrain a    As presented in Table 1, we demonstrate the performance of
+model from scratch is the most effective method for ma-     various MU methods for quantized ResNet18 under random
+chine unlearning, yet it consumes a signiﬁcant amount of     data forgetting scenario. Compared to all the baseline meth-
+time. Fine-Tuning (FT) [11, 29]: Using the retained dataset      ods, the performance of Q-MUL is the best. Speciﬁcally,
+to slightly ﬁne-tune the original model, unlike retraining,    On CIFAR-10, existing methods have already achieved rel-
+FT requires only a few training epochs.  Gradient Ascent      atively small average gaps, but Q-MUL is still able to fur-
+(GA) [13, 27]: Contrary to gradient descent, GA trains on      ther reduce the gap compared to Retrain. On CIFAR-100,
+the forget dataset and updates the parameters of the orig-    when the proportion of forgotten data samples to all sam-
+inal model in the direction of gradient ascent.  Inﬂuence      ples is 10%, the FA and RA of Q-MUL are 75.71% and
+Unlearning (IU) [17, 18]: Using inﬂuence functions to es-    97.89% respectively (with gaps of 0.95% and 2.09% from
+timate the impact of     D_f on the                               \mathcal{M}_0, and then applying a      Retrain), while the previous state-of-the-art (SOTA) method
+Newton-one-step-update to the parameters, eliminating the     SalUn has FA and RA of 82.22% and 98.71% respectively
+inﬂuence of speciﬁc data points. Random Labels (RL) [11]:     (with gaps of 7.46% and 1.27% from Retrain). This indi-
+
+
+
+                                                     20608
+
+======================== PDF 第 7 页 ========================
+                            CIFAR-10                                        CIFAR-100
+ Method           FA      RA       TA      MIA   AG↓    FA      RA       TA      MIA    AG↓
+
+                             The proportion of forgotten data samples to all samples is 10%
+
+  Retrain     93.38        100.0        92.64       13.36      0      74.76        99.98       72.43       56.36      0
+   FT     99.42(6.04)  99.96(0.04)  93.05(0.41)  2.82(10.54)  4.26  91.82(17.06)  94.12(5.86)  65.29(7.14) 16.69(39.67) 17.43
+  GA     99.38(6.00)  99.38(0.62)  93.35(0.71)  1.22(12.14)  4.87  95.02(20.26)  96.86(3.12)  71.84(0.59)  9.56(46.80)  17.69
+   IU     95.64(2.26)  95.53(4.47)  87.85(4.79)   7.93(5.43)   4.24  3.69(71.07)  4.03(95.95)  3.85(68.58)  98.8(42.44)  69.51
+   RL     96.29(2.91)  98.96(1.04)  92.23(0.41)  16.67(3.31)  1.92  68.51(6.25)  98.91(1.07)  69.47(2.96) 85.62(29.26)  9.89
+ ℓ1-sparse  98.71(5.33)  99.88(0.12)  92.92(0.28)   5.29(8.07)   3.45  88.20(13.44)  99.65(0.33)  70.80(1.63) 29.64(26.72) 10.53
+  SalUn   96.82(3.44)  99.45(0.55)  92.32(0.32)  14.27(0.91)  1.31  82.22(7.46)  98.71(1.27)  67.38(5.05) 66.78(10.42)  6.05
+ Q-MUL  97.11(3.73)  99.67(0.33)  92.39(0.25)  12.49(0.87)  1.30  75.71(0.95)  97.89(2.09)  67.27(5.16)  52.11(4.25)   3.11
+
+                             The proportion of forgotten data samples to all samples is 30%
+
+  Retrain     91.61        99.97        91.29       16.11      0      67.67        99.98       67.54       58.47      0
+   FT     99.19(7.58)  99.95(0.02)  92.94(1.65)  3.10(13.01)  5.57  96.24(28.57)  99.94(0.04)  71.49(3.95) 20.57(37.90) 17.62
+  GA     99.35(7.74)  99.38(0.59)  93.39(2.10)  1.28(14.83)  6.32  96.73(29.06)  97.30(2.68)  73.35(5.81)  6.19(52.28)  22.46
+   IU    76.21(15.40) 75.93(24.04) 71.48(19.81) 24.53(8.42) 16.92  2.81(64.86)  3.19(96.79)  3.09(64.45) 96.33(37.86) 65.99
+   RL     93.96(2.35)  96.03(3.94)  90.34(0.95)  19.07(2.96)  2.55  75.50(7.83)  99.58(0.40)  66.56(0.98) 87.33(28.86)  9.52
+ ℓ1-sparse  99.06(7.45)  99.90(0.07)  93.01(1.72)  4.54(11.57)  5.20  88.59(20.92)  99.79(0.19)  70.72(3.18) 33.16(25.31) 12.40
+  SalUn   96.17(4.56)  97.78(2.19)  91.57(0.30)  15.50(0.66)  1.93  79.60(11.93)  96.70(3.28)  63.41(4.13)  57.73(0.74)   5.02
+ Q-MUL  93.57(1.96)  96.77(3.20)  90.24(1.05)  15.59(0.52)  1.68  73.90(6.23)  97.63(2.35)  65.80(1.74)  63.76(5.29)   3.90
+
+                             The proportion of forgotten data samples to all samples is 50%
+
+  Retrain     90.75        100.0        90.28       18.76      0      65.40        99.99       65.74       68.19      0
+   FT     99.29(8.54)  99.96(0.04)  93.28(3.00)  2.85(15.91)  6.87  97.10(31.70)  99.98(0.01)  72.82(7.08) 16.86(51.33)  22.71
+  GA     99.34(8.59)  99.34(0.66)  93.44(3.16)  1.27(17.49)  7.48  96.82(31.42)  97.33(2.66)  73.37(7.63)  5.93(62.26)  25.99
+   IU    16.12(74.63) 16.02(83.98) 16.22(74.06) 16.36(2.40) 58.77  0.96(64.44)  1.04(98.95)  1.00(64.74) 98.96(30.77) 64.73
+   RL     95.32(4.57)  97.17(2.83)  90.85(0.57)  21.33(2.57)  2.64  69.20(3.80)  85.60(14.39) 64.39(1.35) 54.58(13.61)  8.29
+ ℓ1-sparse  99.25(8.50)  99.95(0.05)  92.67(2.39)  3.91(14.85)  6.45  96.48(31.08)  99.98(0.01)  72.26(6.52) 25.11(43.08) 20.17
+  SalUn   96.56(5.81)  98.03(1.97)  91.55(1.27)  18.05(0.71)  2.44  87.75(22.35)  98.99(1.00)  64.69(1.05)  73.12(4.93)   7.33
+ Q-MUL  91.09 (0.34)  93.94(6.06)  89.12(1.16)  18.68 (0.08)  1.91  67.25(1.85)  89.65(10.34) 61.38(4.36) 56.52(11.67)  7.06
+
+
+Table 1. Performance of various MU methods for ResNet18 with both activations and weights quantized to 4 bits CIFAR-10 and CIFAR-
+100. The unlearning scenario is random data forgetting. Bold indicates the best performance and underline indicates the runner-up. A
+performance gap against Retrain is provided in(•).
+
+
+ Method    FA     RA      TA     MIA   AG↓     gap than SalUn, the average gap of the four metrics from
+                                                              Retrain is 3.11%, which is signiﬁcantly lower than the ex-
+  Retrain    74.76      99.98      72.43      56.36     0
+                                                                      isting baseline methods. When the proportion of forgotten Q-MUL 75.71(0.95) 97.89(2.09) 67.27(5.16) 52.11(4.25) 3.11
+                                                              data samples to all samples is 30% and 50%, Q-MUL can  w/oSL  73.67(1.09) 96.46(3.52) 65.91(6.52) 51.09(5.27) 4.10
+ w/oAGR 69.84(4.92) 92.08(7.90) 68.62(3.81) 58.00(1.64) 4.57       also achieve the smallest average gaps of 3.90% and 7.06%.
+                                                                 In the appendix, we provide experiments on quantized
+Table 2. Impact of Removing Components of Q-MUL. Ablation     ResNet18 on the larger dataset Tiny-Imagenet and the class-
+study is from ResNet18 on CIFAR-100. The unlearning scenario     wise forgetting scenario, as well as experiments on quan-
+is random data forgetting(10%).                                     tized MobileNetV2 across different datasets.
+
+                                                               5.3. Ablation Studies
+
+cates that Q-MUL balances the contributions of forgotten    The Impact of Different Components. To further demon-
+and retained data to the model parameter updates. For the      strate the effectiveness of different components of Q-MUL,
+MIA metric, Q-MUL is 52.11% (with a gap of 4.25% from    we conduct ablation experiments using two variants of Q-
+Retrain) and SalUn is 66.78% (with a gap of 10.42% from    MUL: (a) w/o Similar Labels (SL) and (b) w/o Adaptive
+Retrain), showing that the forgetting effect of Q-MUL is     Gradient Reweighting (AGR). As shown in Table 2, using
+closer to the optimal machine unlearning method Retrain.      the complete Q-MUL enables the performance of the un-
+Although the TA metric of Q-MUL has a slightly higher     learned model to be closest to that of the retrained model,
+
+
+
+                                                    20609
+
+======================== PDF 第 8 页 ========================
+           FA                RA                 TA                 MIA                 Summary                                                                                    50   20
+                                                         4                                                                                    40                         60                                3
+   15
+                                                         3                          30                                2                                                                              40
+   10                                                    2                          20
+    5                           1                        1                          10                         20
+    0                           0                        0                           0                          0
+      Q-MULFT GA IU RLℓ1-sparseSalUn        Q-MULFT GA IU RLℓ1-sparseSalUn      Q-MULFT GA IU RLℓ1-sparseSalUn       Q-MULFT GA IU RLℓ1-sparseSalUn       Q-MULFT GA IU RLℓ1-sparseSalUn
+
+
+Figure 3. Performance gaps of Full-precision ResNet18 on CIFAR-100. The unlearning scenario is random data forgetting (10%). A
+shorter bar (smaller gap) indicates performance is closer to that of the Retrained model. The average gap for each method is calculated by
+dividing the values in the Summary bar chart by 4.
+
+
+       QAT   Df/D   Bit Width   MU       FA       RA        TA       MIA     AG↓
+
+                          4w4a      Retrain       66.64         94.90         65.84         40.78       0
+                          4w4a     RL       71.87(5.23)    80.28(14.62)   60.56(5.28)    34.18(6.60)    7.93
+        PACT[6]   10%     4w4a     ℓ1-sparse   78.69(12.05)    85.42(9.48)    65.90(0.06)   24.44(16.34)    9.48
+                          4w4a      SalUn     75.13(8.49)    81.21(13.69)   61.16(4.68)   30.60(10.18)    9.26
+                          4w4a    Q-MUL    73.51(6.87)    84.73(10.17)   66.10(0.26)    34.09(6.69)    6.00
+
+                          4w4a      Retrain       65.24         99.22         63.62         44.42       0
+                          4w4a     RL      80.42(15.18)    90.28(8.94)    60.54(3.08)   32.09(12.33)    9.88
+      DSQ [12]   10%     4w4a     ℓ1-sparse   89.11(23.87)    97.11(2.11)    65.36(1.74)   19.82(24.60)   13.08
+                          4w4a      SalUn     82.73(17.49)   87.04(12.18)   58.50(5.12)   21.75(22.67)   14.37
+                          4w4a    Q-MUL    78.18(12.94)    92.28(6.94)    65.31(1.69)   32.89(11.53)    8.26
+
+
+Table 3. ResNet18 with both activations and weights quantized to 4 bits on CIFAR-100. We conduct unlearning across different QAT
+methods. The unlearning scenario is random data forgetting(10%).
+
+
+with an average gap of only 3.11%. When SL is removed,    LSQ+, we also validate the performance of different MU
+the gap in the RA metric increases from 2.09% to 3.52%,     methods under other QAT methods. As shown in Table
+indicating a decline in the discriminative ability of the un-      3, Q-MUL can achieve SOTA performance in other QAT
+learned model on the retained data.  This is attributed to     methods as well. Speciﬁcally, for PACT, the gaps between
+the introduction of noise inconsistent with the original data   Q-MUL and Retrain in FA and TA are 6.87% and 10.17%,
+during the data processing phase, which leads to excessive      respectively, with an average gap of 6.00%. For DSQ, the
+model adjustments and the forgetting of information that     gaps between Q-MUL and Retrain in FA and TA are 12.94%
+should not have been forgotten. When AGR is removed, the     and 6.94%, respectively, with an average gap of 8.26%. Q-
+forgotten model’s FA and RA are 69.84% and 92.08%, re-   MUL effectively reduces the RA gap while balancing the
+spectively, with gaps of 4.92% and 7.90% compared to the    FA gap and RA gap as much as possible.
+retrained model’s FA and RA (which increased by 3.97%
+and 5.81% when using AGR, respectively). This indicates                                                          6. Conclusions
+that AGR is crucial for balancing the contributions of for-
+gotten and retained data to the model parameter updates.        This paper is the ﬁrst to directly apply machine unlearning
+Q-MUL with Full-precision Models. To more compre-      to quantized models. We analyze the challenges of machine
+hensively evaluate Q-MUL, we compare the effects of dif-     unlearning in quantized models: noise introduced during
+ferent unlearning methods on the full-precision model, as      the data processing phase and the large gradient difference
+shown in Figure 3. The issues of noise introduction and     of the loss function between forgotten and retained data. To
+gradient imbalance also exist in the full-precision model,     address these challenges, we propose Q-MUL. This method
+although they are not as severe as in the quantized model.     reduces noise by replacing the labels of forgotten data with
+However, Q-MUL can still address these two issues. Specif-      similar labels during the data processing phase.  During
+ically, the average gap of Q-MUL can reach 5.46%, which      training, it adaptively adjusts the weights of the loss from
+is signiﬁcantly lower than that of existing methods. This      forgotten and retained data based on the gradient to balance
+demonstrates that Q-MUL can achieve superior unlearning      their contributions to model parameter updates. Experimen-
+performance even in full-precision models.                          tal results show that Q-MUL is more suitable for quantized
+Q-MUL with Different QAT Methods.  In addition to     models than existing methods.
+
+
+
+                                                    20610
+
+======================== PDF 第 9 页 ========================
+References                                                            national conference on computer vision, pages 4852–4861,
+                                                                     2019. 2, 8
+ [1] Yoshua Bengio, Nicholas L´eonard, and Aaron Courville.
+                                                                     [13] Laura Graves, Vineel Nagisetty, and Vijay Ganesh. Amne-
+     Estimating  or  propagating  gradients  through  stochastic
+                                                                                siac machine learning. In Proceedings of the AAAI Confer-
+     neurons  for  conditional  computation.    arXiv  preprint
+                                                                    ence on Artiﬁcial Intelligence, pages 11516–11524, 2021. 6
+     arXiv:1308.3432, 2013. 3
+                                                                     [14] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+ [2] Yash  Bhalgat,  Jinwon  Lee,  Markus  Nagel,  Tijmen                                                           Deep residual learning for image recognition.  In Proceed-
+     Blankevoort, and Nojun Kwak.  Lsq+: Improving low-bit                                                                           ings of the IEEE conference on computer vision and pattern
+     quantization through learnable offsets and better initializa-                                                                             recognition, pages 770–778, 2016. 1, 6
+      tion. In Proceedings of the IEEE/CVF conference on com-
+                                                                     [15] Chris Jay Hoofnagle,  Bart Van Der  Sloot,  and  Fred-
+     puter vision and pattern recognition workshops, pages 696–
+                                                                                erik Zuiderveen Borgesius. The european union general data
+     697, 2020. 2, 6
+                                                                             protection regulation: what it is and what it means.  Infor-
+ [3] Lucas Bourtoule, Varun Chandrasekaran, Christopher A                                                                   mation & Communications Technology Law, 28(1):65–98,
+     Choquette-Choo, Hengrui Jia, Adelin Travers, Baiwu Zhang,                                                                     2019. 1
+     David Lie, and Nicolas Papernot. Machine unlearning.  In
+                                                                     [16] Andrew G Howard, Menglong Zhu, Bo Chen, Dmitry
+    2021 IEEE Symposium on Security and Privacy (SP), pages
+                                                                      Kalenichenko, Weijun Wang, Tobias Weyand, Marco An-
+     141–159. IEEE, 2021. 1, 2
+                                                                                  dreetto, and Hartwig Adam. Mobilenets: Efﬁcient convolu-
+ [4] Yaohui Cai, Zhewei Yao, Zhen Dong, Amir Gholami,                                                                                  tional neural networks for mobile vision applications. arXiv
+     Michael W Mahoney, and Kurt Keutzer.  Zeroq: A novel                                                                             preprint arXiv:1704.04861, 2017. 6
+     zero shot  quantization framework.    In Proceedings  of                                                                     [17] Zachary Izzo, Mary Anne Smart, Kamalika Chaudhuri, and
+     the IEEE/CVF conference on computer vision and pattern                                                                James Zou. Approximate data deletion from machine learn-
+      recognition, pages 13169–13178, 2020. 2                                                                         ing models. In International Conference on Artiﬁcial Intelli-
+ [5] Eli Chien, Chao Pan, and Olgica Milenkovic. Certiﬁed graph          gence and Statistics, pages 2008–2016. PMLR, 2021. 6
+     unlearning. arXiv preprint arXiv:2206.09140, 2022. 1                                                                     [18] Pang Wei Koh and Percy Liang. Understanding black-box
+ [6] Jungwook Choi, Zhuo Wang,  Swagath Venkataramani,            predictions via inﬂuence functions. In International confer-
+     Pierce I-Jen Chuang, Vijayalakshmi Srinivasan, and Kailash          ence on machine learning, pages 1885–1894. PMLR, 2017.
+     Gopalakrishnan.    Pact:  Parameterized  clipping  activa-         6
+      tion  for  quantized  neural  networks.    arXiv  preprint      [19] Alex Krizhevsky, Geoffrey Hinton, et al. Learning multiple
+     arXiv:1805.06085, 2018. 2, 8                                           layers of features from tiny images. 2009. 6
+ [7] Steven K Esser,  Jeffrey L McKinstry, Deepika Bablani,      [20] Yann Le and Xuan Yang. Tiny imagenet visual recognition
+     Rathinakumar Appuswamy, and Dharmendra S Modha.            challenge. CS 231N, 7(7):3, 2015. 6
+     Learned step size quantization. In International Conference                                                                     [21] Jiancheng Liu, Parikshit Ram, Yuguang Yao, Gaowen Liu,
+    on Learning Representations, 2020. 2                                                            Yang Liu, PRANAY SHARMA, Sijia Liu, et al. Model spar-
+ [8] Chongyu Fan, Jiancheng Liu, Yihua Zhang, Dennis Wei,             sity can simplify machine unlearning. Advances in Neural
+     Eric Wong, and  Sijia Liu.    Salun:  Empowering ma-           Information Processing Systems, 36, 2024. 6
+     chine unlearning  via  gradient-based weight  saliency  in      [22] Markus Nagel, Rana Ali Amjad, Mart Van Baalen, Chris-
+     both image classiﬁcation and generation.  arXiv preprint            tos Louizos, and Tijmen Blankevoort. Up or down? adap-
+     arXiv:2310.12508, 2023. 1, 2, 3, 5, 6                                      tive rounding for post-training quantization. In International
+ [9] Jun Fang, Ali Shaﬁee, Hamzah Abdel-Aziz, David Thorsley,          Conference on Machine Learning, pages 7197–7206. PMLR,
+     Georgios Georgiadis, and Joseph H Hassoun. Post-training           2020. 1, 2
+     piecewise linear quantization for deep neural networks.  In      [23] Yuval Netzer, Tao Wang, Adam Coates, Alessandro Bis-
+    Computer Vision–ECCV 2020: 16th European Conference,           sacco, Baolin Wu, Andrew Y Ng, et al. Reading digits in
+     Glasgow, UK, August 23–28, 2020, Proceedings, Part II 16,            natural images with unsupervised feature learning. In NIPS
+     pages 69–86. Springer, 2020. 1                                  workshop on deep learning and unsupervised feature learn-
+[10] Antonio  Ginart,  Melody Guan,  Gregory  Valiant,  and            ing, page 4. Granada, 2011. 6
+     James Y Zou. Making ai forget you: Data deletion in ma-      [24] Thanh Tam Nguyen, Thanh Trung Huynh, Phi Le Nguyen,
+     chine learning. Advances in neural information processing          Alan Wee-Chung Liew, Hongzhi Yin, and Quoc Viet Hung
+     systems, 32, 2019. 2                                          Nguyen. A survey of machine unlearning.  arXiv preprint
+[11] Aditya Golatkar, Alessandro Achille, and Stefano Soatto.           arXiv:2209.02299, 2022. 3
+     Eternal sunshine of the spotless net: Selective forgetting in      [25] Ayush Sekhari, Jayadev Acharya, Gautam Kamath, and
+     deep networks. In Proceedings of the IEEE/CVF Conference         Ananda Theertha Suresh. Remember what you want to for-
+    on Computer Vision and Pattern Recognition, pages 9304–             get: Algorithms for machine unlearning. Advances in Neural
+     9312, 2020. 1, 2, 3, 5, 6                                            Information Processing Systems, 34:18075–18086, 2021. 2
+[12] Ruihao Gong, Xianglong Liu, Shenghu Jiang, Tianxiang Li,      [26] Reza Shokri, Marco Stronati, Congzheng Song, and Vitaly
+    Peng Hu, Jiazhen Lin, Fengwei Yu, and Junjie Yan. Differ-           Shmatikov. Membership inference attacks against machine
+      entiable soft quantization: Bridging full-precision and low-            learning models. In 2017 IEEE symposium on security and
+      bit neural networks. In Proceedings of the IEEE/CVF inter-           privacy (SP), pages 3–18. IEEE, 2017. 6
+
+
+
+                                                    20611
+
+======================== PDF 第 10 页 ========================
+[27] Anvith Thudi, Gabriel Deza, Varun Chandrasekaran, and
+     Nicolas Papernot. Unrolling sgd: Understanding factors in-
+     ﬂuencing machine unlearning. In 2022 IEEE 7th European
+    Symposium on Security and Privacy (EuroS&P), pages 303–
+     319. IEEE, 2022. 6
+[28] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszko-
+       reit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia
+     Polosukhin. Attention is all you need. Advances in neural
+     information processing systems, 30, 2017. 1
+[29] Alexander Warnecke, Lukas Pirch, Christian Wressnegger,
+     and Konrad Rieck. Machine unlearning of features and la-
+      bels. arXiv preprint arXiv:2108.11577, 2021. 6
+[30] Shoukai Xu, Haokun Li, Bohan Zhuang, Jing Liu, Jiezhang
+     Cao, Chuangrun Liang, and Mingkui Tan. Generative low-
+     bitwidth data free quantization. In Computer Vision–ECCV
+     2020: 16th European Conference, Glasgow, UK, August 23–
+     28, 2020, Proceedings, Part XII 16, pages 1–17. Springer,
+     2020. 2
+[31] Xiangguo Zhang, Haotong Qin, Yifu Ding, Ruihao Gong,
+     Qinghua Yan, Renshuai Tao, Yuhang Li, Fengwei Yu, and
+     Xianglong Liu. Diversifying sample generation for accurate
+      data-free quantization. In Proceedings of the IEEE/CVF con-
+     ference on computer vision and pattern recognition, pages
+     15658–15667, 2021. 2
+[32] Yiren Zhou, Seyed-Mohsen Moosavi-Dezfooli, Ngai-Man
+     Cheung, and Pascal Frossard. Adaptive quantization for deep
+     neural network. In Proceedings of the AAAI Conference on
+      Artiﬁcial Intelligence, 2018. 1
+
+
+
+
+
+                                                    20612

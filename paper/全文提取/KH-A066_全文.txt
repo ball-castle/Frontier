@@ -1,0 +1,1025 @@
+KH-A066 | Back to Basics: Let Denoising Generative Models Denoise
+来源：https://arxiv.org/abs/2511.13720
+本地PDF：专题文献/何恺明/KH-A066_Back_to_Basics_Let_Denoising_Generative_Models_Denoise_CVPR2026.pdf
+SHA-256：8c265e4adfd488ccbce035a53ad9055edddd02f5c0393738f54da583ee832b8f
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+               Back to Basics: Let Denoising Generative Models Denoise
+
+
+                                       Tianhong Li    Kaiming He
+
+                                       MIT
+
+
+
+                          Abstract                                                 input
+
+           Today’s denoising diffusion models do not “denoise” in the2026     classical sense, i.e., they do not directly predict clean im-
+            ages. Rather, the neural networks predict noise or a noised
+            quantity.  In this paper, we suggest that predicting cleanJan     data and predicting noised quantities are fundamentally
+7      different.  According to the manifold assumption, natural                                                                                  image
+           data should lie on a low-dimensional manifold, whereas                                                                                             manifold
+           noised quantities do not.  With this assumption, we ad-
+           vocate for models that directly predict clean data, which
+           allows apparently under-capacity networks to operate ef-                                                                               Figure 1. The Manifold Assumption [4] hypothesizes that nat-
+             fectively in very high-dimensional spaces. We show that      ural images lie on a low-dimensional manifold within the high-[cs.CV]     simple, large-patch Transformers on pixels can be strong      dimensional pixel space. While a clean image x can be modeled as
+           generative models: using no tokenizer, no pre-training, and      on-manifold, the noise ϵ or flow velocity v (e.g., v = x−ϵ) is in-
+          no extra loss. Our approach is conceptually nothing more      herently off-manifold. Training a neural network to predict a clean
+           than “Just image Transformers”, or JiT, as we call it. We     image (i.e., x-prediction) is fundamentally different from training
+            report competitive results using JiT with large patch sizes         it to predict noise or a noised quantity (i.e., ϵ/v-prediction).
+            of 16 and 32 on ImageNet at resolutions of 256 and 512,
+          where predicting high-dimensional noised quantities can      dicting the clean image (“x-prediction” [52]) is closely re-
+              fail catastrophically. With our networks mapping back to      lated to ϵ- and v-prediction, provided that the weighting of
+            the basics of the manifold, our research goes back to basics      the prediction loss is reformulated accordingly (detailed in
+          and pursues a self-contained paradigm for Transformer-     Sec. 3). Owing to this relation, less attention has been paid
+          based diffusion on raw natural data.                             to what the network should directly predict, implicitly as-
+                                                               suming that the network is capable of performing the as-
+                                                                       signed task.
+           1. Introduction                                                                   However, the roles of clean images and a noised quan-
+        When diffusion generative models were  first developed       tity (including the noise itself) are not equal. In machinearXiv:2511.13720v2
+            [57, 59, 23], the core idea was supposed to be denoising,      learning, it has long been hypothesized [4, 3] that “(high-
+                i.e., predicting a clean image from its corrupted version.     dimensional) data lie (roughly) on a low-dimensional man-
+          However, two significant milestones in the evolution of dif-      ifold” ([4, p.6]). Under this manifold assumption, while
+           fusion models turned out to deviate from the goal of directly     clean data can be modeled as lying on a low-dimensional
+            predicting clean images.  First, predicting the noise itself     manifold, a noised quantity is inherently distributed across
+         (known as “ϵ-prediction”) [23] made a pivotal difference      the full high-dimensional space [69] (see Fig. 1). Predicting
+            in generation quality and largely popularized these mod-     clean data is fundamentally different from predicting noise
+              els. Later, diffusion models were connected to flow-based     or a noised quantity.
+          methods [37, 38, 1] through predicting the flow velocity        Consider a scenario where a low-dimensional manifold
+            (“v-prediction” [52]), a quantity that combines clean data       is embedded in a high-dimensional observation space. Pre-
+          and noise. Today, diffusion models in practice commonly      dicting noise in this high-dimensional space requires high
+            predict noise or a noised quantity (e.g., velocity).                capacity:  the network needs to preserve all information
+              Extensive studies [52, 29, 25, 15] have shown that pre-     about the noise. In contrast, a limited-capacity network can
+
+
+                                                           1
+
+======================== PDF 第 2 页 ========================
+still predict the clean data, as it only needs to retain the low-     rameters of a normal distribution (e.g., mean and standard
+dimensional information while filtering out the noise.            deviation). Five years after its introduction, this method was
+  When a low-dimensional space (e.g., image latent [49])      revitalized and popularized by Denoising Diffusion Proba-
+is used, the difficulty of predicting noise is alleviated, yet at       bilistic Models (DDPM) [23]: a pivotal discovery was to
+the same time is hidden rather than solved. When it comes    make noise the prediction target (i.e., ϵ-prediction).
+to pixel or other high-dimensional spaces, existing diffusion       The  relationships among  different prediction  targets
+models can still struggle to address the curse of dimension-     were then investigated in [52] (originally in the context of
+ality [4]. The heavy reliance on a pre-trained latent space     model distillation), where the notion of v-prediction was
+prevents diffusion models from being self-contained.            also introduced. Their work focused on the weighting ef-
+   In pursuit of a self-contained principle, there has been      fects introduced by reparameterization.
+strong focus on advancing diffusion modeling in the pixel       Meanwhile, EDM [29] reformulated the diffusion prob-
+space [7, 25, 26, 6, 70]. In general, these methods explicitly     lem around a denoiser function, which constitutes a major
+or implicitly avoid the information bottleneck in the net-     milestone in the evolution of diffusion models. However,
+works, e.g., by using dense convolutions or smaller patches,   EDM adopted a pre-conditioned formulation, where the di-
+increasing channels, or adding long skip connections. We      rect output of the network is not the denoised image. While
+suggest that these designs may stem from the demand to      this formulation is preferable in low-dimensional scenarios,
+predict high-dimensional noised quantities.                               it still inherently requires the network to output a quantity
+   In this paper, we return to first principles and let the neu-      that mixes data and noise (more comparisons in appendix).
+ral network directly predict the clean image. By doing so,                                                      Flow Matching models [37, 38, 1] can be interpreted as
+we show that a plain Vision Transformer (ViT) [13], oper-                                                          a form of v-prediction [52] within the diffusion modeling
+ating on large image patches consisting of raw pixels, can                                                        framework. Unlike pure noise, v is a combination of data
+be effective for diffusion modeling. Our approach is self-                                                      and noise. The connections between flow-based models and
+contained and does not rely on any pre-training or auxil-                                                             previous diffusion models have been established [15]. To-
+iary loss — no latent tokenizer [49], no adversarial loss                                                                day, diffusion models and their flow-based counterparts are
+[16, 49], no perceptual loss [77, 49] (thus no pre-trained                                                               often studied under a unified framework.
+classifier [56]), and no representation alignment [74] (thus
+                                                       Denoising Models. Over the past decades, the concept ofno self-supervised pre-training [45]).  Conceptually, our
+                                                            denoising has been closely related to representation learn-model is nothing more than “Just image Transformers”, or
+                                                                    ing. Classical methods, exemplified by BM3D [9] and oth-JiT, as we call it, applied to diffusion.
+                                                                   ers [47, 14, 79], leveraged the assumptions of sparsity and  We conduct experiments on the ImageNet dataset [11]
+                                                     low dimensionality to perform image denoising.at resolutions of 256 and 512, using JiT models with patch
+sizes 16 and 32 respectively. Even though the patches are        Denoising Autoencoders (DAEs) [68, 69] were devel-
+very high-dimensional (hundreds or thousands), our models     oped as an unsupervised representation learning method,
+using x-prediction can easily produce strong results, where     using denoising as their training objective. They leveraged
+ϵ- and v-prediction fail catastrophically.  Further analysis      the manifold assumption [4] (Fig. 1) to learn meaningful
+shows that it is unnecessary for the network width to match      representations that approximate the low-dimensional data
+or exceed the patch dimension; in fact, and surprisingly, a     manifold. DAEs can be viewed as a form of Denoising
+bottleneck design can even be beneficial, echoing observa-     Score Matching [67], which in turn is closely related to
+tions from classical manifold learning.                     modern score-based diffusion models [59, 60]. Neverthe-
+                                                                          less, while it is natural for DAEs to predict clean data for  Our effort marks a step toward a self-contained “Diffu-
+                                                          manifold learning, in score matching, predicting the scoresion + Transformer” philosophy [46] on native data.  Be-
+                                                              function effectively amounts to predicting the noise (up to ayond computer vision, this philosophy is highly desirable
+                                                                scaling factor), i.e., ϵ-prediction.in other domains involving natural data  (e.g.,  proteins,
+molecules, or weather), where a tokenizer can be difficult     Manifold Learning.  Manifold learning has been a clas-
+to design. By minimizing domain-specific designs, we hope      sical field [51, 63] focused on learning low-dimensional,
+that the general “Diffusion + Transformer” paradigm origi-     nonlinear representations from observed data.  In general,
+nated from computer vision will find broader applicability.      manifold learning methods leverage bottleneck structures
+                                                                  [64, 48, 41, 2] that encourage only useful information to
+2. Related Work                                         pass through.  Several studies have explored the connec-
+                                                                   tions between manifold learning and generative models
+Diffusion Models and Their Predictions. The pioneering      [39, 27, 8]. Latent Diffusion Models (LDMs) [49] can be
+work on diffusion models [57] proposed to learn a reversed     viewed as manifold learning in the first stage via an autoen-
+stochastic process, in which the network predicts the pa-      coder, followed by diffusion in the second stage.
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+Pixel-space Diffusion. While latent diffusion [49] has be-      When it comes to the image restoration application ad-
+come the default choice in the field today, the develop-     dressed by diffusion [10, 72, 42], it is natural for the net-
+ment of diffusion models originally began with pixel-space    work to predict the clean data, as this is the ultimate goal of
+formulations [59, 23, 44, 12]. Early pixel-space diffusion     image restoration. Concurrent with our work, [18] also ad-
+models were typically based on dense convolutional net-     vocates the use of x-prediction, for generative world models
+works, most often a U-Net [50]. These models often use      that are conditional on previous frames.
+over-complete channel representations (e.g., transforming       Our work does not aim to reinvent this fundamental con-
+H×W×3 into H×W×128 in the first layer), accompanied      cept; rather, we aim to draw attention to a largely over-
+by long-range skip connections. While these models work     looked yet critical issue in the context of high-dimensional
+well for ϵ- and v-prediction, their dense convolutional struc-     data with underlying low-dimensional manifolds.
+tures are typically computationally expensive.  Applying
+these convolutional models to high-resolution images does     3. On Prediction Outputs of Diffusion Models
+not lead to catastrophic degradation, and as such, research
+                                                             Diffusion models can be formulated in the space of x, ϵ, or
+in this direction has commonly focused on noise schedules
+                                                             v. The choice of the space determines not only where the
+and/or weighting schemes [7, 25, 26, 30] to further improve
+                                                                   loss is defined, but also what the network predicts. Impor-
+generation quality.
+                                                                          tantly, the loss space and the network output space need not
+   In contrast, applying a Vision Transformer (ViT) [13] di-
+                                                       be the same. This choice can make critical differences.
+rectly to pixels presents a more challenging task. Standard
+ViT architectures adopt an aggressive patch size  (e.g.,     3.1. Background: Diffusion and Flows
+16×16 pixels), resulting in a high-dimensional token space
+                                                             Diffusion models can be formulated from the perspective of
+that can be comparable to, or larger than, the Transformer’s
+                                           ODEs [5, 60, 37, 58]. We begin our formulation with the
+hidden dimension. SiD2 [26] and PixelFlow [6] adopt hi-
+                                                            flow-based paradigm [37, 38, 1], i.e., in the v-space, as a
+erarchical designs that start from smaller patches; how-
+                                                             simpler starting point, and then discuss other spaces.
+ever, these models are “FLOP-heavy” [26] and lose the in-
+                                                            Consider a data distribution x ∼pdata(x) and a noise dis-
+herent generality and simplicity of standard Transformers.
+                                                                    tribution ϵ ∼pnoise(ϵ) (e.g., ϵ ∼N(0, I)). During training,
+PixNerd [70] adopts a NeRF head [43] that integrates infor-
+                                                          a noisy sample zt is an interpolation: zt = at x + bt ϵ,
+mation from the Transformer output, noisy input, and spa-
+                                                     where at and bt are pre-defined noise schedules at time t ∈
+tial coordinates, with training further assisted by represen-                                                                          [0, 1]. In this paper, we use a linear schedule [37, 38, 1]1:
+tation alignment [74].
+                                                               at = t and bt = 1 −t. This gives:
+  Even with these special-purpose designs, the architec-
+tures in these works typically start from the “L” (Large) or                       zt = t x + (1 −t) ϵ,                 (1)
+“XL” size. In fact, a latest work [73] suggests that a large
+                                                     which leads to zt ∼pdata when t=1. We use the logit-hidden size appears necessary for high dimensionality.
+                                                       normal distribution over t [15], i.e., logit(t) ∼N(µ, σ2).
+High-dimensional Diffusion. When using ViT-style archi-                                      A flow velocity v is defined as the time-derivative of z,
+tectures, modern diffusion models are still challenged by                                                                     that is, vt = z′t = a′tx + b′tϵ. Given Eq. (1), we have:
+high-dimensional input spaces, whether in pixels or latents.
+In the literature [8, 73, 55], it has been repeatedly reported                     v = x −ϵ.                      (2)
+that ViT-style diffusion models degrade rapidly and catas-
+                                                  The flow-based methods [37, 38, 1] minimize a loss func-
+trophically when the per-token dimensionality increases, re-
+                                                                   tion defined as:
+gardless of the use of pixels or latents.
+   Concurrently with our work, a line of research [78, 34,            L = Et,x,ϵ∥vθ(zt, t) −v∥2,             (3)
+55] resorts to self-supervised pre-training to address high-
+                                                     where vθ is a function parameterized by θ. While vθ is oftendimensional diffusion. In contrast to these efforts, we show
+                                                                the direct output of a network vθ = netθ(zt, t) [37, 38, 1],that high-dimensional diffusion is achievable without any
+                                                                                             it can also be a transform of it, as we will elaborate.pre-training, and using just Transformers.
+                                                         Given the function vθ, sampling is done by solving an
+x-prediction. The formulation of x-prediction is natural                                                             ordinary differential equation (ODE) for z [37, 38, 1]:
+and not new; it can be traced back at least to the original
+DDPM [23] (see their code [24]).  However, DDPM ob-                      dzt/dt = vθ(zt, t),                 (4)
+served that ϵ-prediction was substantially better, which later
+                                                                     starting from z0 ∼pnoise and ending at t = 1.  In prac-became the go-to solution. In later works (e.g., [26]), al-
+                                                                             tice, this ODE can be approximately solved using numericalthough the analysis was sometimes preferably conducted in
+                                                                    solvers. By default, we use a 50-step Heun.the x-space, the actual prediction was often made in other
+spaces, likely for legacy reasons.                                   1Our analysis in this paper is applicable to other schedules.
+
+
+                                                 3
+
+======================== PDF 第 4 页 ========================
+                                                    (a) x-pred               (b) ϵ-pred                 (c) v-pred
+                                   xθ := netθ(zt, t)      ϵθ := netθ(zt, t)      vθ := netθ(zt, t)
+                 (1) x-loss: E∥xθ −x∥2          xθ          xθ = (zt−(1−t)ϵθ )/t   xθ = (1−t)vθ +zt
+                 (2) ϵ-loss: E∥ϵθ −ϵ∥2  ϵθ = (zt−txθ )/(1 −t)           ϵθ                ϵθ = zt−tvθ
+                 (3) v-loss: E∥vθ −v∥2  vθ = (xθ −zt)/(1 −t)    vθ = (zt−ϵθ )/t             vθ
+
+Table 1. All possible combinations of defining the loss and network prediction in x, v, or ϵ spaces. The direct network outputs are
+highlighted in colors. For any off-diagonal entry where the network output space differs from the loss space, a transformation on the
+network output is applied.
+
+                                                                                      ground-truth     x-pred        ϵ-pred        v-pred
+3.2. Prediction Space and Loss Space
+
+Prediction Space. The network’s direct output can be de-     D=2
+fined in any space: v, x, or ϵ. Next, we discuss the resulting
+transformation. Note that in the context of this paper, we
+refer to it as “x, ϵ, v-prediction”, only when the network
+netθ’s direct output is strictly x, ϵ, v, respectively.          D=8
+  Given three unknowns (x, ϵ, v) and one network output,
+we require two additional constraints to determine all three
+unknowns. The two constraints are given by Eq. (1) and (2).                                                  D=16
+For example, when we let the direct network output netθ
+be x, we solve the following set of equations:
+
+        xθ = netθ                            D=512
+                          zt = t xθ + (1 −t) ϵθ               (5)
+         vθ = xθ −ϵθ                                Figure 2. Toy Experiment: d-dimensional (d = 2) underlying
+                                                                     data is “buried” in a D-dimensional space, by a fixed, random,
+Here, the notations xθ, ϵθ, and vθ suggest that they are all                                                                column-orthogonal projection matrix.  In the D-dim space, we
+predictions dependent on θ. Solving this equation set gives:                                                                               train a simple generative model (5-layer ReLU MLP with 256-dim
+ϵθ = (zt−txθ)/(1−t) and vθ = (xθ −zt)/(1−t), that is,      hidden units). The projection matrix is unknown to the model, and
+both ϵθ and vθ can be computed from zt and the network    we only use it for visualizing the output. In this toy experiment,
+xθ. These are summarized in Tab. 1 in column (a).               with the observed dimension D increasing, only x-prediction can
+   Similarly, when we let the direct network output netθ be     produce reasonable results.
+ϵ or v, we obtain the other sets of equations (by replacing
+the first one in Eq. (5)). The transformations are summa-     two among the nine cases are mathematically equivalent.
+rized in Tab. 1 in the columns of (b), (c) for ϵ-, v-prediction.                                                     Generator Space. Regardless of the combination used, to
+This shows that when one quantity in {x, ϵ, v} is predicted,                                                        perform generation at inference-time, we can always trans-
+the other two can be inferred. The derivations in many prior                                                     form the network output to the v-space (Tab. 1, row (3))
+works (e.g., [52, 15]) are special cases covered in Tab. 1.                                                      and solve the ODE in Eq. (4) for sampling. As such, all
+Loss Space. While the loss is often defined in one reference     nine combinations are legitimate generators.
+space (e.g., v-loss in Eq. (3)), conceptually, one can define
+                                                               3.3. Toy Experimentit in any space. It has been shown [52, 15] that with a given
+reparameterization from one prediction space to another, the     According to the manifold assumption [4], the data x tends
+loss is effectively reweighted.                                    to lie in a low-dimensional manifold (Fig. 1), while noise ϵ
+   For example, consider the combination of x-prediction     and velocity v are off-manifold. Letting a network directly
+and v-loss in Tab. 1(3)(a). We have vθ = (xθ −zt)/(1−t)      predict the clean data x should be more tractable. We verify
+as the prediction and v = (x −zt)/(1 −t) as the target.      this assumption in a toy experiment in this section.
+The v-loss in Eq. (3) becomes: L = E∥vθ(zt, t) −v∥2 =     We consider the toy case of d-dimensional underlying
+E    1  ∥xθ(zt, t)−x∥2, which is a reweighted form of the     data “buried” in an observed D-dimensional space (d < D).  (1−t)2
+x-loss. A transformation like this one can be done for any   We synthesize this scenario using a projection matrix P ∈
+prediction space and any loss space listed in Tab. 1.         RD×d that is column-orthogonal, i.e., P ⊤P = Id×d. This
+   Put together, consider the three unweighted losses de-     matrix P is randomly created and fixed. The observed data
+fined in {x, ϵ, v}, and the three forms of the network di-       is x = P ˆx ∈RD, where the underlying data is ˆx ∈Rd.
+rect output, there are nine possible combinations (Tab. 1).    The matrix P is unknown to the model, and as such, it is a
+Each combination constitutes a valid formulation, and no     D-dimensional generation problem for the model.
+
+
+                                                 4
+
+======================== PDF 第 5 页 ========================
+  We train a 5-layer ReLU MLP with 256-dim hidden units
+as the generator and visualize the results in Fig. 2. We ob-
+tain these visualizations by projecting the D-dim generated
+samples back to d-dim using P. We investigate the cases                                          ...
+of D ∈{2, 8, 16, 512} for d = 2. We study x, ϵ, or v-
+                                                                                                                                        Linear Embed
+prediction, all using the v-loss, i.e., Tab. 1(3)(a-c).
+                                                                                                                                       Transformer Block
+   Fig. 2 shows that only x-prediction can produce rea-
+sonable results when D increases. For ϵ-/v-prediction, the                                             Transformer Block
+models struggle at D=16, and fail catastrophically when                                             Transformer Block
+D=512, where the 256-dim MLP is under-complete.                                                        Linear Predict
+                                                                                                                    ...   Notably, x-prediction can work well even when the
+model is under-complete.  Here, the 256-dim MLP in-
+evitably discards information in the D=512-dim space.
+However, since the true data is in a low-dimensional d-dim
+space, x-prediction can still perform well, as the ideal out-
+put is implicitly d-dim. We draw similar observations in the      Figure 3. The “Just image Transformer” (JiT) architecture:
+case of real data on ImageNet, as we show next.                 simply a plain ViT [13] on patches of pixels for x-prediction.
+
+4. “Just Image Transformers” for Diffusion          binations, we train a “Base” [13] model (JiT-B), which has
+                                                          a hidden size of 768-dim per token. We study JiT-B/16 at
+Driven by the above analysis, we show that plain Vision                                                256×256 resolution in Tab. 2(a). As a reference, we ex-
+Transformers (ViT) [13] operating on pixels can work sur-                                                     amine JiT-B/4 (i.e., p=4) at 64×64 in Tab. 2(b).  In both
+prisingly well, simply using x-prediction.                                                                       settings, the sequence length is the same (16×16).
+                                          We draw the following observations:4.1. Just Image Transformers
+                                                          x-prediction is critical. In Tab. 2(a) with JiT-B/16, only
+The core idea of ViT [13]  is “Transformer on Patches                                                              x-prediction performs well, and it works across all three
+(ToP)”2. Our architecture design follows this philosophy.                                                                     losses. Here, a patch is 768-d (16×16×3), which coincides
+   Formally, consider H×W×C-dim image data (C=3).                                                          with the hidden size of 768 in JiT-B. While this may seem
+All x, ϵ, v and zt share this same dimensionality. Given                                                          “about enough”, in practice the models may require addi-
+an image, we divide it into non-overlapping patches of size
+                         H W                    tional capacity, e.g., to handle positional embeddings. For
+p×p, resulting in a sequence of a length p × p . Each patch      ϵ-/v-prediction, the model does not have enough capacity
+is a p×p×3-dim vector. This sequence is processed by a                                                                   to separate and retain the noised quantities. These observa-
+linear embedding projection, added with positional embed-                                                                   tions are similar to those in the toy case (Fig. 2).
+ding [66], and mapped by a stack of Transformer blocks                                                 As a comparison, we examine JiT-B/4 at 64×64 res-
+[66]. The output layer is a linear predictor that projects each                                                                olution (Tab. 2(b)).  Here,  all cases perform reasonably
+token back to a p×p×3-dim patch. See Fig. 3.                                                                 well: the accuracy gaps among the nine combinations are
+  As standard practice, the architecture is conditioned on                                                              marginal, not decisive. The dimensionality is 48 (4×4×3)
+time t and a given class label. We use adaLN-Zero [46] for                                                             per patch, well below the hidden size of 768 in JiT-B, which
+conditioning and will discuss other options later. Conceptu-                                                               explains why all combinations work reasonably well. We
+ally, this architecture amounts to the Diffusion Transformer                                                            note that many previous latent diffusion models have a sim-
+(DiT) [46] directly applied to patches of pixels.                                                                          ilarly small input dimensionality and therefore were not ex-
+  The overall architecture is nothing more than “Just im-                                                        posed to the issue we discuss here.
+age Transformers”, which we refer to as JiT. For exam-
+                                                     Loss weighting is not sufficient. Our work is not the firstple, we investigate JiT/16 (i.e., patch size p=16, [13]) on
+                                                                   to enumerate the combinations of relevant factors. In [52],256×256 images, and JiT/32 (p=32) on 512×512 images.
+                                                                                             it has explored the combinations of loss weighting and net-These settings respectively result in a dimensionality of 768
+                                                   work predictions. Their experiments were done on the low-(16×16×3) and 3072 (32×32×3) per patch. Such high-
+                                                          dimensional CIFAR-10 dataset, using a U-net. Their obser-dimensional patches can be handled by x-prediction.
+                                                               vations were closer to ours on ImageNet 64×64.3
+4.2. What to Predict by the Network?                    However, Tab. 2(a) on ImageNet 256×256 suggests that
+                                                                   loss weighting is not the whole story. On one hand, both
+We have summarized the nine possible combinations of loss
+space and prediction space in Tab. 1. For each of these com-          3In the CIFAR-10 experiments in [52], they enumerated three types of
+                                                                                   loss weighting and three types of network outputs.  In 8 out of these 9
+   2Quoting Lucas Beyer.                                                   combinations, their models work reasonably well (see their Tab. 1).
+
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+                    x-pred       ϵ-pred       v-pred                                t-shift (µ)     x-pred        ϵ-pred        v-pred
+
+         x-loss         10.14        379.21        107.55                     (lower noise)   –0.0       14.44         464.25         120.03
+          ϵ-loss         10.45        394.58        126.88                               –0.4        9.79         372.91         109.93
+          v-loss          8.62        372.38         96.53                               –0.8        8.62         372.36          96.53
+                     (a) ImageNet 256×256, JiT-B/16                                (higher noise)   –1.2        8.99         355.25         106.85
+
+                    x-pred       ϵ-pred       v-pred              Table 3.  Noise-level shift (JiT-B/16, ImageNet 256×256, FID-
+         x-loss         5.76          6.20          6.12              50K). We shift the noise level by adjusting µ in the logit-normal
+          ϵ-loss          3.56          4.02          3.76               t-sampler [15]. An appropriate noise level is useful, but is not
+                                                                              sufficient for addressing the catastrophic failure in ϵ-/v-prediction.         v-loss          3.55          3.63          3.46
+                                                                        Settings (the same as Tab. 2): 200 epochs, with CFG.                     (b) ImageNet 64×64, JiT-B/4
+Table 2. Results of all combinations of loss space and network             10
+space (see Tab. 1), evaluated by FID-50K on ImageNet: (a) JiT-                                                                                     9  9.40                                                    8.62
+B/16 at 256 resolution, 768-d per patch; (b) JiT-B/4 at 64 resolu-
+tion, 48-d per patch. We annotate catastrophic failures in red and              8           8.38                                  8.15                                                                                                                                          7.89
+reasonable results by green. Settings: 200 epochs, with CFG [22].                                                                                                                                                                                            FID-50K 7                     7.35      7.48
+
+                                                                                     6      no bottleneck
+ϵ- and v-prediction fail catastrophically in Tab. 2(a), re-                       bottleneck                                    raw768-dpatch
+                                                                                     5gardless of the loss space, which corresponds to different                 16      32      64      128     256     512     1024
+                                                                                                        bottleneck dimension (log-scale)effective weightings in different loss spaces (as discussed).
+On the other hand, x-prediction works across all three loss      Figure 4. Bottleneck linear embedding. Results are for JiT-B/16
+spaces: the loss weighting induced by the v-loss is prefer-     on ImageNet 256×256. A raw patch is 768-dim (16×16×3) and
+                                                                                       is embedded by two sequential linear layers with an intermediateable, but not critical.4
+                                                                     bottleneck dimension d′ (d′ < 768). Here, bottleneck embedding
+Noise-level shift is not sufficient. Prior works [7, 25, 26]        is generally beneficial, and our x-prediction model can work de-
+have suggested that increasing the noise level is useful for      cently even with aggressive bottlenecks as small as 32 or 16. Set-
+high-resolution pixel-based diffusion. We examine this in      tings (the same as Tab. 3): 200 epochs, with CFG.
+Tab. 3 with JiT-B/16. As we use the logit-normal distribu-
+tion [15] for sampling t (see appendix), the noise level can     works well; in fact, it works without any modification other
+be shifted by changing the parameter µ of this distribution:     than scaling the noise proportionally (e.g., by 2× and 4× at
+intuitively, shifting µ towards the negative side results in      resolution 512 and 1024; see appendix).
+smaller t and thus increases the noise level (Eq. (1)).              This evidence suggests that the network design can be
+   Tab. 3 shows that when the model already performs de-      largely decoupled from the observed dimensionality, as is
+cently (here, x-pred), appropriately high noise is benefi-      the case in many other neural network applications. Increas-
+cial, which is consistent with prior observations [7, 25, 26].     ing the number of hidden units can be beneficial (as widely
+However, adjusting the noise level alone cannot remedy ϵ-     observed in deep learning), but it is not decisive.
+or v-prediction: their failure stems inherently from the in-                                                         Bottleneck can be beneficial. Even more surprisingly, we
+ability to propagate high-dimensional information.                                                                   find that, conversely, introducing a bottleneck that reduces
+  As a side note, according to Tab. 3, we set µ = –0.8 in                                                             dimensionality in the network can be beneficial.
+other experiments on ImageNet 256×256.                                                                        Specifically, we turn the linear patch embedding layer
+Increasing hidden units is not necessary. Since the ca-      into a low-rank linear layer, by replacing it with a pair of
+pacity can be limited by the network width (i.e., numbers of     bottleneck (yet still linear) layers. The first layer reduces
+hidden units), a natural idea is to increase it. However, this      the dimension to d′, and the second layer expands it to the
+remedy is neither principled nor feasible when the observed     hidden size of the Transformer. Both layers are linear and
+dimension is very high. We show that this is not necessary     serve as a low-rank reparameterization.
+in the case of x-prediction.                                         Fig. 4 plots the FID vs. the bottleneck dimension d′, us-
+   In Tab. 5 and Tab. 6 in the next section, we show results     ing JiT-B/16 (768-d per raw patch). Reducing the bottle-
+of JiT/32 at resolution 512 and JiT/64 at resolution 1024,     neck dimension, even to as small as 16-d, does not cause
+using a proportionally large patch size of p=32 or p=64.      catastrophic failure. In fact, a bottleneck dimension across
+This amounts to 3072-dim (i.e., 32×32×3) or 12288-dim     a wide range (32 to 512) can improve the quality, by a de-
+per patch, substantially larger than the hidden size of B, L,     cent margin of up to ∼1.3 FID.
+and H models (defined in [13]). Nevertheless, x-prediction      From a broader perspective of representation learning,
+                                                                        this observation is not entirely unexpected. Bottleneck de-
+   4From Tab. 1(a), we see that with x-prediction, the coefficients of xθ
+are 1, t/(1−t), and −1/(1−t) in the three rows. When converting to x-     signs are often introduced to encourage the learning of in-
+loss, the weights of x-loss are 1, t2/(1−t)2, and 1/(1−t)2, respectively.      herently low-dimensional representations [64, 48, 41, 2].
+
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+                                                                                                             JiT-B/16      JiT-L/16
+Algorithm 1 Training step                                                Baseline (SwiGLU, RMSNorm)     7.48 (6.32)            -
+                                                             + RoPE, qk-norm                  6.69 (5.44)            -
+# net(z, t): JiT network                                   + in-context class tokens            5.49 (4.37)     3.39 (2.79)
+# x: training batch
+                                                                  Table 4. “Just Advanced” Transformers with general-purpose
+t = sample t()                                                     designs. All are JiT/16 for ImageNet 256×256, with bottleneck
+e = randn like(x)
+                                                                   patch embedding (128-d, Fig. 4), evaluated by FID-50K. Settings:
+z = t * x + (1 - t) * e                                 200 epochs, with CFG (and with CFG interval [33] in brackets).
+v = (x - z) / (1 - t)
+
+x_pred = net(z, t)                                                        resolution   model    len patch dim hiddens params Gflops FID
+v_pred = (x_pred - z) / (1 - t)                           256×256   JiT-B/16  256   768     768    131    25   4.37
+                                                             512×512   JiT-B/32  256   3072     768    133    26   4.64
+loss = l2 loss(v - v_pred)
+                                                             1024×1024  JiT-B/64  256  12288    768    141    30   4.82
+
+                                                                  Table 5. ImageNet 1024×1024 with JiT-B/64. All entries have
+                                                                 roughly the same number of parameters and compute. Settings: ifAlgorithm 2 Sampling step (Euler)
+                                                                    not specified here, the same as Tab. 4 (all are with CFG interval).
+# z: current samples at t
+                                                             256×256   200-ep    600-ep     512×512   200-ep    600-ep
+x_pred = net(z, t)
+v_pred = (x_pred - z) / (1 - t)                                  JiT-B/16    4.37      3.66        JiT-B/32    4.64      4.02
+                                                                              JiT-L/16    2.79      2.36        JiT-L/32    3.06      2.53
+z_next = z + (t_next - t) * v_pred                             JiT-H/16    2.29      1.86        JiT-H/32    2.51      1.94
+                                                                            JiT-G/16    2.15      1.82        JiT-G/32    2.11      1.78
+
+                                                                  Table 6. Scalability on ImageNet 256×256 and 512×512, eval-
+                                                                   uated by FID-50K. All models have the same sequence length of4.3. Our Algorithm
+                                                         16×16, and thus the models at 512 resolution have nearly the same
+Our final algorithm adopts x-prediction and v-loss, which     compute as their 256 counterparts. Settings: the same as Tab. 5.
+corresponds to Tab. 1(3)(a). Formally, we optimize:
+                                          2                   5. Comparisons
+         L = Et,x,ϵ vθ(zt, t) −v    ,             (6)
+                                                          High-resolution generation on pixels. In Tab. 5, we fur-
+    where:  vθ(zt, t) = (netθ(zt, t) −zt)/(1 −t).           ther report our base-size model (JiT-B) on ImageNet at res-
+                                                                olutions 512 and even 1024. We use patch sizes propor-
+Alg. 1 shows the pseudo-code of a training step, and Alg. 2                                                                   tional to image sizes, and therefore the sequence length at
+is that of a sampling step (Euler solver; can be extended to                                                                    different resolutions remains the same. The per-patch di-
+Heun or other solvers). For brevity, class conditioning and                                                      mension can be as high as 3072 or 12288, and none of the
+CFG [22] are omitted, but both follow standard practice. To                                             common models would have sufficient hidden units.
+prevent zero division in 1/(1−t) , we clip its denominator                                                                 Tab. 5 shows that our models perform decently across
+(by default, 0.05) whenever computing this division.                                                                   resolutions. All models have similar numbers of parameters
+                                                      and computational cost, which only differ in the input/out-4.4. “Just Advanced” Transformers
+                                                             put patch embeddings. Our method does not suffer from the
+The strength of a general-purpose Transformer [66] is partly     curse of observed dimensionalities.
+in that, when its design is decoupled from the specific task,
+                                                                   Scalability. A core goal of decoupling the Transformer de-
+it can benefit from architectural advances developed in other
+                                                              sign with the task is to leverage the potential for scalability.
+applications. This property underpins the advantage of for-
+                                                              Tab. 6 provides results on ImageNet 256 and 512 with four
+mulating diffusion with a task-agnostic Transformer.
+                                                    model sizes (note that at resolution 512, none of these mod-
+   Following [73], we incorporate popular general-purpose
+                                                                      els have more hidden units than the patch dimension). The
+improvements5: SwiGLU [54], RMSNorm [75], RoPE
+                                                    model sizes and flops are shown in Tab. 7 and 8: our model
+[62], qk-norm [19], all of which were originally developed
+                                                                        at resolution 256 has similar cost as its counterpart at 512.
+for language models. We also explore in-context class con-
+                                                  Our approach benefits from scaling.
+ditioning:  but unlike original ViT [13] that appends one
+                                                                         Interestingly, the FID difference between resolution 256
+class token to the sequence, we appends multiple such to-
+                                                      and 512 becomes smaller with larger models. For JiT-G, the
+kens (by default, 32; see appendix), following [35]. Tab. 4
+                                                FID at 512 resolution is even lower. For very large models
+reports the effects of these components.
+                                                    on ImageNet, FID performance largely depends on overfit-
+   5Our baselines in previous sections all use SwiGLU + RMSNorm. Re-      ting, and denoising at 512 resolution poses a more challeng-
+moving them has a slight degradation: FID goes from 7.48 to 7.89.           ing task, making it less susceptible to overfitting.
+
+
+                                                 7
+
+======================== PDF 第 8 页 ========================
+                                                                                                                   pre-training
+                                                                      ImgNet 256×256       token  perc. self-sup.  params  Gflops FID↓IS↑
+                                                                                        Latent-space Diffusion
+                                                                            DiT-XL/2 [46]        SD-VAE VGG      -    675+49M   119   2.27 278.2
+                                                                                SiT-XL/2 [40]        SD-VAE VGG      -    675+49M   119   2.06 277.5
+                                                             REPA [74], SiT-XL/2  SD-VAE VGG DINOv2  675+49M   119   1.42 305.7
+                                                                                               LightningDiT-XL/2 [73]  VA-VAE VGG DINOv2  675+49M   119   1.35 295.3
+                                                                     DDT-XL/2 [71]       SD-VAE VGG DINOv2  675+49M   119   1.26 310.6
+                                                         RAE [78], DiTDH-XL/2  RAE  VGG DINOv2 839+415M  146   1.13 262.6
+                                                                                        Pixel-space (non-diffusion)
+                                                                                    JetFormer [65]                -       -        -       2.8B         -    6.64     -
+                                                                          FractalMAR-H [36]          -       -        -     848M        -    6.15 348.9
+                                                                                        Pixel-space Diffusion
+                                                        ADM-G [12]                  -       -        -     554M    1120  4.59 186.7
+                                                                  RIN [28]                       -       -        -     410M    334   3.42 182.0
+                                                                         SiD [25] , UViT/2            -       -        -      2B     555   2.44 256.3
+                                                             VDM++, UViT/2             -       -        -      2B     555   2.12 267.7
+                                                                          SiD2 [26], UViT/2           -       -        -      N/A     137   1.73     -
+                                                                          SiD2 [26], UViT/1           -       -        -      N/A     653   1.38     -
+                                                                                    PixelFlow [6], XL/4          -       -        -     677M    2909  1.98 282.1
+                                                                                PixNerd [70], XL/16         -       -   DINOv2   700M    134   2.15  297
+                                                                                   JiT-B/16                       -       -        -     131M     25   3.66 275.1
+                                                                                   JiT-L/16                       -       -        -     459M     88   2.36 298.5
+                                                                                 JiT-H/16                       -       -        -     953M    182   1.86 303.4
+                                                                                 JiT-G/16                       -       -        -      2B     383   1.82 292.6
+
+                                                                  Table 7. Reference results on ImageNet 256×256. FID [21] and
+                                                                 IS [53] of 50K samples are evaluated. The “pre-training” columns
+                                                                                              list the external models required to obtain the results (note that the
+                                                                     perceptual loss [77] uses a pre-trained VGG classifier [56]). The
+                                                                  parameters include the generator and tokenizer decoder (used at
+                                                                        inference-time), but exclude other pre-trained components. The
+Figure 5. Qualitative Results. Selected examples on ImageNet      Giga-flops are measured for a single forward pass (not counting
+512×512 using JiT-H/32. More uncurated results are in appendix.      the tokenizer) and are roughly proportional to the computational
+                                                                        cost of an iteration during both training and inference (for the
+                                                                       multi-scale method [6], we measure the finest level).
+Reference results from previous works. As a reference,
+we compare with previous results in Tab. 7 and 8. We mark
+the pre-training components involved for each method.                                    pre-training
+                                                                      ImgNet 512×512       token  perc. self-sup.  params  Gflops FID↓IS↑
+Compared with other pixel-based methods, ours is purely         Latent-space Diffusion
+driven by plain, general-purpose Transformers. Our mod-        DiT-XL/2 [46]        SD-VAE VGG      -    675+49M   525   3.04 240.8
+els are compute-friendly and avoid the quadratic scaling of        SiT-XL/2 [40]        SD-VAE VGG      -    675+49M   525   2.62 252.2
+                                                              REPA [74], SiT-XL/2  SD-VAE VGG DINOv2  675+49M   525   2.08 274.6
+expense with doubled resolution (see flops in Tab. 8).              DDT-XL/2 [71]       SD-VAE VGG DINOv2  675+49M   525   1.28 305.1
+  Our approach does not use extra losses or pre-training,      RAE [78], DiTDH-XL/2  RAE  VGG DINOv2 839+415M  642   1.13 259.6
+which may lead to further gains (an example is in appendix).         Pixel-space Diffusion
+                                                        ADM-G [12]                  -       -        -     559M    1983  7.72 172.7
+These directions are left for future work.                          RIN [28]                       -       -        -     320M    415   3.95 216.0
+                                                                         SiD [25] , UViT/4            -       -        -      2B     555   3.02 248.7
+6. Discussion and Conclusion                           VDM++,SiD2 [26],UViT/4UViT/4           --       --        --      N/A2B     555137   2.652.19 278.1-
+                                                                          SiD2 [26], UViT/2           -       -        -      N/A     653   1.48     -
+Noise is inherently different from natural data. Over the        PixNerd [70], XL/16         -       -   DINOv2   700 M    583   2.84 245.6
+years, the development of diffusion models has focused pri-         JiT-B/32                       -       -        -     133M     26   4.02 271.0
+marily on probabilistic formulations, while paying less at-         JiT-L/32                       -       -        -     462M     89   2.53 299.9
+                                                                                 JiT-H/32                       -       -        -     956M    183   1.94 309.1
+tention to the capabilities (and limitations) of the neural net-         JiT-G/32                       -       -        -      2B     384   1.78 306.8
+works used. However, neural networks are not infinitely ca-
+                                                                  Table 8. Reference results on ImageNet 512×512. JiT has anpable, and they can better use their capacity to model data
+                                                                    aggressive patch size and can use small compute to achieve strongrather than noise. Under these perspectives, our findings on
+                                                                                 results. Notations are similar to Tab. 7.
+x-prediction are, in hindsight, a natural outcome.
+  Our work adopts a minimalist and self-contained design.
+By reducing domain-specific inductive biases, we hope our     dimensional natural data. We envision that the general-
+approach can generalize to other domains where tokeniz-     purpose “Diffusion + Transformer” paradigm will be a po-
+ers are difficult to obtain. This property is particularly de-      tential foundation in other areas.
+sirable for scientific applications that involve raw, high-
+
+
+                                                 8
+
+======================== PDF 第 9 页 ========================
+A. Implementation Details                                                              JiT-B   JiT-L   JiT-H   JiT-G
+                                                                              architecture
+Our implementation closely follows the public codebases of         depth                      12      24      32      40
+                                                                          hidden dim                 768    1024    1280    1664
+DiT [46] and SiT [40]. Our configurations are summarized                                                                          heads                      12      16      16      16
+in Tab. 9. We describe the details as follows.                       image size                  256 (other settings: 512, or 1024)
+                                                                             patch size                     image size / 16
+Time distribution.  Following [15], during training, we
+                                                                                 bottleneck                       128 (B/L), 256 (H/G)
+adopt the logit-normal distribution over t [15]: logit(t) ∼         dropout                           0 (B/L), 0.2 (H/G)
+N(µ, σ2).  Specifically, we sample s ∼N(µ, σ2) and let          in-context class tokens                 32 (if used)
+t=sigmoid(s). The hyper-parameter µ determines the noise          in-context start block          4       8       10      10
+level (see Tab. 3), and by default we set µ = –0.8 on Ima-         training
+                                                                        epochs                           200 (ablation), 600
+geNet at resolution 256 (or 512, 1024), and fix σ as 0.8.          warmup epochs [17]                       5
+ImageNet 512×512 and 1024×1024. We adopt JiT/32         optimizer                Adam [31], β1, β2 = 0.9, 0.95
+                                                                             batch size                              1024
+(i.e., a patch size of 32) on ImageNet 512×512. The model                                                                                  learning rate                                2e-4
+leads to a sequence of 256 = 16×16 patches, the same as          learning rate schedule                       constant
+JiT/16 on ImageNet 256×256. As such, JiT/32 only differs         weight decay                             0
+from JiT/16 in the input/output patch dimension, increasing       ema decay                        {0.9996, 0.9998, 0.9999}
+                                                                           time sampler               logit(t)∼N(µ, σ2), µ = –0.8, σ = 0.8
+from 768-d to 3072-d per patch; all other computations and                                                                               noise scale                         1.0 × image size / 256
+costs are exactly the same.                                                      clip of (1 −t) in division                    0.05
+  To reuse the exact same recipe from ImageNet 256×256,          class token drop (for CFG)                     0.1
+for 512×512 images we rescale the magnitude of the noise        sampling
+                                                 ODE solver                         Heun [20]
+ϵ by 2×: that is, ϵ ∼N(0, 22I). This simple modification                                                 ODE steps                               50
+approximately maintains the signal-to-noise ratio (SNR) be-         time steps                                 linear in [0.0, 1.0]
+tween the 256×256 and 512×512 resolutions [25, 7, 26].      CFG scale sweep range [22]                   [1.0, 4.0]
+No other changes to the ImageNet 256×256 configuration      CFG interval [33]                          [0.1, 1] (if used)
+are required or applied.                                                     Table 9. Configurations of experiments.
+   For ImageNet 1024×1024, we use the model JiT/64 and
+scale the noise ϵ by 4×. No other change is needed.                            15                                        w/o CFG interval
+                                                                                                                                          w/ CFG interval
+In-context class conditioning. Standard DiT [46] performs                  10
+class conditioning through adaLN-Zero. In Tab. 4, we fur-                                                                                                                                                                                                                            FID-50K
+ther explore in-context class-conditioning.                                          5
+                                                                                                                             FID=2.88                 FID=2.36   Specifically, following ViT [13], one can prepend a class                   0
+                                                                                                                           1.0             1.5             2.0             2.5             3.0
+token to the sequence of patches. This is referred to as “in-                                     CFG scale
+context conditioning” in DiT [46].  Note that we use in-      Figure 6. The influence of CFG, without and with CFG interval
+context conditioning jointly with the default adaLN-Zero       (for JiT-L/16 on ImageNet 256×256, 600 epochs).
+conditioning, unlike DiT. In addition, following MAR [35],
+we further prepend multiple such tokens to the sequence.
+These tokens are repeated instances of the same class token,                                 EMA and CFG. Our study covers a wide range of configu-
+with different positional embeddings added. We prepend 32                                                                      rations, including variations in loss and prediction spaces,
+such tokens. Moreover, rather than prepending these tokens                                                    model sizes, and architectural components.  The optimal
+to the Transformer’s input, we find that prepending them at                                                              values of the CFG scale [22] and EMA (exponential moving
+later blocks can be beneficial (see “in-context start block” in                                                             average) decay vary from case to case, and fixing them may
+Tab. 9). Tab. 4 shows that our implementation of in-context                                                              lead to incomplete or misleading observations. Since main-
+conditioning improves FID by ∼1.2.                                                                 taining these hyperparameter configurations is relatively in-
+Dropout and early stop. We apply dropout [61] in JiT-H     expensive, we strive to adopt the optimal values.
+and G to mitigate the risk of overfitting.  Specifically, we         Specifically, for the CFG scale ω [22], we determine
+apply dropout to the middle half of the Transformer blocks.      the optimal value by searching over a range of candidate
+For Transformer blocks with dropout, we apply it to both      scales at inference time, as is common practice in exist-
+the attention block and the MLP block.                        ing work. For EMA decays, we maintain multiple copies
+  As the G-size models still tend to overfit under our cur-     of the moving-averaged parameters during training, which
+rent dropout setting, we apply early stopping when the mon-     introduces a negligible computational overhead. To avoid
+itored FID begins to degrade. This occurs at around 320    memory overhead, different EMA copies can be stored on
+epochs for both JiT-G/16 and JiT-G/32.                         separate devices (e.g., GPUs). As such, both the CFG scale
+
+
+                                                 9
+
+======================== PDF 第 10 页 ========================
+            0.12
+                                                                                      v-pred                  Fig. 7 (top) shows that v-prediction yields substantially
+            0.10                                                                 x-pred              higher loss values (about 25%) than x-prediction, even
+            0.08                                               though v-prediction appears to be the “native” parameter-
+          loss0.06                                                        ization for the v-loss. This comparison indicates that the
+            0.04                                                      task of x-prediction is inherently easier, as the data lie
+            0.02                                           on a low-dimensional manifold. We also observe that ϵ-
+            0.00               0     25     50     75    100    125    150    175    200            prediction (not shown here) has about 3× higher loss and is
+                                    Epoch                                unstable, which may explain its failure in Tab. 2(a).
+                    t = 0.1    t = 0.2    t = 0.3    t = 0.4    t = 0.5           Fig. 7 (bottom) compares the denoised images corre-
+                                                         sponding to the two training curves. For x-prediction, the
+   noisy image                                                 denoised image is simply xθ = netθ; for v-prediction, the
+                                                          denoised image is xθ=(1−t)netθ+zt with vθ=netθ (see
+                                                              Tab. 1(c)(1)). The higher loss of v-prediction in Fig. 7 (top)
+ denoised image
+  from x-pred                                               can be reflected by its noticeable artifacts in Fig. 7 (bottom).
+                                                        Note that the artifact in Fig. 7 (bottom) is that of a single
+                                                            denoising step. In the generation process, this error can ac-
+ denoised image                                              cumulate in the multi-step ODE solver, which leads to the
+  from v-pred
+                                                                 catastrophic failure in Tab. 2(a).
+
+Figure 7. (Top): Training loss of x- and v-prediction, using the     B.2. Pre-conditioner
+same loss space of v-loss (Tab. 2(a), third row). We plot the loss
+                                                              In EDM [29], an extra “pre-conditioner” is applied to wrapaveraged per pixel per channel. (Bottom): Denoised images from
+x- and v-prediction, where v-prediction’s denoised output is vi-      the direct output of the network. Using the notation of our
+sualized according to Tab. 1(c)(1). The denoised image from v-      paper, the pre-conditioner formulation can be written as:
+prediction has noticeable artifacts, as reflected by the higher loss.      xθ(zt, t) = cskip ·zt +cout ·netθ(zt, t), where cskip and cout
+                                                                are pre-defined coefficients. This equation suggests that un-
+                                                                     less cskip ≡0, the network output in a pre-conditioner must
+and EMA decay are essentially inference-time decisions.        not perform x-prediction. And according to the manifold
+  Our CFG scale candidates range from 1.0 to 4.0 with a     assumption, this formulation should not remedy the issue
+step size of 0.1. The influence of CFG is shown in Fig. 6 for    we consider, as we examine next.
+a JiT-L/16 model. Our EMA decay candidates are 0.9996,                                                     Formulation of pre-conditioners.  Given the definition
+0.9998, and 0.9999, evaluated with a batch size of 1024. For                                                              of pre-conditioner, we can rewrite the “pre-conditioned x-
+each model (including any one in the ablation), we search                                                                prediction” as:
+for the optimal setting using 8K samples and then apply it
+to evaluate 50K samples.                        xθ = cskip · zt + cout · netθ
+                                    
+Evaluation.  Following common pratice, we evaluate the                     ϵθ = (zt −txθ)/(1 −t)               (7)
+FID [21] against the ImageNet training set. We evaluate          vθ = (xθ −zt)/(1 −t)
+FID on 50K generated images, with 50 samples for each
+                                                            Accordingly, the objective in Eq. (6) (v-loss) is written as:of the 1000 ImageNet classes. We evaluate the Inception
+Score (IS) [53] on the same 50K images.                                                                   2
+                                              L = Et,x,ϵ vθ(zt, t) −v    ,             (8)
+
+B. Additional Experiments                                 where:  vθ(zt, t) = (xθ(zt, t) −zt)/(1 −t)
+                                                           and  xθ(zt, t) = cskip · zt + cout · netθ(zt, t).B.1. Training Loss and Denoised Images
+                                                    Comparing with Eq. (6), the only difference is in how weIn Tab. 2(a), the failure of ϵ-/v-prediction is caused by the
+                                                     compute xθ from the network.inherent incapability of predicting a high-dimensional out-
+                                                 As EDM [29] uses a variance-exploding schedule (thatput from a limited-capacity network.  This failure can be
+                                                                                     is, zt=x+σtϵ) and we use a (roughly) variance-preservingseen from the training loss curves.
+                                                              version (that is, zt=tx+(1−t)ϵ), a fully equivalent conver-   In Fig. 7 (top), we compare the training loss curves under
+                                                              sion is impossible. To have a pre-conditioner in our case,the same v-loss, defined as L = E∥vθ(zt, t)−v∥2, using v-                                 1           1−t                                             we rewrite                                                                     our version as  t zt = x +   t  ϵ. As such, weprediction (i.e., vθ = netθ) versus x-prediction (i.e., vθ =                                                                     1−t
+                                                                      set σt =    t   , which is the noise added to unscaled im-(netθ−zt)/(1−t)). Since the loss is computed in the same
+                                                                ages, similar to EDM’s. With this, we can rewrite the co-space and only the parameterization differs, comparing the
+                                                                                                               1  σ2data
+loss values is legitimate.                                             efficients defined by EDM [29] as:  cskip =  t σ2data+σ2t and
+
+
+                                                 10
+
+======================== PDF 第 11 页 ========================
+                                  pre-conditioned predictions          This minor modification leads to a decent improvement, as
+                x-pred        EDM-style           linear          shown in Tab. 11. This exploration suggests further poten-
+                                    1  σ2data
+                       cskip = 0     cskip= t σ2data+σ2t        cskip = t              tial for combining our simple method with additional loss
+                      cout = 1      cout= qσdataσtσ2data+σ2t      cout = 1 −t          terms, which we leave for future work.                                                              Despite the improvement, we do not use this or any addi-
+    x-loss         10.14            28.94            39.50             tional loss in the other experiments presented in this paper.
+     ϵ-loss         10.45            72.05            67.56
+     v-loss          8.62            35.49            46.25           B.4. Cross-resolution Generation
+
+                                    A model trained at one resolution can be applied to anotherTable 10. Comparisons with pre-conditioners (FID-50K, Ima-
+geNet 256, JiT-B/16). The settings are the same as Tab. 2 (a).        by simply downsampling or upsampling the generated im-
+                                                                ages. We refer to this as cross-resolution generation.  In
+             FID-50K     JiT-B/16     JiT-L/16                  our setup, JiT/16 at 256 and JiT/32 at 512 have compara-
+               v-loss only       4.37          2.79                     ble parameters and compute, making their cross-resolution
+             w/ cls loss       4.14          2.50                   comparison meaningful. The results are in Tab. 12
+
+Table 11.  Exploration: additional classification loss. We do                      FID@256                    FID@512
+not use this loss in any other experiments.  Settings: ImageNet      JiT-G/16@256          1.82       JiT-G/16@256, ↑512    2.45
+256×256, 200-ep, with CFG interval.                                JiT-G/32@512, ↓256    1.84       JiT-G/32@512          1.78
+
+                                                                  Table 12.  Cross-resolution Generation (noted in gray), using
+cout = √σdataσt   where σdata is the data standard deviation      JiT-G/16 trained at resolution 256 and JiT-G/32 trained at 512,
+         σ2data+σ2t
+                                           1                     followed by upsampling (↑) or downsampling (↓). All entries have
+set as 0.5 [29]. We choose cin = t (= σt+1), so that the      similar parameters and flops (see Tab. 7 and 8).
+direct input to the network (i.e., cin · 1t zt) is still zt. It can be
+shown that only when t →0, we have: σt→+ ∞, cskip→0,       Downsampling the images generated by the 512 model
+cout→1, which approaches x-prediction. We also consider      to 256 resolution yields a decent FID@256 of 1.84. This
+a simpler linear pre-conditioner: cskip = t and cout = 1 −t,      result remains competitive when compared with the 256-
+which also performs x-prediction only when t = 0.              resolution expert (FID@256 of 1.82), while maintaining a
+Results of pre-conditioners. Tab. 10 shows that the pre-      similar computational cost and gaining the additional ability
+conditioned versions all  fail catastrophically, suggesting      to generate at 512 resolution.
+that deviating from x-prediction is not desired in high-      On the other hand, upsampling the images generated
+dimensional spaces. Interestingly, the pre-conditioned ver-     by the 256 model to 512 resolution results in a noticeably
+sions are much better than ϵ-/v-prediction in Tab. 2(a). We     worse FID@512 of 2.45, compared with the 512-resolution
+hypothesize that this is because they are more similar to x-      expert’s FID@512 of 1.78. This degradation is caused by
+prediction when t→0, which alleviates this issue.               the loss of higher-frequency details due to upsampling.
+
+                                                         B.5. Additional MetricsB.3. Exploration: Classification Loss
+                                                         For completeness, we report precision and recall [32] onOur paper focuses on a minimalist design, and we intention-
+                                                     ImageNet 256×256 in Tab. 13, compared with the com-ally do not use any extra loss. However, we note that latent-
+                                                   monly used baselines of DiT and SiT, and the latest RAE:based methods [49] typically rely on tokenizers trained with
+adversarial and perceptual losses, and thus their generation                               FID↓    IS↑    Prec↑   Rec↑
+process is not purely driven by diffusion. Next, we discuss           DiT-XL/2 [46]             2.27    278.2    0.83    0.57
+a simple extension on our pixel-based models with an addi-           SiT-XL/2 [40]             2.06    277.5    0.82    0.59
+                                                    RAE [78], DiTDH-XL/2    1.13    262.6    0.78    0.67
+tional classification loss.
+                                                                                 JiT-B/16                  3.66    275.1    0.82    0.50
+   Formally, we attach a classifier head after a specific            JiT-L/16                  2.36    298.5    0.80    0.59
+Transformer block (the 4th in JiT-B and the 8th in JiT-L).            JiT-H/16                  1.86    303.4    0.78    0.62
+The classifier consists of global average pooling followed            JiT-G/16                  1.82    292.6    0.79    0.62
+by a linear layer, and a cross-entropy loss is applied for the                                                                       Table 13. Precision and recall on ImageNet 256×256.
+1000-class ImageNet classification task. This classification
+loss Lcls is scaled by a weight λ (e.g., 100) and added to the
+ℓ2-based (i.e., element-wise sum of squared errors) regres-    C. Qualitative Results
+sion loss. To prevent label leakage, we disable class con-
+                                                              In Fig. 8 to 11, we provide additional uncurated examplesditioning for all layers before the classifier head. We note
+                                                    on ImageNet 256×256.that this modification remains minimal and does not rely
+on any pre-trained classifier, unlike the perceptual loss [76].
+
+
+                                                 11
+
+======================== PDF 第 12 页 ========================
+Acknowledgements.  We thank Google TPU Research      [16] Ian J Goodfellow, Jean Pouget-Abadie, Mehdi Mirza, Bing
+Cloud (TRC) for granting us access to TPUs, and the MIT          Xu, David Warde-Farley, Sherjil Ozair, Aaron Courville, and
+ORCD Seed Fund Grants for supporting GPU resources.            Yoshua Bengio.  Generative adversarial nets.  In NeurIPS,
+                                                                     2014.
+References                                                      [17] Priya Goyal, Piotr Doll´ar, Ross Girshick, Pieter Noord-
+                                                                                 huis, Lukasz Wesolowski, Aapo Kyrola, Andrew Tulloch,
+ [1] Michael Samuel Albergo and Eric Vanden-Eijnden. Build-          Yangqing Jia, and Kaiming He.  Accurate, large minibatch
+     ing normalizing flows with stochastic interpolants. In ICLR,        SGD: Training ImageNet in 1 hour. arXiv:1706.02677, 2017.
+     2023.                                                           [18] Danijar Hafner, Wilson Yan, and Timothy Lillicrap. Training
+ [2] Alexander A Alemi, Ian Fischer, Joshua V Dillon, and Kevin           agents inside of scalable world models. arXiv:2509.24527,
+     Murphy. Deep variational information bottleneck. In ICLR,           2025.
+     2017.                                                           [19] Alex Henry, Prudhvi Raj Dachapally, Shubham Shantaram
+ [3] Gunnar Carlsson. Topology and data. Bulletin of the Ameri-           Pawar, and Yuxuan Chen.  Query-key normalization for
+     can Mathematical Society, 46(2):255–308, 2009.                      Transformers. In Findings of EMNLP, 2020.
+ [4] Olivier Chapelle, Bernhard Sch¨olkopf, and Alexander Zien,      [20] Karl Heun. Neue methoden zur approximativen integration
+      editors. Semi-Supervised Learning. MIT Press, Cambridge,           der differentialgleichungen einer unabh¨angigen ver¨ander-
+    MA, USA, 2006.                                                         lichen. Z. Math. Phys, 45:23–38, 1900.
+ [5] Ricky TQ Chen, Yulia Rubanova, Jesse Bettencourt, and      [21] Martin Heusel,  Hubert Ramsauer, Thomas  Unterthiner,
+     David K Duvenaud. Neural ordinary differential equations.          Bernhard Nessler, and Sepp Hochreiter. GANs trained by
+     In NeurIPS, 2018.                                                 a two time-scale update rule converge to a local Nash equi-
+ [6] Shoufa Chen, Chongjian Ge, Shilong Zhang, Peize Sun, and            librium. NeurIPS, 2017.
+     Ping Luo.  PixelFlow: Pixel-space generative models with      [22] Jonathan Ho and Tim Salimans.   Classifier-free diffusion
+      flow. arXiv:2504.07963, 2025.                                      guidance. In NeurIPS Workshops, 2021.
+ [7] Ting Chen. On the importance of noise scheduling for diffu-      [23] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffu-
+     sion models. arXiv:2301.10972, 2023.                                sion probabilistic models. In NeurIPS, 2020.
+ [8] Xinlei Chen, Zhuang Liu, Saining Xie, and Kaiming He. De-      [24] Jonathan Ho, Ajay Jain, and Pieter Abbeel. DDPM github
+     constructing denoising diffusion models for self-supervised            repo. L155, diffusion utils 2.py, 2020.
+      learning. In ICLR, 2025.                                        [25] Emiel Hoogeboom, Jonathan Heek, and Tim Salimans. sim-
+ [9] Kostadin Dabov, Alessandro Foi, Vladimir Katkovnik, and            ple diffusion: End-to-end diffusion for high resolution im-
+     Karen Egiazarian. Image denoising by sparse 3-D transform-            ages. ICML, 2023.
+    domain collaborative filtering. IEEE Transactions on image      [26] Emiel Hoogeboom, Thomas Mensink, Jonathan Heek, Kay
+     processing, 16(8):2080–2095, 2007.                                 Lamerigts, Ruiqi Gao, and Tim Salimans. Simpler Diffusion
+[10] Mauricio Delbracio and Peyman Milanfar. Inversion by di-           (SiD2): 1.5 FID on ImageNet512 with pixel-space diffusion.
+      rect iteration: An alternative to denoising diffusion for image           In CVPR, 2025.
+      restoration.  Transactions on Machine Learning Research,      [27] Ahmed Imtiaz Humayun, Ibtihel Amara, Cristina Vascon-
+     2023.                                                                     celos, Deepak Ramachandran, Candice Schumann, Jun-
+[11]  Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li,           feng He, Katherine Heller, Golnoosh Farnadi, Negar Ros-
+     and Li Fei-Fei. ImageNet: A large-scale hierarchical image          tamzadeh, and Mohammad Havaei. What secrets do your
+     database. In CVPR, 2009.                                          manifolds hold? understanding the local geometry of gener-
+[12] Prafulla Dhariwal and Alexander Nichol. Diffusion models            ative models. In ICLR, 2025.
+     beat GANs on image synthesis. In NeurIPS, 2021.               [28] Allan Jabri, David Fleet, and Ting Chen. Scalable adaptive
+[13] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov,          computation for iterative generation. In ICML, 2023.
+     Dirk Weissenborn,  Xiaohua  Zhai, Thomas  Unterthiner,      [29] Tero Karras, Miika Aittala, Timo Aila, and Samuli Laine.
+     Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-           Elucidating the design space of diffusion-based generative
+     vain Gelly, Jakob Uszkoreit, and Neil Houlsby. An image is           models. In NeurIPS, 2022.
+     worth 16x16 words: Transformers for image recognition at      [30] Diederik Kingma and Ruiqi Gao. Understanding diffusion
+      scale. In ICLR, 2021.                                                  objectives as the ELBO with simple data augmentation. In
+[14] Michael Elad and Michal Aharon.  Image denoising via          NeurIPS, 2023.
+     sparse and redundant representations over learned dictionar-      [31] Diederik P Kingma and Jimmy Ba. Adam: A method for
+       ies. IEEE Transactions on Image processing, 15(12):3736–            stochastic optimization. In ICLR, 2015.
+     3745, 2006.                                                     [32] Tuomas Kynk¨a¨anniemi, Tero Karras, Samuli Laine, Jaakko
+[15] Patrick Esser, Sumith Kulal, Andreas Blattmann, Rahim           Lehtinen, and Timo Aila. Improved precision and recall met-
+      Entezari, Jonas M¨uller, Harry Saini, Yam Levi, Dominik             ric for assessing generative models. NeurIPS, 2019.
+     Lorenz, Axel Sauer, Frederic Boesel, Dustin Podell, Tim      [33] Tuomas Kynk¨a¨anniemi, Miika Aittala, Tero Karras, Samuli
+     Dockhorn, Zion English, and Robin Rombach. Scaling rec-           Laine, Timo Aila, and Jaakko Lehtinen. Applying guidance
+      tified flow Transformers for high-resolution image synthesis.            in a limited interval improves sample and distribution quality
+     In ICML, 2024.                                                          in diffusion models. In NeurIPS, 2024.
+
+
+                                                 12
+
+======================== PDF 第 13 页 ========================
+[34] Jiachen Lei, Keli Liu, Julius Berner, Haiming Yu, Hongkai      [52] Tim Salimans and Jonathan Ho. Progressive distillation for
+     Zheng, Jiahong Wu, and Xiangxiang Chu. Advancing end-             fast sampling of diffusion models. In ICLR, 2022.
+     to-end pixel space generative modeling via self-supervised      [53] Tim Salimans, Ian Goodfellow, Wojciech Zaremba, Vicki
+      pre-training. arXiv:2510.12586, 2025.                            Cheung, Alec Radford, and Xi Chen. Improved techniques
+[35] Tianhong Li, Yonglong Tian, He Li, Mingyang Deng, and            for training GANs. NeurIPS, 29, 2016.
+    Kaiming He. Autoregressive image generation without vec-      [54] Noam  Shazeer.   GLU  variants  improve  Transformer.
+      tor quantization. In NeurIPS, 2024.                                 arXiv:2002.05202, 2020.
+[36] Tianhong Li, Qinyi Sun, Lijie Fan, and Kaiming He. Fractal      [55] Minglei Shi, Haolin Wang, Wenzhao Zheng, Ziyang Yuan,
+     generative models. arXiv:2502.17437, 2025.                         Xiaoshi Wu, Xintao Wang, Pengfei Wan, Jie Zhou, and Ji-
+[37] Yaron Lipman, Ricky TQ Chen, Heli Ben-Hamu, Maximil-         wen Lu. Latent diffusion model without variational autoen-
+     ian Nickel, and Matt Le. Flow matching for generative mod-            coder. arXiv:2510.15301, 2025.
+      eling. In ICLR, 2023.                                                                     [56] Karen Simonyan and Andrew Zisserman.   Very deep
+[38] Xingchao Liu, Chengyue Gong, and Qiang Liu.  Flow           convolutional networks for large-scale image recognition.
+      straight and fast: Learning to generate and transfer data with           arXiv:1409.1556, 2014.
+      rectified flow. In ICLR, 2023.                                                                     [57] Jascha Sohl-Dickstein, Eric Weiss, Niru Maheswaranathan,
+[39] Gabriel Loaiza-Ganem, Brendan Leigh Ross, Rasa Hossein-                                                                 and Surya Ganguli.  Deep unsupervised learning using
+     zadeh, Anthony L Caterini, and Jesse C Cresswell. Deep                                                                       nonequilibrium thermodynamics. In ICML, 2015.
+     generative models through the lens of the manifold hypothe-
+                                                                     [58] Jiaming Song, Chenlin Meng, and Stefano Ermon. Denois-
+       sis: A survey and new connections. Transactions on Machine
+                                                                         ing diffusion implicit models. In ICLR, 2021.
+     Learning Research, 2024.
+                                                                     [59] Yang Song and Stefano Ermon. Generative modeling by es-
+[40] Nanye Ma, Mark Goldstein, Michael S Albergo, Nicholas M
+                                                                           timating gradients of the data distribution. In NeurIPS, 2019.
+      Boffi, Eric Vanden-Eijnden, and Saining Xie. SiT: Explor-
+                                                                     [60] Yang Song, Jascha Sohl-Dickstein, Diederik P Kingma, Ab-     ing flow and diffusion-based generative models with scalable
+                                                                       hishek Kumar, Stefano Ermon, and Ben Poole. Score-based      interpolant Transformers. In ECCV, 2024.
+                                                                           generative modeling through stochastic differential equa-
+[41] Alireza Makhzani and Brendan Frey. K-sparse autoencoders.
+                                                                                     tions. In ICLR, 2021.
+     arXiv:1312.5663, 2013.
+                                                                     [61] Nitish Srivastava, Geoffrey Hinton, Alex Krizhevsky, Ilya[42] Peyman Milanfar and Mauricio Delbracio.  Denoising: a
+                                                                            Sutskever, and Ruslan Salakhutdinov. Dropout: a simple way     powerful building block for imaging, inverse problems and
+                                                                                to prevent neural networks from overfitting. The journal of     machine learning. Philosophical Transactions A, 383(2299):
+                                                                machine learning research, 15(1):1929–1958, 2014.     20240326, 2025.
+                                                                     [62] Jianlin Su, Murtadha Ahmed, Yu Lu, Shengfeng Pan, Wen[43] Ben  Mildenhall,  Pratul P  Srinivasan, Matthew  Tancik,
+                                                                  Bo, and Yunfeng Liu.  RoFormer: Enhanced Transformer     Jonathan T Barron, Ravi Ramamoorthi, and Ren Ng. NeRF:
+                                                                      with rotary position embedding.   Neurocomputing, 568:     Representing scenes as neural radiance fields for view syn-
+                                                                   127063, 2024.      thesis. Communications of the ACM, 65(1):99–106, 2021.
+[44] Alexander Quinn Nichol and Prafulla Dhariwal. Improved      [63] Joshua B Tenenbaum, Vin de Silva, and John C Langford.
+     denoising diffusion probabilistic models. In ICML, 2021.        A global geometric framework for nonlinear dimensionality
+                                                                             reduction. Science, 290(5500):2319–2323, 2000.[45] Maxime Oquab et al. DINOv2: Learning robust visual fea-
+      tures without supervision. Transactions on Machine Learn-      [64] Naftali Tishby, Fernando C Pereira, and William Bialek.
+     ing Research, 2023.                                        The  information  bottleneck  method.    arXiv  preprint
+                                                                       physics/0004057, 2000.[46] William Peebles and Saining Xie. Scalable diffusion models
+     with Transformers. In ICCV, 2023.                              [65] Michael Tschannen, Andr´e Susano Pinto, and Alexander
+[47] Javier  Portilla, Vasily Strela, Martin J Wainwright, and           Kolesnikov. JetFormer: an autoregressive generative model
+     Eero P Simoncelli.  Image denoising using scale mixtures           of raw images and text. In ICLR, 2025.
+     of Gaussians in the wavelet domain. IEEE Transactions on      [66] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszko-
+    Image processing, 12(11):1338–1351, 2003.                                   reit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia
+[48] Salah Rifai, Pascal Vincent, Xavier Muller, Xavier Glorot,           Polosukhin. Attention is all you need. NeurIPS, 2017.
+     and Yoshua Bengio. Contractive auto-encoders: Explicit in-      [67] Pascal Vincent. A connection between score matching and
+     variance during feature extraction. In ICML, 2011.                    denoising autoencoders. Neural computation, 23(7):1661–
+[49] Robin Rombach, Andreas Blattmann, Dominik Lorenz,           1674, 2011.
+      Patrick Esser, and Bj¨orn Ommer. High-resolution image syn-      [68] Pascal Vincent, Hugo Larochelle, Yoshua Bengio, and
+      thesis with latent diffusion models. In CVPR, 2022.                   Pierre-Antoine Manzagol. Extracting and composing robust
+[50] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-            features with denoising autoencoders. In ICML, 2008.
+     Net: Convolutional networks for biomedical image segmen-      [69] Pascal Vincent, Hugo Larochelle, Isabelle Lajoie, Yoshua
+      tation. In MICCAI, 2015.                                          Bengio,  Pierre-Antoine  Manzagol,  and  L´eon  Bottou.
+[51] Sam T Roweis and Lawrence K Saul. Nonlinear dimension-          Stacked denoising autoencoders: Learning useful represen-
+      ality reduction by locally linear embedding.  Science, 290            tations in a deep network with a local denoising criterion.
+     (5500):2323–2326, 2000.                                          Journal of Machine Learning Research, 11(12), 2010.
+
+
+                                                 13
+
+======================== PDF 第 14 页 ========================
+[70] Shuai Wang, Ziteng Gao, Chenhui Zhu, Weilin Huang,
+     and Limin Wang.  PixNerd:  Pixel neural field diffusion.
+     arXiv:2507.23268, 2025.
+[71] Shuai Wang, Zhi Tian, Weilin Huang, and Limin Wang.
+    DDT: Decoupled diffusion Transformer. arXiv:2504.05741,
+     2025.
+[72] Yutong Xie, Minne Yuan, Bin Dong, and Quanzheng Li. Dif-
+     fusion model for generative image denoising. In ICCV, 2023.
+[73] Jingfeng Yao, Bin Yang, and Xinggang Wang. Reconstruc-
+      tion vs. generation: Taming optimization dilemma in latent
+      diffusion models. In CVPR, 2025.
+[74] Sihyun Yu, Sangkyung Kwak, Huiwon Jang, Jongheon
+     Jeong, Jonathan Huang, Jinwoo Shin, and Saining Xie.
+     Representation alignment for generation: Training diffusion
+     Transformers is easier than you think. In ICLR, 2025.
+[75] Biao Zhang and Rico Sennrich. Root mean square layer nor-
+     malization. In NeurIPS, 2019.
+[76] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shechtman,
+     and Oliver Wang. The unreasonable effectiveness of deep
+      features as a perceptual metric. In CVPR, 2018.
+[77] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shechtman,
+     and Oliver Wang. The unreasonable effectiveness of deep
+      features as a perceptual metric. In CVPR, 2018.
+[78] Boyang Zheng, Nanye Ma, Shengbang Tong, and Saining
+     Xie.  Diffusion Transformers with representation autoen-
+     coders. arXiv:2510.11690, 2025.
+[79] Daniel Zoran and Yair Weiss. From learning models of nat-
+      ural image patches to whole image restoration.  In ICCV,
+     2011.
+
+
+
+
+
+                                                 14
+
+======================== PDF 第 15 页 ========================
+                 class 012: house finch, linnet, Carpodacus mexicanus                             class 014: indigo bunting, indigo finch, indigo bird, Passerina cyanea
+
+
+
+
+
+                                    class 042: agama                                                                         class 081: ptarmigan
+
+
+
+
+
+                                   class 107: jellyfish                                                                 class 108: sea anemone, anemone
+
+
+
+
+
+                           class 110: flatworm, platyhelminth                                              class 117: chambered nautilus, pearly nautilus, nautilus
+
+
+
+
+
+                                   class 130: flamingo                                                         class 279: Arctic fox, white fox, Alopex lagopus
+
+
+Figure 8. Uncurated samples on ImageNet 256×256 using JiT-G/16 conditioned on the specified classes. Unlike the common practice of
+visualizing with a higher CFG, here we show images using the CFG value (2.2) that achieves the reported FID of 1.82.
+
+
+                                                 15
+
+======================== PDF 第 16 页 ========================
+                          class 288: leopard, Panthera pardus                                                                   class 309: bee
+
+
+
+
+
+        class 349: bighorn, bighorn sheep, cimarron, Rocky Mountain bighorn                               class 397: puffer, pufferfish, blowfish, globefish
+
+
+
+
+
+                                     class 425: barn                                                                          class 448: birdhouse
+
+
+
+
+
+                                  class 453: bookcase                                                             class 458: brass, memorial tablet, plaque
+
+
+
+
+
+                          class 495: china cabinet, china closet                                                             class 500: cliff dwelling
+
+
+Figure 9. Uncurated samples on ImageNet 256×256 using JiT-G/16 conditioned on the specified classes. Unlike the common practice of
+visualizing with a higher CFG, here we show images using the CFG value (2.2) that achieves the reported FID of 1.82.
+
+
+                                                 16
+
+======================== PDF 第 17 页 ========================
+                                    class 658: mitten                                                                         class 661: Model T
+
+
+
+
+
+                                     class 718: pier                                                                      class 724: pirate, pirate ship
+
+
+
+
+
+                                 class 725: pitcher, ewer                                                           class 757: recreational vehicle, RV, R.V.
+
+
+
+
+
+                                  class 779: school bus                                                                       class 780: schooner
+
+
+
+
+
+                  class 829: streetcar, tram, tramcar, trolley, trolley car                                                 class 853: thatch, thatched roof
+
+
+Figure 10. Uncurated samples on ImageNet 256×256 using JiT-G/16 conditioned on the specified classes. Unlike the common practice of
+visualizing with a higher CFG, here we show images using the CFG value (2.2) that achieves the reported FID of 1.82.
+
+
+                                                 17
+
+======================== PDF 第 18 页 ========================
+                                class 873: triumphal arch                                                                    class 900: water tower
+
+
+
+
+
+                           class 911: wool, woolen, woollen                                                                  class 913: wreck
+
+
+
+
+
+                                     class 927: trifle                                                                         class 930: French loaf
+
+
+
+
+
+                                   class 946: cardoon                                                                        class 947: mushroom
+
+
+
+
+
+                             class 975: lakeside, lakeshore                                                             class 989: hip, rose hip, rosehip
+
+
+Figure 11. Uncurated samples on ImageNet 256×256 using JiT-G/16 conditioned on the specified classes. Unlike the common practice of
+visualizing with a higher CFG, here we show images using the CFG value (2.2) that achieves the reported FID of 1.82.
+
+
+                                                 18

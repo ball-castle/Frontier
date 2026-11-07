@@ -1,0 +1,495 @@
+KH-A010 | Product Sparse Coding
+来源：https://openaccess.thecvf.com/content_cvpr_2014/html/Ge_Product_Sparse_Coding_2014_CVPR_paper.html
+本地PDF：专题文献/何恺明/KH-A010_Product_Sparse_Coding_CVPR2014.pdf
+SHA-256：eaac209f34129c4602fd7d905d314a5ebd551e25f73eb869296097a5e57c9910
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                         Product Sparse Coding
+
+
+                  Tiezheng Ge1∗          Kaiming He2             Jian Sun2
+              1University of Science and Technology of China     2Microsoft Research
+
+
+                 Abstract                              Closely related to sparse coding, Vector Quantization
+                                                 (VQ) [12] is another widely used technique in computer
+   Sparse coding is a widely involved technique in com-      vision. Vector quantization ﬁnds the nearest codeword to
+puter vision.  However, the expensive computational cost     encode a vector (Fig. 1(a)). Although this seems a simple
+can hamper its applications, typically when the codebook     computation, it turns out to be nontrivial if exponentially
+size must be limited due to concerns on running time. In      large codebooks are used, e.g., in the case of data compres-
+this paper, we study a special case of sparse coding in which     sion [12] and nearest neighbor search [14, 3]. The Product
+the codebook is a Cartesian product of two subcodebooks.     Quantization (PQ) [12, 14] is an efﬁcient solution to expo-
+We present algorithms to decompose this sparse coding      nentially large codebooks. The basic idea is to decompose
+problem into smaller subproblems, which can be separately      the vector space into the Cartesian product of subspaces
+solved.  Our solution, named as Product Sparse Coding     and separately quantize each subspace by a subcodebook                          √
+(PSC), reduces the time complexity from O(K) to O( K)      (Fig. 1(b)). With m small subcodebooks of a size k, the
+in the codebook size K. In practice, this can be 20-100×      effective codebook size in the full space is K=km, while                                                                              m√
+faster than standard sparse coding.  In experiments we      the complexity is O(  K). The product quantization tech-
+demonstrate the efﬁciency and quality of this method on the     niques have witnessed great success in large scale problems,
+applications of image classiﬁcation and image retrieval.        including nearest neighbor search [14, 3, 9, 10, 22, 30] and
+                                                                  large scale learning [25, 27].
+
+                                                            Driven by PQ, in this work we present a method called
+1. Introduction                                                          Product Sparse Coding (PSC). It shares the same encoding
+                                                    model as sparse coding, but requires the codebook to be a   Sparse Coding (SC) [23] is a broadly studied and suc-
+                                                              Cartesian product of smaller subcodebooks. The relationcessful technique in computer vision. It represents a given
+                                                              of SC vs. PSC is analogous to the relation of VQ vs. PQvector as a sparse linear combination of the elements in a
+                                                                    (Fig. 1). If we can separately solve smaller subproblems incodebook. Its applications involve image denoising [1], im-
+                                                         each subspace, we can reduce the linear time complexity ofage super-resolution [31], image segmentation [21], image
+                                                              sparse coding.classiﬁcation [32], face recognition [29], etc.
+   However, sparse coding is computationally expensive.       But unlike PQ, the PSC problem is not readily separable
+The state-of-the-arts solutions, such as the Least Angle Re-     because the subproblems are mutually dependent.  In this
+gression (LARS) [6] and the Feature Sign algorithm [19],     paper we investigate the case of two subspaces. We ﬁnd the
+present a time complexity of O(K) in the codebook size K.     dependency of the two subspaces can be determined by a
+This computational cost is still demanding when the code-      single unknown variable. We propose a binary search solu-
+book is large and a considerable set of vectors have to be en-      tion to compute this variable. Then we can separately solve
+coded, e.g., as in the scenario of image classiﬁcation [32].     smaller subproblems. Under some conditions, we theoret-
+As a result, the sparse-coding-based methods may retreat      ically prove this solution to the PSC problem is globally
+to use smaller codebooks (e.g., K=1000 in [32]) for prac-     optimal. We further present an approximate solution that is
+tical running time, but the smaller codebooks may hamper    more efﬁcient and works well in practice.
+the representing ability and the quality. Thus the sparse-                                                           For a codebook of the size K, PSC has a time complex-                                    √
+coding-based methods can appear less competitive due to                                                                          ity of O(  K). So it is a very efﬁcient solution to large
+the limited codebook size, typically when the accuracy of                                                       codebooks that are infeasible for sparse coding methods.
+other encoding methods can be improved by simply enlarg-                                                         For example, it can increase the speed by 20-100× when
+ing the codebook (before over-ﬁtting) [4].                               K > 104. The gain in speed is at the price of constraining
+   ∗This work is done when Tiezheng Ge is an intern at Microsoft Re-      the codebook to be a product of subcodebooks (Fig. 1(d)).
+search Asia.                                          So our solution is a trade-off between speed and quality.
+
+
+                                                 1
+
+======================== PDF 第 2 页 ========================
+                                           A2                                                        A2
+
+
+
+
+                                                      A1                                                        A1
+
+
+
+           (a) VQ                      (b) PQ                       (c) SC                     (d) PSC
+
+Figure 1: The illustrations of Vector Quantization (VQ), Product Quantization (PQ), Sparse Coding (SC), and Product Sparse
+Coding (PSC). A green circle denotes a codeword, and a red triangle denotes a vector to be encoded. An arrow indicates a
+codeword that contributes a non-zero coefﬁcient. An axis represents a subspace in which a subcodebook lies. The subspaces
+can be high-dimensional. In this illustration, each subcodebook in PQ/PSC has 4 subcodewords, while the effective number
+of codewords in the full space is 16.
+
+
+This trade-off can be worthwhile or even necessary, typi-     subcodebooks, the encoding problem of PQ can be written
+cally when the high computational cost prohibits the usage     as [9, 10]:
+of large codebooks for sparse coding. This will be demon-
+strated in the applications of image classiﬁcation [32] and                                                              min ∥x −Ay∥2,                   (2)
+image retrieval [15]. We will show PSC has competitive                        y
+accuracy among various state-of-the-art methods for these                      s.t.  ∥y∥0 = 1, |y| = 1, y ⪰0
+applications, while is very efﬁcient.                                                                      and A = A1 × A2.
+  How does PSC work?  Consider a “color” subcode-
+book that consists of 4 elements {red, yellow, green, blue},
+                                                     where “×” denotes the Cartesian product. A1 and A2 are
+and another “shape” subcodebook that consists of {circle,                                 d
+                                                    two subcodebooks of a size 2-by-k. Any codeword in A issquare, triangle, ellipse}. The Cartesian product of these
+                                                                the concatenation of a subcodeword in A1 and a subcode-two subcodebooks involves 16 distinct elements (Fig. 1(d)).
+                                                   word in A2. So A is a d-by-K matrix with K = k2 (if thereTo encode a new item, we need not explicitly enumerate all
+                                                                are m subspaces, then K = km). See Fig. 1 (b).
+16 elements, but instead only need to visit 4 elements in
+each of the two subcodebooks.                             The PQ problem in (2) can be separated into smaller in-
+                                                         dependent subproblems. Each subproblem is simply apply-
+2. Formulations                                          ing VQ in the subspaces with the√subcodebook. The cost
+                                                              of each subproblem is merely O(  K), whereas the cost of
+2.1. Background:  from Vector Quantization to      directly applying VQ on (2) would be O(K).
+     Product Quantization
+   Let x ∈Rd be a vector to be encoded.  Suppose the     2.2. From Sparse Coding to Product Sparse Coding
+codebook is given. The encoding problem of VQ [12] can
+                                            SC is closely related to VQ [32, 5].  In this paper webe formulated as:
+                                                             consider the SC problem in this form:
+               min ∥x −Ay∥2,                   (1)
+                   y
+                                                           min ∥x −Ay∥2 + λ|y|,               (3)
+                s.t.  ∥y∥0 = 1, |y| = 1, y ⪰0.                                y
+                                                                                                      s.t.  y ⪰0
+Here A is a d-by-K matrix called a codebook, y is a K-
+by-1 vector called a code, ∥· ∥is the l2 norm, ∥· ∥0 is the
+                                                     where A is a d-by-K codebook and λ is a regularization
+zero norm (number of non-zero entries), and | · | are the
+                                                              parameter. The constraint y ⪰0 means all entries in the
+l1 norm. The codebook A has K codewords as its columns.
+                                                       code are non-negative. An illustration is in Fig. 1 (c).
+The constraint means y has one and only one non-zero entry
+whose value is 1. Minimizing (1) is equivalent to ﬁnding the           It can be time-consuming to solve (3). The state-of-the-
+nearest codeword. See Fig. 1 (a).                                    art methods have a time complexity linear in K and also in
+  The Product Quantization (PQ) [12, 14] can be consid-     other nontrivial factors (more details are in Sec. 3.5).
+ered as a special case of VQ when the codebook is the        Motivated by the relation between VQ and PQ, we
+Cartesian product of subcodebooks.  In the case of two     propose a new formulation called Product Sparse Coding
+
+======================== PDF 第 3 页 ========================
+(PSC). We only consider the case of two subspaces:           can rewrite the PSC problem (4) as:
+
+             min ∥x −Ay∥2 + λ|y|,               (4)     min ∥x1 −A1u1∥2 + λ1|u1| + ∥x2 −A2u2∥2 + λ2|u2|
+                y                                              u1,u2
+                           s.t.  y ⪰0                                                       s.t.  u1 ⪰0, u2 ⪰0              (10)
+                and A = A1 × A2.                                      and  |u1| = |u2|.
+
+                                           d                       If we ignore the constraint |u1| = |u2|, we can have twoHere A1 and A2 are subcodebooks of a size 2-by-k, and A
+                                                               separate subproblems:is their Cartesian product and is d-by-K with K = k2. This
+is illustrated in Fig. 1 (d).                                                         min ∥x1 −A1u1∥2 + λ1|u1|,
+    If we can separate this problem into two subproblems as                    u1
+in PQ, the         time complexity of each subproblem can become                                 s.t.  u1 ⪰0.                  (11)    √
+linear in  K. However, this problem is not readily sepa-                                                         min ∥x2 −A2u2∥2 + λ2|u2|,
+rable due to the regularization λ|y|.  In the following we                    u2
+propose solutions to this issue.                                                                  s.t.  u2 ⪰0.
+
+3. Algorithms                                      Each is a SC problem as in (3). But the codebooks A1 and
+                                             A2 are much smaller. Solving these two subproblems can
+3.1. Separate the Problem                             be much faster.
+                                                        Suppose λ1 has been set to a “special” value λ∗1 that the                                       x1
+   In the case of two subspaces, we denote x =     where     two subproblems will produce a pair of solutions u1 and u2                                       x2
+x1 and x2 are the ﬁrst and second subvector of x (that is,      satisfying |u1| = |u2|. Given u1 and u2, the solution y is
+                                                             not unique because only two of its marginal sums are given.the ﬁrst/second half of its entries). Further, any codeword in
+                            a1,i                     We show the following y is a solution that satisﬁes (7):
+A can be represented as       where a1,i is the i-th code-
+                           a2,j
+                                                                                        yij = u1,iu2,j/p|u1||u2|,            (12)word in A1 and a2,j the j-th in A2, for i, j = 1, ..., k. We
+denote the coefﬁcient of this codeword as yij (note y is still     or equivalently:
+a vector). Then the objective function in (4) becomes:                               vec(u1uT2)
+                                                         y =                            (13)
+                                     p |u1||u2|                              a1,i            x1          − X          ∥                                yij∥2 + λ|y|.          (5)
+            x2                             a2,j                           where vec(·) rearrange the matrix u1uT2 into a vector.                                i,j
+                                                                                  If such a value λ∗1 exists, then we can proof the solution
+The ﬁrst term can be expanded as:                    y in (13) is a global optimum of the PSC problem (4) (see
+                                                  Theorem A.1).  If we can ﬁnd the value λ∗1, then we can
+ ∥x1− X(a1,i X yij)∥2+∥x2− X(a2,j X yij)∥2. (6)     obtain a solution to the PSC problem (4) simply from the
+             i          j                      j            i                   solutions to the subproblems (11).
+                                                            Before we introduce an algorithm to ﬁnd λ∗1, we should
+We introduce two vectors u1 and u2 of the size k-by-1,                                                            note λ∗1 does not always exist (explained later). In case it
+whose entries are:                                                         does not exist, the global optimal solution to (4) can not be
+              u1,i = X yij,   u2,j = X yij.           (7)     obtained through the subproblems.
+                          j                        i                        3.2. An Iterative Algorithm
+Note u1 and u2 are two marginal sums. Then (6) becomes:       Next we describe an algorithm to compute λ∗1 if it exists.
+                                                          Consider the solutions u1 and u2 to the separated subprob-
+          ∥x1 −A1u1∥2 + ∥x2 −A2u2∥2.          (8)     lems in (11). We can proof if λ1 increases, then |u1| is non-
+                                                                  increasing. Intuitively, the increased λ1 will penalize |u1|
+This gives a separate representation of the ﬁrst term in (5).
+                                                        more, so |u1| will not increase. A formal proof is in Theo-
+This is also a way of separating the PQ problem in (2).
+                                                  rem A.2. So |u1| is a monotonically decreasing function in
+   Because y ⪰0, so the vectors u1 and u2 are subject
+                                                             λ1. Similarly, because λ2 = λ −λ1, so |u2| is a monotoni-
+to the constraint Pi,j |yij| = Pi |u1,i| = Pj |u2,j|, or                                                                   cally increasing function in λ1. See Fig. 2 (left). If the two
+equivalently:
+                                                          monotonically curves intersect in the range of (0, λ), then
+                     |y| = |u1| = |u2|.                  (9)
+                                                    λ∗1 exists.
+To give a separate form of |y|, we introduce a parameter λ1       The monotonicity leads to a simple binary search (half-
+to be determined (0 < λ1 < λ). Denoting λ2 = λ −λ1, we      interval search) algorithm of ﬁnding λ∗1. Consider an initial
+
+======================== PDF 第 4 页 ========================
+102                                                    102                          Algorithm 1 Iterative Product Sparse Coding (IPSC)
+                                                       101                            Input: A1, A2, λ, x.
+101                                                           |u2|       Output: y
+                                                       100                                           1: Initialize λmin1  = 0, λmax1  = λ.
+                                                                                     2: repeat
+                                                                                                     -1       |u1|             |u2|             10                                                                                     3:    Set λ1 = (λmin1  + λmax1   )/2.100
+                                           |u1|                                 4:    Set λ2 = λ −λ1.                                                                                                     -2
+                                                       10
+                                                                                     5:   Solve (11) for u1 and u2.
+          *
+                                                                                                     -3                                          6:     if |u1| < |u2| then10-1     λ1                                     10
+   0        0.2       0.4       0.6       0.8       1         0        0.2       0.4       0.6       0.8       1         7:      Set λmax1  = λ1.             λ1                          λ1
+                                                                                     8:    else
+Figure 2: Left: |u1| (blue) and |u2| (red) are monotonic         9:      Set λmin1  = λ1.
+functions in λ1. The unit of the x-axis is λ. If λ∗1 exists, it       10:   end if
+is at the intersection of the curves. Right: If the two mono-       11: until |u1| = |u2| or max iterations reached.
+tonic curves do not intersect, then λ∗1 does not exist.                12: Set y = vec(u1uT2)/ p|u1||u2|
+
+
+                                                                                                   |u1| - |u2|value of λ1, like λ/2. We use this value to solve the separate
+subproblems in (11). If |u1| = |u2|, then we have found the               0.6
+expected value. If not, without loss of generality, we con-
+                                                                                                0.4
+sider |u1| < |u2|. Because of the monotonicity, it is easy to
+show any λ1 ∈[λ/2, λ) will also leads to |u1| < |u2| (see               0.2
+Fig. 2 left). So the search range of λ1 can be halved and
+becomes (0, λ/2).                                                              0
+  We can iterate this procedure. After each iteration, the                -0.2
+search range is halved, and the true λ∗1 can only be found
+in this range.  The iteration stops when |u1| = |u2| or                -0.4
+the search range is sufﬁciently narrow. This solution is de-                -0.6
+scribed in Algorithm 1. This algorithm always converges to
+                                                                                        2         4         6         8        10        12
+the solution |u1| = |u2| if λ∗1 exists. We called it Iterative                                                iteration
+Product Sparse Coding (IPSC). Fig. 1 shows the behavior of                                                            Figure 3: The convergence of Iterative Product Sparse Cod-
+IPSC in 100 randomly sampled SIFT vectors. We see that                                                             ing (IPSC). The x-axis is the number of iterations. The y-
+after 10 iterations (the search range spans λ/1024) the gap                                                                axis is the value of |u1| −|u2|. Here the results of 100
+between |u1| and |u2| is ignorable.                         randomly sampled 128-D SIFT vectors are shown, each by
+  But there are cases that λ∗1 does not exist. Fig. 2 (right)     a curve. The subcodebook size is k = 64.
+shows an example - the two monotonic curves do not inter-
+sect. If this happens, the PSC problem (4) is not separable in
+our way. Fig. 2 (right) also indicates this will happen when     through (13). So we can simply use a heuristic λ1, like λ/2,
+λ1 →0 gives |u1| < |u2|, or λ1 →λ gives |u1| > |u2|.      to separate the problem.
+This suggests the magnitudes of the two subvectors x1 and        Formally,  the Approximate  Product  Sparse Coding
+x2 are very imbalanced. In our experiments, these cases are    (APSC) has these steps: (i) set λ1 = λ2 = λ/2, (ii) solve
+in a few number. In a set of one million randomly sampled                                                                the two subproblems in (11), and (iii) compute y using (13).
+SIFT vectors, there are about 1% of such cases. In case it                                                                 In experiments we ﬁnd the simple APSC is a reasonable
+happens, IPSC stops at the max iteration and can still out-                                                          approximation of the global optimum achieved by IPSC (if
+put y using (13), but the global optimality is lost.  In the     λ∗1 exists). Table 1 shows the objective function values in
+pooling-based applications [32], we ﬁnd there is no observ-                                                                   (4) computed using the resulting y given by IPSC/APSC.
+able impact in practice.                                                  The values are averaged over 105 randomly sampled SIFT
+                                                               vectors (in which λ∗1 exists). We see the relative error is3.3. An Approximate Algorithm
+                                                              smaller than 1%. A possible explanation is that the two
+  Next we describe a non-iterative approximate solution     subspaces of the SIFT vectors are about balanced, and λ∗1
+that works well in practice. In our PSC problem in (4), the     might be not far from λ/2.
+task is to ﬁnd the code y. If we ignore the constraint |u1| =      As an approximate algorithm, APSC need not consider
+|u2|, then any pair of u1 and u2 can still produce a vector y      the existence of λ∗1. We ﬁnd APSC works well in the appli-
+
+======================== PDF 第 5 页 ========================
+                                          √     √
+           IPSC  APSC   relative error              O(2k d2)+O(2ks)=O( Kd)+O(2 KS). The complexity
+             0.590   0.594       7e-3                             is much smaller than SC mainly due to the square root.
+                                                    Our algorithm also has a smaller memory complex-
+Table 1: The values of the objective function averaged over
+                                                                                    ity. Throughout the encoding/training algorithms, we never105 randomly sampled SIFT vectors.
+                                                       need to explicitly compute or store the matrix A. All the
+                                                         computation can be done by A1 and A2. We consider the
+cations (Sec. 4).                                             case of encoding a large set of vectors, e.g., as in image
+                                                                 classiﬁcation [32]. One way of efﬁciently applying FS is to
+3.4. Codebook Training                                                         pre-compute the K-by-K Gram matrix (ATA) [32]. This
+  Next we describe the codebook training. Note, however,     matrix consumes O(K2) memory.  In PSC we only need
+the above derivations are true for any codebook satisfying      to pre-compute two smaller k-by-k Gram matrices (AT1A1
+A = A1 × A2, not necessarily trained in the way below.       and AT2A2). Their memory cost is O(2k2) = O(2K). This
+  Given a sample set {xs}, we optimize:                            is a signiﬁcantly smaller consumption.  For example, the
+                                              Gram matrix of SC takes 2.14GB memory when K=16384,
+         min X  ∥xs −Ays∥2 + λ|ys|   ,     (14)     whereas the two smaller Gram matrices of PSC take only
+         A1,A2,{ys}                      s                              262KB (k=128). Further, it is time-consuming to access a
+                                                                  large Gram matrix. So the memory issue also impacts run-                       s.t.  ys ⪰0,  ∀s
+                                                          ning time.
+            A = A1 × A2,
+                                          We should remark the above time/memory gain is the re-
+    and  ∥a1,i∥2 = ∥a2,j∥2 = 1/2,    i, j = 1, ..., k            sult of using a product codebook A = A1×A2. Because the
+                                          SC method does not have this constraint, it can use a better
+where ys is the code of a sample xs. Here a1,i and a2,j
+                                                        codebook. So there is a trade-off between the time/memory
+are the subcodewords in the subcodebooks A1 and A2.
+                       1                                      gain and quality loss. We will demonstrate this trade-off by
+∥a1,i∥2 = ∥a2,j∥2 = 2 guarantees that the l2-norm of any                                                             experiments.
+codeword in A is 1.
+  We use an EM-alike solution to optimize (14) just like
+                                                          4. Experimentstraditional VQ/SC. With A1, A2 ﬁxed, we solve each ys
+using IPSC or APSC. With {ys} ﬁxed, we ﬁrst compute                                                                 In all the experiments we use the APSC algorithm unless
+{us1, us2} using (7). Then we compute A1 and A2 through     speciﬁed, because we ﬁnd the improvement of using IPSC
+separately minimizing two subproblems given by (8), each                                                                              is ignorable compared with APSC.
+of which can be solved by [19]. This process is iterated.
+   In the entire procedure we never need to express the     4.1. Computational Efﬁciency
+product matrix A. If the APSC is used to solve for ys, then
+                                          We randomly sample 2×105 SIFT vectors (d=128)the algorithm is equivalent to separately training A1 and A2
+                                                              [20] extracted from the Caltech101 image set [8].  Wein the two subspaces. The training using APSC is very efﬁ-
+                                                                       train a codebook A of the size d-by-K for SC, and two
+cient. For example, it takes less than one minute to train the                                           d  √
+                                                       subcodebooks A1 and A2 of the size 2-by- K for PSC.codebooks using 105 SIFT when K=16384 (k=128).
+                                        We use 105 vectors to train. The remaining 105 vectors are
+3.5. Complexity                                                to be encoded. All experiments are on a workstation with
+                                                       an Intel Xeon 2.67GHz CPU using a single thread. The im-
+  The PSC is a special case of sparse coding when a prod-
+                                                            plementation of all methods is in C++. Table 2 shows the
+uct codebook is used.  Because PSC only need to solve
+                                                                         total encoding time of SC and PSC for 105 vectors when
+smaller subproblems, its complexity is low even the product
+                                                 K=16384. The parameter λ is set 0.3, as we will use for
+codebook is large.
+                                                     image classiﬁcation1 (Sec. 4.2).
+  We adopt a state-of-the-art SC solver - the Feature Sign
+                                                                 In Table 2, SC-FS is the Feature Sign variant that com-
+(FS) algorithm [19]. For a general (non-product) codebook
+                                                              putes the Gram matrix before encoding all the vectors. The
+A of a size d-by-K, the time complexity of FS is roughly
+                                          APSC also uses this Feature Sign algorithm to solve the two
+O(Kd)+O(KS) per vector, where S is the “sparsity” of
+                                                        subproblems in (11). We see APSC is faster than SC-FS by
+the code (number of non-zero entries). Here O(Kd) is con-
+                                                   104×. This is consistent with the complexity estimation:tributed by projecting x onto the codebook, and O(KS) is           √
+                                                     from O(K) to O(  K).
+due to the feature sign steps.
+                                          We also evaluate two more variants of SC solvers based  Now consider a product codebook A.  If the sparsity in
+                                                    on FS. In the variant SC-FS-OTF, the full Gram matrix iseach of u1 or u2 is s, then the sparsity of the code y in (13)
+is S = s2. We use the FS algorithm to solve the two sub-         1For SC/PSC, we normalize the SIFT vectors so the l2 norms are 1.
+problems. Then the APSC algorithm has a time complexity     The value of λ corresponds to this implementation.
+
+======================== PDF 第 6 页 ========================
+          method      time (s)     vs. APSC                                 accuracy (%)     encoding time (s)
+          SC-FS        490      104×            K       SC    PSC     SC    PSC
+       SC-FS-OTF     634      135×                4096 (642)     77.91    76.71     10.5     0.45
+        SC-FS-NN      114      24×                 8100 (902)     78.40    77.45     12.2     0.54
+          IPSC         14       3×                16384 (1282)    78.55    78.02     14.6     0.65
+        APSC          4.7              -
+                                                           Table 3: The comparisons between SC/PSC in Caltech101.
+Table 2: Computational time of encoding 105 SIFT vectors.    The mean accuracy is shown in percentage. The encoding
+The codebook size is K=16384. The running time are given     time (in seconds) is the average per image, not including
+in seconds. The column “vs. APSC” shows the multiples of    SIFT extraction. The SC is using SC-FS-NN.
+the APSC running time.
+
+                                                            product constraint.
+not computed; instead, a smaller Gram matrix is computed        Despite the small accuracy loss, we see the speed gain is
+“on-the-ﬂy” (OTF) in the feature sign iterations. This is as      large. Table 3 shows the average time spent on encoding an
+originally described in [19]. Though this is more economic     image (not including SIFT extraction). We see PSC is much
+for encoding a single vector, it is not the case for encoding       faster. In our implementation based on [4], the total running
+a large set of vectors with the same codebook. It is slower     time of encoding the 9K images (including SIFT extraction)
+than SC-FS for encoding 105 vectors.                                 is less than 15 minutes using 8 cores when K = 4096. As
+  The variant SC-FS-NN is used in the public code in [32].     a comparison, in the same setting SC takes over 4 hours to
+It ﬁnds the n nearest codewords to the vector, and solves     encode when K = 4096.
+a smaller SC problem that consists of these n codewords.        In Table 4 we further compare with other methods for
+Its time complexity is O(Kd) + O(nS) per vector. Note      classiﬁcation [4]. The VQ method, implemented in [4], is
+O(Kd) is because of the nearest neighbor search. Here we      the bag-of-words method [26] using SPM [18]. It is slower
+use n=200 as in [32]. We see this solution is faster than     than PSC and is not as accurate. The Locality-constrained
+SC-FS, but is still slower than PSC by 24×. This is because     Linear Coding (LLC) [28] encodes a vector by ﬁnding the
+O(Kd) still contributes substantially to the running time.     n nearest codewords and solves a least square problem on
+  We also evaluate the running time of IPSC using 10 iter-     them. The implementation in [4] sets n as 5. The main cost
+ations. Its running time is 3× of the APSC. It is not linear       is in the nearest neighbor search. The Fisher Vector (FV)
+on the iteration number because some intermediate results     [24] is based on a Gaussian-Mixture-Model (GMM) as the
+can be reused in the IPSC iterations.                         codebook. It can generate high-dimensional (e.g., 40960-d)
+                                                         codes using a small codebook (e.g., K=256). Table 4 shows
+4.2. For Image Classiﬁcation                                            PSC performs at least comparably good as LLC and FV, but
+  Our ﬁrst application of PSC is image classiﬁcation [32,       is faster than these methods.
+4, 5]. The experiment settings follow those in the bench-        Table 4 also shows SC is a competitive method given
+mark paper [4] and its public code. We evaluate on the Cal-      sufﬁciently large codebooks. So its power is mostly limited
+tech101 dataset [8]. It contains about 9K images in 102 cat-     by the intolerable running time in practice.
+egories (one background). For each image we extract 128-D     We also evaluate different ways of subspace decomposi-
+SIFT vectors at four scales and a step size 4. These SIFT      tion in PSC. In the case of PQ, the decomposition is impor-
+vectors are encoded using SC, PSC, or other methods. The      tant for the quality [14, 9, 10, 22]. In our experiments, the
+codes y are pooled to generate the image representation. We     vector x is arranged as the so-called “natural” order [14] of
+use the spatial pyramid pooling (SPM) [18] in three levels:     SIFT. So PSC decomposes the spatial bins of a SIFT vector
+1×1, 2×2, and 4×4 for a total of 21 regions. We use max      into upper/lower parts (horizontal split). Alternatively, we
+pooling for SC and PSC. The pooled image representations     can decompose the spatial bins into left/right parts (vertical
+are used to train a linear SVM [7]. We use 30 images per       split). We also test the “structural” order [14] that decom-
+category for training and the rest for testing. The perfor-     poses the orientation bins of a SIFT vector. Table 5 shows
+mance is evaluated by the average classiﬁcation accuracy.      the result of PSC using K=4096. We see the the two natural
+The implementation is in Matlab, except the encoding steps     orders performs similarly, and the structural order is slightly
+are in mex. The SC-FS-NN is used as solver for SC.            worse. In the other part of this paper we use the horizonal
+   Table 3 shows the performance of SC and PSC. We use      natural order.
+K=4096, 8100, and 16384, corresponding to k=64, 90, 128.
+                                                               4.3. For Image Retrieval
+We use λ=0.3 for both SC and PSC. We see our method is
+slightly worse than SC at the same K. This is as expected,       Image retrieval [15] is a scenario related to image classi-
+because our codebook is not as accurate as SC due to the     ﬁcation but has different concerns. Image retrieval focuses
+
+======================== PDF 第 7 页 ========================
+   method    dimensionality   accuracy (%)   time (s)                mAP (%) in Holiday
+    SC         4096          77.91        10.5                 dimensionality  VLAD  PSC   SC
+    SC        16384          78.55        14.6                4K         67.89    68.34   71.37
+   PSC        4096          76.71        0.45                8K         69.20    70.76   72.80
+   PSC        16384          78.02        0.65                16K        71.36    74.49   74.75
+  VQ [4]       4000          74.41        1.94                                                           Table 6: The mAP in the Holiday set. The dimensionality
+  VQ [4]       8000          74.23        2.18                                                                              is the size of a code before PCA-whitening. For VLAD, the
+  LLC [28]      4000          76.15        2.41                                                     codebook size K is 32, 64, and 128, and its code size is Kd
+  LLC [28]      8000          76.95        2.65                                                           (d=128). The mAP are evaluated after PCA-whitening that
+  FV [24]      40960          77.78        2.12                                                        compresses the representations into 128-D.
+
+Table 4:  The comparisons of various methods in Cal-
+tech101. The dimensionality is the size of a code. The                    encoding time in Holiday
+Fisher Vector (FV) uses K=256 codebook, but the dimen-             dimensionality  VLAD  PSC   SC
+sionality of its code is 2Kd where d=80 due to PCA. All             4K          0.42     0.87    22.8
+the methods here use linear kernels expect VQ uses Chi-             8K          0.60     1.27    27.6
+squared kernels [4]. The time (in seconds) is the average              16K         1.08     1.60    30.2
+encoding time per image, not including SIFT extraction.
+                                                           Table 7: The encoding time (in seconds) per image in the
+                                                        Holiday set. The time excludes the SIFT extraction.
+          natural (hor)   natural (ver)   structural
+           76.71         76.58       76.04
+                                                          5. Limitations and Future Work
+Table 5: The mean accuracy in Caltech101 of different sub-
+space decompositions in PSC. K=4096.                    As discussed, the quality of PSC depends on the sub-
+                                                          space decomposition.  In the case of PQ, recent studies
+                                                                  [22, 9, 10] have shown the decomposition can be optimized
+                                                              as an orthogonal projection. However, it is more challeng-
+more on the encoding speed and the representation size. In
+                                                             ing to optimize the decomposition of PSC, because the l1
+this paper we compare our method with the improved Vec-
+                                                         term is not invariant to orthogonal projections. This can be
+tor of Locally Aggregated Descriptors (VLAD) [17] and the
+                                                          a future topic.
+Sparse-Coded features for image retrieval [11].
+                                                                 In this paper we only consider the case of two subspaces.
+  We evaluate on the Holiday dataset [13]. We resize the       It has already provided good speed up by reducing the com-                                           √
+images beforehand to no larger than 640×480, and extract      plexity from O(K) to O(  K). But it would be interesting
+SIFT vectors at three scales and a step size 5. We ﬁnd the      to study the case of more subspaces (m > 2). Though the
+dense features improve the accuracy for both VLAD and    APSC algorithm can be simply generalized by using λ/m
+our method. We use the square root of each component of      in each subproblem, the IPSC algorithm is not applicable
+a SIFT vector, known as RootSIFT [2]. In our method, the      for m > 2. We will study this in the future.
+SIFT vectors are encoded using PSC and max-pooled over     We have proved that the IPSC algorithm can produce a
+the entire image. We set λ=0.3. No SPM is used. In VLAD,      globally optimal solution if λ∗1 exists. In case λ∗1 does not
+a SIFT vector ﬁnds the nearest codeword and gives a resid-      exist, the global optimum cannot be simply achieved from
+ual vector. All the residual vectors are aggregated. The ag-      the two separable problems. Although we have not seen any
+gregated representation is power-normalized [17] and then     observable impact in the experiments in this paper, it is still
+l2 normalized. Both the PSC and VLAD representations     an open question for future studies.
+are compressed into 128-D using PCA-whitening [16] (we                                                    The applications studied in this paper all involve the
+ﬁnd PCA is poorer). The images are ranked using the l2     pooling operations. Our method may beneﬁt from this sce-
+distances and mean Average Precision (mAP) is evaluated.                                                                    nario, because in this case the statistical accuracy is con-
+Table 6 and 7 show the results. We see the PSC is slower                                                              cerned. In other applications when the individual accuracy
+than VLAD, but is more accurate.                                                                              is of particular importance (e.g., image super-resolution
+  We also show the performance of SC in Table 6 and  7.      [31]), the quality of our method needs further veriﬁcations.                                               √
+VLAD and SC are two strategies of addressing the “loss       The essence of PSC is the O( K) complexity. This is
+of quantization”. Our experiments show that SC can be a      in contrast to any O(K) SC algorithm. Nevertheless, PSC
+superior solution for quality. The PSC slightly sacriﬁces     needs to solve two smaller sparse coding subproblems, each
+the quality of SC, but is practically fast.                        of which is still based on SC algorithms. The future ad-
+
+======================== PDF 第 8 页 ========================
+vance of the fast SC algorithms could further improve the      [21]  J. Mairal, F. Bach, J. Ponce, G. Sapiro, and A. Zisserman.
+subproblem speed of PSC.                                              Discriminative learned dictionaries for local image analysis.
+                                                                           In CVPR, 2008.
+References                                                      [22] M. Norouzi and D. Fleet.  Cartesian k-means.  In CVPR,
+                                                                     2013.
+ [1] M. Aharon, M. Elad, and A. Bruckstein. K-svd: An algo-      [23] B. A. Olshausen and D. J. Field. Sparse coding with an over-
+     rithm for designing overcomplete dictionaries for sparse rep-          complete basis set: A strategy employed by v1?  Vision re-
+      resentation. Transactions on Signal Processing, 2006.                  search, 1997.
+ [2] R. Arandjelovic and A. Zisserman. Three things everyone      [24]  F. Perronnin and C. Dance. Fisher kernels on visual vocabu-
+     should know to improve object retrieval. In CVPR, 2012.                 laries for image categorization. In CVPR, 2007.
+ [3] A. Babenko and V. S. Lempitsky. The inverted multi-index.      [25]  J. S´anchez and F. Perronnin.  High-dimensional signature
+     In CVPR, 2012.                                                 compression for large-scale image classiﬁcation. In CVPR,
+ [4] K. Chatﬁeld, V. Lempitsky, A. Vedaldi, and A. Zisserman.           2011.
+    The devil is in the details: an evaluation of recent feature      [26]  J. Sivic and A. Zisserman.  Video google: a text retrieval
+     encoding methods. In BMVC, 2011.                               approach to object matching in videos. In ICCV, 2003.
+ [5] A. Coates and A. Ng.  The importance of encoding ver-      [27] A. Vedaldi and A. Zisserman. Sparse kernel approximations
+     sus training with sparse coding and vector quantization. In            for efﬁcient classiﬁcation and detection. In CVPR, 2012.
+    ICML, 2011.                                                    [28]  J. Wang, J. Yang, K. Yu, F. Lv, T. Huang, and Y. Gong.
+ [6] B. Efron, T. Hastie, I. Johnstone, and R. Tibshirani. Least           Locality-constrained linear coding for image classiﬁcation.
+     angle regression. The Annals of statistics, 2004.                       In CVPR, 2010.
+ [7] R.-E. Fan, K.-W. Chang, C.-J. Hsieh, X.-R. Wang, and C.-J.      [29]  J. Wright, A. Y. Yang, A. Ganesh, S. S. Sastry, and Y. Ma.
+     Lin. Liblinear: A library for large linear classiﬁcation. The          Robust face recognition via sparse representation. TPAMI,
+     Journal of Machine Learning Research, 2008.                       2009.
+ [8] L. Fei-Fei, R. Fergus, and P. Perona.  Learning generative      [30] Y. Xia, K. He, F. Wen, and J. Sun. Joint inverted indexing.
+      visual models from few training examples: An incremental           In ICCV, 2013.
+     bayesian approach tested on 101 object categories. CVIU,      [31]  J. Yang, J. Wright, T. Huang, and Y. Ma.  Image super-
+     2007.                                                                   resolution as sparse representation of raw image patches. In
+ [9] T. Ge, K. He, Q. Ke, and J. Sun. Optimized product quan-         CVPR, 2008.
+      tization for approximate nearest neighbor search. In CVPR,      [32]  J. Yang, K. Yu, Y. Gong, and T. Huang. Linear spatial pyra-
+     2013.                                                   mid matching using sparse coding for image classiﬁcation.
+                                                                           In CVPR, 2009.[10] T. Ge, K. He, Q. Ke, and J. Sun. Optimized product quanti-
+      zation. TPAMI, 2014.
+[11] T. Ge, Q. Ke, and J. Sun. Sparse-coded features for image    A. Appendix
+      retrieval. In BMVC, 2013.
+                                               Theorem A.1.  If λ∗1 exists, then y in (13) gives a globally
+[12] R. Gray. Vector quantization. ASSP Magazine, IEEE, 1984.
+                                                           optimal solution to the PSC problem in (4).
+[13] H. Jegou, M. Douze, and C. Schmid. Hamming embedding
+     and weak geometric consistency for large scale image search.     Proof. Assume there were a solution y′ that leads to a
+     In ECCV, 2008.                                           smaller objective value in (4). We can compute its marginal
+[14] H. Jegou, M. Douze, and C. Schmid. Product quantization    sums u′1 and u′2 as in (7). Substituting u′1 and u′2 into (10)
+      for nearest neighbor search. TPAMI, 2011.                   with the given λ1 = λ∗1, if the assumption were true, we
+[15] H. Jegou, M. Douze, C. Schmid, and P. Perez. Aggregating     have ∥x1 −A1u′1∥2 + λ1|u′1| + ∥x2 −A2u′2∥2 + λ2|u′2| <
+      local descriptors into a compact image representation.  In    ∥x1 −A1u1∥2 + λ1|u1| + ∥x2 −A2u2∥2 + λ2|u2|. On
+    CVPR, 2010.                                                                the other hand, because u1 and u2 are the minimizers to the
+[16] H. Jegou, F. Perronnin, M. Douze, J. Sanchez, P. Perez, and                                                    two separate subproblems in (11), then the right-hand side
+     C. Schmid. Aggregating local image descriptors into com-
+                                                              of the above inequality is no greater than the left-hand side,
+     pact codes. TPAMI, 2012.
+                                                          a contradiction.
+[17] H. J´egou, F. Perronnin, M. Douze, C. Schmid, et al. Aggre-
+     gating local image descriptors into compact codes. TPAMI,    Theorem A.2. Assume u = minu≻0 ∥x −Au∥2 + λ|u|
+     2012.                                            and u′ = minu′≻0 ∥x −Au′∥2 + λ′|u′|.  If λ′ > λ, then
+[18] S. Lazebnik, C. Schmid, and J. Ponce.  Beyond bags of      |u′| ≤|u|.
+      features: Spatial pyramid matching for recognizing natural
+     scene categories. In CVPR, 2006.                             Proof. Assume |u′| > |u|. Denote ∆λ = λ′ −λ > 0. Then
+[19] H. Lee, A. Battle, R. Raina, and A. Ng.  Efﬁcient sparse    ∥x−Au′∥2+λ′|u′| = ∥x−Au′∥2+λ|u′|+∆λ|u′| ≥∥x−
+     coding algorithms. In NIPS, 2006.                     Au∥2+λ|u|+∆λ|u′| > ∥x−Au∥2+λ′|u|. So u is a better
+[20] D. G. Lowe. Distinctive image features from scale-invariant     minimizer than u′ in the λ′-problem, a contradiction.
+     keypoints. IJCV, pages 91–110, 2004.

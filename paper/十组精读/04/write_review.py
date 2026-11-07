@@ -1,0 +1,123 @@
+import json
+import re
+import hashlib
+from pathlib import Path
+
+root = Path(__file__).resolve().parent.parent
+papers = [
+    {
+        "id": "W10",
+        "title": "Efficient High-Order Spatial Interactions for Visual Perception（HorNet期刊扩展；下列定量精读依据NeurIPS 2022原版）",
+        "source_url": "https://doi.org/10.1109/TPAMI.2025.3603181",
+        "screenshot_check": "已目视截图05，标题明确为“TPAMI 2026|HorNet”。不能简单判为把2022误写成2026：作者主页与Crossref确认同系列期刊扩展，2026年48(1):33–46；原版为NeurIPS 2022。扩展摘要新增Hor3D、HorCLIP，但未获得扩展全文。以下公式、页码、实验均来自本地14页原版，不冒充扩展版精读。",
+        "problem": "自注意力的优势究竟来自架构标签，还是输入自适应、较大感受野和显式高阶空间交互？论文试图以卷积、投影、逐元素乘法实现这些性质，并把高阶交互用于图像骨干和多层特征融合。值得学习的是将模糊优势拆成可替换计算步骤，再做同架构消融。",
+        "mechanism": "输入投影产生p₀及多个qₖ，递归执行pₖ₊₁=fₖ(qₖ)⊙gₖ(pₖ)/α；f为深度卷积，g匹配通道。每次门控增加一次显式交互，通道Cₖ=C/2^(n−k−1)逐级增宽，使总投影宽度保持2C。四阶段默认阶数2/3/4/5；空间混合用7×7卷积，或后层半通道全局频域滤波。HorFPN将同一算子置于金字塔融合后。",
+        "evidence": [
+            {"claim": "式(3.3)给出递归门控；式(3.6)给出FLOPs<HWC(2K²+11C/3+2)，因此在其通道分配下，提高阶数有有界计算开销。", "page_or_table": "NeurIPS 2022原版PDF第4页，式(3.3)–(3.6)"},
+            {"claim": "固定28M参数、4.3G FLOPs，统一交互阶数1/2/3/4对应ImageNet准确率81.7/82.2/82.5/82.5%；收益出现饱和，并非阶数越高越好。", "page_or_table": "原版PDF第9页，表6(a)"},
+            {"claim": "ResNet-50配UperNet，FPN到HorFPN-GF的单尺度mIoU由40.7升至43.2，FLOPs从947G降至497G；模块收益也存在于下游融合。", "page_or_table": "原版PDF第8页，表3"}
+        ],
+        "compute": "原版ImageNet-1K训练300轮；Tiny约22M参数、4.0G FLOPs。4–8张高端GPU适合从公开权重做融合模块对照，不应为验证一个门控想法重做22K预训练。论文第9页延迟实测用单RTX3090、batch128，不能直接代表在线单样本延迟。",
+        "limits": "“高阶”是本文特定交互定义，不等于一般表达能力或可训练性定理；大核、宽深与训练配置仍影响效果。期刊新增点云和视觉语言结果尚未全文核验，不能借摘要宣称迁移已被我们验证。",
+        "transfer_hypothesis": "对现有有限记忆视频候选，可把递归门控作为固定编码后的局部融合对照，检验短暂证据与上下文的交互是否重要；这是候选假设。不能据此重启被冻结的C2，或给ESN证书强加泛化到现代视觉骨干的结论。",
+        "pilot": "两人先用冻结视觉编码和同字节记忆，比较线性融合、一次门控、三次门控；匹配参数、读写与输入历史，设置未知未来查询和证据恢复对照。仅在原始测试划分、第二模型与真实延迟同时保留收益时继续；若差距仅来自更多通道或更大感受野则停止。该探针尚未执行。",
+        "priority": "P3：基础算子与必要对照；不作为独立新主线。"
+    },
+    {
+        "id": "W11",
+        "title": "MICN: Multi-scale Local and Global Context Modeling for Long-term Series Forecasting",
+        "source_url": "https://openreview.net/forum?id=zt53IDUR1U",
+        "screenshot_check": "已目视截图06上半部“ICLR神作！MICN卷积反超Transformer”及论文页缩图，与本地ICLR 2023正文匹配。原文是数值时间序列预测，不是视频理解；截图宣传语不能外推为卷积普遍优于注意力。",
+        "problem": "长序列预测既要识别局部起伏，也要处理趋势和远期依赖。直接全局注意力成本高，单一尺度又可能混合不同周期。MICN的核心拆分是先用多尺度平滑分出趋势与季节残差，再让各尺度的局部压缩支撑全局预测。",
+        "mechanism": "MHDecomp对不同核的移动平均取均值得到Xₜ，令Xₛ=X−Xₜ；趋势用线性回归或均值外推。季节分支补未来零占位并加入时间、位置和值编码。每支先以kernel=stride=i的一维卷积压缩为S=L/i个局部表示，再用核长S、补S−1零的isometric卷积混合短序列；转置卷积恢复长度，多支经二维卷积加权合并，最后与趋势预测相加。",
+        "evidence": [
+            {"claim": "输入96、预测720的多变量Electricity，MICN-regre MSE为0.212，FEDformer为0.246；相同设置下Exchange为0.714对1.195，效果依赖数据与预测跨度。", "page_or_table": "PDF第7页，表1"},
+            {"claim": "只将全局等距卷积替换为masked attention，单变量Traffic的96步MSE为0.140，优于卷积0.158；四个跨度attention均更好，反证普遍“卷积反超”。", "page_or_table": "PDF第16页，表14"},
+            {"claim": "局部卷积成本O(LD²)，全局卷积为O(L²D²/i²)；附录将i设为L/4、L/8等比例尺度才推出线性总复杂度。", "page_or_table": "PDF第16页，附录B.5"}
+        ],
+        "compute": "附录A.2使用单RTX A5000 24GB、batch32、一个MIC层、三随机种子，并在验证集连续三轮无改进后早停；原任务复现对4–8卡团队较轻。实际默认核12/16，固定核时不能把全局部分随L增长的平方项隐藏为常数；视频迁移还要另计编码成本。",
+        "limits": "作者汇报的平均改进混合regre与mean两种趋势策略，表1中ETTm2长跨度反而mean更好，选型应在验证集冻结。本文没有证明丢弃历史后的任务信息保真；零占位预测器也不是现成的恒定总记忆流式系统。",
+        "transfer_hypothesis": "最有价值的迁移是把“先多尺度局部压缩、后短序列全局处理”纳入有限记忆路线的强简单基线。推测多尺度摘要可保留长事件背景，却可能平均掉决定未来问题的瞬时证据；这个矛盾比重新比较CNN和Transformer更贴近当前研究。",
+        "pilot": "一人先复核Electricity和ETTm2的两种趋势策略及短序列attention替换；另一人在固定视频特征上比较均匀池化、多尺度摘要、递归摘要加小缓存，锁定总字节、历史访问和查询揭示时刻。用恢复被删证据能否修复回答检验损失来源；若多尺度优势被简单更大缓存追平或在线成本失去优势，停止方法开发。尚未运行。",
+        "priority": "P2：有限记忆探针的低成本多尺度基线，优先于新建预测骨干。"
+    },
+    {
+        "id": "W12",
+        "title": "HEAPr: Hessian-based Efficient Atomic Expert Pruning in Output Space",
+        "source_url": "https://proceedings.iclr.cc/paper_files/paper/2026/hash/d47e75c3429b407e440405b317ef8054-Abstract-Conference.html",
+        "screenshot_check": "已目视截图06下半部ICLR2026、Train-Free MoE及Wgate/Wup/Wdown原子专家剪枝图，与原文图1一致。官方ICLR2026目录已核准。免训练指不更新模型权重，仍需要校准语料、梯度反传与剪枝后评测。",
+        "problem": "MoE每次只激活少量专家，却仍需存储全部专家权重；整专家删除又过粗。本文将剪枝单位缩为专家内部中间通道，利用输出对最终损失的敏感度排序，在减少权重存储的同时缩短实际激活路径。",
+        "mechanism": "每个原子专家eⱼ=w_down,ⱼ[SiLU(w_gate,ⱼx)·(w_up,ⱼx)]，专家输出为原子输出之和。重要度sⱼ≈Eₓ[eⱼᵀḠᵢeⱼ/2]，Ḡᵢ由路由到专家i的输出梯度外积估计。由于同专家各原子输出梯度相同，只存一个d×d协方差矩阵，再全模型排序裁去低分通道。参数空间二阶矩阵转输出空间，使每专家存储从约O(d⁴)降到O(d²)。",
+        "evidence": [
+            {"claim": "DeepSeekMoE-16B剪20%，七任务均分按表内精度仍为0.56，Wiki困惑度6.38→6.54；Qwen3-30B剪25%则均分0.62→0.59，即约3个百分点损失，不能写为0.03个百分点。", "page_or_table": "PDF第7页，表1"},
+            {"claim": "DeepSeekMoE原子级剪20%/40%，FLOPs分别减少8%/21%；相同比例整专家剪枝在保持激活专家数的该设置下为0%，说明参数压缩与推理计算节省不是同一比例。", "page_or_table": "PDF第10页，表3"},
+            {"claim": "校准使用128×2048 token。DeepSeekMoE剪枝开销44GB、6分钟；Qwen2-57B为91GB、20分钟。表格未交代GPU型号，时间只能作作者环境参考。", "page_or_table": "PDF第14页，附录B及表5"}
+        ],
+        "compute": "两次前向、一次反向完成打分，不是数据零成本。4–8张高显存GPU足以做16B/30B多seed复核，但应先从16B开始，实测prefill、decode、峰值显存和不同batch；不把理论FLOPs自动换算为端到端提速。",
+        "limits": "本次数学核查认为：式(7)的专家输出混合二阶导为零，并不自动令损失Hessian的跨原子块JᵢᵀH_EJⱼ为零；Fisher替代与联合删通道仍属近似。原文第9页也只验证分数趋势，不是无损证书。表2还混用acc_norm和accuracy，不能与表1均分直接横比。",
+        "transfer_hypothesis": "可迁移的是“在实际输出和损失中衡量压缩代价”的评估原则。它适合作为已有MoE部署工具候选；把Fisher敏感度换名用于LoRA秩分配会撞上当前已冻结接口选择路线。对未知未来视觉查询，预先知道校准损失的假设也不能直接照搬。",
+        "pilot": "两人用16B、三校准种子，在20%/40%剪枝下同场比较原模型、层内与全局HEAPr、激活幅度基线；锁定评测版本，增加未参与校准的长尾任务。测权重字节、KV显存与真实解码时间。若均分保持却关键任务受损，或结构变窄不能带来真实收益，停止作为部署方案；本轮未剪枝或训练。",
+        "priority": "P1（有MoE部署需求时）：先复核收益；对当前新科研主线为P2工具参考。"
+    }
+]
+
+(root / '04.json').write_text(json.dumps(papers, ensure_ascii=False, indent=2), encoding='utf-8')
+labels = {'screenshot_check':'截图与版本核对','problem':'问题','mechanism':'机制','compute':'算力与复现','limits':'边界','transfer_hypothesis':'迁移假设','pilot':'最小探针（未执行）','priority':'优先级'}
+lines = ['第04组：高阶卷积、多尺度时序与专家剪枝', '核对日期：2026-11-05。页码均为所读本地PDF的1起始页码。研究配置按2–4人、4–8张高端GPU。', '范围：截图05/06已目视；三份可得PDF的方法、公式、正文实验与相关附录已实际提取并阅读，关键表格经页面渲染核对。HorNet期刊版仅身份/摘要核准，未取得全文。没有训练、推理或剪枝实验。', '']
+for p in papers:
+    lines += [p['id']+'｜'+p['title'], '来源：'+p['source_url']]
+    for k in ['screenshot_check','problem','mechanism']:
+        lines.append(labels[k]+'：'+p[k])
+    lines.append('原文证据：')
+    for i,e in enumerate(p['evidence'],1): lines.append(f"{i}. {e['claim']}［{e['page_or_table']}］")
+    for k in ['compute','limits','transfer_hypothesis','pilot','priority']:
+        lines.append(labels[k]+'：'+p[k])
+    lines += ['']
+lines += ['版本与补充来源：',
+          'HorNet原版：https://proceedings.neurips.cc/paper_files/paper/2022/file/436d042b2dd81214d23ae43eb196b146-Paper-Conference.pdf',
+          'HorNet期刊书目信息：https://api.crossref.org/works/10.1109/TPAMI.2025.3603181',
+          '作者期刊记录：https://ivg.au.tsinghua.edu.cn/Jiwen_Lu/pub26.html',
+          '期刊摘要：https://pubmed.ncbi.nlm.nih.gov/40875425/',
+          '作者代码与双版本引用：https://github.com/raoyongming/HorNet',
+          'HEAPr官方代码：https://github.com/LLIKKE/HEAPr',
+          '本组取舍：不改变“ESN证书先收成、一个有限记忆探针”的组合。三篇提供算子、基线与压缩评估工具，均不能凭模块嫁接自动成为新颖主线。']
+(root / '04.txt').write_text('\n\n'.join(lines), encoding='utf-8')
+
+original = root.parent / 'W10_HorNet_NeurIPS2022.pdf'
+correction = {
+    'id':'W10', 'verified_on':'2026-11-05',
+    'screenshot':5,
+    'screenshot_text':'TPAMI 2026|HorNet：不用自注意力，卷积如何实现高阶空间交互？',
+    'corrected_title':'Efficient High-Order Spatial Interactions for Visual Perception',
+    'authors':['Zuyan Liu','Yongming Rao','Wenliang Zhao','Jie Zhou','Jiwen Lu'],
+    'source_url':'https://doi.org/10.1109/TPAMI.2025.3603181',
+    'publisher_url':'https://ieeexplore.ieee.org/abstract/document/11142586/',
+    'venue':'IEEE Transactions on Pattern Analysis and Machine Intelligence',
+    'publication':'2026 Jan;48(1):33–46; online first 2025-08-28',
+    'version_relation':'2022 HorNet系列的期刊扩展。作者代码仓库同时列出两篇引用；作者主页明确称HorNet-Family，包括HorNet、Hor3D、HorCLIP。不得把截图2026直接判错；也不得把2022全文当期刊版全文。',
+    'new_content_verified_from_abstract_only':['Hor3D用于S3DIS/ScanNet V2点云语义分割','HorCLIP用于ImageNet零样本分类和COCO Panoptic视觉语言稠密表征'],
+    'verification_urls':['https://api.crossref.org/works/10.1109/TPAMI.2025.3603181','https://ivg.au.tsinghua.edu.cn/Jiwen_Lu/pub26.html','https://liuzuyan.github.io/','https://github.com/raoyongming/HorNet','https://pubmed.ncbi.nlm.nih.gov/40875425/'],
+    'download_status':'not_downloaded_no_public_fulltext_obtained',
+    'requested_local_file':str(root.parent / 'W10_HorNet_TPAMI2026_Extended.pdf'),
+    'local_file':None, 'sha256':None,
+    'download_attempts':[
+        {'url':'https://ieeexplore.ieee.org/stampPDF/getPDF.jsp?tp=&arnumber=11142586','result':'HTTP 418 HTML, not PDF'},
+        {'url':'https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=11142586','result':'HTTP 418 HTML, not PDF'},
+        {'url':'http://xplorestaging.ieee.org/ielx8/34/11275622/11142586.pdf?arnumber=11142586','result':'Crossref-provided VOR URL redirected to HTTPS and returned HTTP 418 HTML'},
+        {'url':'https://hornet.ivg-research.xyz/','result':'TLS unrecognized-name failure; web fetch 502'},
+        {'url':'https://api.openalex.org/works/https://doi.org/10.1109/TPAMI.2025.3603181','result':'oa_status closed; best_oa_location null; any_repository_has_fulltext false'}
+    ],
+    'original_available':{
+        'title':'HorNet: Efficient High-Order Spatial Interactions with Recursive Gated Convolutions',
+        'venue':'NeurIPS 2022',
+        'source_url':'https://proceedings.neurips.cc/paper_files/paper/2022/file/436d042b2dd81214d23ae43eb196b146-Paper-Conference.pdf',
+        'local_file':str(original),'pages':14,'sha256':hashlib.sha256(original.read_bytes()).hexdigest(),
+        'read_scope':'完整方法，第4–6页公式与架构；第7–9页实验，含渲染表6；本组全部HorNet定量证据限于该版本'
+    }
+}
+(root / '04_version_correction.json').write_text(json.dumps(correction,ensure_ascii=False,indent=2),encoding='utf-8')
+
+for p in papers:
+    text=json.dumps(p,ensure_ascii=False)
+    print(p['id'], 'Chinese characters:',len(re.findall('[\u4e00-\u9fff]',text)), 'evidence:',len(p['evidence']))
+print('Written:',root/'04.json',root/'04.txt',root/'04_version_correction.json')

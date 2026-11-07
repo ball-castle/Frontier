@@ -1,0 +1,1186 @@
+KH-A060 | Highly Compressed Tokenizer Can Generate Without Training
+来源：https://arxiv.org/abs/2506.08257
+本地PDF：专题文献/何恺明/KH-A060_Highly_Compressed_Tokenizer_Can_Generate_Without_Training_ICML2025.pdf
+SHA-256：56ba2561e4aa0fc1765fc961df4fba06f157d19cd0d269757c1673bd747c2584
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+              Highly Compressed Tokenizer Can Generate Without Training
+
+
+
+                     Lukas Lao Beyer 1 Tianhong Li 2  Xinlei Chen 3 Sertac Karaman 1 Kaiming He 2
+
+
+                         Abstract                                    seed                   optimization −−−−−−−−−→
+
+           Commonly used image tokenizers produce a 2D             (a)
+                grid of spatially arranged tokens. In contrast, so-
+                called 1D image tokenizers represent images as
+               highly compressed one-dimensional sequences of
+                                                                                      (b)
+               as few as 32 discrete tokens. We find that the2025        high degree of compression achieved by a 1D to-
+               kenizer with vector quantization enables image
+                 editing and generative capabilities through heuris-              seed                z0 … z31                   objectiveJun           tic manipulation of tokens, demonstrating that                                                        maximize
+9        even very crude manipulations — such as copy-                           TiTok     32 discrete      TiTok
+               ing and replacing tokens between latent represen-                       encoder      tokens      decoder
+                 tations of images — enable fine-grained image          Figure 1. Without further training, a pretrained tokenizer can
+                editing by transferring appearance and semantic        perform generative tasks such as (a) text-guided editing and
+                  attributes. Motivated by the expressivity of the 1D           (b) inpainting. Because the highly compressed latent space of 1D
+                tokenizer’s latent space, we construct an image          tokenizers enables generative capabilities via direct token manipu-
+                                                                                            lation, we generate using test-time optimization of tokens with (a)[cs.CV]         generation pipeline leveraging gradient-based test-
+                                                             CLIP similarity or (b) reconstruction objectives, without training
+              time optimization of tokens with plug-and-play
+                                                                     any dedicated generative model.
+                 loss functions such as reconstruction or CLIP sim-
+                    ilarity. Our approach is demonstrated for inpaint-
+                                                             While the generative models used in such an image genera-               ing and text-guided image editing use cases, and
+                                                                           tion pipeline have received much attention, recently intro-              can generate diverse and realistic samples with-
+                                                                duced 1D tokenizers highlight that highly compressed latent               out requiring training of any generative model.
+                                                                     spaces provide significant leverage in improving generation            Code is available at https://github.com/
+                                                                  performance. For example, the TiTok 1D tokenizer can           lukaslaobeyer/token-opt.
+                                                                    achieve an order of magnitude runtime reduction without
+                                                             compromising sample quality by representing an image in
+                                                                       as few as 32 discrete tokens (Yu et al., 2024b).
+          1. Introduction
+                                             We argue that scaling image tokenizers to higher compres-
+      A standard modern image generation pipeline consists of a    sion ratios requires powerful decoders that may themselves
+           tokenizer — an autoencoder which embeds an image into    be viewed as generative models. As a thought experiment,arXiv:2506.08257v1    a compact latent space — as well as a generative model    consider a tokenizer that encodes an image into just a single
+          operating on this latent space. Commonly, this generative     discrete token from a finite codebook. Then, the decoder for
+         model leverages some form of iterative refinement such    such a “tokenizer” is faced with a generative modeling task,
+           as diffusion (Rombach et al., 2022; Peebles & Xie, 2023),     if its output is to be successful in capturing the data distri-
+           autoregression (Esser et al., 2021; Ramesh et al., 2021;    bution. Supposing we had a decoder for this single-token
+          Razavi et al., 2019), masked modeling (Chang et al., 2022),    tokenizer at hand, using it as a generative model would be
+           or a combination of those approaches (Li et al., 2024b; Zhou    straightforward: an image could be generated by sampling
+            et al., 2025; Xie et al., 2024).                               a random token from the codebook and decoding it. Given
+                                                                        the very high compression offered by 1D tokenizers, we           1MIT LIDS 2MIT CSAIL 3Meta FAIR. Correspondence to:
+          Lukas Lao Beyer <llb@mit.edu>.                          wish to find out to what extent these tokenizers can indeed
+                                                               be viewed as generative models.
+           Proceedings of the 42 nd International Conference on Machine
+           Learning, Vancouver, Canada. PMLR 267, 2025. Copyright 2025    Through a series of experiments, we demonstrate that sim-
+          by the author(s).                                               ple latent space manipulations of tokens can result in im-
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+age editing capabilities typically associated with generative    2021) or gradient-based optimization (Patashnik et al., 2021)
+models. Building upon this insight, we find that the latent     in the latent space of a pretrained GAN. Another approach
+space of 1D tokens is amenable to straightforward gradient-     is to represent visual information in the embedding space of
+based optimization of a variety of objectives. By optimizing    frozen text-to-image models (Gal et al., 2023; Wang et al.,
+a reconstruction loss, a pretrained tokenizer can perform    2025), enabling image generation with rich visual informa-
+inpainting tasks; similarly, optimizing CLIP similarity (Rad-    tion as part of the input prompt. However, we focus on the
+ford et al., 2021), the tokenizer can perform text-guided     setting where only a tokenizer, not a full-blown generative
+image editing (Figure 1).                               model like a GAN or text-to-image model, is available.
+
+Combining the text-guided token optimization with retrieval    Unconditional generation. Unconditional generative mod-
+from a small set of seed images, we find that it is possible to     eling is attractive due to the difficulty associated with large-
+generate realistic and diverse samples without training any    scale annotation. Many generative models benefit greatly
+dedicated generative model.                            from class labels available at training time (Dhariwal &
+                                                           Nichol, 2021; Bao et al., 2022), although recently the gap
+                                                                in performance has been bridged with the help of self-2. Background
+                                                          supervised pretrained encoders (Li et al., 2024a).  Alter-
+Visual tokenization. Many image generation methods rely     natively, semi-parametric generation assumes access to a
+on tokenization to compress input images into a lower-    dataset of images at test time (Casanova et al., 2021; Bordes
+dimensional latent space for efficiency. A variational au-    et al., 2022; Blattmann et al., 2022; Sheynin et al., 2023;
+toencoder (VAE) (Kingma & Welling, 2014) can be used   Zhou et al., 2023).  In our case, we view the pretrained
+to produce continuous tokens to be modeled with diffusion    tokenizer as an unconditional generative model in the semi-
+(Rombach et al., 2022). To further regularize the tokenizer’s    parametric setting, which we can guide with the desired
+latent space and ease the task of modeling distributions    conditioning signal at test-time.
+over tokens autoregressively (Sun et al., 2024; Li et al.,
+2024b), a VQ-VAE (van den Oord et al., 2017; Razavi et al.,    3. Latent Space of 1D Tokens
+2019; Mentzer et al., 2024; Yu et al., 2024a) applies vector
+quantization to produce discrete-valued tokens. Perceptual    In this section we perform a series of simple experiments us-
+(Zhang et al., 2018) and adversarial losses during training    ing a pretrained TiTok (Yu et al., 2024b) 1D tokenizer to bet-
+(Esser et al., 2021; Chang et al., 2022) allow for visually     ter understand the latent space of 1D tokens and determine
+compelling reconstructions under strong lossy compression.   whether it provides a useful representation for latent-space
+Note that most image tokenizers produce a 2D grid of la-    editing of images.
+tents due to their convolutional (Chang et al., 2022) or vision
+transformer (Yu et al., 2023; Cao et al., 2023) architectures.    3.1. Token Position Is Key to Token Semantics
+
+1D tokenization. The spatial structure imposed by standard    Since the TiTok latents receive a positional encoding, one
+tokenizers producing a 2D grid of latents can prevent each    might wonder whether the 1D tokens disentangle seman-
+individual token from describing global attributes of the     tics in the sense that certain token positions correspond to
+input image, instead containing information only about a     certain interpretable, high-level attributes. To investigate
+limited spatial extent (Cao et al., 2023; Rao et al., 2021). In     this question, we propose to analyze the TiTok encodings
+contrast, the TiTok (Yu et al., 2024b) 1D tokenizer learns a    of several different partitions of the ImageNet validation
+sequence of latents with no particular spatial arrangement.    dataset. Since there is no commonly agreed upon disentan-
+This allows each token to capture global information about    glement metric (Locatello et al., 2019), in the following we
+the input image and enables extremely high compression ra-    introduce a per-token-position importance metric that we
+tios (e.g. 32 discrete tokens) because global redundancies in     later verify to closely align with experimental results.
+the input can be exploited. Further background is provided
+                                                                  Start by tokenizing each image I in the dataset with thein Appendix A.
+                                         1D tokenizer, obtaining the tokenized representation x :=
+Image generation without training. Similar to our pro-   Tok(I) = [x(1), ..., x(K)], where K denotes the number
+posed text-guided image editing approach, VQGAN-CLIP    of image tokens produced by the tokenizer. Each token
+(Crowson et al., 2022) performs test-time optimization of    x(k) ∈{1, ..., |D|} refers to a particular D-dimensional
+tokens, but is limited by its use of 2D latents and need    entry z(k) := D[x(k)] ∈RD of the codebook D.
+for complex augmentation pipeline.  It is applied in style
+                                                         Next, create a set of partitions {P1, P2, ...} of the dataset.transfer or artistic image generation settings where these
+                                                    Each partition Pi splits the dataset into Ni high-level classeslimitations are less apparent. To enable text conditioning,
+                                                                        Ci,1, ..., Ci,Ni described by text prompts. The class assign-other methods attempt CLIP-guided search (Galatolo. et al.,
+                                                   ment is computed automatically via CLIP similarity.
+
+
+                                                2
+
+======================== PDF 第 3 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+                                                       Token Pos.
+ Classification Prompts            Token Importance            (Attribute)       Token Perturbation Result
+
+
+                               1
+                                                          4
+    “animal or human”        var                                                                            (subject type)    “inanimate object”
+
+                               0
+                               1
+                                                          27
+  “abundant vegetation”      var                                                                           (bg. material) “sparse or no vegetation”
+
+                               0
+                               1
+                                                          18
+ “large dominant subject”    var                                                                              (bg. blur) “small or subtle subject”
+
+                               0
+                               1
+                                                          31
+     “daytime scene”          var                                                                     (scene lighting)    “nighttime scene”
+
+                               0
+                               1
+                                                          12
+     “high definition”          var                                                                (image quality)    “blurry, low quality”
+
+                               0
+
+
+
+Figure 2. Certain high-level attributes are represented by particular token positions. We verify this using two independent
+experiments. First, we partition the ImageNet validation set into different sets of classes automatically labeled according to CLIP prompts
+(first column), observing for each partition that distinct token indices show the greatest variance when comparing averaged features
+across classes (second column; normalized). Second, we perturb token positions one-by-one (selected token positions shown in third
+column), visualizing the perturbation that maximizes L1 difference with respect to the unperturbed image (fourth column). The token
+positions identified through the token importance experiment are consistent with the attributes altered by the token perturbation
+experiment.
+
+
+In order to determine which tokens contain the most informa-    3.2. Token Perturbations Can Achieve Meaningful Edits
+tion with respect to a particular partition, we will compute
+                                                The observation that a limited number of token positionsclass-specific statistics for each token z(1), ..., z(K). Con-
+                                                         vary for a given class partition suggests a crude way of
+cretely, we fit a Gaussian to each set of features, yielding
+                                                                editing images: is it possible to modify a certain high level
+a distribution N(µ(k)i,j , Σ(k)i,j ) describing feature statistics                                                                    attribute by directly manipulating the token at the most
+of a particular class Ci,j for each of the K tokens. Given                                                               relevant position? We will attempt to answer this question
+some measure of similarity between these statistics we can
+                                                   by considering single-token edits of the following form.
+now determine which tokens vary the most under a particu-
+lar partition. We choose to use the sample variance of the        arg max   ℓ  Dec(Replacek(Tok(I), x(k))), I    (2)
+mean µ(k)i,j computed across the classes of each partition,          x(k)∈{1,...,|D|}
+                                                         Here, Dec decodes a sequence  of 1D  tokens back
+       g(k)Pi =  cov nµ(k)i,j   j ∈{1, ..., Ni}o      .    (1)    into an  image,  and  Replacek([x(1), ..., x(K)], y)  :=
+                                                  2              [x(1), ..., x(k−1), y, x(k+1), ..., x(K)] returns its first argu-
+                                                  ment with the kth input token x(k) replaced by its second
+The leftmost two columns in Figure 2 show the result of this
+                                                       argument y. By maximizing the loss criterion ℓ(·, ·) we can
+per-token inter-class variance computation for the pretrained
+                                                              therefore find the replacement token at position k which
+TiTok-L-32 tokenizer (K = 32, |D| = 212). Surprisingly,
+                                                          causes the greatest change in output according to ℓ.
+we find that for a number of different class partitions there
+exists significant disentanglement across token position in    Thanks to the modest codebook size of |D| = 4096 we can
+the sense that, for a given partition, a certain small number     easily solve the above optimization via exhaustive search.
+of token positions display a large difference in per-class   An L1 loss criterion is used so that the discovered single-
+mean statistics while most others do not.                    token edits maximize visual difference.
+
+                                                3
+
+======================== PDF 第 4 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+  Attribute    background blur      scene lighting         sharpening           colorization            pose
+   Tokens         18                31                12               12, 24, 27            21
+
+
+Reference
+
+
+
+    Target
+
+
+
+    Edited
+
+
+
+Figure 3. Image editing via “copy and paste” latent space manipulation. Edited image is obtained by replacing tokens in the target
+image with tokens copied from the reference image. Using the token positions previously identified to correspond to desired attributes, we
+can reliably obtain fine-grained control over appearance-related properties such as background blur, scene lighting conditions, and image
+quality. Class-specific semantic properties such as pose and gaze can also be controlled with some limited success (see last two columns
+for a successful and a failing example, respectively).
+
+
+As shown in the rightmost two columns of Figure 2, many of     arbitrary target images. Furthermore, the reference image
+the edits discovered with this single-token editing procedure    used to adjust these properties need not be semantically or
+produce valid images, and most of the edits are consistent     visually related to the target image except in the appearance
+with the results from the earlier class partition based token    property to be transferred. In many cases, we can even use
+importance experiment.                                         abstract synthetic reference images demonstrating the prop-
+                                                                   erty to transfer. For example, we may use an arbitrary image
+3.3. “Copy & Paste” in Latent Space for Image Editing     blurred to the desired extent in order to precisely adjust the
+                                                  amount of background blur. We do not observe the same
+Having discovered that certain high-level image properties                                                                    level of token compositionality for semantic properties. For
+appear to be represented by just one token position, and hav-                                                        example, transferring the pose of a subject by copying and
+ing demonstrated that perturbing tokens at these positions                                                             replacing tokens is only successful to a limited extent (see
+can produce valid images while affecting the desired high                                                                         last columns in Figure 3).
+level properties, we propose an extremely simple “copy and
+paste” approach for direct latent space editing of images.
+                                                        4. Gradient-Based Latent OptimizationGiven an input image to edit Itarget and a reference image Iref
+that possesses an attribute that should be exhibited in the                                                            In the preceding sections we have demonstrated that 1D
+edited image Iedit, we tokenize both the target and reference                                                               tokenizers’ highly compressed representation enables even
+images with the 1D tokenizer and then simply copy the                                                          extremely crude latent space manipulations to result in visu-
+token lying at the position k known to correspond to the                                                                    ally coherent and interpretable edits to input images. While
+desired attribute from the reference to the target tokens:                                                                       this enables a surprising amount of control over certain pre-
+                                                                  identified attributes (particularly those controlling global
+            xtarget = Tok(Itarget),   xref = Tok(Iref),
+                                                           appearance), it is not particularly flexible, and cannot be
+             xedit = Replacek(xtarget, x(k)ref ),                (3)     reliably used for editing of more complex properties. In this
+             Iedit = Dec(xedit).                                    section, we explore a more systematic and powerful image
+                                                               editing procedure based on gradient-based optimization of
+Such a procedure cannot be expected to produce coherent   1D tokens at test time.
+results in the case of a 2D tokenizer, where single-token
+edits would result in spatially localized edits (Cao et al.,    4.1. Text-Guided Image Editing
+2023). Remarkably, in the case of 1D tokenization, it can
+                                      We present a simple text-based image editing procedureproduce interpretable, high-quality outputs such as those
+                                                       based on test-time maximization of CLIP similarity (Rad-shown in Figure 3.
+                                                              ford et al., 2021) with respect to a user-supplied text prompt.
+We observe that global appearance related properties — es-     First, the tokens to optimize are initialized from the input or
+pecially background blur, scene lighting and image qual-    seed image to be edited. These tokens are then iteratively
+ity/sharpness — can be accurately edited for essentially
+
+                                                4
+
+======================== PDF 第 5 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+   seed                     optimization −−−−−−−−−−→             input image        edit 1           edit 2           edit 3
+
+                                                                           dog
+                                                                                                                                                                                                                                                                                    hummingbird
+
+                                                                                                                              eagle
+
+
+Figure 4. Test-time optimization according to a CLIP similarity
+objective. Selected intermediate optimization results shown in
+middle columns, with final result after 400 optimizer iterations
+shown in the rightmost column. CLIP prompts are “a photo of a
+class”, with class shown to the right.
+
+
+updated by backpropagating the CLIP objective’s gradient
+and performing gradient ascent as shown in Figure 1.
+
+Specifically, we perform the following optimization:
+
+                   h                        i   arg max ℓ Dec   VQD(ˆz(1)), ..., VQD(ˆz(K))       ,
+    ˆz(1),...,ˆz(K)
+                                                          (4)
+where the decision variables are the continuous feature vec-
+tors ˆz(k) as output by the tokenizer’s encoder just prior
+to the vector quantization step z(k) = VQD(ˆz(k)). The
+straight-through estimator is used for gradient computation
+through the vector quantization step. CLIP similarity of the
+decoded image with respect to the text prompt is denoted    Figure 5. Flexible text-guided editing of an input image using
+by ℓ. Note that it is essential to include the vector quantiza-    test-time optimization with CLIP gradients. Key attributes of
+tion step within the optimization, as optimizing z(k) directly     the input image such as pose are preserved while aligning the image
+leads to poor results. To solve the optimization in practice,    with the prompt. Prompts are listed in the appendix (Table A1).
+we use the Adam optimizer with a learning rate of 0.1. A
+more detailed description of the algorithm can be found in
+Appendix C.1.                                                    4.2. Text-to-Image Generation
+
+A straightforward implementation of this optimization    Consider now the case in which no seed image is available.
+with no further tricks can already produce text-guided    In this case, we can apply the test-time optimization proce-
+edits which are visually coherent and aligned with the    dure starting with randomly selected tokens. In particular,
+prompt. However, we do find that a few additional tweaks   we initialize the feature vectors ˆz(k) (prior to the vector
+to smooth the CLIP objective’s gradient, to artificially in-    quantization step) by randomly sampling their value from a
+troduce additional stochasticity, and to add a small amount    normal distribution. We find that this works better than ini-
+of regularization, can help. We ablate these design choices     tializing from tokens randomly selected from the codebook,
+in Section 5.4.                                        and allows for successful text-to-image generation with-
+                                                      out the need for a seed image (see Figure 6 for example
+Figure 4 shows examples of using our CLIP-guided token                                                                 generations). A further discussion of tweaks and parameters
+optimization to transform the main subject in an image into                                                      used for this “from-scratch” text-to-image generation task
+a different class. However, the usage of CLIP guidance al-                                                       can be found in Section 5.5
+lows going beyond class-conditional generation. We demon-
+strate the capability for open-domain text-guided editing
+                                                                    4.3. Inpainting
+of a subject’s context in Figure 5, noting that the optimiza-
+tion preserves key aspects of the subject while aligning the    Test-time optimization of tokens provides a general frame-
+generated image with the prompt.                       work for optimizing arbitrary cost functions, and is not
+
+                                                5
+
+======================== PDF 第 6 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+                                                        5. Evaluation
+
+                                                         For quantitative evaluation of editing and generation quality,
+                                           we will consider a class-conditional generation pipeline
+                                                       based on a small seed image dataset subsampled from
+                                                             the ImageNet training data, along with a set of CLIP text
+                                                     prompts used to guide generation towards target classes.
+                                                        This setting is similar to semi-parametric generation such
+                                                              as instance conditioning (Casanova et al., 2021) or retrieval-
+                                                    augmented diffusion (Blattmann et al., 2022).
+Figure 6. “From-scratch” generation starting from random to-   Seed image set. A fixed number of ImageNet ILSVRC2012
+kens. Instead of starting with an initial image, it is also possible to                                                    (Deng et al., 2009) training set images are randomly selected.
+apply our test-time latent token optimization starting from a ran-
+                                                      For each ImageNet class, an equal number of images is
+domly sampled initialization. Selected samples for prompts “a dog
+                                                    sampled at random without replacement. The 1D tokens
+running on a dirt trail”, “majestic deer standing in a snowy forest”,
+                                                                for images from this small seed image dataset are used to“a duck in a pond,” and “a wide landscape vista overlooking fields
+and a town”.                                                           initialize the test-time token optimization.
+                                           CLIP prompts. Prompts of the form “a photo of a class”
+                                                             are constructed. We generate 50k prompts, distributed ac-
+                                                         cording to the ImageNet validation set class statistics. In
+                                                      each prompt, class is the natural language label for an
+                                                    ImageNet synset (the first WordNet lemma name).
+
+                                                          Class-to-seed association. We consider a number of dif-
+                                                                ferent strategies to associate a target prompt with a seed
+                                                        image. First, we consider random association. Second, we
+                                                        can use CLIP similarity to associate each prompt with either
+                                                                the most or one of the (randomly picked) top-k most similar
+                                                         seed images.
+
+                                                      Models. Our evaluation uses the pretrained TiTok tokenizer
+                                                            checkpoints1 released by the TiTok authors. We refer to the
+                                                    models by name as VQ|VAE-SencSdec-K where the prefix
+                                                            stands for the type of autoencoder (VQ: discrete tokens
+Figure 7. Inpainting via test-time optimization of tokens. For    using vector quantization, VAE: continuous tokens with KL-
+each pair of images, the left image is the input to the optimization     regularization), Senc and Sdec refer to the size (L, B, or S)
+procedure, which optimizes 1D tokens according to a reconstruc-    of encoder and decoder, respectively, and K denotes the
+tion loss on the given part of the image. The final image is produced    number of tokens.
+by blending the input with the reconstruction.
+                                                  Computational cost.  Running 300 iterations of the
+                                                            text-guided image editing optimization (with CLIP loss
+                                                   smoothed over 8 random crops) in half precision using
+limited to CLIP similarity scores. As an additional use case,    the VQ-LL-32 tokenizer takes 7 seconds per image on an
+we consider the inpainting problem. In this case, the test-                                          NVIDIA A100. Most experiments in this section use this
+time optimization is modified to use an L1 reconstruction     configuration.
+loss over the unmasked part of the image.
+
+While this modified algorithm does perform the inpainting     5.1. Evaluation Protocol
+task successfully in some cases, we observe that the recon-                                                            In order to evaluate quality of generations, we compute
+struction loss tends to favor blurry reconstructions. To solve                                                             the Fr´echet Inception Distance (FID) (Heusel et al., 2017)
+this issue, we periodically reset the tokens during the opti-                                                        with respect to the ImageNet training statistics following
+mization by (i) decoding them into an image, (ii) replacing                                                             the protocol from ADM (Dhariwal & Nichol, 2021). We
+the parts of the image which are known with their given val-                                                               also report Inception Score (IS) (Salimans et al., 2016).
+ues, and (iii) re-encoding this modified image to obtain the
+reset tokens. We also find it essential to inject noise during      1https://github.com/bytedance/
+the optimization process and to apply L2 regularization on   1d-tokenizer/blob/main/README_TiTok.md
+the tokens. Example results are visualized in Figure 7.
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+
+Table 1. A limited number of seed images combined with diverse prompts can achieve good FID and prompt alignment. Baseline
+refers to directly using the seed images (reconstructed via TiTok VQ-LL-32) without any optimization. Adversarial refers to direct
+optimization of pixels to maximize a CLIP objective intended to demonstrate the immunity of the SigLIP similarity. Num Seeds denotes
+the size of the pool of randomly selected seed images, while Seed Assoc describes whether seeds are randomly assigned to target prompts
+or use CLIP-based selection. Configuration marked (∗) used for remaining experiments in this section.
+
+
+    Num Seeds   Seed Assoc   Method                FID-5k↓          IS↑       CLIP↑         SigLIP↑
+
+                                     baseline                    25.2           293          0.12             -16.2
+        2000       random      adversarial                262   (+241)    2 (-291)    0.59 (+0.47)     -14.4  (+1.8)
+                            VQ-LL-32 w/ token opt.     20.7    (-4.5)    75 (-218)    0.36 (+0.24)      -0.3  (+15.9)
+
+                                     baseline                    46.1           226          0.25              -6.9
+        2000     CLIP top-1%
+                            VQ-LL-32 w/ token opt.     14.6   (-31.5)   161 (-65)     0.39 (+0.15)      2.6   (+9.6)
+
+                                     baseline                    73.7           197          0.24              -7.0
+   (∗)   1000     CLIP top-1%
+                            VQ-LL-32 w/ token opt.     15.1   (-58.6)   160 (-37)     0.39 (+0.15)      2.5   (+9.5)
+
+                                     baseline                    71.9           243          0.31              -1.3
+        1000      CLIP top-1
+                            VQ-LL-32 w/ token opt.     21.2   (-50.7)   281(+38)    0.40 (+0.09)      3.5   (+4.8)
+
+                                     baseline                   119.2          135          0.25              -7.0
+        500     CLIP top-1%
+                            VQ-LL-32 w/ token opt.     16.6  (-102.6)   155(+20)    0.39 (+0.14)      2.5   (+9.5)
+
+
+To evaluate alignment with the target prompt, we consider
+                                                                Table 2. Increased compression leads to improved generation.
+CLIP as well as SigLIP (Zhai et al., 2023) similarity. It is
+                                                          Usage of tokenizers with increasing number of tokens or increasing
+critical to include SigLIP scores, as the CLIP-guided test-                                                          codebook size |D| degrades generative performance. The number
+time optimization resembles an adversarial attack on the     of optimization iterations used corresponds to the best FID-5k
+CLIP model and a high CLIP similarity therefore does not     score achieved.
+necessarily indicate successful alignment of the generated
+image with the prompt (see Table 1 for an example of maxi-      Tokenizer      |D|   FID-5k↓   IS↑   CLIP↑   SigLIP↑
+mizing CLIP score without significantly improving SigLIP     VQ-LL-32    4096     15.1    160    0.39      2.53
+score).                                               VQ-BB-64    4096     16.3    135    0.40      2.77
+                                                     VQ-BL-64    8192     18.6    106    0.40      2.07
+                                                     VQ-BL-128   8192     22.3     92     0.42      2.39
+5.2. Seed Image Set Size and Association
+
+To assess the degree of the test-time optimization’s reliance
+on seed images as a source of diversity, we vary the size                                                                association leads to poor results, indicating that the test time
+of the seed image set. We further check the optimization’s                                                           optimization struggles to generate images when the seed
+ability to handle diverse seed images with varying degrees of                                                     image is unrelated to the prompt. Table 1 summarizes these
+similarity to the target prompt by ablating the CLIP-based                                                                       results.
+seed association, and vary the degree of stochasticity in
+the prompt-to-seed association by selecting either the most    Note on determinism. The experiments in this section
+similar seed image or picking uniformly at random between    include a small amount of randomness in the loss. This is
+the top 1% of most similar seed images.                    due to nondeterminism in some of the CUDA kernels used in
+                                                          our PyTorch implementation. Interestingly, this is sufficient
+We find that only a small number of seed images (less                                                                 to lead to diverse generations by the test-time optimization
+than 1000) is needed to produce diverse generations,                                                             procedure. Note that in the case of at least 1000 seed images
+achieving an FID of 8.6 for 50k samples. We also find that                                                          with top-1% selection, there is enough diversity in the seed-
+the number of seed-to-prompt combinations is an important                                                        to-prompt association to yield about 4000 unique inputs,
+source of diversity, observing that seed association schemes                                                       such that the FID-5k results would be relatively unaffected
+that favor more diversity in the association (i.e., allowing for                                                   by the use of a fully deterministic implementation.
+associations that do not necessarily have the best similarity)
+outperform those favoring higher similarity of seed and                                                                    5.3. Tokenizer Variations
+prompt in terms of FID, although those with less diversity
+can lead to improved IS. Varying the degree of stochasticity    Generative performance improves with increasing com-
+in the seed selection therefore provides a way to control the    pression by the tokenizer. As shown in Table 2, a decreas-
+tradeoff between diversity and quality. Performing random    ing number of tokens as well as a decreasing codebook size
+                                                             lead to significant improvements generation quality. Out of
+
+
+                                                7
+
+======================== PDF 第 8 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+
+Table 3. Vector quantization and compression enabled by 1D    Table 5. Generating images from scratch. It is possible to gen-
+tokenization are key to generative performance. Test-time opti-     erate images even when starting from randomly initialized tokens
+mization using 1D continuous tokens or 2D discrete tokens fails.    as opposed to seed images. When using our vanilla token opti-
+In case of continuous tokens, we apply L2 regularization with    mization algorithm, we observe a decrease in generation quality.
+weight chosen for best results from a parameter sweep. Note that    However, additional optimization iterations as well as the tweaks
+when using the tokenizer trained with VQ but optimizing without     presented in Section 5.4 help to significantly decrease the gap in
+VQ (second row), performance drops significantly.                   generation performance when comparing seed-image-based initial-
+                                                                         ization and random token initialization.
+   Tokenizer          FID-5k↓   IS↑   CLIP↑   SigLIP↑
+                                                          Tweaks?     Seed        Iter. FID 5k↓IS↑CLIP↑SigLIP↑
+  VQ-LL-32             15.1    160    0.39      2.53
+  VQ-LL-32 w/o VQ     17.1    127    0.43      3.05                  CLIP-top-1%  300   15.1  160  0.39    2.53                                                            no
+  VAE-LL-32            33.2     93     0.46      3.05               random tokens 300   17.0  114  0.38    1.68
+  MaskGIT-VQGAN     34.3     73     0.44      2.42                                                                   CLIP-top-1%  300   14.6  182  0.38    2.07
+                                                                   yes
+                                                          random tokens 400   15.5  152  0.40    2.54
+
+Table 4. Ablation study. All using the VQ-LL-32 tokenizer and
+300 optimizer iterations. All metrics other than FID-50k computed
+over 5000 samples. We use the configuration from the line marked
+(∗) for the preceding experiments in this section, unless noted                                                                loss function, while the 2D tokenizers’ spatially arranged
+otherwise.
+                                                           tokens tend to lead to optimization results that are spatially
+                                                              incoherent.
+                 FID 5k (50k) ↓  IS↑ CLIP↑SigLIP↑
+     baseline          14.8         140   0.39     1.81      Number of optimization iterations. It is possible to con-
+    +random crops   15.3         157   0.40     2.55          trol the tradeoff between FID and IS scores by varying the
+  (∗) +EMA           15.1  (8.6)    160   0.39     2.53       number of optimization iterations. In fact, the best FID and
+    (−100 opt. iter)   15.2         149   0.38     1.93                                                                best IS scores are achieved at different numbers of iterations,
+    (+100 opt. iter)   15.3         169   0.40     2.88
+                                                     and this number varies between different tokenizers. There-    +token noise     14.5  (8.2)    165   0.39     2.46
+    +token reg.       14.6  (8.2)    182   0.38     2.07         fore, we report values at the number of iterations yielding
+                                                               the best FID score in Table 2, and include additional results
+                                                                 in Appendix C.2.
+all models we tested, were only able to achieve qualitatively
+satisfactory performance in editing and generation tasks us-    5.4. Tweaking the Test Time Optimization Algorithm
+ing the TiTok-LL-32 model (see Figure A6 in the appendix
+                                       We find that averaging the CLIP loss over multiple random
+for qualitative results).
+                                                            crops (we use 8 crops encompassing 75% of the image area)
+Discrete vs. continuous tokens. In comparing a version of     significantly helps prompt alignment and boosts IS, while
+the TiTok tokenizer trained as a VAE with continuous tokens     slightly degrading FID, likely due to smoother gradients
+with the standard VQ model, we find that the compression    of the objective function leading to reduced diversity in
+provided by the discrete latent space is essential in achiev-    the generations. Returning an exponential moving average
+ing good generative performance (Table 3). Even when   (EMA) of token iterates yields a small boost to FID and IS.
+optimizing the continuous tokens of a tokenizer trained with     Injecting additional noise to the tokens at the beginning of
+VQ (i.e. optimizing z(k) directly and skipping the VQ step),    each optimization iteration can further improve FID and IS,
+performance drops significantly. We hypothesize that VQ    achieving an FID of 8.2 over 50k samples. Applying weak
+provides an essential form of regularization that prevents the   L2 regularization on the tokens yields a significant boost
+optimization from behaving adversarially (Santurkar et al.,    to IS, while slightly degrading FID. Finally, increasing the
+2019).                                            number of optimization iterations can improve IS as well
+                                                             as CLIP and SigLIP scores at the expense of degraded FID.
+1D vs. 2D tokenizer. We further find that the large num-
+                                                         Table 4 summarizes these findings. Additional results to
+ber of tokens in a standard VQGAN 2D tokenizer such as
+                                                                establish the relationship between optimization iterations
+MaskGIT’s VQGAN (Chang et al., 2022) prevent success-
+                                                     and FID/IS are presented in the appendix (Appendix C.2).
+ful application of the test-time optimization approach for
+generation (Table 3). This is consistent with the finding that    While these tweaks do improve performance, we note that
+an increasing number of tokens is detrimental to genera-    our very simple baseline is already strong. This highlights
+tion (Table 2). Note also that the 32-token 1D tokenizer is     that the pretrained tokenizer on its own possesses strong
+able to successfully generate visually coherent images even    generative capabilities and can easily be made to generate
+without any tricks such as augmentations to stabilize the    images with simple heuristic methods.
+
+                                                8
+
+======================== PDF 第 9 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+
+Table 6. System-level comparison. Approaches other than our own require training a generative model (gray). We compare with
+models supporting unconditional generation, as our method supports arbitrary objective functions and the 1D tokenizer is trained in a
+self-supervised manner without class labels. We also compare with semi-parametric methods leveraging retrieval of training set images.
+The second column specifies whether arbitrary objective functions can be used as guidance without training a new model. The third
+column refers to the need to access training set images at test time, where selected denotes that the entire training set has been considered
+in selection of the pool of training images available at test time, while random describes a randomly subsampled pool of seed images.
+
+  Gen. Model Training   Plug & Play Guidance   Access to Training Data   Method                         FID↓   IS↑
+
+                                               ADDP (Tian et al., 2024)                7.6    105
+         Yes              No         No
+                                                    RCG-G (Li et al., 2024a)                2.2    254
+
+                                                     Full training set      RCDM (Bordes et al., 2022)           19.0    52
+         Yes              No          1000 selected images    IC-GAN (Casanova et al., 2021)        15.6    59
+                                                     Full training set        RDM-IN (Blattmann et al., 2022)        5.9    159
+
+        No                  Yes          1000 random images      Test-time optimization (VQ-LL-32)    8.2    182
+
+
+5.5. Text-to-Image Generation Without Seed Image         Qualitative image generation results can be found in the
+                                                       appendix (Figure A9).
+When no seed image is available, it is still possible to ap-
+ply the test-time optimization approach for text-to-image
+generation. As reported in Table 5, FID and IS scores are    6. Discussion
+weaker than when starting with a seed image. While this is
+                                          1D tokenizers have recently shown impressive compression
+expected, the tweaks from Section 5.4 as well as additional
+                                                              of images into small numbers of discrete tokens. Compared
+optimization iterations help significantly close the gap in per-
+                                                                to generative models using 2D tokenizers, models trained
+formance. Note that image generation quality when starting
+                                                                in this highly compressed latent space produce high qual-
+from randomly selected tokens (that is, ˆz(k) ∼N(0, σ2init))                                                                        ity images orders of magnitude faster without significantly
+is higher than when starting from random but valid seed
+                                                    compromising sample quality. In our paper, we show that
+images (see third row in Table 1). In our experiments, we
+                                                                       this is facilitated by the strong generative capabilities of the
+set σinit = 0.3 as chosen for best performance from a sweep                                                               tokenizer itself. We find that the latent space of 1D tokens is
+including {0.05, 0.3, 1.0}.
+                                                             highly semantic, to the point that certain image editing oper-
+                                                                 ations can be performed in an accurate and interpretable way
+5.6. System-Level Comparison                                                        through targeted perturbations of specific tokens. Further-
+Since tokenizers are trained unconditionally, we focus our    more, a 1D tokenizer can generate diverse and high quality
+system-level comparison in Table 6 on methods support-   images without the use of any dedicated generative model
+ing unconditional generation. We find that even though     at all with assistance from a simple test-time optimization
+image generation via test-time optimization of tokens is    procedure.
+training-free, it approaches or exceeds performance of pre-                                                 Our experiments suggest that increasing compression — in
+vious unconditional generation approaches evaluated on Im-                                                             the form of a small number of tokens, vector quantization,
+ageNet (Tian et al., 2024), including semi-parametric ones                                                    and small codebook size — is crucial in giving rise to gen-
+which also require access to a database of images (Bordes                                                                  erative capabilities in the tokenizer. We therefore hope our
+et al., 2022; Casanova et al., 2021; Blattmann et al., 2022).                                                 work encourages scaling of tokenizers to even higher com-
+Compared to these generative models, our tokenizer-only                                                             pression ratios, larger datasets, or different domains.
+approach can maintain high diversity of generations with
+even smaller seed dataset sizes.
+                                         Impact Statement
+Recent unconditional generation methods such as RCG (Li
+et al., 2024a) can match or exceed the performance of class-    This paper presents work that is intended to improve under-
+conditioned generators. However, we stress that RCG and    standing of image tokenizers with very high compression
+all other approaches we compare against require training     ratios. It does not advance the state of the art in image gener-
+of a generative model. Overall, we conclude that the pre-    ation, although it may encourage work that does. Improved
+trained TiTok VQ-LL-32 tokenizer is able to achieve rea-   image understanding and generation have many potential
+sonable generation quality without any further training     societal consequences, none which we feel must be specifi-
+through the use of a straightforward test-time optimization     cally highlighted here.
+approach.
+
+
+                                                9
+
+======================== PDF 第 10 页 ========================
+                            Highly Compressed Tokenizer Can Generate Without Training
+
+References                                                 Galatolo., F., Cimino., M., and Vaglini, G. Generating im-
+                                                            ages from caption and vice versa via CLIP-guided genera-
+Bao, F., Li, C., Sun, J., and Zhu, J. Why are conditional
+                                                                         tive latent space search. Proceedings of the International
+  generative models better than unconditional ones?  In
+                                                           Conference on Image Processing and Vision Engineering,
+  NeurIPS 2022 Workshop on Score-Based Methods, 2022.
+                                                          2021.
+Blattmann, A., Rombach, R., Oktay, K., M¨uller, J., and
+                                                           Heusel, M., Ramsauer, H., Unterthiner, T., Nessler, B., and
+  Ommer, B. Retrieval-augmented diffusion models. Ad-
+                                                                Hochreiter, S. GANs trained by a two time-scale update
+  vances in Neural Information Processing Systems, 35:
+                                                                  rule converge to a local nash equilibrium. Advances in
+  15309–15324, 2022.
+                                                         Neural Information Processing Systems, 30, 2017.
+Bordes, F., Balestriero, R., and Vincent, P. High fidelity                                                  Kingma, D. P. and Welling, M. Auto-encoding variational
+   visualization of what your self-supervised representation                                                          Bayes. In International Conference on Learning Repre-
+  knows about.  Transactions on Machine Learning Re-                                                                   sentations, 2014.
+  search, 2022.
+                                                                 Li, T., Katabi, D., and He, K.  Return of unconditional
+Cao, S., Yin, Y., Huang, L., Liu, Y., Zhao, X., Zhao, D., and                                                               generation: A self-supervised representation generation
+  Huang, K. Efficient-VQGAN: Towards high-resolution                                                        method. In Advances in Neural Information Processing
+  image generation with efficient vision transformers. In                                                              Systems, 2024a.
+  Proceedings of the IEEE/CVF International Conference
+  on Computer Vision, pp. 7368–7377, 2023.                   Li, T., Tian, Y., Li, H., Deng, M., and He, K. Autoregressive
+                                                      image generation without vector quantization. Advances
+Casanova, A., Careil, M., Verbeek, J., Drozdzal, M., and                                                                  in Neural Information Processing Systems, 37:56424–
+  Romero Soriano, A.  Instance-conditioned GAN. Ad-                                                         56445, 2024b.
+  vances in Neural Information Processing Systems, 34:
+  27517–27529, 2021.                                       Locatello, F., Bauer, S., Lucic, M., Raetsch, G., Gelly, S.,
+                                                                 Sch¨olkopf, B., and Bachem, O. Challenging common
+Chang, H., Zhang, H., Jiang, L., Liu, C., and Freeman,      assumptions in the unsupervised learning of disentangled
+  W. T. MaskGIT: Masked generative image transformer.       representations. In International Conference on Machine
+  In The IEEE Conference on Computer Vision and Pattern      Learning, pp. 4114–4124. PMLR, 2019.
+  Recognition, June 2022.
+                                                        Mentzer, F., Minnen, D., Agustsson, E., and Tschannen,
+Crowson, K., Biderman, S., Kornis, D., Stander, D., Hal-     M. Finite scalar quantization: Vq-vae made simple. In
+  lahan, E., Castricato, L., and Raff, E. VQGAN-CLIP:      Proceedings of the Eleventh International Conference on
+  Open domain image generation and editing with natural      Learning Representations, 2024.
+  language guidance. arXiv preprint arXiv:2204.08583,
+  2022.                                                    Patashnik, O., Wu, Z., Shechtman, E., Cohen-Or, D., and
+                                                                Lischinski, D.  Styleclip: Text-driven manipulation of
+Deng, J., Dong, W., Socher, R., Li, L.-J., Li, K., and Fei-Fei,       stylegan imagery. In Proceedings of the IEEE/CVF inter-
+  L. ImageNet: A large-scale hierarchical image database.      national conference on computer vision, pp. 2085–2094,
+  In IEEE Conference on Computer Vision and Pattern      2021.
+  Recognition, pp. 248–255. Ieee, 2009.
+                                                            Peebles, W. and Xie, S.  Scalable diffusion models with
+Dhariwal, P. and Nichol, A. Diffusion models beat GANs       transformers. In Proceedings of the IEEE/CVF Interna-
+  on image synthesis.  Advances in Neural Information       tional Conference on Computer Vision, pp. 4195–4205,
+  Processing Systems, 34:8780–8794, 2021.                   2023.
+
+Esser, P., Rombach, R., and Ommer, B. Taming transformers    Radford, A., Kim, J. W., Hallacy, C., Ramesh, A., Goh, G.,
+   for high-resolution image synthesis. In Proceedings of the      Agarwal, S., Sastry, G., Askell, A., Mishkin, P., Clark, J.,
+  IEEE/CVF Conference on Computer Vision and Pattern        et al. Learning transferable visual models from natural
+  Recognition, pp. 12873–12883, June 2021.                  language supervision. In International Conference on
+                                                     Machine Learning, pp. 8748–8763. PMLR, 2021.
+Gal, R., Alaluf, Y., Atzmon, Y., Patashnik, O., Bermano,
+  A. H., Chechik, G., and Cohen-Or, D. An image is worth    Ramesh, A., Pavlov, M., Goh, G., Gray, S., Voss, C., Rad-
+  one word: Personalizing text-to-image generation using       ford, A., Chen, M., and Sutskever, I. Zero-shot text-to-
+   textual inversion. In Proceedings of the Eleventh Inter-     image generation.  In Meila, M. and Zhang, T. (eds.),
+  national Conference on Learning Representations, 1–5      Proceedings of the 38th International Conference on Ma-
+  May 2023.                                                chine Learning, volume 139 of Proceedings of Machine
+
+                                                10
+
+======================== PDF 第 11 页 ========================
+                            Highly Compressed Tokenizer Can Generate Without Training
+
+  Learning Research, pp. 8821–8831. PMLR, 18–24 Jul       single transformer to unify multimodal understanding and
+  2021.                                                         generation. arXiv preprint arXiv:2408.12528, 2024.
+
+Rao, Y., Zhao, W., Liu, B., Lu, J., Zhou, J., and Hsieh, C.-J.    Yu, J., Li, X., Koh, J. Y., Zhang, H., Pang, R., Qin, J., Ku,
+  DynamicViT: Efficient vision transformers with dynamic       A., Xu, Y., Baldridge, J., and Wu, Y. Vector-quantized
+  token sparsification. In Beygelzimer, A., Dauphin, Y.,     image modeling with improved VQGAN. In Proceed-
+  Liang, P., and Vaughan, J. W. (eds.), Advances in Neural       ings of the 10th International Conference on Learning
+  Information Processing Systems, 2021.                       Representations, 2023.
+
+Razavi, A., Van den Oord, A., and Vinyals, O. Generating    Yu, L., Lezama, J., Gundavarapu, N. B., Versari, L., Sohn,
+  diverse high-fidelity images with VQ-VAE-2. Advances       K., Minnen, D., Cheng, Y., Birodkar, V., Gupta, A., Gu,
+   in Neural Information Processing Systems, 32, 2019.          X., Hauptmann, A. G., Gong, B., Yang, M.-H., Essa,
+                                                                                             I., Ross, D. A., and Jiang, L. Language model beats
+Rombach, R., Blattmann, A., Lorenz, D., Esser, P., and                                                                 diffusion – tokenizer is key to visual generation. In Pro-
+  Ommer, B. High-resolution image synthesis with latent                                                           ceedings of the Eleventh International Conference on
+  diffusion models. In Proceedings of the IEEE/CVF con-                                                         Learning Representations, 2024a.
+  ference on computer vision and pattern recognition, pp.
+  10684–10695, 2022.                                   Yu, Q., Weber, M., Deng, X., Shen, X., Cremers, D., and
+                                                        Chen, L.-C. An image is worth 32 tokens for reconstruc-
+Salimans, T., Goodfellow, I., Zaremba, W., Cheung, V.,                                                                   tion and generation. In Advances in Neural Information
+  Radford, A., and Chen, X. Improved techniques for train-                                                            Processing Systems, volume 38, 2024b.
+  ing GANs. Advances in Neural Information Processing
+  Systems, 29, 2016.                                        Zhai, X., Mustafa, B., Kolesnikov, A., and Beyer, L. Sig-
+                                                  moid loss for language image pre-training. In Proceed-
+Santurkar, S., Ilyas, A., Tsipras, D., Engstrom, L., Tran, B.,                                                                ings of the IEEE/CVF International Conference on Com-
+  and Madry, A. Image synthesis with a single (robust)                                                              puter Vision, pp. 11975–11986, 2023.
+   classifier. Advances in Neural Information Processing
+  Systems, 32, 2019.                                     Zhang, R., Isola, P., Efros, A. A., Shechtman, E., and Wang,
+                                                     O. The unreasonable effectiveness of deep features as a
+Sheynin, S., Ashual, O., Polyak, A., Singer, U., Gafni, O.,                                                                perceptual metric. In Proceedings of the IEEE conference
+  Nachmani, E., and Taigman, Y. KNN-Diffusion: Im-                                                      on computer vision and pattern recognition, pp. 586–595,
+  age generation via large-scale retrieval. In Proceedings                                                          2018.
+   of the Eleventh International Conference on Learning
+  Representations, 1–5 May 2023.                        Zhou, C., Yu, L., Babu, A., Tirumala, K., Yasunaga, M.,
+                                                         Shamis, L., Kahn, J., Ma, X., Zettlemoyer, L., and Levy,
+Sun, P., Jiang, Y., Chen, S., Zhang, S., Peng, B., Luo,                                                       O. Transfusion: Predict the next token and diffuse images
+   P., and Yuan, Z. Autoregressive model beats diffusion:                                                           with one multi-modal model. 2025.
+  Llama for scalable image generation.  arXiv preprint
+  arXiv:2406.06525, 2024.                              Zhou, Y., Liu, B., Zhu, Y., Yang, X., Chen, C., and Xu,
+                                                                                 J.  Shifted diffusion for text-to-image generation.  In
+Tian, C., Tao, C., Dai, J., Li, H., Li, Z., Lu, L., Wang, X.,                                                          Proceedings of the IEEE/CVF Conference on Computer
+   Li, H., Huang, G., and Zhu, X. ADDP: Learning gen-                                                               Vision and Pattern Recognition, pp. 10157–10166, 2023.
+   eral representations for image recognition and generation
+  with alternating denoising diffusion process. In Proceed-
+  ings of the Twelfth International Conference on Learning
+  Representations, 2024.
+
+van den Oord, A., Vinyals, O., and Kavukcuoglu, K. Neural
+   discrete representation learning. In Advances in Neural
+  Information Processing Systems, volume 30, 2017.
+
+Wang, X., Zhou, X., Fathi, A., Darrell, T., and Schmid, C.
+  Visual lexicon: Rich image features in language space. In
+  Proceedings of the IEEE/CVF Conference on Computer
+  Vision and Pattern Recognition, 2025.
+
+Xie, J., Mao, W., Bai, Z., Zhang, D. J., Wang, W., Lin, K. Q.,
+  Gu, Y., Chen, Z., Yang, Z., and Shou, M. Z. Show-o: One
+
+
+                                                11
+
+======================== PDF 第 12 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+A. Additional Background on TiTok Tokenizer
+
+For completeness, we provide a graphical overview of the TiTok 1D tokenizer in Figure A1. 2D tokens are first obtained by
+patchifying the input image and embedding the patches, which interact with the 1D tokens via several layers of bidirectional
+attention. TiTok relies on an off-the-shelf 2D tokenizer (MaskGIT’s VQGAN) to reconstruct an image from the set of
+2D tokens predicted by the decoder, and is trained in two stages. First, the objective is to learn to reconstruct the (frozen)
+VQGAN’s tokens, and later, the VQGAN itself is also fine-tuned (Yu et al., 2024b).
+
+
+
+
+
+Figure A1. Architecture of the TiTok (Yu et al., 2024b) 1D tokenizer. An image is encoded into a short sequence (e.g. 32 tokens) of
+“1D” tokens, which unlike the grid-arranged latents from a standard 2D tokenizer, do not follow any particular spatial structure and are
+therefore able to capture global attributes of the image.
+
+
+B. Token Semantics
+
+In Section 3.1 we introduce a metric for token importance based on the variance of averaged features across different
+partitions of the ImageNet validation set. In the following, we first provide additional experiments to further support the
+effectiveness of this metric in capturing token importance (Appendix B.1). Then, we present additional results showing
+token importance for different tokenizers (Appendix B.2).
+
+
+B.1. Linear Probing
+
+
+                      1.00
+
+
+                      0.75
+
+
+                      0.50                                                                                      importance
+                      0.25
+
+
+                      0.00
+
+                  1.00%
+
+
+                  0.75%
+
+
+                  0.50%                                                              accuracy
+
+                  0.25%
+
+
+                  0.00%
+                              0            5           10           15           20           25           30
+                                                                       token index
+
+Figure A2. ImageNet classification accuracy using individual discrete tokens is poor (bottom), but correlated with the proposed
+importance metric (top). Red line at 0.1% corresponds to random guessing among the 1000 possible classes. Importance metric (top) is
+computed according to 3.1.
+
+Classification using only one token position at a time. In Figure A2 we attempt ImageNet-1k classification using discrete
+tokens, one-at-a-time. Since we here only consider a single token at a time, we can directly learn a table mapping token
+
+                                                12
+
+======================== PDF 第 13 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+value to class logits for each token position. We observe strong correlation between the results of this experiment and the
+importance metric we propose in Section 3.1.
+
+Linear probing with iterative token masking. Next, we perform linear probing on multiple tokens at a time, and consider
+both the high-dimensional transformer features from the last layer of TiTok’s encoder, as well as discrete tokens as in
+the previous experiment. In contrast to the previous experiment, we begin by linear probing all 32 available tokens, and
+iteratively remove the “least important” ones. Our exact protocol for linear probing with iterative token removal is as
+follows:
+
+  1. Start by training a linear head on top of the concatenation of all 32 features.
+
+  2. During training, perform dropout to randomly mask features corresponding to certain token positions.
+
+  3. After a fixed number of epochs, evaluate the model on the IN-1k validation data with no dropout.
+
+  4. Select the most “unimportant” by applying dropout one-by-one at each token position. After running several validations
+     with each remaining token position masked, select the token position which leads to the smallest drop in classification
+     accuracy with respect to the previous validation results that do not apply masking.
+
+  5. Repeat this process from the start (1), until all token positions are masked.
+
+In the case of using discrete token indices, we learn a new codebook of features to perform linear probing on. Results can be
+found in Figure A3.
+
+
+                 55%                                                                                                                               32 tokens (VQ)
+
+
+
+                 50%
+                                                                         accuracy
+
+
+                 45%
+                                                                                                                                 classification
+                            val 40%
+                                              IN-1k
+
+                 35%
+
+
+
+                             11     12     13     14     15     16     17     18     19     20     21     22     23     24     25     26     27     28     29     30     31
+                          (#19)  (#8)  (#14) (#22) (#10) (#17) (#26) (#16) (#31)  (#5)  (#6)  (#3)  (#0)  (#7)  (#27) (#18) (#29) (#24)  (#4)  (#12) (#11)
+
+                                                                                 number of masked tokens                                            32 tokens (VQ)
+                 20%                                                                 (#token index)
+                                                                        accuracy 18%15%
+
+                 12%
+
+                 10%                                                                                                                             classification
+                           val 8%
+                                             IN-1k 5%
+
+                2%
+
+
+                            11     12     13     14     15     16     17     18     19     20     21     22     23     24     25     26     27     28     29     30     31
+                         (#30)  (#8)  (#15) (#22) (#14) (#26)  (#6)  (#7)  (#16)  (#3)  (#20)  (#5)  (#27)  (#0)  (#31) (#29) (#24) (#12) (#18) (#11)  (#4)
+
+                                                                                 number of masked tokens
+                                                                                         (#token index)
+
+
+Figure A3. Results from linear probing while iteratively removing tokens with the smallest impact on classification accuracy largely
+match our token importance metric. Top: probing of high dimensional features produced by last transformer layer in TiTok encoder.
+Bottom: linear probing after vector quantization, using discrete token indices. In both cases, we plot IN-1k classification accuracy as a
+function of number of masked tokens. Token index to remove after each masking iteration is shown in parentheses, so that most important
+token positions can be read off right-to-left. For example, the top plot based on high-dimensional features suggests tokens 11, 12, 4, 24, ...
+as most important, while the discrete-token-based plot on the bottom indicates most important tokens are 4, 11, 18, 12, ....
+
+Results from these experiments are largely aligned with those from the token importance shown in Figure A2, indicating
+that the approach suggested in Section 3.1 is indeed an informative token importance computation.
+
+                                                13
+
+======================== PDF 第 14 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+B.2. Per-Token Inter-Class Variance and Linear Probing for VAE-TiTok
+
+In Figure A4 we repeat the token importance experiment from Section 3.1 for additional class partitions. Furthermore, we
+find that the VAE version of TiTok does not exhibit the same high degree of correspondence between semantics and token
+position.
+
+              VQ                                     VAE
+           0            10           20           30                                0            10           20           30
+
+
+     (a)                                                   ImageNet classes
+
+
+                              token index                                                                      token index
+     (b)                                                       “animal or human”/
+                                                               “inanimate object”
+
+
+     (c)                                                    “abundant vegetation”/
+                                                                   “sparse or no vegetation”
+
+
+     (d)                                                              “large dominant subject”/
+                                                                  “small or subtle subject”
+
+
+     (e)                                                      “daytime scene”/
+                                                                 “nighttime scene”
+
+
+     (f)                                                         “high definition”/
+                                                                          “blurry, low quality”
+
+
+     (g)                                                            “vibrant color”/
+                                                               “faded or black and white”
+
+
+                                                                  “containing green items”/
+     (h)                                                          “containing red items”/
+                                                                  “containing blue items”
+
+           0            10           20           30                                0            10           20           30
+                              token index                                                                      token index
+
+
+Figure A4. VAE-TiTok does not show semantic disentanglement across token positions. We plot token importance computed according
+to Section 3.1 for both the VQ (left) and VAE (right) versions of the LL-32 TiTok tokenizer for various class partitions of the ImageNet
+validation set. Normalized token importance is shown on the y axis. Abbreviated prompts used as labels for CLIP-based class assignment
+shown in the middle.
+
+
+
+
+
+                                                14
+
+======================== PDF 第 15 页 ========================
+                            Highly Compressed Tokenizer Can Generate Without Training
+
+C. Gradient-Based Latent Editing
+
+C.1. Detailed Description of Test-Time Optimization Algorithm
+
+The following algorithm describes the baseline algorithm for text-guided image editing.
+
+Algorithm A1 Test-Time Optimization For CLIP-Guided Latent Editing.
+Input: img the seed image, and prompt a text prompt
+Output: recons the optimized image
+  1: tokens ←TiTokEnc(img)
+  2: prompt enc ←CLIPTextEnc(prompt)
+  3: loop
+  4:   recons ←(TiTokDec ◦TiTokQuant)(tokens)
+  5:   rec enc ←CLIPImageEnc(recons)
+                                           rec enc⊤prompt enc
+  6:   Gradient ascent step on ∇tokens ∥rec enc∥∥prompt enc∥
+  7: end loop
+
+
+In Algorithm A1, we refer to TiTok’s transformer-based image encoder taking images and producing K D-dimensional
+continuous features as TiTokEnc : [0, 1]C×H×W →RK×D. The continuous features are then quantized to a particular
+entry in the codebook via the vector quantization module TiTokQuant : RK×D →RK×D, using straight-through gradient
+estimates for the backward pass. Quantized features are decoded to an image via the decoder TiTokDec : RK×D →
+[0, 1]C×H×W . In practice, we use the Adam optimizer with a learning rate of 0.1, β1 = 0.9 and β2 = 0.999.
+
+Additional changes we use for the inpainting task as well as in the improved versions from Table 4 can be found below.
+
+Algorithm A2 Test-Time Optimization with Optional Tweaks.
+Input: img the seed image, ℓan objective function taking an image
+Output: recons the optimized image
+  1: tokens ←TiTokEnc(img)
+  2: for i ←1 to Niter do
+  3:   sample noise ∼N(0, σ2i I)
+  4:   tokens ←tokens + noise
+  5:   recons ←(TiTokDec ◦TiTokQuant)(tokens)
+                                                        1                    2
+  6:   Gradient ascent step on ∇tokens  ℓ(recons)+λ K Pz(k)∈tokens  zk  2
+  7:   tokens ←TiTokEnc(Reset(recons))
+  8: end for
+
+Algorithm A2 shows addition of token noise in blue. We use a cosine schedule to ramp the noise from σ21 = 0.3 to σ2200 = 0.
+Token regularization is highlighted in green. We obtain best results with λ = 0.02. Token EMA (not shown) uses a decay
+factor of 0.98.
+
+Inpainting. The token reset procedure highlighted in red is only used for the inpainting task. Here, Reset takes the decoded
+image and blends it with the given parts of the image according to the inpainting mask. For inpainting, we find it important
+to use masks with soft transitions from fully masked to fully unmasked. Such a “soft” mask can be obtained, for example, by
+applying Gaussian blur to a binary mask. The reasons we use soft masks are twofold: first, it allows for graceful blending of
+the unmasked (given) part of the image with the generated image, which may appear discontinuous if blended with a binary
+mask that uses sharp edges. Second, we find that the optimization can be reliably initialized with masked images when the
+mask has a soft transition (such as those in Figure 7), however, the optimization struggles to succeed when initialized with
+images containing sharp edges.
+
+
+
+
+
+                                                15
+
+======================== PDF 第 16 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+C.2. Choosing Optimization Iterations
+
+The number of optimization iterations directly impacts the quality of generations. Intuitively, the longer the optimization is
+run, the further the image will deviate from the seed image. This can be desirable or necessary when the seed image needs
+significant modification in order to match the target prompt, but for “smaller” edits, a lesser number of iterations may be
+chosen. Therefore, the number of iterations should in general be picked on an example-by-example basis, and one could
+design adaptive stopping criteria based on monitoring the objective function’s value and change across iterations. We leave
+this to future work.
+
+For the evaluations performed in Section 5, we report either scores for a fixed number of optimization iterations, or scores
+corresponding to the number of iterations yielding the best FID. For completeness, we provide FID and IS for a sweep of
+optimization iterations in Figure A5 below.
+
+
+
+
+                              500                                                         VQ-LL-32
+                                                                                  VQ-BB-64
+                            400
+                                                                                     VQ-BL-64
+                           350                                                          VQ-BL-128
+
+                           300
+
+              160
+                            250
+
+
+
+
+                            200
+
+
+
+                                           250
+              140                   200   300
+                                 150 150
+
+               IS
+
+
+
+                                                       100
+                                      100
+
+              120
+
+                                                                      250300
+
+                                                        200
+
+
+                                                       150
+
+
+              100                                           100
+                                                       50
+                                                                                           200       250   300
+                                                                                    150
+
+                                                                                      100
+
+
+
+                          16           18           20           22           24
+                                                            FID-5k
+
+
+Figure A5. The number of optimization iterations controls the tradeoff between FID and IS. The small number alongside each point
+denotes the number of optimization iterations used. The optimal number of iterations for either FID, IS or a given FID/IS tradeoff is
+dependent on the tokenizer used, and models with higher compression ratio are shown to require a larger number of iterations to achieve
+peak performance.
+
+
+
+
+
+                                                16
+
+======================== PDF 第 17 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+C.3. Image Editing Example Prompts
+
+
+                                             Table A1. Prompts used for Figure 5
+
+        Prompt Prefix                Edit 1                       Edit 2                          Edit 3
+
+     a photo of a blue jay...            ...in a forest       ...with the ocean in the background      ...perched on a fence
+    a photo of a lighthouse...         ...in the desert                        ...at sunset              a golf course on the coast
+     a photo of a wallaby...        ...on the highway                     ...in a town                       ...on the beach
+      a photo of a turtle...           ...on the beach                   ...in a green field                      ...on a road
+    a photo of a black swan...           ...at sunset             ...among wildflowers                      ...in the rain
+   a photo of a tibetan terrier...   ...running in a field           ...wading in a river                   ...on the beach
+
+
+D. Additional Qualitative Results
+
+We include additional qualitative results on the importance of compression (Figure A6) and on the out-of-domain tasks
+of generating images of classes not present in ImageNet (Figure A7) as well as style transfer to non-natural-image styles
+(Figure A8). Finally, we show selected generations of the best configuration (32-token tokenizer with VQ) alongside their
+seed images and prompts in Figure A9.
+
+                   Seed Image          VQ-LL-32          VQ-BB-64       MaskGIT VQGAN
+
+
+
+
+
+Figure A6. Qualitatively, the gap in generation quality is very significant between the TiTok 32-token, 64-token, and VQGAN
+models. Prompts are “a photo of an eagle” and “a photo of a tiger” for the first and second rows, respectively.
+
+
+
+
+
+                                                17
+
+======================== PDF 第 18 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+
+                           Cardinal                     Capybara                     Rhinoceros
+
+
+
+
+
+          A photo of an astronaut riding a horse in the forest. There is a river in front of them with water lilies.
+
+Figure A7. Generating images of animals not included in the ImageNet dataset (top) or open-domain scenarios including subjects
+not included in ImageNet (bottom) can produce inaccurate results with varying degrees of plausibility, since the tokenizer has only been
+trained on ImageNet.
+
+
+
+                           input image              a watercolor painting of a       a comic-style drawing of a
+                                                            lighthouse                       lighthouse
+
+
+
+
+
+                      8-bit pixel art featuring a         a cartoon drawing of a         an abstract painting of a
+                           lighthouse                       lighthouse             lighthouse in the style of miro
+
+                         Figure A8. Text-guided style editing to styles underrepresented in ImageNet.
+
+
+
+                                                18
+
+======================== PDF 第 19 页 ========================
+                             Highly Compressed Tokenizer Can Generate Without Training
+
+
+
+
+
+        volcano          mashed potatoes            joystick                   castle                    collie
+     green mamba             lakeside           honeycomb             bald eagle            black widow
+    measuring cup          pomerian           mountain bike         horned viper             leopard
+
+Figure A9. Selected generation results (rows 2, 4, 6) alongside their seeds (rows 1, 3, 5). Corresponding classes shown in table.
+
+
+                                                19

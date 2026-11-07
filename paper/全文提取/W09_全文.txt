@@ -1,0 +1,1417 @@
+W09 | Advancing Vision Transformer with Enhanced Spatial Priors
+来源：https://arxiv.org/abs/2604.18549
+本地PDF：W09_EVT_EuSA_TPAMI2026.pdf
+SHA-256：acc0b788f8bfb222ab710b1d9925a7bb9f64a7c34f9928c9a477e82d60d05d66
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+        JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                              1
+
+    Advancing Vision Transformer with Enhanced
+                     Spatial Priors
+
+                 Qihang Fan, Huaibo Huang, Mingrui Chen, Hongmin Liu, Ran He, Fellow, IEEE
+
+
+
+             Abstract—In recent years, the Vision Transformer (ViT) has garnered significant attention within the computer vision community.
+              However, the core component of ViT, Self-Attention, lacks explicit spatial priors and suffers from quadratic computational complexity,
+                  limiting its applicability. To address these issues, we have proposed RMT, a robust vision backbone with explicit spatial priors for
+               general purposes. RMT utilizes Manhattan distance decay to introduce spatial information and employs a horizontal and vertical
+              decomposition attention method to model global information. Building on the strengths of RMT, Euclidean enhanced Vision
+              Transformer (EVT) is an expanded version that incorporates several key improvements. Firstly, EVT uses a more reasonable
+               Euclidean distance decay to enhance the modeling of spatial information, allowing for a more accurate representation of spatial
+                 relationships compared to the Manhattan distance used in RMT. Secondly, EVT abandons the decomposed attention mechanism
+                featured in RMT and instead adopts a simpler spatially-independent grouping approach, providing the model with greater flexibility in
+                 controlling the number of tokens within each group. By addressing these modifications, EVT offers a more sophisticated and adaptable2026
+              approach to incorporating spatial priors into the Self-Attention mechanism, thus overcoming some of the limitations associated with
+          RMT and further enhancing its applicability in various computer vision tasks. Extensive experiments on Image Classification, Object
+                Detection, Instance Segmentation, and Semantic Segmentation demonstrate that EVT exhibits exceptional performance. WithoutApr         additional training data, EVT achieves 86.6% top1-acc on ImageNet-1k.
+
+
+              Index Terms—Vision Transformer, Spatial Prior, Token grouping.20
+                                 ✦
+
+
+
+      1  INTRODUCTION                                           In this work, we also design a two-dimensional bidirec-
+                                                                           tional spatial decay matrix based on the relative distance[cs.CV]  The Vision Transformer (ViT) [1] has become a highly-
+                                                           between tokens. In our spatial decay matrix, the attention
+        regarded visual architecture within the research commu-
+                                                                       scores for a target token decay more sharply for tokens that
+          nity. Nonetheless,  it encounters several significant issues.
+                                                                      are further away. This design allows the target token to cap-
+       The core module of ViT, Self-Attention, inherently lacks
+                                                                       ture global information while also differentiating attention
+          explicit spatial priors, which is featured by the convolution.
+                                                                           levels based on distance. By incorporating this spatial decay
+        Moreover, the quadratic computational complexity of Self-
+                                                                      matrix, we were able to introduce explicit spatial priors into
+        Attention results in considerable computational costs when
+                                                              our vision backbone, enhancing its ability to handle spatial
+        attempting to model global information, constraining  its
+                                                                  information effectively. Different from the Manhattan dis-
+         practical use.
+                                                                    tance used in the RMT [10], we use the Euclidean distance
+           Various  studies have  tried  to  mitigate  these  chal-
+                                                                         to model the relationship among tokens. This change is
+        lenges [2]–[8]. For example, the Swin Transformer [3] em-
+                                                                because human attention to objects far from the center of the
+        ploys windowing operations to partition tokens for self-
+                                                                       visual field decays in a radial pattern [13], which aligns with
+         attention. This technique not only reduces the computa-
+                                                                     the radial growth pattern of Euclidean distance. Besides,
+         tional expense but also brings spatial priors into the model
+                                                we adopt a one-dimensional, spatially-independent token
+        through the use of windows and relative position encod-
+                                                              grouping method. Compared to two-dimensional, spatially-
+         ing. Likewise, NAT [9] alters the receptive field of Self-arXiv:2604.18549v1                                                       dependent grouping methods, such as the windowing in
+        Attention to emulate the shape of convolutional layers,
+                                                         Swin Transformer and the two-dimensional dilated group-
+        thereby decreasing computational costs and allowing the
+                                                                   ing in MaxViT, this approach allows for more flexible control
+       model to recognize spatial priors through its receptive field
+                                                                over the number of tokens within each group. Our exper-
+         configuration. RMT [10] extends the concept of explicit
+                                                                iments demonstrate that the the proposed spatial decay
+        decay in the NLP [11], [12] to the spatial domain, devising
+                                                                 matrix brings strong spatial prior to the model. The 1D
+        a two-dimensional bidirectional spatial decay matrix based
+                                                                token grouping method, combined with the spatial decay
+       on the Manhattan distance between tokens. It also propose a
+                                                                      matrix, can achieve better results than the 2D grouping
+         horizontal and vertical decomposition attention mechanism
+                                                            method. Since our model incorporates spatial priors by
+         to model the global information.
+                                                                            utilizing the Euclidean distance between tokens, we name
+                                                                                                       it the Euclidean Enhanced Vision Transformer (EVT).         Qihang Fan, Huaibo Huang, Mingrui Chen and Ran He are with the MAIS &
+        NLPR, Institude of Automation, Chinese Academic of Science, Beijing 100190,    We conduct extensive experiments, such as image classi-
+          China.  (E-mail:  fanqihang.159@gmail.com,  huaibo.huang@cripac.ia.ac.cn,   fication, object detection, instance segmentation, semantic
+          charmier2003@gmail.com, rhe@nlpr.ia.ac.cn)                          segmentation, and robustness  tests, to validate the per-
+        Hongmin Liu is with the School of Artificial Intelligence, University of Science
+         and Technology Beijing, Beijing 100083, China. (E-mail: hmliu@ustb.edu.cn)   formance of EVT. EVT demonstrates strong performance
+          Corresponding author: Hongmin Liu.                              advantages across all tasks. As shown in Fig. 1, at a res-
+
+
+                                                                 0000–0000/00$00.00 © 2021 IEEE
+
+======================== PDF 第 2 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                              2
+
+
+
+
+
+                                      Resolution 224x224                                             Resolution 384x384
+
+                                       Fig. 1: FLOPs v.s. Top-1 accuracy on ImageNet-1K.
+
+
+olution of 224 × 224, EVT achieves a top-1 accuracy of   biases. For example, Swin Transformer introduced window-
+85.8% without relying on any additional training data or  based self-attention [3], [21], PVT/PVTv2 proposed spatially
+supervision information, while requiring only 18.2 GFLOPs  down-sampled attention [7], [22]–[24], DAT presented de-
+of computational effort. When the resolution is increased to   formable attention [15], and BiFormer developed multi-scale
+384×384, the model’s performance is further enhanced. Our   routing attention [17]. There are also several approaches
+EVT-L, with just 100M parameters, achieves a top-1 accuracy   that utilize global or region tokens to convey information
+of 86.6%, significantly surpassing existing models.          between different areas of the image [25]–[29]. Additionally,
+  A preliminary version of this work was published in the  many works have attempted to scale ViT, approaching the
+CVPR 2024 [10]. In this paper, we extend our conference  problem from both resolution and model parameter per-
+version in the following aspects:                              spectives [30]–[35]. Apart from the aforementioned meth-
+                                                             ods, many other approaches aim to accelerate ViT inference.
+   •  We replace the Manhattan distance-based spatial
+                                          Among these, methods like EViT [36], [37] employ token
+       priors in RMT with the more intuitive Euclidean
+                                                          pruning, while ToMe [38] uses token merging to combine
+       distance-based spatial priors. We conduct extensive
+                                                               similar tokens. Additionally, some approaches attempt to
+      experiments to demonstrate that this radially decay-
+                                                        reduce the computation overhead of global attention by
+       ing spatial prior significantly enhances the model’s
+                                                               clustering tokens [19], [39]. In this work, we introduce a
+       spatial understanding, thereby improving its perfor-
+                                                        novel spatially-independent one-dimensional token group-
+      mance.
+                                                          ing method. This approach allows for more flexible control
+   •  We propose a one-dimensional grouping method to
+                                                        over the number of tokens within each group. With the
+      group vison tokens. This grouping method ignoring
+                                                        support of spatial priors, this method has demonstrated
+       the spatial relationships between tokens, allowing
+                                                          impressive performance.
+       the model to flexibly control the number of tokens
+      within each group. Compared to the horizontal and
+                                                            2.2  Convolution-Transformer Hybrid Architectures.        vertical decomposition attention mechanism used in
+       the RMT, the proposed grouping method is simpler   Convolutions are effective at capturing high-frequency tex-
+      and faster.                                             ture information in images, whereas Transformers excel at
+   •  We conduct extensive experiments to validate the  modeling low-frequency global information [5], [7], [40].
+      performance of EVT. EVT demonstrates exceptional   Consequently, many architectures have attempted to com-
+      performance across various tasks, including image   bine the strengths of both approaches  [2],  [5],  [7], [40]–
+        classification, object detection, instance segmenta-   [44]. CMT  [7] combines lightweight  attention modules
+        tion, semantic segmentation, and OOD dataset clas-  with convolutions, sequentially extracting both local and
+        sification. Additionally, we perform numerous abla-   global information. iFormer [42] adopts a parallel design,
+       tion studies to verify the contribution of each module  where within the same token mixer module, one portion of
+      within EVT.                                          the channels employs self-attention mechanisms to extract
+                                                             global information, while another portion uses convolutions
+                                                                to capture local information. These pieces of information2  RELATED WORKS
+                                                             are then combined using linear projection. Moreover, many
+2.1  Vision Transformers                                                            other works insert lightweight convolutions into various
+Since the introduction of the original plain ViT [1], many  subcomponents of the Transformer design. For example,
+works have focused on designing hierarchical architectures   using a Conv Stem at the beginning of the model for
+that can better capture spatial information and multi-scale  downsampling the image [17], [39], inserting convolution-
+features [3], [7], [14]–[20]. The core of these works primarily  based local information enhancement modules before the
+revolves around designing efficient, linear-complexity atten-   Attention mechanism [2], [7], [39], and introducing posi-
+tion mechanisms that can more effectively provide inductive   tional information in the FFN with convolutions [22], [23],
+
+======================== PDF 第 3 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                              3
+
+                                                       Stage1              Conv        Stage2              Conv        Stage3              Conv        Stage4                                        Conv          Conv    3Stride      EVT Block 3Stride      EVT Block 3Stride      EVT Block 3Stride      EVT Block
+              2×    ×    2×    ×    2×    ×    2×    ×                                        Stem 3  3  3  3                                          ƶ1                  ƶ2                  ƶ3                  ƶ4
+
+
+
+
+
+                        FFN                          FFN                                    FFN
+
+
+                      LN                        LN                                  LN
+
+                     EuSAg                      EuSAd                              EuSA
+
+                      LN                        LN                                  LN
+
+
+
+                   DWConv ×                  DWConv ×                            DWConv ×                         3  3                       3  3                                 3  3
+
+
+                                               Fig. 2: Overall Architecture of EVT.
+
+
+[45]. In the design of both RMT [10] and EVT, convolutions  3  METHOD
+are also used to enhance the model’s local representation
+capabilities.                                                 3.1  preliminary: RMT
+
+                                                            In RMT, we drew inspiration from the one-dimensional
+2.3  Position Prior in Vision Models                                                       temporal decay proposed in RetNet [11] and ALiBi [12],
+Positional encoding is a crucial module for Transformers  and extended it to the two-dimensional spatial domain. This
+as it imparts positional information to each token, thereby   resulted in the Manhattan distance-based spatial decay used
+enabling the Transformer to perceive the positions of to-   in RMT. As the relative distance between tokens increases,
+kens [46]. The earliest ViT utilized sinusoidal-based ab-   this decay progressively  intensifies, thereby introducing
+solute positional encoding [1]. Subsequently, many works   spatial priors into the model.
+have sought to improve the positional encoding of visual       Specifically, as shown in Eq.  1, our Manhattan  self-
+tokens [3], [14], [23], [34], [47], [48]. CPVT [47] introduced   attention mechanism incorporates a D matrix as a decay
+Conditional Positional Encoding (CPE) based on depthwise   factor in the attention matrix, thereby introducing spatial
+separable convolutions, which can be very flexibly inserted   information into the self-attention mechanism:
+at any position within a ViT. In Swin Transformer v2 [34],
+log-spaced relative positional encoding was proposed. Com-         MaSA(X) = (Softmax(QKT ) ⊙D2d)V
+                                                                                                                                         (1)
+pared to the original relative positional encoding, this ap-              D2dnm = γ|xn−xm|+|yn−ym|
+proach is better suited for high-resolution images [3]. In
+CSwin [14], LePE is employed, which is a highly flexible                                                         Here, (xn, yn) represent the horizontal and vertical coordi-
+convolution-based positional encoding method. This ap-                                                            nates of token n.
+proach has been widely adopted in many techniques [17],
+                                                                  Additionally, hierarchical architectures tend to have high
+[49], [50]. Additionally, some methods incorporate convo-
+                                                               resolutions in the shallow layers, leading to significant
+lution into the FFN (Feed-Forward Network) module to
+                                                        computational overhead. To address this challenge, RMT
+provide positional information, thereby enhancing the per-
+                                                           introduces a decomposed form of the self-attention mech-
+formance of Transformers [7], [23], [45]. Unlike previous
+                                                         anism, which allows for global information modeling with
+methods, EVA02 [48] drew inspiration from the widely-
+                                                       lower computational cost. Specifically, it calculates attention
+used rotary positional encoding (RoPE) in large language
+                                                        weights using one-dimensional decay matrices along the
+models [51], proposing a two-dimensional rotary positional
+                                                             horizontal and vertical directions of the image, then applies
+encoding and applying it to vision models. In RMT [10],
+                                                             these attention weights to the value. The detailed process is
+inspired by the success of ALiBi [12] and RetNet [11] in
+                                               shown in Eq. 2:
+the NLP domain, we introduced Manhattan distance-based
+explicit spatial decay into the self-attention mechanism to
+                                                          AttnH = Softmax(QHKTH) ⊙DH,provide the model with spatial information. In this work, we
+further improved this spatial decay by replacing the Man-           AttnW = Softmax(QW KTW ) ⊙DW ,          (2)
+hattan distance with the more intuitive Euclidean distance.          MaSA(X) = AttnH(AttnW V )T ;
+
+======================== PDF 第 4 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                              4
+
+3.2  Overall Architecture of EVT                            a smaller JS divergence value indicates a higher corre-
+                                                                  lation between the distributions. We compute the averageThe overall structure of EVT is depicted in Fig. 2. For an
+input image x ∈R3×H×W , we initially downsample  it   JS divergence for the images in the ImageNet-1K valida-
+                                                                tion set. The results are shown in the Tab. 2. Based onusing a Conv Stem. This results in tokens having a shape of
+    H  W                                                the JS divergence values, the distribution of the Euclidean
+C1 × 4 × 4 . Inspired by previous works [3], [14], [22], we
+                                                           distance-based decay matrix exhibits higher similarity to theemploy a hierarchical configuration to process these tokens.
+                                                                distribution of the standard attention scores in the trainedThe model is organized into four stages corresponding to
+                           1  1  1        1                   model, which also leads to better performance.
+downsampling factors of 4, 8, 16, and 32, respectively. This
+hierarchical setup is advantageous for downstream tasks
+like object detection, facilitating the construction of feature                      Comparison on EVT-T
+pyramids.                                                                                                 JS↓    Acc(%)
+  An EVT block comprises three main modules: Con-                no decay matrix     –        82.3
+ditional Positional Encoding (CPE)  [47], Euclidean  Self-                Mahattan distance    0.20   82.7(+0.4)
+                                                                                  Euclidean distance    0.12   83.0(+0.7)
+Attention (EuSA), and a classical Feed-Forward Network
+(FFN) [46]. A full EVT block can be expressed by Eq. 3:
+                                            TABLE 1: The JS divergence between different decay ma-
+                                                                       trices and the attention scores of the model without a decay
+         X = CPE(Xin) + Xin,                      matrix, and the performance of models using different decay
+            Y = EuSA(LN(X)) + X,                (3)   matrices.
+           Z = FFN(LN(Y )) + Y.
+                                                    The distribution of our decay matrix closely resembles
+   In each block, the input tensor Xin ∈RC×H×W  first   the attention score distribution of a well-trained ViT model.
+goes through the CPE module to introduce positional in-                                                  The latter already contains the spatial knowledge that the
+formation. The EuSA module then acts as the token mixer.                                                             native ViT learns, although this spatial prior remains rel-
+Finally, the FFN integrates the channel-wise information of                                                                 atively weak due to the absence of external intervention.
+the tokens.                                                       Because the two distributions are highly similar, their com-
+                                                             bination further strengthens the spatial priors learned by the
+                                                      model, thereby leading to improved model performance.3.3  Manhattan Distance to Euclidean Distance
+
+In RMT, the explicit spatial decay is based on the Man-
+                                                                     Model        JS↓    Acc(%)    mIoU(%)hattan distance, which does not align with the way the
+human eye perceives images. When recognizing images,                DeiT-B        0.24      81.8         17.8
+human attention decays radially relative to distance [13].              EVT-DeiT-B     0.10   82.3(+0.5)   24.6(+6.8)
+So we replaced the Manhattan distance with the Euclidean            DINOv2-ViT-B    –        84.5         47.3
+distance. We analyze the advantages of Euclidean distance
+over Manhattan distance from two perspectives.            TABLE 2: The JS divergence between different models.
+    (1) From the Perspective of Distribution Similarity:
+The core purpose of using a decay matrix is to incorporate     To further illustrate our assertion that the spatial decay
+a spatially relevant prior into the attention scores. While   matrix can enhance the spatial priors of the native ViT, we
+standard self-attention can also learn this prior, our decay  compare different models with DINOv2—a powerful ViT
+matrix explicitly embeds it into the attention scores, thereby  backbone that undergoes large-scale unsupervised training
+simplifying the learning process. The closer the attention  on extensive datasets. The results are shown in Tab. 2.
+score distribution of a well-trained ViT model without a  Compared to the original DeiT, our EVT-DeiT exhibits an
+decay matrix  is to that of our decay matrix, the more   attention distribution that is more similar to that of DINOv2,
+effectively our decay matrix facilitates the learning of spatial   indicating that EVT-DeiT acquires richer spatial knowledge.
+priors, ultimately leading to improved model performance.  We pretrain the models on ImageNet-1K and conduct linear
+   Based on this consideration, we train an EVT-T model   probing on ADE20K using the pretrained models. EVT-
+without any decay matrix. Then, we analyze the correlation  DeiT achieves significantly better results than DeiT-T, which
+between its attention score distribution and those of differ-   demonstrates that it learns more spatial knowledge.
+ent decay matrices. We use Jensen-Shannon (JS) divergence                                                                           (2) From the Perspective of Numerical Stability: The
+to measure the similarity between different distributions,                                                    Manhattan distance is defined as:
+which is computed as follows:
+
+                   1             1                                     dManhattan(x, y) = |x1 −y1| + |x2 −y2|         (6)
+       DJS(P||Q) = 2DKL(P||M) + 2DKL(Q||M)      (4)
+                  1                                      While straightforward,  it presents Non-Smooth Distance
+   where M = 2(P + Q) is the average distribution, and                                                              Variation: The Manhattan distance increases linearly along
+DKL(P||Q) denotes the Kullback-Leibler (KL) divergence,
+                                                           coordinate axes but remains constant along diagonals. This
+defined as
+                                                                   results in an uneven scaling of the spatial decay factor,
+                                    P(i)                                                                potentially introducing anisotropic biases in attention mod-
+                                                                 (5)           DKL(P||Q) = X P(i) log                                     Q(i).                  ulation.
+                                            i
+
+======================== PDF 第 5 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                              5
+
+    (3) Comparison with Standard Attention Mechanism  can reduce entropy and restrict the model’s ability to learn
+For standard self-attention (without spatial decay), the at-  complex spatial relationships.
+tention weights are:                                                     (7) Expressivity and Generalization The output for each
+                   √                    token is:
+                                     d)                   exp(QnKTm/                    √                                                                 (7)                  Yn = X AnmVm                 (14)                Astdnm =
+          Pk exp(QnKTk /  d)                                m∈Nn
+This formulation does not explicitly encode any spatial  With L2 decay, the effective receptive field is:
+prior, treating all tokens equally regardless of their geomet-
+                                                                       ReceptiveFieldn = {m | Anm > ϵ}         (15)ric positions. While standard attention mechanisms are ca-
+pable of learning spatial relationships, they typically require  which adapts smoothly to spatial structure. L1 decay tends
+very large-scale training data and extensive optimization   to produce axis-aligned receptive fields, limiting expressiv-
+to capture meaningful spatial structures (as seen in mod-   ity in complex spatial scenarios.
+els such as DINOv2). Without an explicit spatial bias, the       (8) Gradient Flow and Optimization Landscape The
+learned spatial features tend to be weaker and less robust,  second derivative for L2 decay is:
+especially when training data or computational resources
+                                                   ∂2E2dnm                           (yn −ym)2are limited.                                 = E2dnm · (log γ)2 ·
+   By introducing the spatial decay matrix, the attention      ∂x2n                   ((xn −xm)2 + (yn −ym)2)3/2
+                                                                                                                              (16)
+weights become:
+                                                          This ensures a well-conditioned optimization landscape,                  √
+                exp(QnKTm/  d) · Enm                supporting stable and efficient gradient flow. In contrast,
+       Anm =           √                  (8)                                                  L1 decay produces zero second derivatives almost every-        P                 k∈Nn exp(QnKTk /  d) · Enk
+                                                        where, except at discontinuities, which can lead to training
+where Enm can be either L2 or L1-based.                         instability.
+    (4) Gradient of Attention Weights with Respect to       (9) Unified View: Why L2  is Superior for Spatial
+Spatial Coordinates For L2-based decay:                    Feature Learning While both L1 and L2 decays can enforce
+            √                                                                          locality, L2’s rotational invariance and smooth decay better
+            E2dnm = γ  (xn−xm)2+(yn−ym)2              (9)  match the natural geometry of images and spatial patterns.
+                                This is particularly important in grouped and dilated at-
+  ∂Anm           −xm          xn −xk
+     = log γ · Anm       − X Ank                tention, where token neighborhoods are irregular. L2 decay               xn                 ∂xn               dnm                                            dnk         enables the model to learn spatial priors adaptively from                               k∈Nn
+                                                            (10)    all directions, resulting in more coherent aggregation, better
+where dnm = p(xn −xm)2 + (yn −ym)2.                    generalization, and improved representation of complex
+   For L1-based decay:                                         spatial structures. Even in standard attention architectures,
+                                                  L2 decay enhances spatial expressivity and optimization,
+              E1dnm = γ|xn−xm|+|yn−ym|              (11)   outperforming both L1 and no-decay baselines.
+        ∂Anm                                         Based on above analysis, we employ the Euclidean dis-
+          = log γ · Anm sign(xn −xm)               tance:          ∂xn
+                                                            (12)             q
+            − X Anksign(xn −xk)                            dEuclidean(x, y) =   (x1 −y1)2 + (x2 −y2)2     (17)
+                   k∈Nn
+                                                   which offers Smooth and Continuous Scaling: Unlike the
+The L2 gradient is smooth and direction-aware, while the   step-wise behavior of the Manhattan distance, the Euclidean
+L1 gradient is piecewise constant and discontinuous, which   distance varies smoothly, ensuring a gradual and consistent
+can hinder optimization and spatial generalization.          decay of attention scores. The smooth variation of Euclidean
+    (5) Spectral Analysis and Spatial Coverage The spatial   distance leads to a well-behaved weighting function, pre-
+decay matrix Enm can be interpreted as a weighted adja-   venting sudden changes in attention distribution and en-
+cency matrix of a graph over tokens. The Laplacian matrix   suring stable training.
+L = D −E (where D is the degree matrix) encodes the      Since our method applies a distance-based decay func-
+spatial connectivity. For L2 decay, the eigenvectors of L   tion to attention scores, the discontinuous nature of the
+capture isotropic spatial harmonics, allowing the model to  Manhattan distance can cause instability in attention mod-
+represent spatial features smoothly across all directions. In   ulation. In contrast, the Euclidean distance, with its smooth
+contrast, L1 decay leads to axis-aligned harmonics, limiting   transitions, ensures a more stable and consistent weighting
+the diversity of spatial patterns.                          mechanism, ultimately improving attention performance.
+    (6) Information-Theoretic Perspective: Spatial Entropy  Based on these, we believe that using Euclidean distance
+Optimization The spatial decay acts as a prior that shapes   as the decay factor for tokens should be a more intuitive
+the entropy of the attention distribution:                    approach. We have upgraded the Manhattan Self-Attention
+                                                 mechanism (MaSA) in Eq. 1 to the Euclidean Self-Attention
+          H(An) = − X Anm log Anm           (13)                                                 mechanism (EuSA) based on Euclidean distance, as detailed
+                   m∈Nn
+                                                                in Eq. 18:
+L2 decay maximizes entropy under isotropic constraints,
+                                                   EuSA(X) = (Softmax(QKT ) ⊙E2d)V
+encouraging the model to capture diverse and meaningful              √                               (18)
+spatial dependencies. L1 decay, due to its axis-aligned bias,              E2dnm = γ  (xn−xm)2+(yn−ym)2
+
+======================== PDF 第 6 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                              6
+
+
+
+                                             Flatten&&Group                                         Reshape
+                                                                                                                                         ......
+
+
+                                                                                               (a) Grouped EuSA
+
+
+
+
+
+                                      Flatten&&Permute&&Group                             Permute&&Reshape
+                                                                                                                                         ......
+
+
+                                                                                           (b) Dilated EuSA
+
+   Fig. 3: Illustration of Grouped EuSA (EuSAg) and Dilated EuSA (EuSAd). Different colors represent different groups.
+
+
+Here, E is the decay matrix based on Euclidean distance,
+where each element Emn represents the Euclidean distance
+between token m and token n. Moreover, γ is a manually
+set hyper-parameter, and its value differs for each head in
+the multi-head self-attention mechanism. The value of γ
+controls the receptive field of the tokens, and using different
+γ values for different heads enables the model to perceive
+multi-scale features.
+
+
+3.4  Decomposed Form to the Grouped Form
+
+In RMT, we decompose global attention into horizontal and
+vertical dimensions and then weight the values using the
+attention weights from each dimension, allowing MaSA to
+perceive global information, as shown in Eq. 2. However,
+this approach presents two issues.
+    First, this method results in higher complexity. Com-                                                                   Fig. 4: Comparison between 2D grouping/shuffling and our
+pared to other linear complexity attention mechanisms, such                                            1D grouping/shuffling.
+as Window Self-Attention [3], the complexity of MaSA is:
+         O(hwwd) + O(hhwd) ≥O(N 1.5d).         (19)    Group n tokens EuSA FLOPs Throughput  acc   FPS   mIoU
+                                                                                                (G)    (imgs/s)   (%)  (imgs/s)  (%)
+Here, h and w are the height and width of the feature map,      2d    7 × 7   ×      4.4      1002     83.7    21.6     49.2
+respectively, and N =√hw. The equality in Eq. 19 holds if      2d    7 × 7   ✓      4.4       926      83.8    21.5     49.3
+and only if h = w =  N. The high complexity limits the      2d    8 × 8   ✓      4.6       889      83.9    21.0     49.4
+                                                              2d   10 × 10  ✓      4.8       806      84.1    20.4     49.7
+model’s performance in high-resolution tasks, such as object
+detection and semantic segmentation.                          1d      49    ×      4.4      1168     83.5    23.2     48.8
+                                                              1d      49    ✓      4.4      1102     83.9    23.1     49.6
+   Second, the decomposition approach  of MaSA  self-                                                              1d      64    ✓      4.5      1052     84.2    22.8     49.8
+attention hinders the model’s parallelism. The horizontal      1d      98    ✓      4.6      1001     84.4    22.4     50.0
+and vertical attention scores cannot be used to weight the
+values in parallel. Their multiplication with V  follows a  TABLE 3: Ablation study on different grouping/shuffling
+strict sequential order: Attnw  is first multiplied with V ,   strategy. ”n token” represents the number of tokens within
+and then Attnh is applied to the resulting product. This   each group/grid, and ”EuSA” indicates whether the Eu-
+step significantly limits the parallelism of the model and   clidean decay matrix is used.
+is impossible to optimize through engineering techniques.
+Consequently, although RMT has a low computational com-
+plexity, its inference speed remains relatively slow.              [52]. Although this introduces inductive bias to ViT, such
+   Based on the two considerations above, we abandoned   a grouping method lacks flexibility, as shown in Tab. 3,
+the decomposition approach  of  global  self-attention  in   the 2D grouping method has a relatively large impact
+MaSA and instead adopted a token grouping method to  on the model’s throughput. Therefore, we adopted a one-
+reduce the computational cost of the model. Most token   dimensional token grouping approach, where the feature
+grouping methods, whether it is window grouping or di-  map is flattened before grouping the tokens. Given that our
+lated window grouping, consider the two-dimensional spa-   Euclidean decay matrix has already introduced sufficient
+tial characteristics of tokens, i.e., grouping tokens simulta-   spatial priors to the model, the one-dimensional grouping
+neously in both the height and width dimensions [3], [14],  method does not degrade the model’s performance. To
+
+======================== PDF 第 7 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                              7
+
+        Grouping/Shuffling   224      384        512           For 1D attention, receptive field growth is:
+
+            1D            83.0   83.3/84.0   82.8/84.5
+            2D            82.8   82.6/83.6   81.1/84.0                          f1D(L) = g · w · L                  (27)
+
+                                                        Thus,
+TABLE  4: Comparison  of  different  grouping/shuffling
+                                                                    f1D(L) = g · f2D(L)                 (28)
+methods. The results on the left show the direct inference
+of the model trained at a resolution of 224x224. The results      Graph-theoretic interpretation: The attention connectiv-
+on the right are from the model after fine-tuning at a higher   ity graph for 1D group/dilated attention is denser due to in-
+resolution.                                                  terleaved group assignments, leading to faster expansion of
+                                                           reachable nodes (tokens) compared to the grid-constrained
+                                            2D case.
+ensure that the model has a global receptive field, we pro-      Spatial distribution: 1D attention, through group/dila-
+pose two token grouping methods: grouped EuSA (EuSAg)   tion, can connect tokens across√the entire axis in O(L) steps,
+and dilated EuSA (EuSAd). The specific grouping methods   while 2D attention requires O( N/w) steps to reach distant
+are illustrated in Fig. 3. The comparison between the two                                                            corners on the grid.
+approaches is shown in the Fig. 4. In the first three stages                                                                           (2) Spatial Structure Restoration via 2D Euclidean
+of the model, we alternated between EuSAg and EuSAd to  Decay
+ensure that the model has a global receptive field. In the                                                       While 1D attention alone may disrupt local spatial conti-
+final stage, due to the smaller number of tokens, we used                                                                   nuity, our proposed 2D Euclidean (L2) spatial decay matrix:
+the original EuSA.                                   √
+   Compared to previous 2D Group/Dilated Attention, the              E2dnm = γ  (xn−xm)2+(yn−ym)2            (29)
+proposed 1D Group/Dilated Attention has following ad-
+vantages.                                              modulates the attention weights as:
+                                                  √
+    (1) Theoretical Comparison: Receptive Field of 1D vs.                  exp(QnKTm/  d) · E2dnm
+2D Group/Dilated Attention Let N = H × W be the total        Anm =           √               (30)
+                                  Pk∈R1Dn exp(QnKTk /  d) · E2dnknumber of tokens, w the number of tokens each group
+attends to per layer (after dilation), g the number of groups,                                                          This spatial prior ensures that, even within a large and
+and L the number of layers. We ensure that in both 1D and                                                                irregular receptive field, the model remains sensitive to ge-
+2D group/dilated attention, each group attends to exactly w                                                          ometric proximity and local continuity, effectively restoring
+tokens per layer.                                                                  spatial structure.
+    Initial receptive field: At layer l = 1, for any token n:                                                                           (3) Theoretical Impact of 2D Spatial Prior on 1D
+                       R(1)n = Nn                      (20)   Attention
+                                                    The gradient of attention weights with respect to spatial
+where |Nn| = w.                                            coordinates is:
+   Recursive expansion: At layer l + 1:                                       
+                                           ∂Anm           −xm           xn −xk
+                                       = log γ · Anm                                                     − X Ank                                                                           xn                                                  ∂xn               dnm                 dnk 
+                                                                                                    n              R(l+1)n  = R(l)n ∪  [ Nm             (21)                                 k∈R1D                                                                                                                              (31)
+                                m∈R(l)n                                                   where dnm = p(xn −xm)2 + (yn −ym)2. This smooth,
+Assuming minimal overlap, the upper bound for receptive   direction-aware gradient allows the model to optimize spa-
+field size after L layers is:                                              tial relationships robustly, even when the underlying atten-
+                                                                tion is 1D.
+                    |R(L)n   | ≤1 + w · L                  (22)      Moreover, the spatial entropy of the attention distribu-
+                                                                      tion:
+for a single group. For g groups, the expansion is:                                                      H(An) = − X Anm log Anm          (32)
+             |R1Dn  | ≤min {N, g · w · L}              (23)                     m∈R1Dn
+              |R2Dn  | ≤min {N, w · L}               (24)    is maximized under isotropic constraints, enabling richer
+                                                                  spatial representations.
+   Coverage ratio:                                   As shown in Tab. 3, we conducted experiments on EVT-
+                   |R1Dn  |                           S and provided a detailed comparison of different grouping
+                 = g                      (25)  methods. Compared to the 2D grouping/shuffling strategy,                   |R2Dn  |
+                                                            the 1D grouping/shuffling strategy offers two key advan-
+This shows that, for the same w and L, 1D attention with g   tages:
+groups covers g times more tokens than 2D attention.              (a) Lower computational complexity and higher effi-
+   Extreme case (full coverage): If g · w · L ≥N, then   ciency. The 2D grouping/shuffling strategy operates along
+|R1Dn  | = N, i.e., the receptive field covers the entire image   both the Height and Width dimensions, resulting in a more
+in fewer layers.                                       complex memory interaction mechanism. In contrast, the
+   Growth curves: For 2D attention, receptive field growth  1D grouping/shuffling strategy is applied solely to the to-
+is linear:                                             ken sequence, eliminating redundant 2D computations and
+                  f2D(L) = w · L                    (26)  improving overall efficiency. As shown in Tab. 3, inference
+
+======================== PDF 第 8 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                              8
+
+    Output Size      Layer Name           EVT-T              EVT-S              EVT-B              EVT-L             EVT-XL
+
+                                      3 × 3, 32, stride 2     3 × 3, 32, stride 2     3 × 3, 40, stride 2      3 × 3, 56, stride 2      3 × 3, 64, stride 2
+                                         3 × 3, 32            3 × 3, 32            3 × 3, 40             3 × 3, 56             3 × 3, 64
+      56 × 56       Conv Stem                                         3 × 3, 32            3 × 3, 32            3 × 3, 40             3 × 3, 56             3 × 3, 64
+                                      3 × 3, 64, stride 2     3 × 3, 64, stride 2     3 × 3, 80, stride 2     3 × 3, 112, stride 2     3 × 3, 128, stride 2
+
+                    CPE         3 × 3, 64        3 × 3, 64        3 × 3, 80         3 × 3, 112         3 × 3, 128 
+       Stage 1     EuSAg/EuSAd     k=98, h=2 × 2     k=98, h=2 × 4     k=98, h=2 × 4     k=98, h=4 × 4     k=98, h=4 × 6
+                   FFN               r=3                  r=3                  r=3                  r=3                   r=3
+
+      28 × 28       Patch Merging      3 × 3, 128, stride 2    3 × 3, 128, stride 2    3 × 3, 160, stride 2     3 × 3, 224, stride 2     3 × 3, 256, stride 2
+
+                    CPE         3 × 3, 128        3 × 3, 128        3 × 3, 160         3 × 3, 224         3 × 3, 256 
+       Stage 2     EuSAg/EuSAd     k=98, h=4 × 2     k=98, h=4 × 4     k=98, h=4 × 8     k=98, h=8 × 8     k=98, h=8 × 12
+                   FFN               r=3                  r=3                  r=3                  r=3                  r=3
+
+      14 × 14       Patch Merging      3 × 3, 256, stride 2    3 × 3, 256, stride 2    3 × 3, 320, stride 2     3 × 3, 448, stride 2     3 × 3, 512, stride 2
+
+                    CPE         3 × 3, 256        3 × 3, 256        3 × 3, 320        3 × 3, 448        3 × 3, 512 
+       Stage 3     EuSAg/EuSAd     k=98, h=8 × 9    k=98, h=8 × 18    k=98, h=8 × 26    k=98, h=14 × 26    k=98, h=16 × 28
+                   FFN               r=3                 r=3                  r=3                  r=3                   r=3
+
+       7 × 7        Patch Merging      3 × 3, 512, stride 2    3 × 3, 512, stride 2    3 × 3, 512, stride 2     3 × 3, 640, stride 2     3 × 3, 1024, stride 2
+
+                    CPE        3 × 3, 512       3 × 3, 512       3 × 3, 512        3 × 3, 640        3 × 3, 1024 
+       Stage 4        EuSA           k=49, h=16    2      k=49, h=16    4      k=49, h=16    9      k=49, h=20    9      k=49, h=32    12                                  ×          ×          ×          ×          ×
+                   FFN               r=3                  r=3                  r=3                  r=3                  r=3
+
+       1 × 1             Classifier                                                   Fully Connected Layer, 1000
+
+                # Params                    15 M                27 M                57 M                101 M                205 M
+
+                # FLOPs                        2.5 G                  4.6 G                  9.8 G                 18.2 G                 36.4 G
+
+TABLE 5: Architectures for ImageNet classification with resolution 224 × 224. k is the number of tokens for each group. h
+is the number of heads. r is the expand ratio of FFN.
+
+
+     Settings                        pretrain             finetune         maintaining lower computational complexity.
+    Input resolution                2242               3842                  (c) Improved Resolution Adaptability. By using 1D
+    Batch size                     1024               512           grouping/shuffling, the trained model demonstrates better
+    Optimizer            AdamW        AdamW
+    Learning rate             1×10−3          1×10−5          resolution adaptability. We conduct experiments based on
+   LR schedule                   cosine               cosine          EVT-T, performing direct inference and fine-tuning at two
+    Weight decay             5×10−2          1×10−8          resolutions, 384 and 512. The results, as shown in Tab. 4,
+   Warmup epochs                 5                  0
+    Epochs                        300                30            indicate that 1D grouping/shuffling achieves superior per-
+                                                         formance.    Horizontal flip           ✓          ✓
+   Random resize & Crop      ✓          ✓               This grouping method reduces the model complexity to
+    AutoAugment           ✓          ✓              linear. Assuming the number of tokens in each group is k,
+    Mixup alpha                       0.8                    0.8          where k is set as a hyperparameter and remains unchanged    Cutmix alpha                      1.0                    1.0
+   Random erasing prob            0.25                  0.25           within the same task (i.e., at a fixed resolution). However,
+    Color jitter                         0.4                    0.4         when the task changes (i.e., the input resolution varies), k
+    Label smoothing                   0.1                    0.1           can be manually adjusted. The complexity of EuSAg and
+    Dropout              ×          ×         EuSAd is:
+    Droppath rate          0.1/0.15/0.4/0.55/0.7  0.1/0.15/0.4/0.55
+    Repeated augment         ×          ×                                                        O((hw/k) ∗k2d) = O(hwkd) = O(Nkd).      (33)    Grad clipping           ×          ×
+
+                                          We employ LCE to enhance the model’s local perception
+TABLE 6: Detailed hyper-parameters for training variants of
+                                                                    capability, which is a depthwise separable convolution ap-
+EVT on ImageNet.
+                                                             plied to V :
+                                                         V = WvX,
+                                                                                                                              (34)
+                                        X = EuSA(X) + LCE(V ).
+with 1D grouping/shuffling is slightly faster than with 2D
+grouping/shuffling.
+                                                            3.5  Variants of EVT
+    (b) Longer Modeling Range. Compared to the 2D
+grouping/shuffling  strategy,  the 1D grouping/shuffling   Tab. 5 shows the variants of EVT. Similar to our previous
+strategy enables a longer effective token interaction range  work RMT [10], we have designed four model variants:
+within each group/grid, given the same number of tokens  EVT-T/S/B/L. In addition, to enable a fair comparison
+per group. Although it loses the explicit 2D spatial priors,  with previous work like Swin, we also designed EVT-
+it compensates with an extended token receptive field. As  Swin-T/S/B. For the EVT-Swin series models, we strictly
+shown in Tab. 3, without incorporating Euclidean distance   aligned the configurations of EVT and Swin, except that
+priors, the performance of the 1D strategy is slightly inferior  WSA/SWSA is replaced with EuSAg/EuSAd. For the decay
+to that of the 2D strategy. However, once the distance   coefficient γ in the Euclidean decay matrix, we manually set
+prior is introduced, the 1D strategy gains sufficient spatial    its value to:
+priors, allowing it to achieve superior performance while                     γn = 1 −2−3−n                   (35)
+
+======================== PDF 第 9 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                              9
+
+
+                                  Parmas   FLOPs    Top1-acc                                  Parmas   FLOPs    Top1-acc
+       Cost         Model                                           Cost          Model
+                                     (M)       (G)        (%)                                       (M)       (G)        (%)
+
+           MSVmamba-M [53]       12         1.5         79.8                ConvNeXt-S [18]         50         8.7         83.1
+                 RegionViT-T [26]        14         2.4         80.4               UniRepLKNet-S [57]       56         9.1         83.9
+               tiny-MOAT-2 [54]        10         2.3         81.0                 Quadtree-B-b4 [69]        64        11.5        84.0
+               VAN-B1 [55]          14         2.5         81.1                    ScaleViT-B [70]          81         8.6         84.1
+             Conv2Former-N [56]      15         2.2         81.5               CrossFormer++-B [71]       52         9.5         84.2
+             UniRepLKNet-N [57]      18         2.8         81.6                  BiFormer-B [17]          57         9.8         84.3
+              NAT-M [9]           20         2.7         81.8                 MILA-S [67]           43         7.3         84.4                 model          FAT-B2 [24]          14         2.0         81.9                   iFormer-B [42]          48         9.4         84.6                     ∼2.5G       QnA-T [58]           16         2.5         82.0                 model       SE-CoTNetD-152 [72]       56        26.5        84.6             tiny                GC-ViT-XT [59]         20         2.6         82.0                     ∼9.0G     TransNeXt-Small [61]       50        10.3        84.7                                                                                                                                            base                SMT-T [60]           12         2.4         82.2                OverLoCK-S [62]         56         9.7         84.8
+              TransNeXt-Micro [61]      13         2.7         82.5                RMT-B [10]           54         9.7         85.0
+              OverLoCK-XT [62]       16         2.6         82.7                   EVT-B              57         9.8         85.3
+               RMT-T [10]          14         2.5         82.4
+                                                                    ViTAEv2-48M↑384 [73]      49        41.1        84.7
+                  EVT-T             15         2.5         83.0
+                                                                     MViTv2-B↑384 [74]        52        36.7        85.6
+                    DeiT-S [63]           22         4.6         79.9                iFormer-B↑384 [42]        48        30.5        85.7
+                   Swin-T [3]           29         4.5         81.3                 EVT-B↑384           57        32.8        86.2
+                  CrossViT-15 [64]        27         5.8         81.5
+                                                                                  DeiT-B [63]            86        17.5        81.8
+               ConvNeXt-T [18]        29         4.5         82.1
+                                                                               Swin-B [3]            88        15.4        83.3
+                    Focal-T [65]          29         4.9         82.2
+                                                                              CrossFormer-L [75]        92        16.1        84.0
+                 RegionViT-S [26]        31         5.3         82.6
+                                                                                 Ortho-L [45]           88        15.4        84.2
+            MSVmamba-T [53]       33         4.6         82.8
+                                                                              DaViT-B [16]           88        15.5        84.6
+             UniRepLKNet-T [57]      31         4.9         83.2
+                                                                       VSSD-B [68]           89        16.1        84.7
+                SG-Former-S [66]        23         4.8         83.2
+                                                                               TransNeXt-Base [61]        90        18.4        84.8
+                   Ortho-S [45]          24         4.5         83.4
+                                                                          MaxViT-B [52]          120        23.4        84.9                InternImage-T [35]       30         5.0         83.5                 model
+                                                                      OverLoCK-B [62]         95        16.7        85.1                 model        MILA-T [67]          25         4.2         83.5                         ∼18.0G       MILA-B [67]           96        16.2        85.3                     ∼4.5G      MaxViT-T [52]         31         5.6         83.6                 large           RMT-L             95        18.2        85.5                 small          FAT-B3 [24]          29         4.4         83.6                   EVT-L             101        18.2        85.8
+                VSSD-T [68]          24         4.5         83.7
+                 BiFormer-S [17]         26         4.5         83.8                 Swin-B↑384 [3]          88        47.0        84.2
+               TransNeXt-Tiny [61]       28         5.7         84.0               CSwin-B↑384 [14]        78        47.0        85.4
+                RMT-S [10]           27         4.5         84.1               CoAtNet-2↑384 [44]       75        49.8        85.7
+                  EVT-S             27         4.6         84.4                iFormer-L↑384 [42]        87        45.3        85.8
+                                                                      EVT-L↑384           101        59.1        86.6
+                CvT-13↑384 [6]         20        16.3        83.0
+              CoAtNet-0↑384 [44]      20        13.4        83.9                ConvNeXt-L [18]        198        34.4        84.3
+              CSwin-T↑384 [14]       23        14.0        84.3                 MaxViT-L [52]          212        43.9        85.1                                                                                                                                                                               model               iFormer-S↑384 [42]       20        16.1        84.6             GC ViT-L [59]          201        32.6        85.7                EVT-S↑384          27        15.8        85.3       XL ∼35.0G         EVT-XL            205        36.4        86.3
+
+                TABLE 7: Comparison with the state-of-the-art on ImageNet-1K classification.
+
+Here, n is the index of the head in multi-head attention.   [84] (prob = 1.0), Random Erasing (prob = 0.25), and Expo-
+Setting different decay coefficients for each head endows   nential Moving Average (EMA) [85]). The maximum rates of
+the model with the capability to perceive multi-scale infor-   increasing stochastic depth [86] are set to 0.1/0.15/0.4/0.55
+mation.                                                         for EVT-T/S/B/L.
+                                                             Results. We compare our EVT against the state-of-the-
+                                                                    art models in Tab. 7. The comparison results demonstrate4  EXPERIMENTS
+                                                                that our EVT outperforms previous models under different
+We conducted extensive experiments on the image classfica-   settings in terms of FLOPs and model size. Specifically,
+tion, object detection, instance segmentation and semantic  our EVT-T achieves 83.0% top-1 acc, surpasses RMT-T by
+segmentation. We also evaluate the EVT’s robustness on  0.6% with similar Params and FLOPs. It achieved the same
+ImageNet-v2/A/R [78]–[80]. In addition to these experi-   accuracy as MPViT-S, but requires only about half the com-
+ments, we also conducted detailed ablation studies to verify   putation. This fully demonstrates the advantages of EVT.
+the role of each module in EVT.                       Our EVT-B achieves 85.3% top1-acc, not only surpassing
+                                                            the corresponding counterparts with the base model size
+4.1  Image Classification                                but also surpassing those with large model size. As for the
+                                                              resolution of 384 × 384, our large model EVT-L achievesSettings: We use the widely used ImageNet-1K [81] to
+                                                   an accuracy of 86.6%. This result significantly surpasses itsconduct the image classification task. The dataset contains
+                                                              counterparts.1.28M images for training and 50K images for validation.
+The detailed settings for pretraining and finetuning are
+                                                            4.2  Object Detection and Instance Segmentationlisted in the Tab. 6. The AdamW is used with a cosine
+decay learning rate scheduler. The  initial learning  rate,   Settings: We evaluate the proposed EVT on the MS-
+weight decay, and batch-size are set to 0.001, 0.05, and  COCO [90], a widely used dataset. It contains 118K training
+1024, respectively. We apply the same data augmentation  images and 5K validation images. We utilize MMDetec-
+and regularization used in DeiT [63] (RandAugment [82]   tion [91] to implement Mask-RCNN [92], Cascade Mask R-
+(randm9-mstd0.5-inc1)  , Mixup [83] (prob = 0.8), CutMix  CNN [93], and RetinaNet [94] for evaluating the proposed
+
+======================== PDF 第 10 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                             10
+
+
+                     Params FLOPs     Mask R-CNN 3×+MS                        Params FLOPs  Cascade Mask R-CNN 3×+MS
+         Backbone                                                                     Backbone
+                       (M)    (G) AP b AP50b AP75b AP m AP50m AP75m                                                                                   (M)    (G) AP b AP50b AP75b AP m AP50m AP75m
+
+       MPViT-S [76]     43    268   48.4  70.5  52.6  43.9  67.6  47.5  UniRepLKNet-T [57]   89    749   51.8   –    –   44.9   –    –
+       VSSD-T [68]      44    265   48.8  70.4  53.4  43.6  67.6  46.9      SMT-S [60]       78    744   51.9  70.5  56.3  44.7  67.8  48.6
+        SMT-S [60]      40    265   49.0  70.1  53.4  43.4  67.3  46.7    UniFormer-S [2]     79    747   52.1  71.1  56.6  45.2  68.3  48.9
+       CSWin-T [14]     42    279   49.0  70.7  53.7  43.6  67.9  46.6     CSWin-T [14]      80    757   52.5  71.5  57.1  45.3  68.8  48.9
+      InternImage-T [35]   49    270   49.1  70.4  54.1  43.7  67.3  47.3       RMT-S         83    741   53.2  72.0  57.8  46.1  69.8  49.8
+       MILA-T [67]      44    255   48.8  71.0  53.6  43.8  68.0  46.8       EVT-S         83    741   53.8  72.4  58.4  46.5  70.2  50.5
+         RMT-S        46    262   50.7  71.9  55.6  44.9  69.1  48.4
+                                                                       Swin-S [3]       107    838   51.9  70.7  56.3  45.0  68.2  48.8          EVT-S        45    262   51.6  72.4  56.6  45.6  69.8  49.1
+                                                              NAT-S [9]       108    809   51.9  70.4  56.2  44.9  68.2  48.6
+      ConvNeXt-S [18]    70    348   47.9  70.0  52.7  42.9  66.9  46.2      DAT-S [15]       107    857   52.7  71.7  57.2  45.5  69.1  49.3
+         Swin-S [3]       69    359   48.5  70.2  53.5  43.3  67.3  46.6  UniRepLKNet-S [57]  113    835   53.0   –    –   45.9   –    –
+      InternImage-S [35]   69    340   49.7  71.1  54.5  44.5  68.5  47.8   OverLoCK-S [62]    114    857   53.6   –    –   46.4   –    –
+       CSWin-S [14]     54    342   50.0  71.3  54.7  44.5  68.4  47.7    UniFormer-B [2]    107    878   53.8  72.8  58.5  46.4  69.9  50.4
+       MILA-S [67]      63    319   50.5  71.8  55.2  44.9  69.1  48.2       RMT-B        111    852   54.5  72.8  59.0  47.2  70.5  51.4
+         RMT-B        73    373   52.2  72.9  57.0  46.1  70.4  49.9       EVT-B         114    849   55.5  74.0  60.2  47.9  71.7  52.2
+         EVT-B        76    371   53.3  73.9  58.4  46.7  71.2  50.6
+                                                                     Swin-B [3]       145    982   51.9  70.5  56.4  45.0  68.1  48.9
+         Swin-B [3]      107    496   48.6  70.0  53.4  43.3  67.1  46.7    GC ViT-B [59]     146   1018  52.9  71.7  57.8  45.8  69.2  49.8
+      ViT-Adapter-B [77]  120    832   49.6  70.6  54.0  43.6  67.7  46.9   OverLoCK-B [62]    154   1008  53.9   –    –   46.8   –    –
+      InternImage-B [35]  115    501   50.3  71.4  55.3  44.8  68.7  48.0     CSWin-B [14]      135   1004  53.9  72.6  58.5  46.4  70.0  50.4
+          EVT-L        119    550   53.6  74.1  58.7  47.1  71.5  51.0       EVT-L         157   1029  55.8  74.3  60.4  48.2  72.2  52.2
+
+              TABLE 8: Comparison with other backbones using ”3 × +MS“ schedule on COCO.
+
+                         Params FLOPs         Mask R-CNN 1×          Params FLOPs            RetinaNet 1×
+             Backbone
+                            (M)     (G)  AP b AP50b AP75b AP m AP50m AP75m   (M)     (G)  AP b AP50b AP75b APSb APMb APLb
+
+          MPViT-XS [76]      30     231   44.2  66.7   48.4   40.4   63.4   43.4    20     211   43.8  65.0   47.1   28.1   47.6   56.5
+          VSSD-M [68]      33     220   45.4  67.5   49.8   41.3   64.5   44.6     –      –     –     –     –     –     –     –
+            FAT-B2 [24]       33     215   45.2  67.9   49.0   41.3   64.6   44.0    23     196   44.0  65.2   47.2   27.5   47.7   58.8
+           RMT-T [10]       33     218   47.1  68.8   51.7   42.6   65.8   45.9    23     199   45.1  66.2   48.1   28.8   48.9   61.1
+             EVT-T         34     221   47.8  69.4   52.2   42.9   66.3   46.4    24     202   46.2  67.3   49.4   29.6   50.7   61.8
+
+           CMT-S [7]        45     249   44.6  66.8   48.9   40.7   63.9   43.4    44     231   44.3  65.5   47.5   27.1   48.3   59.1
+          CrossFormer-S [75]    50     301   45.4  68.0   49.7   41.4   64.8   44.6    41     272   44.4  65.8   47.4   28.2   48.4   59.4
+             STViT-S [39]       44     252   47.6  70.0   52.3   43.1   66.8   46.5     –      –     –     –     –     –     –     –
+           BiFormer-S [17]      –      –     47.8  69.8   52.3   43.2   66.8   46.5     –      –     45.9  66.9   49.4   30.2   49.6   61.7
+       MSVMamba-T [53]    53     252   46.9  68.8   51.4   42.2   65.6   45.4     –      –     –     –     –     –     –     –
+           MILA-S [67]       63     319   49.2  71.5   53.9   44.2   68.5   47.2     –      –     –     –     –     –     –     –
+          TransNeXt-T [61]    48     269   49.9  71.5   54.9   44.6   68.6   48.1     –      –     –     –     –     –     –     –
+           RMT-S [10]       46     262   49.0  70.8   53.9   43.9   67.8   47.4    36     244   47.8  69.1   51.8   32.1   51.8   63.5
+             EVT-S         45     262   49.9  71.3   54.9   44.5   68.4   48.1    36     243   48.0  69.2   51.5   30.7   52.5   64.0
+
+             Swin-S [3]        69     359   45.7  67.9   50.4   41.1   64.9   44.2    60     339   44.5  66.1   47.4   29.8   48.5   59.1
+           CSWin-S [14]      54     342   47.9  70.1   52.6   43.2   67.1   46.2     –      –     –     –     –     –     –     –
+           BiFormer-B [17]      –      –     48.6  70.5   53.8   43.7   67.6   47.1     –      –     47.1  68.5   50.4   31.3   50.8   62.6
+         OverLoCK-S [62]    75     366   49.4   –     –    44.0    –     –      –      –     –     –     –     –     –     –
+           RMT-B [10]       73     373   51.1  72.5   56.1   45.5   69.7   49.3    63     355   49.1  70.3   53.0   32.9   53.2   64.2
+             EVT-B         76     371   51.7  73.1   56.6   45.8   70.2   49.6    66     352   49.3  70.5   53.1   31.9   53.9   65.5
+
+           MPViT-B [76]      95     503   48.2  70.0   52.9   43.5   67.1   46.8    85     482   47.0  68.4   50.8   29.4   51.3   61.5
+           CSwin-B [14]      97     526   48.7  70.4   53.9   43.9   67.8   47.3     –      –     –     –     –     –     –     –
+          InternImage-B [35]   115    501   48.8  70.9   54.0   44.0   67.8   47.4     –      –     –     –     –     –     –     –
+          MILA-B [67]      115    502   50.5  72.0   55.4   45.0   69.3   48.6     –      –     –     –     –     –     –     –
+            RMT-L        114    557   51.6  73.1   56.5   45.9   70.3   49.8    104    537   49.4  70.6   53.1   34.2   53.9   65.2
+             EVT-L         119    550   52.2  73.6   57.5   46.2   70.6   49.9    110    531   50.1  71.4   53.7   33.8   54.9   66.1
+
+                 TABLE 9: Comparison to other backbones using ”1×“ schedule on COCO.
+
+EVT. For Mask R-CNN and Cascade Mask R-CNN, we use      For ”1×” schedule, EVT also demonstrates its advan-
+the commonly used “3 × +MS” setting, and for Mask R-   tages. For example, under the Mask R-CNN framework,
+CNN and RetinaNet, we apply the “1×” setting. Following  EVT-S achieves an improvement of 0.9 in AP b and 0.6 in
+previous works  [3], [14], during training, we resize the  AP m compared to RMT-S. Additionally, the performance of
+images such that the shorter side is 800 pixels while keeping  EVT-B surpasses that of most models an order of magnitude
+the longer side within 1333 pixels. We employ the AdamW   larger. Under the RetinaNet framework, EVT-T achieves
+optimizer for model optimization.                       an improvement of 1.1 in AP b compared to RMT-T. Its
+Results. Tab. 8 and Tab. 9 shows the results of object detec-  performance even surpasses that of the significantly larger
+tion and instance segmentation. For ”3 × +MS” schedule,   STViT-S.
+EVT demonstrates significant advantages over its competi-
+tors across various model scales. Specifically, EVT-B, com-
+                                                                       b   4.3  Semantic Segmentationpared to RMT-B, achieves an improvement of 1.1 in AP
+and 0.6 in AP m under the Mask R-CNN framework. In   Settings. ADE20K [95] is a popular dataset for semantic
+the Cascade Mask R-CNN framework, EVT-L outperforms   segmentation, which has 20K training examples and 2K
+CSwin-B by 1.8 in both AP b and AP m.                       validation images. We utilize Semantic FPN [96] and Uper-
+
+======================== PDF 第 11 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                             11
+
+
+                                Semantic FPN                                            UperNet
+               Backbone       Params(M)   FLOPs(G)   mIoU(%)         Backbone        Params(M)   FLOPs(G)   mIoU(%)
+            PVTv2-B1 [23]         18           34          42.5         NAT-T [9]            58          934          47.1
+              FAT-B2 [24]           17           32          45.4      MSVmamba-T [53]        65          942          47.6
+             EdgeViT-S [87]         17           32          45.9         VSSD-T [68]           53          941          47.9
+            RMT-T [10]           17           34          46.4         MPViT-S [76]           52          943          48.3
+               EVT-T             18           34          48.3      UniRepLKNet-T [57]       61          946          48.6
+                                                                   HorNet-T [88]          55          924          49.2
+             DAT-T [15]           32          198          42.6          SMT-S [60]            50          935          49.2
+            RegionViT-S+ [26]        35          236          45.3         RMT-S [10]            56          937          49.8
+             CSWin-T [14]          26          202          48.2           EVT-S              56          936          49.8
+              FAT-B3 [24]           33          179          48.9
+             RMT-S [10]           30          180          49.4          NAT-S [9]            82          1010         48.0
+               EVT-S             30          180          50.0          DAT-S [15]            81          1079         48.3
+                                                                           InterImage-S [35]         80          1017         50.2
+             DAT-S [15]           53          320          46.1         CSWin-S [14]           65          1027         50.4
+            RegionViT-B+ [26]        77          459          47.5       OverLoCK-S [62]         85          1051         51.3
+            UniFormer-B [2]         54          350          47.7         TransNext-S [61]         80          1028         52.2
+             CSWin-S [14]          39          271          49.2         RMT-B [10]           83          1051         52.0
+            RMT-B [10]           57          294          50.4           EVT-B              86          1048         52.7
+               EVT-B             60          291          51.7
+                                                                               Focal-B [65]           126         1354         49.0
+             DAT-B [15]           92          481          47.0         DAT-B [15]           121         1212         49.4
+           CrossFormer-L [75]       95          497          48.7         HorNet-B [88]          126         1171         50.5
+            PVTv2-B5 [23]         86          486          48.7         MILA-B [67]          128         1183         51.9
+             CSWin-B [14]          81          464          49.9        TransNext-B [61]         121         1265         53.0
+            RMT-L [10]           98          482          51.4         RMT-L [10]           125         1241         52.8
+               EVT-L            103          475          52.0           EVT-L             131         1234         53.6
+
+                      TABLE 10: Comparison with the state-of-the-art on ADE20K.
+
+                   Backbone        Params(M)   FLOPs(G)   IN-1K↑   IN-C↓   IN-A↑   IN-R↑   Sketch↑   IN-V2↑
+
+                 PVTv2-B1 [23]          14            2.1         78.7      62.6      14.7      41.8      28.9       66.9
+                  BiFormer-T [17]          13            2.2         81.4      55.7      25.7      45.4      31.5       70.6
+               TransNeXt-Micro [61]       13            2.7         82.5      50.8      29.9      45.8      33.0       72.6
+                   EVT-T              15            2.5         83.0      49.2      34.7      46.7      35.4       72.6
+
+                   Swin-T [3]            29            4.5         81.3      62.0      21.7      41.3      29.0       69.7
+                  FocalNet-T [89]          29            4.5         82.3      55.0      23.5      45.1      31.8       71.2
+                  BiFormer-S [17]          26            4.5         83.8      48.5      39.5      49.6      36.4       73.7
+                TransNeXt-Tiny [61]        28            5.7         84.0      46.5      39.9      49.6      37.6       73.8
+                    EVT-S              27            4.6         84.4      44.2      44.2      46.7      38.8       74.6
+
+                  BiFormer-B [17]          57            9.8         84.3      47.2      44.3      49.7      35.3       74.0
+                MaxViT-Small [52]        69           11.7        84.4      46.4      40.0      50.6      38.3       74.0
+               TransNeXt-Small [61]       50           10.3        84.7      43.9      47.1      52.5      39.7       74.8
+                   EVT-B              57            9.8         85.3      43.1      51.4      55.2      41.4       75.7
+
+                   Swin-B [3]            88           15.4        83.5      54.5      35.9      46.6      32.4       72.3
+               ConvNeXt-B [18]         89           15.4        83.8      46.8      36.7      51.3      38.2       73.7
+                TransNeXt-Base [61]        90           18.4        84.8      43.5      50.6      53.9      41.4       75.1
+                   EVT-L             101          18.2        85.8      42.7      55.5      56.9      43.2       76.1
+
+             GC ViT-L [59]          201          32.6        85.7      42.9      54.8      56.0      43.4       75.5
+                  EVT-XL             205          36.4        86.3      41.1      56.7      58.0      44.0       76.4
+
+                          TABLE 11: Evaluation of the model’s robustness.
+
+
+Net [97] to evaluate EVT’s performance on the semantic seg-   Net, EVT also demonstrate superiority. Specifically, EVT-
+mentation task. We implement the two frameworks based  B achieves the mIoU of 52.7, surpassing previous SOTA
+on the MMSegmentation [98]. The two frameworks both use  RMT-B by 0.7. EVT-B’s performance even exceeds that of
+an encoder-decoder structure where we employ variants of  many models which are an order of magnitude larger. In
+EVT as the encoder in the frameworks. We follow the traing  summary, EVT exhibits significant performance advantages
+recipes in Swin Transformer [3] and PVT [22], initializing the   across various scales.
+encoder from ImageNet pretrained models. After that, we
+train 160K iterations for UperNet and 80K for SemanticFPN.                                                            4.4  Robustness Evaluation
+All models use an input resolution of 512 × 512, and during
+testing, the image’s shorter side is resized to 512 pixels.       Settings. We evaluate the model’s robustness on several
+                                                       popular datasets [79], [80], [99], [100]. We also evaluate the
+Results. Tab. 10 shows the results of different variants of   overfitting level of EVT on ImageNet-V2 [101]. The models
+EVT with two segmentation frameworks on ADE20K. For  used for evaluation are pretrained on the ImageNet-1K.
+Semantic FPN, EVT-T/S/B/L achieves the mIoU of 48.3,   Results.  The robustness evaluation results are shown in
+50.0, 51.7 and 52.0, respectively, which leads to an im-   Tab. 11. On ImageNet-V2 (IN-V2), EVT performs better
+pressive performance gain over its counterparts. For Uper-   than  all  its counterparts. For example, EVT-B surpasses
+
+======================== PDF 第 12 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                             12
+
+BiFormer-B for +1.7 with similar parameters and FLOPs.   accuracy (84.4 v.s. 83.8). These results fully illustrate the
+In ImageNet-A (IN-A) and ImageNet-R (IN-R), the ad-   advantages of EVT in both performance and speed.
+vantages demonstrated by EVT become even more pro-
+nounced. Specifically, pretrained solely on ImageNet-1k,   4.6  Ablation Study
+EVT-L achieves an accuracy of 55.5 on ImageNet-A and 56.9
+                                                  Comparison between Manhattan distance and Euclidean
+on ImageNet-R.
+                                                              distance. Our experiments demonstrate the advantages of
+4.5  Efficiency Comparison
+                                                         Euclidean distance over Manhattan distance. The experi-
+Settings. We compare the throughput of different models  ments are based on the EVT-T. As shown in Fig. 5, in
+on the same device. Specifically, we test the speed of various   addition to achieving better model performance, using Eu-
+models on a single NVIDIA A100 using a batch size of 64   clidean distance results in reduced overfitting and more
+and fp32 precision.                                             stable training.
+
+
+                       Params  FLOPs  Top1-acc  Throughput                   7                                                Manhattan(top1-acc: 82.7%)         Model
+                         (M)      (G)      (%)      (imgs/s)                                                                             Euclidean(top1-acc: 83.0%)
+
+      MPViT-XS [76]       11       2.9       80.9        1496
+      BiFormer-T [17]       13       2.2       81.4        1602                       6
+       SMT-T [60]         12       2.4       82.2        636
+      VSSD-M [68]        14       2.3       82.5        712
+      OverLoCK-XT        16       2.6       82.7        678                        5
+       RMT-T [10]         14       2.5       82.4        1650                              loss
+         EVT-T           15       2.5       83.0        2142
+
+       CSWin-T [14]        22       4.3       82.7        1561                       4
+    MSVMamba-T [53]      33       4.6       82.8        436
+       MILA-T [67]        25       4.2       83.5        1203
+      MaxViT-T [52]        31       5.6       83.6        826
+                                                                                                    3        SMT-S [60]         20       4.8       83.7        356
+       BiFormer-S [17]       26       4.5       83.8        766
+     OverLoCK-T [62]      33       5.5       84.2        382                            0        50       100       150       200       250       300
+                                                                                                                                         epoch     RMT-Swin-T [10]      29       4.7       83.6        1192
+       EVT-Swin-T        29       4.8       83.9        1420
+       RMT-S [10]         27       4.5       84.1        876          Fig. 5: Loss curves for Euclidean distance and Manhattan
+         EVT-S           27       4.6       84.4        1001
+                                                                distance. The experiments are conducted based on EVT-T.
+         Swin-S [3]         50       8.8       83.0        1006
+    UniRepLKNet-S [57]     56       9.1       83.9        998
+      BiFormer-B [17]       57       9.8       84.3        518       Comparison among different decay matrix. Since the gra-
+       MaxViT-S [52]        69      11.7      84.5        546         dients of Minkowski distance and RBF are also continuous
+       iFormer-B [42]        48       9.4       84.6        688       and preserve directional optimization information, they are
+    TransNeXt-Small [61]     50      10.3      84.7        302
+     OverLoCK-S [62]      56       9.7       84.8        241          theoretically feasible choices for serving as spatial priors.
+     RMT-Swin-S [10]      50       9.1       84.5        722        However, in practice, this is not the case. Since our explicit
+       EVT-Swin-S        50       9.3       85.1        866        decay is directly applied to the attention scores, it effectively
+       RMT-B [10]         54       9.7       85.0        457
+         EVT-B           57       9.8       85.3        502          scales them. However, the scaling factor should not be too
+                                                       complex, as excessive scaling can significantly compromise
+       CSWin-B [14]        78      15.0      84.2        660
+       MPViT-B [76]        75      16.4      84.3        498         the stability of model training. When using Minkowski
+       SMT-L [60]         80      17.7      84.6        158         distance or radial basis function (RBF) kernels, the high-
+    TransNeXt-Base [61]     90      18.4      84.8        202
+                                                          order power or exponential growth of the distance function       MILA-B [67]        96      16.2      85.3        466
+       VSSD-B [68]         89      16.1      85.4        289        can lead to severe instability, which becomes particularly
+       EVT-Swin-B        88      16.1      85.3        700         evident in high-resolution tasks such as object detection,
+       RMT-L [10]         95      18.2      85.5        326
+                                                   where the number of tokens is considerably large. During         EVT-L           101      18.2      85.8        368
+                                                                  training, we consistently observed distinct loss spikes and
+      MaxViT-L [52]       212      43.9      85.1        127
+     GC ViT-L [59]       201      32.6      85.7        138      Nan when using Minkowski distance or RBF. In contrast,
+        EVT-XL          205      36.4      86.3        142       no such phenomenon occurred when employing Euclidean
+                                                                distance. As shown in Tab. 14, using specialized distance
+TABLE 12: Inference throughputs of different models. Mod-   functions can introduce instability or lead to significant
+els are tested on resolution of 224 × 224. We benchmark the  performance degradation.
+throughputs on a single NVIDIA A100 GPU with batch size   Strict Comparison with Baselines. To enable a fair compar-
+of 64.                                                       ison with previous methods, we design the EVT-Swin series
+                                                        models. EVT-Swin strictly aligns with the various configura-
+Results. We present the efficiency comparison of differ-   tions of Swin-Transformer, replacing only the WSA/SWSA
+ent models in Tab. 12, where EVT demonstrates the best   in Swin-Transformer with our EuSAg/EuSAd, and replac-
+accuracy-speed trade-off. Specifically, compared to its base-   ing the vanilla attention in Swin-Transformer with our
+line model RMT, EVT achieves efficiency improvements at  EuSA, while not using additional modules such as CPE and
+all scales, along with better classification accuracy. Com-  Conv Stem.
+pared to other state-of-the-art models such as BiFormer,    We compare the performance of various models on im-
+EVT not only has faster inference speed (1001  v.s. 766),  age classification, object detection, instance segmentation,
+but also achieves a significant improvement in classification  and semantic segmentation tasks in detail. The results are
+
+======================== PDF 第 13 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                             13
+
+             Model        Throughput(imgs/s)   Params(M)   FLOPs(G)   Top1-acc(%)   AP b     AP m    mIoU(%)
+
+            Swin-T [3]              1704              29            4.5           81.3          43.7         39.8         44.5
+          RMT-Swin-T             1192              29            4.7        83.6(+2.3)     47.8(+4.1)   43.1(+3.3)   49.1(+4.6)
+           EVT-Swin-T             1420              29            4.8        83.9(+2.6)     48.6(+4.9)   43.9(+4.1)   49.6(+5.1)
+
+             Swin-S [3]              1006              50            8.8           83.0          45.7         41.1         47.6
+           RMT-Swin-S             722               50            9.1        84.5(+1.5)     49.5(+3.8)   44.2(+3.1)   51.0(+3.4)
+            EVT-Swin-S             866               50            9.3        85.1(+2.1)     50.5(+4.8)   45.1(+4.0)   51.7(+4.1)
+
+            Swin-B [3]              798               88           15.5           83.5          –          –          –
+           EVT-Swin-B             700               88           16.1        85.3(+1.8)        –          –          –
+
+             EVT-T               2142              15            2.5           83.0          47.8         42.9         48.3
+          w/o LCE              2315              15            2.5         82.8(-0.2)      47.1(-0.7)    42.3(-0.6)    47.6(-0.7)
+          w/o CPE              2204              15            2.5         82.9(-0.1)      47.5(-0.3)    42.7(-0.2)    48.0(-0.3)
+        w/o Conv Stem           2296              14            2.2         82.8(-0.2)      47.3(-0.5)    42.2(-0.7)    47.1(-1.2)
+       EuSAg −→EuSAd          2145              15            2.5         82.5(-0.5)      46.9(-0.9)    41.6(-1.3)    46.8(-1.5)
+       EuSAd −→EuSAg          2145              15            2.5         82.6(-0.4)      47.2(-0.6)    42.0(-0.9)    47.0(-1.3)
+       w/o decay matrix          2168              15            2.5         82.3(-0.7)      47.1(-0.7)    42.2(-0.7)    46.6(-1.7)
+                                 TABLE 13: Ablation Studies.
+
+         Model        Params(M) FLOPs(G) Acc(%) AP b AP m                         Params FLOPs  Top1-acc   mIoU
+                                                                   Model
+                                                                                    (M)     (G)      (%)       (%)
+         Euclidean            29         4.8      83.9   48.6  43.9
+                                                             RMT-T        14       2.5       82.4       46.4
+                                                           44.4  40.6     Minkowski p=3         29         4.8      83.5                           deeper        15       2.7    82.5(+0.1)  46.7(+0.3)
+                                                                     (-4.2) (-3.3)        MaSA −→EuSA    15       2.7    82.8(+0.4)  47.6(+1.2)
+     Minkowski p=4         29         4.8    Nan   –    –            decop−→group     15       2.5    83.0(+0.6)  48.3(+1.9)
+     Minkowski p=5         29         4.8    Nan   –    –
+
+       Gaussian RBF          29         4.8    Nan   –    –           TABLE 16: Roadmap from RMT to EVT.
+                                                           47.0  42.2
+     Multiquadric RBF        29         4.8      83.6
+                                                                     (-1.6) (-1.7)
+  Inverse Multiquadric RBF    29         4.8    Nan   –    –                               Throughput Params FLOPs Acc
+                                                                     Model
+                                                                                                 (img/s)    (M)    (G)   (%)
+TABLE  14: Ablation study about the different distance               Swin-T          1704      29      4.5   81.3
+functions. Overly complex distance functions can degrade                                                                    RMT-Swin-T        1192      29      4.7   83.6
+training stability and lead to performance deterioration.                 EVT-Swin-T        1420      29      4.8   83.9
+                                                                             RetNet-Swin-T-linear     336       29      4.3   80.8
+
+                  γn      Acc(%)  mIoU(%)
+                                             TABLE 17: Comparison between RMT/EVT and RetNet.
+                None        82.3       46.6
+                 1 −2−3       82.4       46.7
+                 1 −2−7       82.4       46.6
+                1 −2−3−n     83.0       48.3                         is a plug-and-play module composed of a simple DWConv,
+                1 −2−7−n     82.9       47.8                 which conveniently provides positional information to the
+                                                      model. As shown in the Tab. 13, in EVT, CPE brings a slight
+          TABLE 15: Ablation study for γ.              performance improvement. Specifically, CPE enhances the
+                                                 model by +0.1top1-acc, +0.3AP b, +0.2AP m, and +0.3mIoU.
+shown in Tab. 13. EVT achieves excellent results across  Convolution Stem. Convolution Stem helps to train the
+various downstream tasks. Specifically, in the image classi-  model more stably. Compared to patch embedding, Convo-
+fication task, EVT-Swin-S achieves a top-1 accuracy of 85.1,   lution Stem can extract better shallow fine-grained features,
+an improvement of 0.6 over RMT-Swin-S, and its inference   thereby enhancing the model’s performance across various
+speed is also somewhat faster. EVT-Swin-B achieves a top-1   vision tasks. As shown in Tab. 13, in EVT, Convolution Stem
+accuracy of 85.3 with minimal speed loss, surpassing many  improves the model by +0.2top1-acc, +0.5AP b, +0.7AP m,
+deeper and larger models. In dense prediction downstream  and +1.2mIoU.
+tasks, EVT-Swin also performs exceptionally well. For ex-  EuSAg and EuSAd. EuSAg and EuSAd are two one-
+ample, EVT-Swin-S surpasses RMT-Swin-S by 1.0 in AP b,   dimensional token grouping methods we designed, which
+leads by 0.9 in AP m, and shows an improvement of 0.7 in  do not consider spatial information. They model short-
+mIoU.                                                  range and long-range dependencies between tokens, respec-
+Local Context Enhance Module. The LCE module  is a   tively. In the Methods section, we discovered that under
+simple DWConv that enhances the model’s ability to express   the influence of the Euclidean distance decay matrix, the
+local details, thereby improving its performance. As shown   one-dimensional grouping method outperforms the two-
+in Tab. 13, LCE improves the model’s classification accuracy   dimensional grouping method and  is more  flexible. In
+by 0.2 and significantly boosts performance in dense pre-   Tab. 13, we compare the effects of EuSAg and EuSAd on
+diction tasks such as instance segmentation and semantic   the model’s performance. We found that using only one
+segmentation. Specifically, LCE provides the model with a  grouping method significantly harms the model’s perfor-
+performance increase of +0.7AP b, +0.6AP m, and +0.7mIoU.  mance, which fully demonstrates the rationality of the two
+Conditional Position Encoding. CPE is a positional encod-  grouping designs.
+ing used in many models [5], [17], [19], [20], [24], [39], [47]. It  Euclidean distance-based decay matrix. The Euclidean
+
+======================== PDF 第 14 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                             14
+
+                                Throughput                                                       b      m                 Model                     Parmas(M)   FLOPs(G)    Acc(%)    AP      AP       mIoU
+                                     (imgs/s)
+
+                  Swin-T            1704          29            4.5          81.3         43.7         39.8         44.5
+               +CPE             1640          29            4.5       81.7(+0.4)   44.2(+0.5)   40.5(+0.7)   45.2(+0.7)
+               +LCE             1529          29            4.5       82.0(+0.7)   44.6(+0.9)   41.1(+1.3)    45.6+1.1)
+           +1D group/dilated       1446          29            4.8       83.1(+1.8)   46.6(+2.9)   43.1(+3.3)    46.9+2.4)
+             +Euclidean distance
+                                      1420          29            4.8       83.9(+2.6)   48.6(+4.9)   43.9(+4.1)   49.6(+5.1)
+                (EVT-Swin-T)
+
+                          TABLE 18: Roadmap from Swin-T to EVT-Swin-T.
+
+
+
+                FLOPs    Spatial           Throughput                    Model     ntokens   FLOPs  mIoU
+       Attention                     Acc(%)
+                      (G)      Prior               (imgs/s)
+                                                                          EVT-S       448       936      49.8
+     CSwin [14]      4.6    ×        83.7        924                         EVT-S        98       872      49.3
+     CSwin [14]      4.6    ✓        84.0        901                         EVT-S        49       864      49.1
+
+     CCnet [102]      4.8    ×        83.0        678                          SViT-S [39]      –        926      48.6
+     CCnet [102]      4.8    ✓        83.5        662
+      1D,98tokens      4.6    ×        83.6        1022        TABLE 20: Ablation study on different number of tokens
+      1D,98tokens      4.6    ✓        84.4        1001          based on the semantic segmentation.
+      1D,49tokens      4.4    ×        83.5        1082
+      1D,49tokens      4.4    ✓        84.2        1057
+      1D,32tokens      4.3    ×        83.5        1123
+      1D,32tokens      4.3    ✓        84.1        1100      RNN is not applicable to vision tasks. This is because the
+                                                             inherently bidirectional nature of vision is not well suited
+TABLE 19: Ablation study on different models. All exper-   for representation as an RNN. In RMT/EVT, we use a 2D,
+iments are conducted based on the EVT-S. Throughput is   bidirectional decay matrix to model the vision information,
+measured by A100 80G with the batch size of 64.            whereas in RetNet  [11], the decay matrix for sequence
+                                                              tasks is 1D and unidirectional. Without using the Softmax
+                                                               function, both can be expressed with the following formula:
+distance-based decay matrix  is a core module in EuSA,                  Xout = (QKT ⊙D)V
+providing the model with spatially related prior knowledge.                                                            In RetNet, D is a diagonal matrix, which allows RetNet to be
+In Tab. 13, we validate the effect of the decay matrix on
+                                                          conveniently unfolded into the form of an RNN. In RetNet,
+the model, demonstrating a significant performance im-
+                                    D is a diagonal matrix, with all values above the diagonal
+provement. Specifically, the introduction of the Euclidean
+                                                                    set to zero, meaning that the current token can only associate
+distance-based decay matrix boosts the model’s perfor-
+                                                       with preceding tokens and has no relation to the following
+mance by +0.7top1-acc, +0.7AP b, +0.7AP m, and +1.7mIoU.
+                                                              tokens. This allows RetNet to be conveniently unfolded into
+To further understand the working mechanism of the decay
+                                                            the form of an RNN. However, in RMT/EVT, each position
+matrix, we experiment with different configurations of the                                                                in D is non-zero, meaning that the current token interacts
+decay coefficient in Tab. 15. We find that setting different
+                                                         simultaneously with both preceding and succeeding tokens.
+decay coefficients for each head in multi-head attention
+                                                          This creates a bidirectional modeling process, which fun-
+allows each head to focus on different scales, resulting
+                                                       damentally prevents the model from being unfolded into
+in better model performance. Conversely, using the same
+                                                            the form of an RNN, as RNNs are inherently designed for
+decay coefficient for all heads leads to only a slight per-
+                                                               unidirectional sequence modeling.
+formance improvement. This indicates that the multi-scale
+                                                       To validate our perspective, we directly apply RetNet’s
+information introduced by the decay matrix is what truly
+                                            1D decay and its linear complexity RNN formulation to
+enhances the model’s performance.                                                          Swin-T. The results are shown in Tab. 17. Using the D matrix
+Roadmap from RMT to EVT. As shown in Tab. 16, we  and RNN formulation from RetNet effectively reduces the
+gradually modify components in RMT-T to transform  it   model’s computational cost, achieving linear complexity.
+into EVT-T. First, we adopt a deeper model, resulting in  However, the 1D inference approach disrupts the inherent
+performance improvements (top1-acc+0.1, mIoU+0.3). Next,  2D nature of vision, and the RNN formulation compromises
+we replace the Manhattan distance-based decay matrix with   the parallelism of visual reasoning. As a result, both the
+a Euclidean distance-based decay matrix. This results in   model’s performance and inference speed suffer a signifi-
+a further improvement in the model’s performance (top1-   cant decline.
+acc+0.4, mIoU+1.2). Finally, we replace the horizontal and  Roadmap from Swin-T  to EVT-Swin-T. We show the
+vertical decomposition in MaSA with the token grouping  roadmap from Swin-T to EVT-Swin-T in the Tab. 18. The
+method of EuSA. This change not only reduces the com-   results clearly demonstrate the different modules’ effect.
+putational load (by 0.2G) but also improves the model’s  Ablation study on the number  of  vision  tokens. In
+performance (top1-acc+0.6, mIoU+1.9).                       Tab. 19, we compare model performance under different
+A Comparative Discussion on RMT/EVT and RetNet.   token group sizes (such as groups of 49 or 32 tokens, with
+RMT/EVT  is inspired by RetNet, aiming to transfer  its  padding when necessary). Although our approach is not
+potentially beneficial properties to ViT for vision tasks.   equivalent to CSWin under these settings,  it consistently
+However, the ability of RetNet to be unfolded into an   achieves better performance.
+
+======================== PDF 第 15 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                             15
+
+
+
+
+
+       Fig. 6: Illustration of EVT’s resource consumption and performance with progressively increasing resolutions
+
+
+   Even with smaller group sizes (such as 32 tokens per
+group), our model benefits from the inherent flexibility of
+the 1D grouping paradigm. Compared with other methods
+that use fixed attention patterns, the 1D paradigm is more
+flexible and diverse, enabling the model to learn richer
+features.
+   For higher resolutions, we test various values of ntoken.
+Thanks to the highly flexible nature of 1D grouping in
+2D space, as the resolution increases, the token groupings
+become even more diverse. This strong variability enables
+the model to learn richer spatial patterns. As shown in
+the Tab. 20. Even when the number of tokens per group
+decreases, the model still achieves strong performance with
+the help of the spatial prior.
+Efficiency and Performance on Multiple Resoslution. We
+show the model’s resource consumption and performance
+in the Fig. 6. EVT, like other models with linear complexity,
+exhibits a linear increase in resource requirements.
+
+4.7  Visualization
+
+Euclidean distance v.s. Manhattan distance. We show the
+visualization results in the Fig. 7. The models are trained
+base on the DeiT. We can see that the incorporation of spatial
+prior makes the distribution of attention scores more con-
+centrated, reducing the likelihood of attention dispersion. At             Original         DeiT          DeiT+         DeiT+
+the same time, compared to Manhattan distance, Euclidean            Image                       Manhattan       Euclidean
+distance brings smoother changes in attention, which more
+easily leads to a reasonable attention distribution.              Fig. 7: Visualization results of different models. Three mod-
+Comparision with Swin. To fully demonstrate the advan-   els are DeiT-B (Top1-acc 81.8%), DeiT-B+Manhattan distance
+tages of EVT, we visualize the attention maps of the tokens   (Top1-acc 82.4%), DeiT-B+Euclidean (Top1-acc 82.7%).
+output at each stage. We also visualize the feature maps of
+Swin-Transformer for comparison. We visualize the atten-
+tion maps at each hierarchical level of the Swin Transformer   the model to achieve accurate classification. Compared to
+by constructing a global heat map for every stage. This   Swin-Transformer, EVT’s feature map exhibits less noise and
+approach is borrowed from the Attention Rollout technique  more accurate object localization, fully demonstrating the
+used in [103], which aggregates attention scores across lay-   advantages of EVT.
+ers to create a global attention map. To generate a global
+heat map at each level, we calculate attention scores for
+                                           5  CONCLUSIONeach query token by aggregating attention weights across
+all heads and groups, and we recursively accumulate these   In this work, we propose EVT, a powerful general vision
+scores across layers. This leads to the formation of global   backbone. Building on RMT,  it replaces the Manhattan
+attention patterns even from local attention operations. The   distance-based explicit decay with a Euclidean distance-
+results are shown in Fig. 8. We use an input image resolution  based explicit decay, resulting in improved model perfor-
+of 224×224, and the token resolutions at Stage 1, 2, 3, and 4  mance. Additionally,  it replaces the O(N 1.5) complexity
+are 56×56, 28×28, 14×14, and 7×7, respectively. From the   attention decomposition method in RMT with a more ef-
+visualization results, it is evident that EVT retains detailed   ficient one-dimensional token grouping approach of linear
+information in the shallow layers of the model, such as Stage   complexity. This makes EVT a powerful backbone that
+1 and Stage 2. In the deeper layers, EVT successfully cap-   excels in both performance and efficiency. We validate the
+tures important object information in the images, enabling   strong performance of the model in tasks such as image
+
+======================== PDF 第 16 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                             16
+
+
+                            Image
+
+
+
+
+
+                                 Swin-B:
+
+
+                      Stage1
+
+
+                             EVT-Swin-B:
+
+
+
+
+
+                                 Swin-B:
+
+
+                      Stage2
+
+
+                             EVT-Swin-B:
+
+
+
+
+
+                                 Swin-B:
+
+
+                      Stage3
+
+
+                             EVT-Swin-B:
+
+
+
+
+
+                                 Swin-B:
+
+
+                      Stage4
+
+
+                             EVT-Swin-B:
+
+
+
+                             Fig. 8: Visualization of EVT and Swin-Transformer’s attention map.
+
+
+classification, object detection, instance segmentation, and    [3]   Z. Liu, Y. Lin, Y. Cao, H. Hu, Y. Wei, Z. Zhang, S. Lin, and B. Guo,
+semantic segmentation, and demonstrate its robustness on        “Swin transformer: Hierarchical vision transformer using shifted
+                                                                  windows,” in ICCV, 2021.
+OOD data. Lastly, we conduct extensive ablation studies to
+                                                                                     [4]   H. Touvron, M. Cord, A. Sablayrolles, G. Synnaeve, and H. J´egou,
+verify the role of each module in the model.                       “Going deeper with image transformers,” in ICCV, 2021.
+                                                                                     [5]   Q.  Fan, H. Huang,   J. Guan, and  R. He, “Rethinking  lo-
+                                                                                       cal perception in lightweight vision transformer,” ArXiv, vol.
+6  ACKNOWLEDGEMENTS                                          abs/2303.17803, 2023.
+                                                                                     [6]   H. Wu, B. Xiao, N. Codella, M. Liu, X. Dai, L. Yuan, and L. Zhang,
+This work was supported by National Natural Science
+                                                                            “Cvt: Introducing convolutions to vision transformers,” arXiv
+Foundation  of China  (Grant Nos.  62576342,  62425606,          preprint arXiv:2103.15808, 2021.
+62550062, 32341009), Beijing Natural Science Foundation    [7]     J. Guo, K. Han, H. Wu, C. Xu, Y. Tang, C. Xu, and Y. Wang,
+(4252054, L257008), Beijing Nova Program (20230484276,        “Cmt: Convolutional neural networks meet vision transformers,”
+                                                                                  in CVPR, 2022.
+20240484601).
+                                                                                     [8]   C. Yang, Y. Wang, J. Zhang et al., “Lite vision transformer with
+                                                                   enhanced self-attention,” in CVPR, 2022.
+REFERENCES                                                               [9]   A. Hassani, S. Walton, J. Li, S. Li, and H. Shi, “Neighborhood                                                                                 attention transformer,” in CVPR, 2023.
+[1]   A. Dosovitskiy, L. Beyer, A. Kolesnikov et al., “An image is worth    [10]  Q. Fan, H. Huang, M. Chen, H. Liu, and R. He, “Rmt: Retentive
+     16x16 words: Transformers for image recognition at scale,” in        networks meet vision transformers,” in CVPR, 2024.
+      ICLR, 2021.                                                             [11]   Y. Sun, L. Dong, S. Huang, S. Ma, Y. Xia, J. Xue, J. Wang, and
+[2]   K. Li, Y. Wang, P. Gao, G. Song, Y. Liu, H. Li, and Y. Qiao,            F. Wei, “Retentive network: A successor to Transformer for large
+      “Uniformer: Unified transformer for efficient spatiotemporal rep-        language models,” ArXiv, vol. abs/2307.08621, 2023.
+      resentation learning,” 2022.                                           [12]  O. Press, N. Smith, and M. Lewis, “Train short, test long: At-
+
+======================== PDF 第 17 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                             17
+
+      tention with linear biases enables input length extrapolation,” in    [42]  C. Si, W. Yu, P. Zhou, Y. Zhou, X. Wang, and S. YAN, “Inception
+      ICLR, 2022.                                                             transformer,” in NeurIPS, 2022.
+[13]    J. Min, Y. Zhao, C. Luo et al., “Peripheral vision transformer,” in    [43]  Z. Pan, J. Cai, and B. Zhuang, “Fast vision transformers with hilo
+      NeurIPS, 2022.                                                              attention,” in NeurIPS, 2022.
+[14]  X. Dong, J. Bao, D. Chen et al., “Cswin transformer: A general    [44]  Z. Dai, H. Liu, Q. V. Le, and M. Tan, “Coatnet: Marrying
+      vision transformer backbone with cross-shaped windows,” in         convolution and attention for  all data  sizes,” arXiv preprint
+     CVPR, 2022.                                                              arXiv:2106.04803, 2021.
+[15]  Z. Xia, X. Pan, S. Song, L. E. Li, and G. Huang, “Vision trans-    [45]  H. Huang, X. Zhou, and R. He, “Orthogonal transformer: An effi-
+     former with deformable attention,” in CVPR, 2022.                         cient vision transformer backbone with token orthogonalization,”
+[16]  M. Ding, B. Xiao, N. Codella et al., “Davit: Dual attention vision          in NeurIPS, 2022.
+      transformers,” in ECCV, 2022.                                         [46]  A. Vaswani, N. Shazeer, N. Parmar et al., “Attention is all you
+[17]   L. Zhu, X. Wang, Z. Ke, W. Zhang, and R. Lau, “Biformer: Vision         need,” in NeurIPS, 2017.
+      transformer with bi-level routing attention,” in CVPR, 2023.         [47]  X. Chu, Z. Tian, B. Zhang, X. Wang, and C. Shen, “Conditional
+[18]  Z. Liu, H. Mao, C.-Y. Wu et al., “A convnet for the 2020s,” in          positional encodings for vision transformers,” in ICLR, 2023.
+     CVPR, 2022.                                                            [48]   Y. Fang, Q. Sun, X. Wang, T. Huang, X. Wang, and Y. Cao,
+[19]  Q. Fan, H. Huang, M. Chen, and R. He, “Semantic equitable         “Eva-02: A visual representation for neon genesis,” arXiv preprint
+       clustering: A simple, fast and effective strategy for vision trans-          arXiv:2303.11331, 2023.
+      former,” in ICCV, 2025.                                                [49]  D. Han, X. Pan, Y. Han, S. Song, and G. Huang, “Flatten trans-
+[20] ——, “Vision transformer with sparse scan prior,” 2024.                  former: Vision transformer using focused linear attention,” in
+[21]  X. Chu, Z. Tian, Y. Wang, B. Zhang, H. Ren, X. Wei, H. Xia,        ICCV, 2023.
+     and C. Shen, “Twins: Revisiting the design of spatial attention    [50]  D. Han, T. Ye, Y. Han, Z. Xia, S. Song, and G. Huang, “Agent
+      in vision transformers,” in NeurIPS, 2021.                                   attention: On the integration of softmax and linear attention,” in
+[22]  W. Wang, E. Xie, X. Li, D.-P. Fan, K. Song, D. Liang, T. Lu, P. Luo,       ECCV, 2024.
+     and L. Shao, “Pyramid vision transformer: A versatile backbone    [51]    J. Su, Y. Lu, S. Pan, B. Wen, and Y. Liu, “Roformer: Enhanced
+      for dense prediction without convolutions,” in ICCV, 2021.              transformer with rotary position embedding,” 2021.
+[23] ——, “Pvtv2: Improved baselines with pyramid vision trans-    [52]  Z. Tu, H. Talebi, H. Zhang, F. Yang, P. Milanfar, A. Bovik, and
+      former,” Computational Visual Media, vol. 8, no. 3, pp. 1–10, 2022.           Y. Li, “Maxvit: Multi-axis vision transformer,” in ECCV, 2022.
+[24]  Q. Fan, H. Huang, X. Zhou, and R. He, “Lightweight vision    [53]   Y. Shi, M. Dong, and C. Xu, “Multi-scale vmamba: Hierarchy in
+      transformer with bidirectional interaction,” in NeurIPS, 2023.             hierarchy visual state space model,” in NeurIPS, 2024.
+[25]   P. Zhang, X. Dai, J. Yang, B. Xiao, L. Yuan, L. Zhang, and J. Gao,                                                                               [54]  C. Yang, S. Qiao, Q. Yu et al., “Moat: Alternating mobile convolu-
+      “Multi-scale vision longformer: A new vision transformer for                                                                                  tion and attention brings strong vision models,” in ICLR, 2023.
+      high-resolution image encoding,” in ICCV, 2021.                                                                               [55]  M.-H. Guo, C.-Z. Lu, Z.-N. Liu, M.-M. Cheng, and S.-M. Hu,
+[26]   C.-F. R. Chen, R. Panda, and Q. Fan, “RegionViT: Regional-to-                                                                            “Visual attention network,” arXiv preprint arXiv:2202.09741, 2022.
+      Local Attention for Vision Transformers,” in ICLR, 2022.
+                                                                               [56]  Q. Hou, C.-Z. Lu, M.-M. Cheng, and J. Feng, “Conv2former: A
+[27]   S. Sun, X. Yue, S. Bai, and P. Torr, “Visual parser: Represent-                                                                        simple transformer-style convnet for visual recognition,” arXiv
+      ing part-whole hierarchies with transformers,” arXiv preprint                                                                                      preprint arXiv:2211.11943, 2022.
+      arXiv:2107.05790, 2021.
+                                                                               [57]   Y. Zhang, X. Ding, and X. Yue, “Scaling up your kernels: Large
+[28]  A. Jaegle, F. Gimeno, A. Brock, A. Zisserman, O. Vinyals, and
+                                                                             kernel design in convnets towards universal representations,”
+         J. Carreira, “Perceiver: General perception with iterative atten-                                                                TPAMI, 2025.
+       tion,” in ICML, 2021.
+                                                                               [58]  M. Arar, A. Shamir, and A. H. Bermano, “Learned queries for
+[29]    J. Fang, L. Xie, X. Wang, X. Zhang, W. Liu, and Q. Tian, “Msg-
+                                                                                           efficient local attention,” in CVPR, 2022.
+      transformer: Exchanging local spatial information by manipulat-
+                                                                               [59]  A. Hatamizadeh, H. Yin, G. Heinrich, J. Kautz, and P. Molchanov,      ing messenger tokens,” in CVPR, 2022.
+                                                                         “Global context vision transformers,” in ICML, 2023.
+[30]   Y. Yuan, R. Fu, L. Huang, W. Lin, C. Zhang, X. Chen, and J. Wang,
+                                                                               [60]  W. Lin, Z. Wu,  J. Chen,  J. Huang, and L.  Jin, “Scale-aware      “Hrformer: High-resolution transformer for dense prediction,” in
+                                                                     modulation meet transformer,” in ICCV, 2023.      NeurIPS, 2021.
+                                                                               [61]  D. Shi, “Transnext: Robust foveal visual perception for vision[31]    J. Gu, H. Kwon, D. Wang, W. Ye, M. Li, Y.-H. Chen, L. Lai,
+                                                                              transformers,” in CVPR, 2024.       V. Chandra, and D. Z. Pan, “Multi-scale high-resolution vision
+      transformer for semantic segmentation,” in CVPR, 2022.             [62]  M. Lou and Y. Yu, “Overlock: An overview-first-look-closely-next
+                                                                       convnet with context-mixing dynamic kernels,” in CVPR, 2025.[32]   B. Shi, Z. Wu, M. Mao, X. Wang, and T. Darrell, “When do we
+      not need larger vision models?” arXiv preprint arXiv:2403.13043,    [63]  H. Touvron, M. Cord, M. Douze et al., “Training data-efficient
+      2024.                                                         image transformers & distillation through attention,” in ICML,
+[33]   T. Yao, Y. Li, Y. Pan, and T. Mei, “Hiri-vit: Scaling vision trans-         2021.
+     former with high resolution inputs,” TPAMI, 2024.                   [64]   C.-F. R. Chen, Q. Fan, and R. Panda, “CrossViT: Cross-Attention
+[34]  Z. Liu, H. Hu, Y. Lin, Z. Yao, Z. Xie, Y. Wei,  J. Ning, Y. Cao,         Multi-Scale Vision Transformer  for Image  Classification,” in
+      Z. Zhang, L. Dong, F. Wei, and B. Guo, “Swin transformer v2:        ICCV, 2021.
+      Scaling up capacity and resolution,” in CVPR, 2022.                 [65]    J. Yang, C. Li, P. Zhang, X. Dai, B. Xiao, L. Yuan, and J. Gao, “Focal
+[35]  W. Wang, J. Dai, Z. Chen, Z. Huang, Z. Li, X. Zhu, X. Hu, T. Lu,          self-attention for local-global interactions in vision transformers,”
+      L. Lu, H. Li et  al., “Internimage: Exploring large-scale vision          in NeurIPS, 2021.
+      foundation models with deformable convolutions,” in CVPR,    [66]   S.-F. S. guided Transformer with Evolving Token Reallocation,
+      2023.                                                          “Sucheng ren, xingyi yang, songhua liu, xinchao wang,” in ICCV,
+[36]   Y. Liang, C. Ge, Z. Tong, Y. Song, J. Wang, and P. Xie, “Not all         2023.
+      patches are what you need: Expediting vision transformers via    [67]  D. Han, Z. Wang, Z. Xia, Y. Han, Y. Pu, C. Ge, J. Song, S. Song,
+      token reorganizations,” in ICLR, 2022.                                      B. Zheng, and G. Huang, “Demystify mamba in vision: A linear
+[37]   Y. Rao, W. Zhao, B. Liu, J. Lu, J. Zhou, and C.-J. Hsieh, “Dynam-          attention perspective,” in NeurIPS, 2024.
+        icvit: Efficient vision transformers with dynamic token sparsifi-    [68]   Y. Shi, M. Dong, M. Li, and C. Xu, “Vssd: Vision mamba with
+      cation,” in NeurIPS, 2021.                                             non-causal state space duality,” in ICCV, 2025.
+[38]  D. Bolya, C.-Y. Fu, X. Dai,  P. Zhang, C. Feichtenhofer, and    [69]   S. Tang, J. Zhang, S. Zhu et al., “Quadtree attention for vision
+         J. Hoffman, “Token merging: Your ViT but faster,” in ICLR, 2023.         transformers,” in ICLR, 2022.
+[39]  H. Huang, X. Zhou, J. Cao, R. He, and T. Tan, “Vision transformer    [70]  R. Yang, H. Ma, J. Wu, Y. Tang, X. Xiao, M. Zheng, and X. Li,
+     with super token sampling,” in CVPR, 2023.                                “Scalablevit: Rethinking the context-oriented generalization of
+[40]  Z. Peng, W. Huang, S. Gu, L. Xie, Y. Wang, J. Jiao, and Q. Ye,         vision transformer,” in ECCV, 2022.
+     “Conformer: Local features coupling global representations for    [71]  W. Wang, W. Chen, Q. Qiu, L. Chen, B. Wu, B. Lin, X. He, and
+      visual recognition,” in ICCV, 2021.                               W. Liu, “Crossformer++: A versatile vision transformer hinging
+[41]  Q. Chen, Q. Wu,  J. Wang, Q. Hu, T. Hu, E. Ding,  J. Cheng,        on cross-scale attention,” TPAMI, 2023.
+     and J. Wang, “Mixformer: Mixing features across windows and    [72]   Y. Li, T. Yao, Y. Pan, and T. Mei, “Contextual transformer net-
+      dimensions,” in CVPR, 2022.                                     works for visual recognition,” TPAMI, 2022.
+
+======================== PDF 第 18 页 ========================
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021                                                                             18
+
+[73]  Q. Zhang, Y. Xu, J. Zhang, and D. Tao, “Vitaev2: Vision trans-  7  BIOGRAPHY SECTION
+     former advanced by exploring inductive bias for image recogni-
+      tion and beyond,” arXiv preprint arXiv:2202.10108, 2022.
+[74]   Y. Li, C.-Y. Wu, H. Fan, K. Mangalam, B. Xiong, J. Malik, and
+      C. Feichtenhofer, “Mvitv2: Improved multiscale vision trans-
+      formers for classification and detection,” in CVPR, 2022.
+                                                                           Qihang Fan received the B.Eng. degree with the
+[75]  W. Wang, L. Yao, L. Chen, B. Lin, D. Cai, X. He, and W. Liu,
+                                                                                  Department of Precision Instrument, Tsinghua
+      “Crossformer: A versatile vision transformer hinging on cross-
+                                                                                                         University, Beijing, China, in 2023. He is cur-
+      scale attention,” in ICLR, 2022.
+                                                                                                          rently working toward the PhD degree with the
+[76]   Y. Lee, J. Kim, J. Willette, and S. J. Hwang, “Mpvit: Multi-path
+                                                                                                               Institute of Automation, Chinese Academy of
+      vision transformer for dense prediction,” in CVPR, 2022.
+                                                                                          Sciences, Beijing. His research interests include
+[77]  Z. Chen, Y. Duan, W. Wang, J. He, T. Lu, J. Dai, and Y. Qiao,
+                                                                                   computer vision, deep learning architecture, and
+      “Vision transformer adapter for dense predictions,” in ICLR,
+                                                                                          multimodal large language models.
+      2023.
+[78]   B. Recht, R. Roelofs, L. Schmidt, and V. Shankar, “Do imagenet
+       classifiers generalize to imagenet?” 2019.
+[79]  D. Hendrycks, K. Zhao, S. Basart,  J. Steinhardt, and D. Song,
+      “Natural adversarial examples,” in CVPR, 2021.
+[80]  D.  Hendrycks,  S.  Basart, N. Mu,  S.  Kadavath,  F. Wang,
+      E. Dorundo, R. Desai, T. Zhu, S. Parajuli, M. Guo, D. Song,
+         J. Steinhardt, and J. Gilmer, “The many faces of robustness: A                     Huaibo Huang (Member, IEEE) received the BE
+       critical analysis of out-of-distribution generalization,” in ICCV,                       degree in measurement and control technology
+      2021.                                                                     and instrument from Xi’an Jiaotong University, in
+[81]    J. Deng, W. Dong, R. Socher  et  al., “Imagenet: A large-scale                        2012, the ME degree in optical engineering from
+      hierarchical image database,” in CVPR, 2009.                                       Beihang University, in 2016, and the PhD degree
+[82]   E. D. Cubuk, B. Zoph, J. Shlens et al., “Randaugment: Practical                              in pattern recognition and intelligent system from
+     automated data augmentation with a reduced search space,” in                      CASIA, in 2019. He is currently an associate
+    CVPRW, 2020.                                                                          professor in MAIS, NLPR, CASIA, China. His
+[83]  H. Zhang, M. Cisse, Y. N. Dauphin  et  al., “mixup: Beyond                          current research interests include computer vi-
+      empirical risk minimization,” in ICLR, 2018.                                              sion and pattern recognition. He serves as the
+[84]   S. Yun, D. Han, S. J. Oh et al., “Cutmix: Regularization strategy to                            editor board member of IEEE TIFS and TBIOM.
+       train strong classifiers with localizable features,” in ICCV, 2019.
+[85]   B. T. Polyak and A. B. Juditsky, “Acceleration of stochastic ap-
+      proximation by averaging,” arXiv preprint arXiv:1906.07155, 2019.
+[86]  G. Huang, Y. Sun, and Z. Liu, “Deep networks with stochastic
+      depth,” in ECCV, 2016.                                                           Mingrui Chen received the B.E. degree from the
+[87]    J. Pan, A. Bulat, F. Tan et al., “Edgevits: Competing light-weight                       School of Artificial Intelligence and Automation,
+     cnns on mobile devices with vision transformers,” in ECCV, 2022.                     Huazhong University of Science and Technol-
+[88]   Y. Rao, W. Zhao, Y. Tang, J. Zhou, S.-L. Lim, and J. Lu, “Hor-                          ogy, in 2024. He  is currently working toward
+       net: Efficient high-order spatial interactions with recursive gated                         the Ph.D. degree with the School of Artificial
+      convolutions,” in NeurIPS, 2022.                                                                Intelligence, University of Chinese Academy of
+[89]    J. Yang, C. Li, X. Dai, and J. Gao, “Focal modulation networks,”                       Sciences (UCAS) and Institute of Automation,
+      in NeurIPS, 2022.                                                               Chinese Academy of Sciences (CASIA), Beijing,
+[90]   T.-Y. Lin, M. Maire, S. Belongie et al., “Microsoft coco: Common                        China. His research interests include in deep
+      objects in context,” in ECCV, 2014.                                                        learning architecture and representation learn-
+[91]  K. Chen, J. Wang, J. Pang et al., “MMDetection: Open mmlab de-                             ing.
+      tection toolbox and benchmark,” arXiv preprint arXiv:1906.07155,
+      2019.
+[92]  K. He, G. Gkioxari, P. Doll´ar, and R. B. Girshick, “Mask r-cnn,” in
+     ICCV, 2017.
+[93]  Z. Cai and N. Vasconcelos, “Cascade r-cnn: Delving into high                   Hongmin Liu received the B.S. degree from
+      quality object detection,” in CVPR, 2018.                                                 Xidian University, Xi’an, China, in 2004, and the
+[94]   T. Lin, P. Goyal, R. B. Girshick, and K. H. andPiotr Doll´ar, “Focal                        Ph.D. degree from the Institute of Electronics,
+       loss for dense object detection,” in ICCV, 2017.                                      Chinese Academy of Sciences, Beijing, China,
+[95]   B. Zhou, H. Zhao, X. Puig et al., “Scene parsing through ade20k                              in 2009. She is currently a Professor with the
+      dataset,” in CVPR, 2017.                                                          School of Artificial Intelligence, University of Sci-
+[96]  A. Kirillov, R. Girshick, K. He, and P. Doll´ar, “Panoptic feature                      ence and Technology Beijing. Her research inter-
+     pyramid networks,” in CVPR, 2019.                                                      ests include computer vision and smart sensing.
+[97]   T. Xiao, Y. Liu, B. Zhou, Y. Jiang, and J. Sun, “Unified perceptual
+      parsing for scene understanding,” in ECCV, 2018.
+[98]  M. Contributors, “Mmsegmentation, an open source semantic
+      segmentation toolbox,” 2020.
+[99]  D. Hendrycks and T. Dietterich, “Benchmarking neural network
+      robustness to common corruptions and perturbations,” in ICLR,
+      2019.
+[100] H. Wang, S. Ge, E. P. Xing, and Z. C. Lipton, “Learning robust                   Ran He (Fellow, IEEE) received the BE degree
+      global representations by penalizing local predictive power,” in                              in computer science from the Dalian Univer-
+      NeurIPS, 2019.                                                                                           sity of Technology, in 2001, the MS degree in
+[101] B. Recht, R. Roelofs, L. Schmidt, and V. Shankar, “Do ImageNet                       computer science from the Dalian University of
+       classifiers generalize to ImageNet?” in ICML, 2019.                                      Technology, in 2004, and the PhD degree in pat-
+[102] Z. Huang, X. Wang, L. Huang, C. Huang, Y. Wei, and W. Liu, “Cc-                           tern recognition and intelligent systems from CA-
+       net: Criss-cross attention for semantic segmentation,” in ICCV,                         SIA, in 2009. Since September 2010, he joined
+      2019.                                                                 NLPR, where he is currently a full professor. His
+[103]  S. Abnar and W. Zuidema, “Quantifying attention flow in trans-                        research interests include information theoretic
+      formers,” in ACL, 2020.                                                                      learning, pattern recognition, and computer vi-
+                                                                                                      sion. He serves as the editor board member of
+                                                          IEEE TPAMI, TIP, TIFS, TCSVT and TBIOM, and serves on the program
+                                                                committee of several conferences. He is also a fellow of the IAPR.

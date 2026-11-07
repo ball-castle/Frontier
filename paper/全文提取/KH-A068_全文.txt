@@ -1,0 +1,1856 @@
+KH-A068 | GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+来源：https://arxiv.org/abs/2602.20399
+本地PDF：专题文献/何恺明/KH-A068_GeoPT_Scaling_Physics_Simulation_via_Lifted_Geometric_Pre_Training_ICML2026.pdf
+SHA-256：9c8ce699ca8c5006f19728962f66b2b042000d8b1665c1544ddc6c45a4be1428
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+         GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+
+
+         Haixu Wu * 1 Minghao Guo * 1 Zongyi Li 1 Zhiyang Dou 1 Mingsheng Long 2 Kaiming He 1 Wojciech Matusik 1
+
+
+                         Abstract                                    From Scratch   Geometry-Only Pre-Training   Geometry-Only Conditioning   GeoPT
+
+              Neural simulators promise efficient surrogates                                                     L2
+                                                                                                                                                                   2x Faster
+                for physics simulation, but scaling them is bot-           L2                                                                                                                                                                Relative                 Converging
+               tlenecked by the prohibitive cost of generating                                             Relative                                                     Epochs (Fix 100 Samples)                 high-fidelity training data. Pre-training on abun-
+                                                                                                                                    40% Data
+                                                                                                                                  L2                     Saving2026         dant off-the-shelf geometries offers a natural al-
+                 ternative, yet faces a fundamental gap: super-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         Relative               vision on static geometry alone ignores dynam-                Training
+                                                                                                     Epochs            Training Samples                   Samples (Fix 200 Epochs)                 ics and can lead to negative transfer on physicsMay                 tasks. We present GeoPT, a unified pre-trained         Figure 1. Neural aerodynamics simulation on DrivAerML (Ash-
+20       modellifted geometricfor generalpre-training.physics simulationThe core basedidea is onto          tonGeometry-onlyet al., 2024)pre-trainingbased on Transolverand conditioning(Wu et al.,refer2024)to pre-trainingbackbone.
+                                                                  by predicting vector distance (Faugeras & Gomes, 2000) of given             augment geometry with synthetic dynamics, en-
+                                                                                  positions and utilizing geometry representation extracted by Hun-
+               abling dynamics-aware self-supervision without                                                               yuan3D (Tencent, 2025) as auxiliary feature, respectively.
+               physics labels. Pre-trained on over one million
+               samples, GeoPT consistently improves industrial-
+                                                                    design (Ansys Inc., 2026; Altair Engineering Inc., 2026a).
+                  fidelity benchmarks spanning fluid mechanics for[cs.LG]          cars, aircraft, and ships, and solid mechanics in        Achieving industrial-fidelity accuracy, however, typically
+               crash simulation, reducing labeled data require-        hinges on scaling model capacity and training data. Unlike
+             ments by 20-60% and accelerating convergence         vision or language, where well-established self-supervision
+             by 2×. These results show that lifting with syn-         learning methods and web-scale data enable such scal-
+                 thetic dynamics bridges the geometry-physics         ing (He et al., 2022; Achiam et al., 2023), neural simulators
+               gap, unlocking a scalable path for neural sim-        remain dominated by supervised learning on physics data
+                ulation and potentially beyond. Code is available         generated from numerical solvers. The primary scaling bot-
+                  at https://github.com/Physics-Scaling/GeoPT.            tleneck is label generation: each training sample requires
+                                                                   a full numerical solve, whose computational cost increases
+                                                                      sharply with geometry and physics complexity. For exam-
+          1. Introduction                                                ple, in the DrivAerML aerodynamics dataset (Ashton et al.,
+                                                                       2024), generating a single industrial-fidelity sample can cost
+          Neural simulators have emerged as efficient surrogates for    6.1×104 CPU-hours. This prohibitive cost severely limits
+            classical numerical solvers, accelerating physics simulation    the scaling of neural simulators across diverse physics.
+           across scientific discovery and engineering design (Li et al.,arXiv:2602.20399v2                                                                In this paper, we explore self-supervised pre-training for          2021; Wang et al., 2023; Zhou et al., 2024). By learning
+                                                                      neural simulation as a pathway to scale beyond solver-         an operator that maps geometry and initial conditions to
+                                                                    simulated datasets. Fundamentally, the solution field of           solution fields, these models reduce complex evaluations
+                                                                  a physical system is jointly determined by geometry and           to a single forward pass, substantially lowering inference
+                                                                dynamics: the geometry defines the spatial domain and            costs. This amortization is particularly vital for iterative
+                                                                     boundaries, while dynamics specify how the system is          design systems, as evidenced by the widespread adoption
+                                                                          driven. Although physics labels from geometry-dynamics           of commercial neural simulation software within industrial
+                                                                   coupled simulations are costly to obtain, the geometry alone
+             *Equal contribution 1MIT CSAIL 2Tsinghua University.            is abundantly available at web scale from public reposito-
+          <wuhaixu98@gmail.com>, <guomh2014@gmail.com>.                                                                                   ries (Chang et al., 2015; Deitke et al., 2023). This asymme-
+                                  rd                                           try motivates a geometric pre-training paradigm: we pre-           Proceedings of the 43   International Conference on Machine
+           Learning, Seoul, South Korea. PMLR 306, 2026. Copyright 2026     train neural simulators only on geometry data and introduce
+          by the author(s).                                             simulated physics labels during downstream fine-tuning.
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+               Pre-Train on Diverse Geometries                                       Fast Fine-Tune for Physics Simulations
+
+
+                                                 GeoPT                                    …
+
+
+                                                                                                 Aero- and Hydrodynamics    Crash       Radiosity
+
+Figure 2. GeoPT offers a way to scale up neural simulators with off-the-shelf geometries and enables fast fine-tuning for various physics.
+
+
+The central challenge is that previous self-supervised learn-    physics domains, e.g., radiosity, successfully unlocking the
+ing methods only optimize the model within the native space    scaling benefits of neural simulators.
+of the pre-training data, such as learning to reconstruct from
+masked images (He et al., 2022) or learning to identify sim-    2. Related Work
+ilar samples from augmentations (Chen et al., 2020), where
+the model input will not exceed the original information of     2.1. Neural Simulators
+pre-training data. This paradigm succeeds when the pre-
+                                                Our review focuses on the evolution of neural simulators,
+training data space is aligned with downstream tasks, such
+                                                     which we categorize into model architectures and foundation
+as image pre-training for recognition. However, a funda-
+                                                         models. For classical numerical solvers, we refer readers to
+mental gap emerges when the downstream task inhabits a
+                                                               established reviews (Solin, 2005; Jasak, 2009).
+space strictly richer than that of the pre-training data. Neural
+simulation exemplifies this failure: while pre-training on
+                                                Model architectures. Extensive architectures have been ex-
+geometry data is viable, the downstream task requires repre-
+                                                            plored for neural simulation (Raissi et al., 2020; Pfaff et al.,
+sentations that encode the coupled interaction of geometry
+                                                       2021; Li et al., 2025), with neural operators representing
+and dynamics, while geometry-only pre-training can only
+                                                              notable progress by formalizing simulation as learning maps
+learn a reduced representation. As evidenced empirically in
+                                                    between function spaces (Kovachki et al., 2023) to solve
+Fig. 1, geometry-only supervision for pre-training cannot
+                                                 PDEs. FNO (Li et al., 2021) and its variants (Wen et al.,
+benefit or even degrade downstream performance.
+                                                         2022; Li et al., 2023a; Rahman et al., 2023; Wu et al., 2023)
+To bridge this gap, we propose dynamics-lifted geometric    approximate integral operator via linear transformations in
+pre-training, defining supervision within an expanded space    Fourier space. Transformers (Vaswani et al., 2017) have
+that reflects the geometry-dynamics coupling required by    also been adopted (Li et al., 2023c; Wu et al., 2024), where
+downstream tasks. Specifically, we augment the geometry-    the attention mechanism serves as a global integral oper-
+only pre-training input with randomly sampled velocity    ator (Kovachki et al., 2023), and naturally accommodates
+fields as dynamics conditions and leverage the dynamics-    irregular geometries by treating mesh points as tokens. To
+induced, geometry-bounded transport trajectories as self-    address the quadratic complexity in geometric resolution,
+supervision. Such pre-training can go beyond the original     efficient attention (Choromanski et al., 2021) and its variants
+geometry space and enables the model to learn geometry-    are introduced to Transformer-based simulators (Cao, 2021;
+dynamics coupled representations in a lifted space.  Af-   Hao et al., 2023). Recently, Transolver (Wu et al., 2024)
+ter pre-training, the model is fine-tuned to specific physics    bypasses mesh structure by learning latent physical states,
+tasks by specializing the dynamics condition with the cor-    demonstrating strong performance and scaling in industrial
+responding simulation settings and learning from solver-    design applications (Luo et al., 2025; Nabian et al., 2025).
+generated labels. In effect, this lifted self-supervision learns    In this paper, we use Transolver as our backbone, although
+a dynamics-aware prior from massive unlabeled geometry,    the proposed pre-training method is architecture-agnostic.
+scaling without task-specific simulation during pre-training.
+                                                       Physics foundation models. Scaling neural simulators as
+We perform dynamics-lifted geometric pre-training on a                                                          physics foundation models has been explored to improve
+large-scale 3D geometry repository (Chang et al., 2015),                                                           simulation performance (Yang et al., 2023; Herde et al.,
+generating over one million solver-free geometric-walk                                                       2024; Ye et al., 2024). Poseidon pre-trains on 2D fluid
+samples by sampling dynamics conditions for each shape.                                                    dynamics with temporal conditioning (Herde et al., 2024);
+We refer to the resulting geometric pre-trained model as                                       DPOT expands to diverse physics with auto-regressive pre-
+GeoPT. GeoPT consistently improves downstream accu-                                                                 diction (Hao et al., 2024); Unisolver incorporates PDE infor-
+racy and data-efficiency across industrial-fidelity fluid and                                                        mation via conditional architectures (Zhou et al., 2025); and
+solid benchmarks, including car, aircraft aerodynamics, ship                                           P3D extends to 3D fluids (Holzschuh et al., 2026). Despite
+hydrodynamics and crash simulation (Figs. 1-2), which re-                                                             these advances, existing models remain restricted to a spe-
+duces physics data requirements by 20-60%, accelerates                                                                           cific physics family on regular grids and do not generalize to
+convergence by up to 2× and can generalize to boarder
+
+
+                                                2
+
+======================== PDF 第 3 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+the industrial simulations evaluated in this paper. Moreover,   The neural simulator Fθ(G, S) learns to estimate the physi-
+they still rely on compute-heavy simulation data for scaling,    cal quantities directly, bypassing the expensive numerical
+whereas GeoPT pre-trains on off-the-shelf geometries alone,    solvers. The learning objective is to minimize:
+offering a more scalable path to large-scale pre-training.
+                                                                                   Lphysics = ED ∥Fθ(x; G, S) −u(x)∥22  .      (1)
+
+2.2. Self-Supervised Pre-Training                                                          Previous supervised learning relies on labeled dataset D =
+                                                         {(x, G, S, u(x))}. The geometric pre-training studied inSelf-supervised pre-training has achieved remarkable suc-
+cess in vision (Caron et al., 2021; He et al., 2022; Lin et al.,     this paper seeks an initialization bθ for Fθ from unlabeled
+2023; Tencent, 2025), language (Devlin et al., 2019; Achiam    geometries G alone, so that the downstream optimization of
+et al., 2023), and audio (Huang et al., 2022), typically by    Eq. (1) converges faster with fewer physics labels.
+constructing pretext tasks from raw input to learn transfer-
+able representations that mitigate labeling bottlenecks.        4. Method
+Well-established methods include reconstructing masked                                      We aim to pre-train a general neural simulator solely from
+inputs (Vincent et al., 2008; He et al., 2022; Xie et al., 2022)                                                        geometric data. This requires a supervision signal that re-
+and predicting similarity among augmentations (He et al.,                                                                         flects the geometry-dynamics coupling of downstream tasks,
+2020; Chen et al., 2020; Caron et al., 2021). Despite the                                                        while enabling adaptation to diverse simulations. GeoPT
+diverse pretext tasks, these methods limit the learning pro-                                                          achieves this through lifted geometric pre-training, which
+cess within the pre-training data space without introducing                                                                naturally yields a unified interface for varied physics tasks.
+external information. This paradigm is widely adopted for
+input-aligned pre-training and fine-tuning tasks. Our setting
+                                                                    4.1. Lifting Geometry to Physics
+differs fundamentally: we pre-train on geometry yet tar-
+get generalization to the higher-dimensional physics space,   The geometry-physics gap. Given the abundance of un-
+where native-space pre-training may collapse due to poten-    labeled 3D shapes, a natural strategy is to pre-train neural
+tial randomness of uncovered factor, e.g., dynamics.          simulators using supervision derived purely from geome-
+                                                                              try. A straightforward approach trains the model to predict
+Self-supervised pre-training has also been explored in 3D
+                                                         geometric features at query points x with following loss:
+geometry understanding (Yu et al., 2022; Tencent, 2025),
+                                                                                                              2  ,      (2)and recent work incorporates such pre-trained encoders as             Lprenative = Ex,G  ∥Fbθ(x; G) −hG(x)∥2auxiliary feature extractors for physics-learning (Deng et al.,
+2024; Zhang et al., 2026).  However, these approaches    where hG(x) ∈H denotes the self-supervision target at
+rely on frozen geometric encoders and do not scale the    x, with H being the space of geometric features such
+core physics backbone.  Furthermore, since pre-training    as occupancy, signed distance (SDF), or vector distance
+uses static geometric supervision only, the learned repre-     fields (Faugeras & Gomes, 2000). We refer to this as native
+sentations lack awareness of dynamics.  In contrast, we     pre-training: the model learns a mapping G →H, where
+directly pre-train the physics backbone itself and bridge the    the supervision hG(x) is derived solely from the geometry,
+geometry-physics gap through dynamics-lifted supervision.    determined by the static spatial information G.
+
+                                                           Despite the intuition that pre-training should help, the objec-
+3. Problem Setup                                              tive in Eq. (2) does not reliably benefit neural simulation in
+                                                                    practice. We empirically study this on the aerodynamics task
+We consider physics systems defined with geometric objects
+                                                                in DrivAerML (Ashton et al., 2024) using Transolver (Wu
+G∈G, where G denotes the space of geometries in RC, and
+                                                                     et al., 2024).  Quantitatively, as shown in Fig. 1, native
+system conditions S ∈S that specify how the system is
+                                                               pre-training followed by fine-tuning on physics labels de-
+driven, including boundary types, external forces, govern-
+                                                         grades accuracy compared to training from scratch by a
+ing equation, initial states, etc. The numerical simulator
+                                                               large margin. To understand this failure, we visualize the
+produces a solution u:RC →RCu, where u(x) is the cor-
+                                                           learned aggregation weights across spatial points in Tran-
+responding physics quantities on discretized mesh points                                                                 solver1, which represent the spatial correlations the model
+x ∈RC and Cu denotes the number of physical variables.                                                          has learned and can reflect the potential interactions among
+In this work, we focus on steady-state simulation, a primary
+                                                                 different positions under the physical simulation context.
+paradigm for industrial design and large-scale engineering
+                                      We compare: (i) training with physics supervision, and (ii)
+analysis (Azizzadenesheli et al., 2024). For example, in
+                                                                training with geometry-only supervision from Eq. (2). As
+aerodynamics, G is a car surface mesh, S specifies incom-
+ing flow velocity and direction, x denotes the query point,        1Transolver aggregates mesh points into several internally
+and u(x) contains the resulting pressure and velocity fields.     representation-consistent tokens. If two positions are more likely
+                                                                         to be ascribed to the same token, they are learned to be correlated.
+
+
+                                                3
+
+======================== PDF 第 4 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+
+
+
+  Physics
+  Supervision                                             (                          )
+                                                                                                                                   ,
+
+  Pure Geo
+  Supervision                                                                         Geometry                               Dynamics
+                                                                                   Space                                  Space
+  GeoPT                                                (                          )
+  Supervision                                                                                                                      ,
+
+                                     (a) Learned Correlation Visualization                                                          (b) Lifting Geometry to Physics Space
+
+Figure 3. Geometry-physics analysis. (a) Visualization of learned correlations on DrivAerML (Ashton et al., 2024). We train Tran-
+solver (Wu et al., 2024) using different supervisions and visualize the spatial distribution of learned aggregation weights in four tokens.
+Brighter colors indicate higher token assignment likelihood, revealing correlations captured by the model. See Appendix F full results. (b)
+We lift the geometry space by augmenting it with synthetic velocity fields, which further derive a dynamics-aware supervision.
+
+
+shown in Fig. 3(a), the two settings yield starkly differ-    simulation, or radiosity in light transport. This formulation
+ent patterns. With geometry-only supervision, the model     is generic across physical regimes: in fluid dynamics, vS
+groups regions by static shape cues, assigning both front     relates to the flow velocity; in solid mechanics, it describes
+and back volumes to the same state and producing left-right    the displacement; in radiative transport, it represents prop-
+asymmetric patterns. In contrast, physics supervision yields    agation direction. The velocity field vS thus provides a
+front-back asymmetric and left-right symmetric patterns that    fundamental parameterization of dynamics conditions S.
+align with the aerodynamic flow structure.
+                                                           Lifting geometry via synthetic dynamics. This observa-
+The root cause of this failure becomes clear when compar-    tion offers a path to incorporating dynamics into pre-training.
+ing native pre-training (Eq. (2)) with the downstream task    Rather than relying on the physics-determined vS, which re-
+(Eq. (1)). Downstream prediction depends jointly on geome-    quires expensive simulation to obtain, we construct synthetic
+try G and dynamics conditions S, yet native pre-training in-    velocities by randomly sampling per-particle velocity:
+volves only G, where dynamics are entirely absent. Without
+                                                         dxt
+any notion of dynamics, native pre-training cannot capture        = v · 1G(xt),  x0 = x,  v∼Unif(BC),   (4)
+                                                             dtthe geometry-dynamics coupling in physics simulation.
+                                                   where BC = {v ∈RC : ∥v∥2 ≤vmax}. Denote V ∈V asParameterize dynamics. To bridge this gap, we need to
+                                                             the collection of such per-point velocities across all querydesign a pre-training objective that incorporates dynamics
+                                                              points as shown in Fig. 3(b).while relying only on geometry data: the supervision should
+remain geometry-derived, yet the learning process should   The self-supervision target then becomes the trajectory of
+also encode dynamics. A key question is how to represent    geometric features under this synthetic dynamics:
+dynamics S in a form amenable to self-supervised learning.
+                                                               hG(x0:τ) = {hG(xt)}τt=0 ∈Htraj,         (5)We begin by examining how particles behave in physical
+systems. In any dynamic process, a particle at position x   where τ is a given fixed time horizon. By tracking how
+is not static but moves under the governing physics. This    geometric features evolve along these synthetic trajectories,
+evolution can be characterized by an (instantaneous) veloc-   we obtain a dynamics-aware supervision signal constructed
+ity field vS : RC ×R→RC determined by the simulation     entirely from geometry.
+settings S, which can be formalized as:
+                                                                   min Lprelifted        In effect, we lift the pre-training         dxt                                                            (G, V)            Htraj  from the native geometry space        = vS(xt, t) · 1G(xt),  x0 = x,        (3)
+          dt                                                                             to a joint geometry-dynamics
+                                                                                                           lifting                            slice
+where 1G(·) equals 0 inside or on the boundary G and 1                             space. The inset diagram illus-
+otherwise. This formulation encodes two key structures                                  trates the key relationships: the                                              G       H
+of physical simulation: (i) The velocity field vS couples             min Lprenative         vertical arrow G →(G, V) is the
+spatially distant points: trajectories from different initial     lifting operation, augmenting each geometry with random
+positions may intersect, causing these points to share cor-    velocity fields; the top arrow (G, V)→Htraj is the lifted pre-
+related physical responses, mirroring how quantities at dif-    training task, predicting feature trajectories under synthetic
+ferent locations become coupled through shared flow or    dynamics; the bottom arrow G →H is native pre-training;
+force transmission. (ii) The indicator 1G halts trajectories    and the dashed arrow Htraj →H is slicing, which recov-
+at the geometry boundary, reflecting that physical responses     ers static features by taking t = 0. Native pre-training is
+are fundamentally shaped by boundary interactions, e.g.,    thus a degenerate case of lifted pre-training: when dynam-
+surface pressure in aerodynamics, contact forces in crash     ics are removed, the trajectory collapses to a single point.
+
+                                                4
+
+======================== PDF 第 5 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+ (a) Lifted Geometric Pre-Train                                                      Dynamics-Lifted Supervision        (b) Configure Dynamics Information for Finetune
+
+         WaterCraft                       …
+            1,939 Shapes                      Dynamic Vector Distances                 …
+                  Airplane
+      Car       4,045 Shapes                                                GeoPT                               …
+    7,479 Shapes
+                                 Sampling            Sampling
+                                      Tracking Particles       Particle Velocities
+
+    Balanced
+    Sampling                                                                  Geometry     Dynamics
+                    Scale & Rotate                                                      Information    Information            Speed          Angle & Speed      Angle & Speed
+
+Figure 4. Overall design of GeoPT. (a) To ensure the pre-training diversity, we pre-train the model with geometry randomly sampled from
+the public repository (Chang et al., 2015) and generate the supervision for random tracking points under random dynamics. (b) Through a
+dynamics-lifted framework, we can configure the dynamics condition to “prompt” the corresponding pre-training capability of GeoPT.
+
+Crucially, downstream simulation also operates on the joint    eration from a finite set of shapes. The model Fbθ receives
+space (G, V), representations learned via lifting therefore    query position x, velocity V , and geometry G, and outputs a
+transfer directly to physics simulation tasks.                   feature trajectory instead of static geometry features. Thus,
+                                                                the whole learning process lies in a geometry-dynamics cou-Remark 4.1 (Theoretical interpretation). The trajectory
+                                                           pled space, which is higher-dimensional than native space.evolution in Eq. (4) corresponds to solving a fundamental
+mass-conservation system, described by the transport equa-   As illustrated in Fig. 4, we pre-train on industry-relevant
+tion with sticking boundary: ∂tf + v · ∇xf = 0, where    subsets of ShapeNet (Chang et al., 2015) (cars, airplanes,
+f(x, v, t) is a phase-space density. Pre-training with ran-    watercraft), comprising over 10,000 unique geometries. Al-
+domly sampled velocity fields v ∈V can be viewed as learn-    though these shapes differ from industrial models, they pro-
+ing to obey the conservation law under arbitrary dynamics,    vide foundational knowledge of real-world geometry. Cou-
+providing a universal prior for the downstream physical    pled with multiple dynamic trajectories per geometry, our
+simulation. See Appendix A for details.                        pre-training leverages 1,346,300 training samples in total.
+
+                                                       Fast Fine-tuning.  After pre-training, GeoPT captures4.2. Lifted Geometric Pre-Training
+                                                              physics-aligned correlations conditioned on the velocity. As
+The above-described dynamics-lifted framework provides    shown in Fig. 4(b), GeoPT adapts to downstream simulation
+both a pre-training objective and a unified interface for    tasks by replacing randomly sampled velocities with task-
+downstream tasks: the model receives geometry and ve-    specific velocity VS = {vS} that encode the simulation
+locity as input during both pre-training and fine-tuning. We     settings S from Eq. (1). The fine-tuning objective is:
+now present the complete GeoPT system.
+                                                                                 Lfine = Ex,G,VS h ∥Fθ(x; G, VS) −u(x)∥22 i .    (7)Pre-training objective. Following the lifting perspective,
+we pre-train the model to predict geometric feature trajecto-
+                                                The key is configuring VS to explicitly encode simulationries under synthetic dynamics:
+                                                                  settings S for each domain. Here are examples for Table 1:
+
+                                                  2                                           i                                                                           .   (6)      (i) Aerodynamics: S specifies incoming flow conditions,    Lprelifted = Ex,G,V h                                                  2                      Fbθ(x; G, V ) −hG(x0:τ)
+                                                           including angle of attack, sideslip angle, and freestream
+The expectation is over three sources of variation (Fig. 4):    velocity. We encode these as VS with direction aligned to
+(i) geometry G sampled with category-balanced sampling    the flow and magnitude equal to the freestream speed. This
+from the geometry dataset G, (ii) tracking point initial po-    covers both car and airplane simulations.
+sition x sampled from both the surrounding volume space
+                                                                                   (ii) Hydrodynamics: S specifies vessel speed and water-air
+ΩG and geometry boundary G, and (iii) per-point velocity
+                                                                interface conditions. We configure separate VS for waterv ∈V sampled uniformly from a bounded ball BC. Given
+                                                    and air phases, with directions and magnitudes reflecting
+geometry-dynamics coupled information (G, V ), the trajec-
+                                                              the two-phase flow in ship resistance simulation.
+tory x0:τ is deterministically computed via Eq. (4), and the
+supervision target hG(x0:τ)={hG(xt)}τt=0 is the sequence      (iii) Crash simulation: S specifies impact location, direc-
+of geometric features along this path.                            tion, and material properties. We encode these as VS with
+                                                                direction aligned to the impact and spatially decaying mag-
+The composition of these three factors yields a combina-
+                                                              nitude from the collision point, reflecting force propagation.
+torially large pre-training space: each geometry admits in-
+finitely many query positions, and each position can be    This unified interface, geometry G plus velocity field VS,
+paired with arbitrary velocities, enabling massive data gen-    allows a single pre-trained model to adapt to diverse physics
+
+                                                5
+
+======================== PDF 第 6 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+by reconfiguring the velocity input.                             Table 1. Summary of experimental simulations. #Mesh records the
+                                                                        size of the discretized meshes for each sample. #Variable records
+Remark 4.2 (Native space v.s. lifted pre-training). By com-    the varied simulation configurations among different samples.
+paring native space (Eq. (2)) and lifted (Eq. (6)) pre-training
+                                                  TYPE    BENCHMARKS #MESH    #VARIABLE    #SIZE
+formalizations, we can establish the theoretical connection
+between these two paradigms. Given optimal models Fθ∗native    AERO-    DRIVAERML ∼160M   GEOMETRY   ∼6TB                                                   NASA-CRM ∼450K  GEO, SPEED, AOA ∼3GB
+                                                     DYNAMICSand Fθ∗lifted achieving zero Lprenative, Lprelifted respectively, we have                                                           AIRCRAFT  ∼330K GEO, SPEED, AOA, SLIP ∼7GB
+        slice EV  Fθ∗lifted(x; G, V ) = Fθ∗native(x; G),    (8)    HYDRO-  DTC HULL  ∼240K   GEO, YAW ANGLE  ∼2GB
+                                                CRASH   CAR-CRASH ∼1M    IMPACT ANGLE  ∼8GB
+where slice denotes taking t = 0. This can be easily proven
+based on the definition of hG in Eq. (5). This equation indi-
+cates that the canonical native-space pretraining essentially    solver (Wu et al., 2024) and train for 200 epochs with
+learns the expectation of our lifted paradigm, which may   AdamW and OneCycleLR scheduling (Smith & Topin,
+lead to information loss and degenerated representations.   2019) for each downstream physics simulation task.
+In contrast, lifted pre-training learns the spanned manifold,
+where the dynamics V can also serve as the “key” to retrieve
+                                                        5. Experiments
+corresponding capability learned during pre-training.
+                                      We extensively evaluate GeoPT in five industrial-scale
+4.3. Implementation Details                                physics simulation tasks, which involve complex geometries
+                                                     and diverse simulation configurations.
+We provide key implementation details here; full configura-
+tions can be found in Appendix E.                      Benchmarks. As summarized in Table 1, we examine the
+                                                  model performance on extensive 3D industrial-scale sim-
+Backbone. GeoPT is architecture-agnostic. We adopt Tran-
+                                                                  ulations. For aerodynamics, we test Reynolds-Averaged
+solver (Wu et al., 2024), a recent geometry-general neural
+                                                         Navier-Stokes (RANS) simulation with DriAverML (Ash-
+solver, as our default backbone. We configure three model
+                                                             ton et al., 2024), NASA-CRM (Bekemeyer et al., 2025) and
+sizes for scaling experiments: base (8 layers, 3M parame-
+                                                           AirCraft (Luo et al., 2025), which are representative high-
+ters), large (16 layers, 7M parameters), and huge (32 layers,
+                                                                        fidelity data for 3D car and aircraft simulations and require
+15M parameters), all with 256 hidden channels and 32 state
+                                                             predicting the surface pressure and surrounding wind. As
+tokens. Note that neural simulators typically operate at
+                                                                for the hydrodynamics simulation DTCHull, we generate
+smaller scales than vision or language models; 15M param-
+                                                                    different geometries with ship parameterization (Bagazinski
+eters represents a substantial model for this domain.
+                                & Ahmed, 2023) and then simulate the ship resistance and
+Pre-training data. We discretize the trajectory in Eq. (4)   wave-making under different geometries and yaw angles
+into 3 steps for a balance between expressiveness and ef-    with RANS using OpenFOAM (Jasak, 2009), where the
+ficiency. For geometric features hG(·), we use vector dis-   model is trained to predict the time-averaged surface pres-
+tance (Faugeras & Gomes, 2000) to encode global geometry    sure and water flow speed. The Car-Crash benchmark is
+information. All geometries are normalized to unit scale    based on an industrial standard model and simulated under
+with consistent orientation. For each geometry, we sample     different impact angles with OpenRadioss (Altair Engineer-
+32,768 volume points and 4,096 surface points, with per-    ing Inc., 2026b), where the maximum 2D Von Mises stress
+point velocities sampled from a bounding ball with radius     for each element during crash is recorded. Although the base
+as 2. For diversity, we generate 100 random dynamics fields    geometry is fixed, it involves deformations during crash.
+per geometry, yielding a million-scale pre-training dataset.
+                                                To mimic the industrial practice (Ansys Inc., 2026), we
+Computational cost. The supervision signal in Eq. (6) can    adopt or generate ∼100 training samples for each bench-
+be computed efficiently via optimized ray-triangle intersec-   mark and test neural simulators on the other 20–50 samples.
+tion (Sawhney, 2021). Tracking 36,864 points within one
+                                                           Baselines. GeoPT mainly focuses on the self-supervised
+geometry-dynamics sample takes approximately 0.2 sec-
+                                                               pre-training of neural simulators, which has not been well
+onds on 80 CPU cores, roughly 107× faster than industrial-
+                                                            studied previously. Therefore, we adopt native geometry
+scale CFD simulation (Ashton et al., 2024). We pre-compute
+                                                        space pre-training: given position information to predict
+all supervision data offline, resulting in a ∼5TB dataset,
+                                         SDF and vector distance, as baselines.  Experimentally,
+which only takes around 3 days with 80 CPU cores, show-
+                                                               since SDF-based pre-training is much worse than vector dis-
+ing the inherent scalability of geometric pre-training.
+                                                                  tance, we defer the SDF-related experiments to Appendix B.
+Training parameters. We pre-train for 200 epochs using    Besides, we also compare with the geometry-conditioned
+AdamW (Loshchilov & Hutter, 2019) with cosine anneal-    paradigm, where we adopt the VAE encoder from the ad-
+ing (He et al., 2022).  For fine-tuning, we follow Tran-   vanced 3D geometry model Hunyuan3D (Tencent, 2025)
+
+                                                6
+
+======================== PDF 第 7 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+
+  (a) NASA-CRM                                 (b) AirCraft                                     (c) DTCHull                                    (d) Car-Crash
+
+
+
+  L2                                    L2                                    L2                                    L2
+        Relative                                                                                                                                                  Relative                                                                                                                                                Relative                                                                                                                                                Relative
+
+  Training                                             Training                                             Training                                             Training
+       Epochs         Training Samples               Epochs         Training Samples               Epochs         Training Samples               Epochs         Training Samples
+
+                           2x Faster                                1.3x Faster                               4x Faster                               2x Faster
+ L2                       Converging    L2                       Converging    L2                       Converging    L2                       Converging
+   Relative                                                                                                                                                 Relative                                                                                                                                                Relative                                                                                                                                                 Relative
+
+
+
+             Epochs (Fix 100 Samples)                       Epochs (Fix 100 Samples)                       Epochs (Fix 100 Samples)                       Epochs (Fix 100 Samples)
+
+                      20% Data                        40% Data                         60% Data                         40% Data
+ L2                           Saving    L2                           Saving    L2                           Saving    L2                           Saving
+   Relative                                                                                                                                                 Relative                                                                                                                                                Relative                                                                                                                                                 Relative
+
+
+
+             Samples (Fix 200 Epochs)                       Samples (Fix 200 Epochs)                       Samples (Fix 200 Epochs)                      Samples (Fix 200 Epochs)
+        Training From Scratch       Pre-Training w/ Geometry-Only Supervision       Conditioning w/ Geometry-Only Representation        Pre-Training w/ GeoPT (Ours)
+
+Figure 5. Performance comparison across fine-tuning epochs and physics samples. We show detailed curves at 200 epochs and 100
+samples for clarity. Here, geometry-only pre-training adopts vector distance, which is better than SDF. See Appendix C for full results.
+
+
+                                                                                                                                          (a) Scaling with Model Size                     (b) Scaling with Pre-Training Data
+to extract geometry representations as an auxiliary feature.
+Additionally, GeoPT is built upon the advanced geometry-
+general backbone Transolver (Wu et al., 2024).  Other
+Transformer-based simulator backbones, including Galerkin       L2                                       L2
+Transformer (2021), GNOT (2023), UPT (2024) and Tran-                        Relative                                                                                                                                                          Relative
+solver++ (2025), are also compared. All methods are under
+the same training strategy to ensure a fair comparison.
+
+5.1. Main Results                                                                                 Number of Layers                                Percent of Pre-Training Data
+                                                                 Figure 6. GeoPT scaling tests. (a) Gradually increase model layers
+Accelerating simulation. As a supplement to Fig. 1, we                                                          from 8 to 32 and record the performance change of training from
+further benchmark GeoPT on the other four simulation tasks     scratch and with GeoPT. (b) Reduce the pre-training diversity of
+in Fig. 5, where we can observe that:                          both geometries and dynamics. See Appendix F for full results.
+
+(i) Reducing simulation data requirements. GeoPT consis-
+                                        CRM, GeoPT yields a moderate improvement, as the geo-tently improves a wide range of physics simulations, reduc-
+                                                          metric variations among samples are primarily limited toing 20–60% data requirements while reaching performance
+                                                        changes in inboard and outboard aileron angles, which onlycomparable to full-data training. This improvement is par-
+                                                         induce slight local deformations in the wing region.ticularly significant in industrial settings, where generating
+a single training sample may require hours or even days of      (iii) Supporting surface-only simulation. Although our pre-
+numerical simulation (Ashton et al., 2024; Bekemeyer et al.,    training procedure involves both volume and surface points,
+2025). By substantially reducing the amount of simulation   GeoPT is also applicable to purely surface-related simula-
+data required, GeoPT can alleviate the data bottleneck in     tions, such as Car-Crash. By configuring a decayed velocity
+AI-enabled industrial workflows (Ansys Inc., 2026).            field on the car surface as the dynamics condition, GeoPT
+                                                       can adapt effectively to this scenario. This flexibility arises(ii) Improving geometry generalization. GeoPT yields larger
+                                                     from the stochastic nature when generating dynamics-liftedimprovements in simulations involving a greater diversity of
+                                                               pre-training supervision, which encourages the model togeometries. For instance, GeoPT brings 60% data require-
+                                                            capture a broader range of geometry–physics correlations.ment reduction on DTCHull, where samples exhibit sub-
+stantial geometric variability in hull curvatures and length-
+                                                                Scalability. As a self-supervised model, GeoPT demon-
+to-beam ratios. In such cases, pre-training on diverse ge-
+                                                                      strates favorable scalability in both model and data aspects.
+ometries enables GeoPT to better generalize across hetero-
+geneous geometric configurations. In contrast, on NASA-     (i) Model size. As presented in Fig. 6(a), although the back-
+
+
+                                                7
+
+======================== PDF 第 8 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+
+                   (a) Worst Case Analysis                                                     (b) Error Map Visualization                                                  (c) Dynamics-dependent Correlations
+                                                               60  850                                                                                     20  200
+
+
+
+
+                                                                                                                                                                      -60°                 Configured Direction                   60°
+
+
+        Ground Truth       GeoPT-Base Prediction  0    -2000       Trained from Scratch       GeoPT-Base          GeoPT-Huge    0   -200   0.0                  Configured Speed                      2.0
+
+Figure 7. Simulation results and learned representations from GeoPT, including (a) visualization of the prediction results with the worst
+relative L2 performance in DrivAerML, (b) the error map of surface pressure and surrounding velocity, (c) correlations learned by
+pre-trained GeoPT under varied dynamics information, such as different directions and speeds of VS. See Appendix D for more results.
+
+bone Transolver (Wu et al., 2024) shows nice scalability                          (a) Geometry Usage                            (b) Baseline Comparison
+in sufficient data scenarios, as reported in their paper, it
+still faces a scaling bottleneck in limited-data industrial sim-
+ulation, which may be caused by overfitting. In contrast,     L2                                  L2
+pre-training with large-scale geometry data can regularize                                                                                                                                                                                                                                                                                                                             Relative                                                                                                                                        Relative
+the model hypothesis space to alleviate potential overfitting,
+thereby consistently benefiting from increasing model size.
+
+(ii) Data diversity. In GeoPT, we construct a million-scale                        Benchmarks                               Benchmarks
+pre-training dataset by simulating 100 dynamic trajectories                                                                Figure 8. (a) Analysis for the geometry usage, including the com-
+for each unique geometry. To investigate the effect of the     parison between geometry-only and dynamics-lifted spaces, as
+pre-training diversity, we separately reduce the number of     well as pre-training v.s. conditioning. (b) Backbone comparison.
+unique geometries and sampled dynamic trajectories. Re-
+                                                            incorporate geometry information as frozen auxiliary fea-sults in Fig. 6(b) demonstrate that, compared to dynamic
+                                                                    tures, GeoPT directly leverages geometry to pre-train thetrajectories, the diversity of base geometries is more impor-
+                                                            physics-learning backbone. As shown in Fig. 8(a), pre-tant to downstream performance. Additionally, the benefit
+                                                                 training the backbone yields more substantial performanceof pre-training dynamics diversity is also task-specific. For
+                                                            gains than representation conditioning when effective geo-example, in DrivAerML with fixed incoming flow, sam-
+                                                             metric signals are available. We attribute this to the fact thatpling 6% dynamic trajectories can already be comparable
+                                                                representation conditioning does not explicitly warm up theto 100 samples, while in AirCraft with varied speed, AoA
+                                                             physics-learning process, thereby limiting its effectiveness.and sideslip, sampling more dynamic trajectories can sig-
+nificantly increase fine-tune performance, highlighting the   Backbone selection. In GeoPT, we adopt Transolver (Wu
+potential of GeoPT in handling more complex simulations.     et al., 2024) as the default backbone and compare it with
+                                                            other Transformer-based neural simulators. As shown in
+5.2. Model Analysis                                          Fig. 8(b), under training-from-scratch settings, Transolver
+                                                              consistently outperforms other baseline models in most
+Geometry usage. We provide a detailed ablation of how    benchmarks, justifying our choice of backbone. These re-
+geometric information is utilized in Fig. 8(a).                   sults further confirm the effectiveness of GeoPT, showing
+                                                               consistent improvements even on advanced benchmarks.(i) Geometry-only v.s. dynamics-lifted. Previously, we have
+extensively discussed the advantage of dynamics-lifting in   Worst case study. We plot the worst prediction case of
+terms of pre-training. Here, we further explore the repre-   GeoPT in Fig. 7, where GeoPT still accurately estimates the
+sentation conditioning usage of GeoPT. For comparison, we    complex aerodynamics surrounding the car. As demon-
+adopt geometry representations from the large-scale pre-    strated in Fig. 7(b), compared to training from scratch,
+trained Hunyuan3D (Tencent, 2025) as the baseline, which   GeoPT can improve the prediction accuracy of wake flow
+employs SDF-based geometry reconstruction. While Hun-   and can be further improved by parameter scaling.
+yuan3D representations are effective for accurate geometry
+                                                  Dynamics-dependent correlations. Empowered by large-
+reconstruction, they remain insufficient in helping physics
+                                                              scale pre-training, GeoPT can capture diverse underlyingsimulation (green curve).  In contrast, GeoPT employs
+                                                                 correlations under a proper dynamics prompt. As shown in
+dynamics-lifted supervision, enabling the model to learn
+                                                                Fig. 7(c), conditioned on different velocity VS, GeoPT canphysics-aligned representations (red curve). Thus, GeoPT
+                                                           capture different correlation patterns, such as the inclined
+helps under both pre-training and conditioning, highlighting
+                                                                 correlation under crosswind and the more concentrated cor-
+the essentiality of dynamics lifting in physics simulation.
+                                                                    relation under high speed. Especially, under zero speed, our
+(ii) Pre-training v.s. conditioning. Unlike prior works that    supervision degenerates to static geometry.
+
+                                                8
+
+======================== PDF 第 9 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+
+    Ground Truth       Training from Scratch       GeoPT            Ground Truth       Training from Scratch       GeoPT
+
+
+
+
+
+ Figure 9. Experiments of neural radiosity simulation on the Cornell box (Goral et al., 1984) with an unseen Stanford bunny geometry.
+
+
+5.3. Towards Physics Foundation Model                                                                                                                                (a) ShapeNet-Full Examples
+
+Generalize to other physics domains. GeoPT is pre-
+trained with highly diverse dynamics, endowing it with      L2
+
+                                                                                                                                                                                                                         (b) HY3D-Bench Examplesstrong potential to generalize across physics domains. We                        Relative
+apply GeoPT to radiosity simulation (Goral et al., 1984),
+a classical light transport problem, which involves funda-
+mentally different governing physics and geometries from
+our main experiments. Despite a significant domain shift,
+GeoPT continues to yield consistent performance improve-                                                               Figure 10. Scaling up GeoPT-Huge pre-training with general 3D
+ments, which achieves an MAE of 9.0×10−2, outperform-    shape repositories. Left: performance under different pre-training
+ing training from scratch (9.7×10−2). Qualitatively, Fig. 9     scales. Right: geometry examples from the pre-training datasets.
+reveals that GeoPT captures high-frequency shadow bound-
+aries more accurately, particularly in regions with complex   As shown in Fig. 10, GeoPT can be further improved by in-
+light-geometry interactions. More implementation details    creasing the diversity of pre-training geometries, even when
+of this task can be found in Appendix E.1.                     these geometries differ substantially from those used during
+                                                                fine-tuning, especially for AirCraft with rarely observed
+Pre-training on general-purpose geometries. As shown                                                   smooth geometries. This result suggests that GeoPT can
+in Fig. 6, GeoPT exhibits favorable scalability, suggest-                                                                  effectively benefit from large-scale and diverse geometries,
+ing its potential to be further developed into a foundation                                                           providing a practical path toward scaling up pre-training.
+model (Bommasani et al., 2021) for physics simulation. To
+further investigate this potential, we enhance GeoPT by    Together, the favorable physics and geometry generalizabil-
+increasing the diversity of pre-training geometries. Specifi-     ity demonstrated above highlight the potential of GeoPT as
+cally, we pre-train GeoPT under the following three settings:    a step toward general-purpose physics foundation models.
+(i) ShapeNet subsets (∼10,000 geometries). We use the car,
+airplane, and watercraft subsets from ShapeNet, which is    6. Conclusion
+also the default pre-training setting in previous experiments.
+                                                          This paper presents GeoPT in pursuit of a unified pre-trained
+(ii) ShapeNet full (∼50,000 geometries). As a general-                                                   model for general physics simulation. Trained solely on ge-
+purpose 3D shape repository, ShapeNet (2015) contains 55                                                     ometry data with dynamics-lifted supervision, GeoPT can
+object categories, covering a wide range of shapes such as                                                              consistently improve diverse downstream physics, along
+mobile devices and furniture. Here, we use the full dataset.                                                        with a significant reduction in training data requirements
+(iii) ShapeNet+Hunyuan3D (∼300,000 geometries). Be-   and favorable scalability w.r.t. data and model size, demon-
+yond public 3D assets, advanced 3D generative models     strating a possible pathway for scaling neural simulators. As
+can provide an additional source of diverse pre-training ge-    future work, we will further investigate the scaling behav-
+ometries. We therefore augment the pre-training data with     ior of GeoPT by continuously expanding the pre-training
+HY3D-Bench (Hunyuan3D et al., 2026), which contains    data and increasing model capacity, as well as validating its
+over 250k geometries generated by Hunyuan3D (2025).        effectiveness on broader physical systems.
+
+                                                9
+
+======================== PDF 第 10 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+Acknowledgements                                   Azizzadenesheli, K., Kovachki, N., Li, Z., Liu-Schiaffini,
+                                                        M., Kossaifi, J., and Anandkumar, A. Neural operators
+We would like to thank Hang Zhou and Yuezhou Ma from                                                                     for accelerating scientific simulations and design. Nature
+Tsinghua University for their helpful discussion during the                                                         Reviews Physics, 2024.
+initial exploration of this project.
+
+                                                           Bagazinski, N. J. and Ahmed, F. Ship-d: Ship hull dataset
+Impact Statement                                           for design optimization using machine learning.  In
+                                                     IDETC-CIE. American Society of Mechanical Engineers,
+This paper aims to find a scalable way for large-scale pre-
+                                                           2023.
+training of neural simulators, which is not only valuable
+for current AI-aided software in industrial design but also
+                                                    Bekemeyer, P., Hariharan, N., Wissink, A. M., and Cor-
+poses an intriguing scientific challenge due to the gap be-
+                                                                       nelius, J. Introduction of applied aerodynamics surrogate
+tween geometry and physics. By newly presenting a lifted
+                                                       modeling benchmark cases.  In AIAA SCITECH 2025
+self-supervised learning paradigm, we successfully bridge
+                                                       Forum, 2025.
+the geometry-physics gap and construct GeoPT solely pre-
+trained from off-the-shelf geometry data, which reduces
+                                                 Bommasani, R., Hudson, D. A., Adeli, E., Altman, R.,
+20%–60% training data requirements and achieves 2× faster
+                                                             Arora, S., von Arx, S., Bernstein, M. S., Bohg, J., Bosse-
+convergence. Such advantages can significantly accelerate
+                                                                               lut, A., Brunskill, E., Brynjolfsson, E., Buch, S., Card,
+the workflow of AI-aided software. Besides, the lifted learn-
+                                                               D., Castellon, R., Chatterji, N., Chen, A., Creel, K.,
+ing paradigm also poses a possible way to bridge simple
+                                                            Davis, J. Q., Demszky, D., Donahue, C., Doumbouya,
+pre-training data and complex downstream tasks, offering a
+                                                        M., Durmus, E., Ermon, S., Etchemendy, J., Ethayarajh,
+new perspective for self-supervised learning.
+                                                               K., Fei-Fei, L., Finn, C., Gale, T., Gillespie, L., Goel,
+Note that this paper mainly focuses on the scientific problem.      K., Goodman, N., Grossman, S., Guha, N., Hashimoto,
+When developing our approach, we are fully committed to        T., Henderson, P., Hewitt, J., Ho, D. E., Hong, J., Hsu,
+ensuring ethical considerations are taken into account. Thus,       K., Huang, J., Icard, T., Jain, S., Jurafsky, D., Kalluri, P.,
+we believe there are no potential ethical risks in our work.       Karamcheti, S., Keeling, G., Khani, F., Khattab, O., Koh,
+                                                                            P. W., Krass, M., Krishna, R., Kuditipudi, R., Kumar, A.,
+References                                            Ladhak, F., Lee, M., Lee, T., Leskovec, J., Levent, I., Li,
+                                                       X. L., Li, X., Ma, T., Malik, A., Manning, C. D., Mirchan-
+Achiam, J., Adler, S., Agarwal, S., Ahmad, L., Akkaya, I.,       dani, S., Mitchell, E., Munyikwa, Z., Nair, S., Narayan,
+  Aleman, F. L., Almeida, D., Altenschmidt, J., Altman, S.,      A., Narayanan, D., Newman, B., Nie, A., Niebles, J. C.,
+  Anadkat, S., et al. Gpt-4 technical report. arXiv preprint       Nilforoshan, H., Nyarko, J., Ogut, G., Orr, L., Papadim-
+  arXiv:2303.08774, 2023.                                           itriou, I., Park, J. S., Piech, C., Portelance, E., Potts, C.,
+                                                         Raghunathan, A., Reich, R., Ren, H., Rong, F., Roohani,
+Alkin, B., F¨urst, A., Schmid, S., Gruber, L., Holzleitner,                                                                          Y., Ruiz, C., Ryan, J., R´e, C., Sadigh, D., Sagawa, S., San-
+  M., and Brandstetter, J.  Universal physics transform-                                                         thanam, K., Shih, A., Srinivasan, K., Tamkin, A., Taori,
+   ers: A framework for efficiently scaling neural operators.                                                                  R., Thomas, A. W., Tram`er, F., Wang, R. E., Wang, W.,
+  NeurIPS, 2024.                                               Wu, B., Wu, J., Wu, Y., Xie, S. M., Yasunaga, M., You,
+                                                                                         J., Zaharia, M., Zhang, M., Zhang, T., Zhang, X., Zhang,
+Altair Engineering Inc. Altair physicsai. https://www.
+                                                                       Y., Zheng, L., Zhou, K., and Liang, P. On the oppor-
+  altair.com/physicsai, 2026a. Accessed: 2026-                                                                      tunities and risks of foundation models. arXiv preprint
+  01-06.
+                                                           arXiv:2108.07258, 2021.
+
+Altair Engineering Inc.  Altair radioss. https://www.
+                                                     Cao, S. Choose a transformer: Fourier or galerkin.  In  openradioss.org, 2026b. Accessed: 2026-01-06.
+                                                         NeurIPS, 2021.
+Ansys Inc. Ansys simai. https://www.ansys.com/
+  products/simai, 2026. Accessed: 2026-01-06.        Caron, M., Touvron, H., Misra, I., J´egou, H., Mairal, J.,
+                                                         Bojanowski, P., and Joulin, A. Emerging properties in
+Ashton, N., Mockett, C., Fuchs, M., Fliessbach, L., Het-       self-supervised vision transformers. In ICCV, 2021.
+  mann, H., Knacke, T., Schonwald, N., Skaperdas, V.,
+   Fotiadis, G., Walle, A., et al. Drivaerml: High-fidelity    Chang, A. X., Funkhouser, T., Guibas, L., Hanrahan, P.,
+  computational fluid dynamics dataset for road-car ex-     Huang, Q., Li, Z., Savarese, S., Savva, M., Song, S.,
+   ternal aerodynamics. arXiv preprint arXiv:2408.11969,      Su, H., et al. Shapenet: An information-rich 3d model
+  2024.                                                            repository. arXiv preprint arXiv:1512.03012, 2015.
+
+                                                10
+
+======================== PDF 第 11 页 ========================
+                      GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+Chen, T., Xu, B., Zhang, C., and Guestrin, C.  Training    Holzschuh, B., Kohl, G., Redinger, F., and Thuerey, N.
+  deep nets with sublinear memory cost. arXiv preprint      P3d: Highly scalable 3d neural surrogates for physics
+  arXiv:1604.06174, 2016.                                    simulations with global context. In ICLR, 2026.
+
+Chen, T., Kornblith, S., Norouzi, M., and Hinton, G. A    Huang, P.-Y., Xu, H., Li, J., Baevski, A., Auli, M., Galuba,
+  simple framework for contrastive learning of visual rep-      W., Metze, F., and Feichtenhofer, C. Masked autoen-
+   resentations. In ICML, 2020.                               coders that listen. NeurIPS, 2022.
+
+Choromanski, K., Likhosherstov, V., Dohan, D., Song, X.,   Hunyuan3D, T., Zhang, B., Guo, C., Guo, D., Liu, H.,
+  Gane, A., Sarl´os, T., Hawkins, P., Davis, J., Mohiuddin,      Yan, H., Shi, H., Yu,  J., Xu,  J., Huang,  J.,  et  al.
+  A., Kaiser, L., Belanger, D., Colwell, L. J., and Weller, A.     Hy3d-bench: Generation of 3d assets. arXiv preprint
+  Rethinking attention with performers. ICLR, 2021.           arXiv:2602.03907, 2026.
+
+Deitke, M., Schwenk, D., Salvador, J., Weihs, L., Michel,    Jasak, H. Openfoam: Open source cfd in research and
+  O., VanderBilt, E., Schmidt, L., Ehsani, K., Kembhavi,       industry. JNAOE, 2009.
+  A., and Farhadi, A. Objaverse: A universe of annotated
+  3d objects. In CVPR, 2023.                             Kovachki, N., Li, Z., Liu, B., Azizzadenesheli, K., Bhat-
+                                                                tacharya, K., Stuart, A., and Anandkumar, A. Neural
+Deng, J., Li, X., Xiong, H., Hu, X., and Ma, J. Geometry-                                                                operator: Learning maps between function spaces with
+  guided conditional adaption for surrogate models of large-                                                                 applications to pdes. JMLR, 2023.
+   scale 3d PDEs on arbitrary geometries. In IJCAI, 2024.
+                                                                  Li, Y., Wu, H., Xu, Z., Stuyck, T., and Matusik, W. Neural
+Devlin, J., Chang, M.-W., Lee, K., and Toutanova, K. Bert:                                                      modular physics for elastic simulation. arXiv preprint
+  Pre-training of deep bidirectional transformers for lan-                                                           arXiv:2512.15083, 2025.
+  guage understanding. In NAACL, 2019.
+                                                                  Li, Z., Kovachki, N. B., Azizzadenesheli, K., liu, B., Bhat-
+Evans, L. C. Partial differential equations. American Math-
+                                                                tacharya, K., Stuart, A., and Anandkumar, A. Fourier
+  ematical Soc., 2010.
+                                                              neural operator for parametric partial differential equa-
+Faugeras, O. and Gomes, J. Dynamic shapes of arbitrary        tions. In ICLR, 2021.
+  dimension: the vector distance functions. In The Math-
+                                                                  Li, Z., Huang, D. Z., Liu, B., and Anandkumar, A. Fourier
+  ematics of Surfaces IX: Proceedings of the Ninth IMA
+                                                              neural operator with learned deformations for pdes on
+  Conference on the Mathematics of Surfaces. Springer,
+                                                               general geometries. JMLR, 2023a.
+  2000.
+
+                                                                  Li, Z., Kovachki, N., Choy, C., Li, B., Kossaifi, J., Otta, S.,Goral, C. M., Torrance, K. E., Greenberg, D. P., and Battaile,
+                                                          Nabian, M. A., Stadler, M., Hundt, C., Azizzadenesheli,  B.  Modeling the interaction of light between diffuse
+                                                               K., et al. Geometry-informed neural operator for large-   surfaces. ACM SIGGRAPH, 1984.
+                                                                  scale 3d pdes. NeurIPS, 2023b.
+Hao, Z., Ying, C., Wang, Z., Su, H., Dong, Y., Liu, S.,
+                                                                 Li, Z., Shu, D., and Farimani, A. B. Scalable transformer  Cheng, Z., Zhu, J., and Song, J. Gnot: A general neural
+                                                                    for pde surrogate modeling. NeurIPS, 2023c.  operator transformer for operator learning. ICML, 2023.
+
+Hao, Z., Su, C., Liu, S., Berner, J., Ying, C., Su, H., Anand-    Lin, Z., Akin, H., Rao, R., Hie, B., Zhu, Z., Lu, W.,
+  kumar, A., Song, J., and Zhu, J. Dpot: Auto-regressive      Smetanin, N., Verkuil, R., Kabeli, O., Shmueli, Y., et al.
+  denoising operator transformer for large-scale pde pre-      Evolutionary-scale prediction of atomic-level protein
+   training. ICML, 2024.                                          structure with a language model. Science, 2023.
+
+He, K., Fan, H., Wu, Y., Xie, S., and Girshick, R. Mo-    Loshchilov, I. and Hutter, F. Decoupled weight decay regu-
+  mentum contrast for unsupervised visual representation        larization. In ICLR, 2019.
+   learning. In CVPR, 2020.
+                                                     Luo, H., Wu, H., Zhou, H., Xing, L., Di, Y., Wang, J., and
+He, K., Chen, X., Xie, S., Li, Y., Doll´ar, P., and Girshick,      Long, M. Transolver++: An accurate neural solver for
+  R. Masked autoencoders are scalable vision learners. In      pdes on million-scale geometries. In ICML, 2025.
+  CVPR, 2022.
+                                                       Nabian, M. A., Chavare,  S., Akhare, D., Ranade, R.,
+Herde, M., Raonic, B., Rohner, T., K¨appeli, R., Molinaro,      Cherukuri, R., and Tadepalli, S. Automotive crash dynam-
+   R., de B´ezenac, E., and Mishra, S. Poseidon: Efficient       ics modeling accelerated with machine learning. arXiv
+  foundation models for pdes. NeurIPS, 2024.                   preprint arXiv:2510.15201, 2025.
+
+                                                11
+
+======================== PDF 第 12 页 ========================
+                      GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+Paszke, A., Gross, S., Massa, F., Lerer, A., Bradbury, J.,   Wen, S., Kumbhat, A., Lingsch, L., Mousavi, S., Zhao,
+  Chanan, G., Killeen, T., Lin, Z., Gimelshein, N., Antiga,       Y., Chandrashekar, P., and Mishra, S. Geometry aware
+   L., Desmaison, A., K¨opf, A., Yang, E., DeVito, Z., Rai-      operator transformer as an efficient and accurate neural
+  son, M., Tejani, A., Chilamkurthy, S., Steiner, B., Fang,      surrogate for pdes on arbitrary domains. arXiv preprint
+   L., Bai, J., and Chintala, S.  Pytorch: An imperative      arXiv:2505.18781, 2025.
+   style, high-performance deep learning library. In NeurIPS,
+                                             Wu, H., Hu, T., Luo, H., Wang, J., and Long, M. Solving  2019.
+                                                           high-dimensional pdes with latent spectral models. In
+Perlman, E., Burns, R., Li, Y., and Meneveau, C. Data     ICML, 2023.
+  exploration of turbulence simulations using a database
+                                             Wu, H., Luo, H., Wang, H., Wang, J., and Long, M. Tran-
+   cluster. In Supercomputing, 2007.
+                                                                   solver: A fast transformer solver for pdes on general
+                                                              geometries. In ICML, 2024.Pfaff,  T.,  Fortunato, M., Sanchez-Gonzalez,  A., and
+   Battaglia, P. Learning mesh-based simulation with graph                                                             Xie, Z., Zhang, Z., Cao, Y., Lin, Y., Bao, J., Yao, Z., Dai, Q.,
+  networks. In ICLR, 2021.                                                      and Hu, H. Simmim: A simple framework for masked
+                                                      image modeling. In CVPR, 2022.Rahman, M. A., Ross, Z. E., and Azizzadenesheli, K. U-no:
+  U-shaped neural operators. TMLR, 2023.                                                        Yang, L., Liu, S., Meng, T., and Osher, S. J. In-context oper-
+                                                                   ator learning with data prompts for differential equation
+Raissi, M., Yazdani, A., and Karniadakis, G. E. Hidden
+                                                            problems. PNAS, 2023.
+   fluid mechanics: Learning velocity and pressure fields
+  from flow visualizations. Science, 2020.                  Ye, Z., Huang, X., Chen, L., Liu, H., Wang, Z., and Dong,
+                                                        B.  Pdeformer: Towards a foundation model for one-
+Sawhney, R. Fcpw: Fastest closest points in the west, 2021.                                                            dimensional partial differential equations. arXiv preprint
+                                                           arXiv:2402.12652, 2024.
+Smith, L. N. and Topin, N. Super-convergence: Very fast
+   training of neural networks using large learning rates.    Yu, X., Tang, L., Rao, Y., Huang, T., Zhou, J., and Lu, J.
+  In Artificial intelligence and machine learning for multi-       Point-bert: Pre-training 3d point cloud transformers with
+  domain operations applications. SPIE, 2019.              masked point modeling. In CVPR, 2022.
+
+Solin, P. Partial differential equations and the finite element    Zhang, L., Rao, A., and Agrawala, M. Adding conditional
+  method. John Wiley & Sons, 2005.                            control to text-to-image diffusion models. In CVPR, 2023.
+
+Team, T. H.  Hunyuan3d 2.5: Towards high-fidelity 3d    Zhang, Z., Wu, Y., Zhang, K., and Wang, Y. From cheap
+   assets generation with ultimate details. arXiv preprint      geometry to expensive physics: A physics-agnostic pre-
+  arXiv:2506.16504, 2025.                                       training framework for neural operators. In ICLR, 2026.
+
+Tencent, H. T. Hunyuan3d 2.0: Scaling diffusion models    Zhou, H., Ma, Y., Wu, H., Wang, H., and Long, M. Uni-
+   for high resolution textured 3d assets generation, 2025.        solver: Pde-conditional transformers towards universal
+                                                               neural pde solvers. In ICML, 2025.
+Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones,
+                                                      Zhou, H., Wu, H., Shangguan, H., Ma, Y., Weng, H., Wang,   L., Gomez, A. N., Kaiser, L. u., and Polosukhin, I. Atten-
+                                                                                       J., and Long, M. Transolver-3: Scaling up transformer   tion is all you need. In NeurIPS, 2017.
+                                                                 solvers to industrial-scale geometries. ICML, 2026.
+Vincent, P., Larochelle, H., Bengio, Y., and Manzagol, P.-A.
+                                                     Zhou, T., Wan, X., Huang, D. Z., Li, Z., Peng, Z., Anand-
+  Extracting and composing robust features with denoising
+                                                        kumar, A., Brady, J. F., Sternberg, P. W., and Daraio,
+  autoencoders. In ICML, 2008.
+                                                         C. Ai-aided geometric design of anti-infection catheters.
+Wang, H., Fu, T., Du, Y., Gao, W., Huang, K., Liu, Z.,      Science Advances, 2024.
+  Chandak, P., Liu, S., Van Katwyk, P., Deac, A., et al.
+   Scientific discovery in the age of artificial intelligence.
+  Nature, 2023.
+
+Wen, G., Li, Z., Azizzadenesheli, K., Anandkumar, A.,
+  and Benson, S. M. U-fno–an enhanced fourier neural
+  operator-based deep-learning model for multiphase flow.
+  Advances in Water Resources, 2022.
+
+                                                12
+
+======================== PDF 第 13 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+A. Theoretical Understanding of GeoPT Pre-Training
+
+This section provides a theoretical interpretation of tracking moving particles in terms of transport equations (also called
+the collisionless Boltzmann equation or Liouville’s equation). We will show that (i) tracking a large number of particle
+trajectories with fixed transport directions is equivalent to solving a transport equation with sticking boundary conditions,
+and that (ii) the resulting dynamics satisfy a natural mass conservation property in the phase space.
+
+Dynamics process restatement  Here, we recap the dynamics defined in GeoPT. Let Ω⊂RC denote the open computa-
+tional domain. In GeoPT pre-training (Eq. (6) of main text), we consider an ensemble of particles initialized with positions
+x0 sampled from the computation domain and the geometry boundary and assigned transport directions v ∼Unif(BC),
+which remain constant throughout the evolution. Under this setting, each particle follows a free-flight trajectory
+
+                                           x(t) = x0 + t v,      t ≥0.                                             (9)
+
+When a particle reaches the geometry boundary G, it sticks to the boundary and remains there permanently.
+
+Phase-space transport formulation  Since in GeoPT, each tracking particle carries both a position and a transport
+direction, the most natural continuum description is given in phase space. Let f(x, v, t) denote the phase-space density
+of particles at position x, velocity v, and time t. Then, under dynamics in Eq. (9), f satisfies the collisionless transport
+equation, which can be formalized as follows
+
+                            ∂tf(x, v, t) + v · ∇xf(x, v, t) = 0,     (x, v) ∈Ω× RC.                          (10)
+
+It can be proved that, Eq. (10) describes advection in phase space along characteristic curves (Evans, 2010)
+
+                                                        ˙x(t) = v,      ˙v(t) = 0,                                           (11)
+
+which correspond exactly to the particle trajectories defined in Eq. (9). Therefore, sampling particle trajectories and
+recording pairs (x(t), v) therefore amounts to sampling characteristic curves of the phase-space transport equation.
+
+Besides, the sticking behavior at the boundary is modeled by allowing particles to transfer from the interior phase space to a
+boundary-supported phase-space density. Let fG(x, v, t) denote the phase-space density of particles accumulated on G. The
+flux of particles reaching the boundary is given by (v · n(x))f(x, v, t), where n(x) denotes the outward unit normal. Only
+particles with v · n(x) > 0 reach the boundary. Accordingly, the boundary accumulation satisfies
+
+                             ∂tfG(x, v, t) = (v · n(x))+ f(x, v, t) dv,    x ∈G.                             (12)
+
+In summary, Eq. (10) and (12) together define a transport equation with the sticking boundary, which is the continuum limit
+of GeoPT self-supervision formalized in Eq. (6).
+Proposition A.1 (Mass conservation). The phase-space transport equation in Eq. (10) is conservative. In the absence of
+sticking, the phase-space flow (x, v) 7→(x + tv, v) is divergence-free. With sticking boundaries, mass is not destroyed but
+transferred from the interior to the boundary. Specifically, the total phase-space mass satisfies (see, e.g., (Evans, 2010))
+
+                      d  Z Z               Z  Z
+                                   f(x, v, t) dv dx +       fG(x, v, t) dv dS(x) = 0.                       (13)
+                          dt   Ω  Rd             G  Rd
+
+Here dS(x) denotes the surface measure on G = ∂Ω. Thus, the dynamics conserve the total number of particles globally,
+with mass redistributed from the interior to the boundary.
+
+Remark A.2 (Connect between GeoPT pre-training and solving collisionless transport equation in Eq. (10)). In the
+above analysis, we have demonstrated that the final phase-space density function f of the constructed dynamic process
+follows the collisionless transport equation. And, in GeoPT, we input the spatial and velocity coordinates of all sampled
+tracking points into a neural network and supervised the model with L2 loss to predict the dynamic process. Since the
+dynamic supervision is defined in Eq. (4), which can be seen as a temporal discretization of f(x, v, t), the learning process
+of GeoPT is actually to estimate f(x, v, t) from the corresponding spatial and velocity coordinates.
+
+As stated in proposition A.1, the flow density f that is used as a self-supervision signal obeys mass conservation under all
+kinds of velocity settings. During the pre-training process, we randomly sample geometries g and velocity fields v as the
+model input. Beyond ensuring data diversity, the above-described pre-training will enforce the model output maintain the
+mass conservation law under all kinds of geometries and dynamics.
+
+                                                13
+
+======================== PDF 第 14 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+Remark A.3 (Generalizability of theoretical framework). The phase-space transport equation captures a canonical
+conservation-law structure: mass evolves by advection along characteristics, with boundary flux accounting. Many physical
+models can be viewed as augmentations of this structure. For example, the Boltzmann equation adds a collision operator to
+the streaming term, and fluid equations such as Navier-Stokes couple mass conservation with additional momentum and
+constitutive relations. Consequently, while our pre-training signal is derived from a simplified transport process, it instills an
+inductive bias toward characteristic-driven correlations and boundary interactions, which are shared components across a
+broad class of continuum and kinetic systems. We therefore expect the pre-trained representation to transfer to downstream
+PDE solvers after task-specific adaptation, rather than guaranteeing universal generalization by itself.
+
+B. Pre-Training Investigation
+
+This section provides the investigation of GeoPT’s pre-training configurations in the dataset, dynamics and supervision.
+
+
+                          (a) Data Preference                                          (b) Dynamic Steps                                           (c) Geometry Feature
+
+
+
+
+ L2                                         L2                                         L2
+   Relative                                                                                                                                                                    Relative                                                                                                                                                                    Relative
+
+
+
+
+                      Benchmarks                                      Benchmarks                                      Benchmarks
+
+Figure 11. Ablations for the pre-training choices in GeoPT, including the comparison among (a) pre-training with a single subset or mixed
+data from ShapeNet-V1, -V2, (b) discretizing the dynamics into various step numbers τ, and (c) pre-training with different geometry
+information, such as SDF and vector distance. All the experiments are based on GeoPT-Based under the full-data-full-training setting.
+
+Ablation 1: single v.s. mixed geometry dataset  In GeoPT, we attempt to build a unified pre-trained model for all types of
+physics simulations. Thus, the default setting in GeoPT is to use a mix of cars, airplanes, and watercraft as the pre-training
+dataset. However, it is also possible to adopt GeoPT on a case-by-case basis, such as pre-training only on the car subset for
+DrivAerML and Car-Crash simulation, only on the airplane subset for NASA-CRM and AirCraft, and only on the watercraft
+subset for DTCHull, which can better align with the geometry in the downstream task. We have also compared GeoPT with
+the single-subset pre-training setting in Fig. 11(a) red v.s. green curves. It is observed that in most tasks, a more diverse
+pre-training brings better performance, highlighting the value of unified pre-training. Only for AirCraft, single-subset
+pre-training is slightly better. Notably, this task can be viewed as a corner case, which contains quite different geometries
+w.r.t. the pre-training geometries (Fig. 17), thereby involving cars or watercraft that are far away from AirCraft geometries
+in pre-training may cause distraction. One possible solution is to keep enlarging the diversity of pre-training geometries.
+
+Ablation 2: ShapeNet-V1 (low quality but high diversity) v.s. ShapeNet-V2 (high quality but low diversity)  In the
+official configuration of GeoPT, we adopt the ShapeNet-V1 (Chang et al., 2015) for pre-training, which contains 13,463
+geometries in total for car, watercraft and airplane categories. However, geometries in the initial version of ShapeNet may
+contain incorrect normals and non-aligned orientations. ShapeNet-V2 is an updated version with manually corrected meshes,
+normals, and normalized orientations, but it contains only 9,515 geometries in the three industrial-related categories. In
+Fig. 11(a), we compare the performance of GeoPT pretrained from ShapeNet-V1 and -V2.  It is observed that in most
+benchmarks, ShapeNet-V1 pre-training brings better performance, even though it is based on geometries without careful
+quality control. This finding also highlights the importance of geometry diversity, encouraging the wide collocation of 3D
+geometries, where the advanced 3D generation models can be a good data source (Tencent, 2025).
+
+Ablation 3: step number in dynamics configuration  As described before, we discretize the dynamic process into
+(τ + 1) steps, which generates the dynamic trajectory supervision hG(x0:τ) ∈R(τ+1)×C. As presented in Fig. 11(b), τ = 0
+corresponds to the degeneration scenario, which is still the static geometry supervision, thereby cannot bring benefits to
+physics simulation. One step forward, namely τ = 1, is able to bring a significant promotion, highlighting the necessity
+of dynamics representation. In general, τ = 2 achieves a balanced performance across various physics simulation tasks,
+which is also set as our default configuration. Besides, adding dynamic steps will not consistently bring benefits since the
+accumulated discretization error, which is why τ = 3, 4 can only surpass the default configuration in part of the benchmarks.
+It is also worth noting that increasing τ will also cause more computation costs. Thus, τ = 2 is a well-verified choice.
+
+                                                14
+
+======================== PDF 第 15 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+                   (a) GeoPT-Base Pre-Training                                  (b) GeoPT-Large Pre-Training                                 (c) GeoPT-Huge Pre-Training
+
+
+ MSE                                                             MSE                                                              MSE
+ Test                                                                                  Test                                                                                  Test
+
+
+
+
+                       Epochs                                            Epochs                                           Epochs
+
+                             Dynamic Condition               GeoPT Predicted Vector Distance                 Ground Truth Vector Distance
+       Case
+        GeoPT-Base                  Prediction
+                    Position & Dynamic Condition                    Step 1 (Initial)                            Step 2                                 Step 3
+
+Figure 12. The pre-training process of GeoPT. (a) We plot the test MSE change during 200 pre-training epochs, which is calculated on 300
+leave-out geometries. The initial unstable stage is caused by learning rate warm up. (b) Prediction case of the pre-trained GeoPT-Base.
+For clarity, we only plot 35 points under 3 dynamic steps, where the prediction is in blue and the ground truth is in orange.
+
+
+                   (a) DrivAerML                             (b) NASA-CRM                                (c) AirCraft                                (d) DTCHull                               (e) Car-Crash
+
+
+
+
+
+ L2
+  Relative
+
+
+
+
+
+                       Shift Angle                                   Shift Angle                                   Shift Angle                                   Shift Angle                                   Shift Angle
+
+Figure 13. GeoPT-Base performance change w.r.t. the direction shifted (by 0◦to 40◦) from the correct configuration. Zero shift refers to
+configuring the dynamics field direction along the incoming flow or impact angle, which is our default setting. For clarity, we adopt the
+same y-axis range of 0.75 among different benchmarks in visualization. All the experiments are under the full-data-full-training setting.
+
+
+Ablation 4: vector distance v.s. SDF in choosing geometry feature  In the main text, we have compared with pre-training
+with vector-distance-based geometry-only supervision. It is also applicable to adopt SDF as the supervision. However, as
+shown in Fig. 11(c), SDF supervision is generally worse than vector distance. This result may be because vector distance is
+more informative than SDF for each point, which not only contains distance information but also involves the direction.
+Based on this result, in GeoPT, we also adopt vector distance as hG(·) in Eq. (5) to encode the geometry information.
+
+Pre-training visualization  To provide an intuitive understanding of GeoPT pre-training, we plot the test loss curve in
+Fig. 12, where GeoPT with different sizes all converge smoothly. Specifically, the relatively unstable curve for the early
+stage during pre-training is caused by learning rate warm-up. Besides, Fig. 12 also presents the prediction results for
+self-supervised dynamic processes. Specifically, the initial geometry information and dynamics field are input to GeoPT and
+the model is expected to predict the vector distance w.r.t. the geometry surface for the future three steps. We can find that the
+pre-trained GeoPT can precisely predict the future dynamics, indicating sufficient optimization in pre-training.
+
+C. Fine-Tuning Investigation
+
+This section provides the analysis for the usage and special features of GeoPT during fine-tuning.
+
+Fine-tuning configuration for particle velocity  As described in the main text, we need to parameterize the simulation
+setting into particle velocity VS for GeoPT fine-tuning. Specifically, we need to determine both the direction and norm:
+
+
+   • As for the direction of the particle velocity VS, the configuration is quite certain in practice, which can be directly
+     calculated based on the direction of incoming flow in aerodynamics (e.g., yaw angle in DTCHull or angle of attack and
+     sideslip in AirCraft) or force direction in solid mechanics (e.g., impact angle of Car-Crash).
+
+                                                15
+
+======================== PDF 第 16 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+
+                   (a) DrivAerML                             (b) NASA-CRM                                (c) AirCraft                               (d) DTCHull                              (e) Car-Crash
+
+
+
+
+
+ L2
+    Relative
+
+
+
+
+
+             Speed Configuration                  Speed Configuration                  Speed Configuration                 Speed Configuration                 Speed Configuration
+
+Figure 14. GeoPT-Base performance change w.r.t. the configured velocity norm in VS, which is sampled from [0, 2] during pre-training.
+For real-world low-speed cases, such as car and watercraft simulations, we explore the choices within less than 1.0. As for high-speed
+cases, such as aircraft, we explore a larger range [0.2, 2.6]. Since both NASA-CRM and AirCraft involve varying simulation speeds, we
+normalize the real-world configuration into different intervals. All the experiments are under the full-data-full-training setting.
+
+
+   • As for the norm of the particle velocity VS, corresponding to speed, it needs more calibrations, since the pre-training is
+    based on the normalized geometry and normalized moving speed, while the simulation speed is a real-world value.
+     Therefore, a correspondence between the normalized geometry space and the real-world physics space is expected.
+
+
+In our experiments, we do not elaborately tune the configuration of VS, especially for its norm. To give an intuitive
+understanding and practical recipe for fine-tuning configurations, we provide a detailed analysis here.
+
+(i) Performance under direction shift. Fig. 13 demonstrates that directly adopting the incoming flow or impact direction
+from downstream simulation settings achieves the best performance, which corresponds to the zero shift setting. Although
+globally shifting the direction configuration by a fixed value can also ensure a quantitatively distinguishable condition value
+among different samples for the model, it will cause performance degradation since it will inform the pre-trained with
+incorrect correlations, as visualized in Fig. 7(c). Therefore, the performance drop gets more serious under a larger direction
+shift. Specifically, the performance drop is more significant for high-speed scenarios, such as NASA-CRM and AirCraft,
+because their high-speed configuration will magnify the effect of incorrect configuration of direction.
+
+(ii) Performance under various speed configurations. To ensure a precise alignment between pre-training supervision and
+fine-tuning configuration, we need to consider all the simulation settings, such as object length, flow viscosity, and real-world
+speed, to determine the norm of VS. However, in practice, we find that a roughly reasonable speed configuration is sufficient
+to deliver a fair performance. In our experiments, we set the norm of elements in VS as 0.3 for all low-speed scenarios,
+including DrivAerML, DTCHull and Car-Crash2 and normalize the real-world speed in NASA-CRM and AirCraft into an
+interval with larger values, which is [1.0, 1.4] and [1.4, 1.8], respectively. In general, as presented in Fig. 14, the low-speed
+scenarios prefer smaller speed configurations and the high-speed task requires a VS with a larger norm, as the latter usually
+corresponds to more concentrated physical states, which can be “prompted” by a larger speed configuration (Fig. 7(c)).
+
+Based on the above analysis, we summarize the following usage recipe for GeoPT.
+
+  Configuration recipe for dynamics conditions VS. In general, the direction of the velocity field should be set following
+   the simulation settings, while the norm of velocity can be set within [0.1, 1.0] for commonly seen low-speed simulations,
+  such as driving cars or ships with speed less than 100 m/s, and be set within [1.0, 2.0] for high-speed tasks.
+
+Remark C.1 (Distinguishable configurations).  It is worth noticing that without pre-training, the dynamics configuration
+only needs to be distinguishable to reflect the exact simulation configurations since the model will automatically learn to
+project the input into deep representations. In GeoPT, we pursue a suitable dynamics configuration to align the pre-training
+model and the downstream task, where different dynamics configurations activate different correlation patterns (Fig. 7(c)),
+while the effective range of configuration is quite flexible as the model can be further optimized during finetuning.
+
+Fine-tune loss curves  Here, we also plot the test loss during the fine-tuning process in Fig. 15, where GeoPT can
+consistently improve the convergence performance and help to accelerate the training stability, especially for the early stage,
+such as DrivAerML and DTCHull. Note that the physics simulation task evaluated in this paper is quite challenging, which
+
+    2In this paper, we configure the dynamics field in Car-Crash with a linearly decayed norm. Here, we only consider the maximum
+speed value. If we adopt the same speed value for all elements, there will be a slight performance drop, where the relative L2 is 0.1783.
+
+
+                                                16
+
+======================== PDF 第 17 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+
+                   (a) DrivAerML                             (b) NASA-CRM                               (c) AirCraft                                 (d) DTCHull                                (e) Car-Crash
+
+
+
+
+ Loss
+ Test
+
+
+
+
+
+                  Epochs                             Epochs                            Epochs                            Epochs                             Epochs
+
+Figure 15. Test loss (relative L2) change during fine-tuning. Note that these test losses are calculated from the downsampled physics field
+to ensure training efficiency, which is proportional to the final performance, but may be shifted w.r.t. the full mesh results.
+
+
+requires the model to infer the whole physics field solely from geometry information and simulation settings. Therefore, the
+training processes of all benchmarks are not very stable in the early stage, but will converge smoothly in the end.
+
+As for the AirCraft benchmark that involves a serious out-of-domain generalization challenge due to the training-test
+geometry gap, the training process is not very stable as presented in Fig. 15(c), where we have also tried 10× smaller
+learning rates, but still cannot ensure a smooth convergence, indicating the learning difficulty of this task. Still, in this task,
+GeoPT can improve the final convergence performance, highlighting its effectiveness.
+
+D. Showcases
+
+As a supplement to Fig. 7, we plot the showcases from the other four benchmarks in Fig. 16-19.
+
+
+                                                                           Transolver++ rL2 = 0.0743        Transolver rL2 = 0.0685         GeoPT-Base rL2 = 0.0591        GeoPT-Huge rL2 = 0.0583
+       Ground Truth             GeoPT-Base Prediction
+                  AoA 3.46°                                                                 1.2                                                                                                                                                                                                        0.2
+                    Mach
+                    0.7219
+
+                                                                                          0                                                                                                                                                                           0
+
+
+
+
+
+                                                                                                                      -1.2                                                                                                                                                                                                                     -0.2
+                        (a) Physics Field Visualization                                                                                     (b) Error Map Visualization
+
+Figure 16. Showcase of NASA-CRM. (a) The pressure coefficient field of the airplane flying under 0.7219 Mach and 3.46◦angle of
+attack. (b) Error map and the relative L2 of different models for this case. For clarity, we zoom in on high-error zones.
+
+
+
+
+       Ground Truth             GeoPT-Base Prediction           GNOT rL2 = 0.0876              Transolver rL2 = 0.0823         GeoPT-Base rL2 = 0.0734        GeoPT-Huge rL2 = 0.0668
+                                                                                       5                                                                                                                                                                               2
+
+
+
+
+
+                                                                                                                                                                                                                                                                       0
+
+       AoA 7°
+  7Mach      SideSlip 2°
+                                                                                       0                                                                                                                                                                                                                       -2
+                        (a) Physics Field Visualization                                                                                    (b) Error Map Visualization
+
+Figure 17. Showcase of AirCraft. We plot the Z-force coefficient field for aircraft flying under 7 Mach, 7◦angle of attack and 2◦sideslip.
+
+
+
+      Ground Truth            GeoPT-Base Prediction        1000   2    Galerkin rL2 = 0.2570               Transolver rL2 = 0.1921         GeoPT-Base rL2 = 0.1399      GeoPT-Huge rL2 = 0.1321                1.5
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  Velocity
+                                                                                                                                                                                                                                                                 0
+
+                                                                                                                                                                                                                                                                                                                                                   -1.5
+
+                                                                                                                                                                                                                                                                 300
+  Yaw                                                                                                                                                                                                                                                         0     Angle         11°                                                                                     -300    0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     Pressure   -300
+                      (a) Physics Field Visualization                                                                                   (b) Error Map Visualization
+
+Figure 18. Showcase of DTCHull. (a) We plot the hydrostatic pressure–corrected pressure and surrounding velocity streamlines for a ship
+moving under 11◦yaw angle. (b) We highlight the surrounding velocity error in the streamline and the pressure error in underside view.
+
+
+
+                                                17
+
+======================== PDF 第 18 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+
+                                                            UPT rL2 = 0.3407                Transolver rL2 = 0.1757         GeoPT-Base rL2 = 0.1658        GeoPT-Huge rL2 = 0.1574
+       Ground Truth             GeoPT-Base Prediction
+                                                                                         500                                                                                                                                                                         200
+
+
+
+
+
+                                                                                         250                                                                                                                                                                         0
+
+Impact
+      Angle                                                                            0                                                                                                                                                                                            -200
+           26.93°     (a) Physics Field Visualization                                                                                     (b) Error Map Visualization
+
+Figure 19. Showcase of Car-Crash. We plot the element-wise maximum 2D Von Mises stress during the crash with 26.93◦impact angle.
+
+
+                                                                                                  Impact Angle
+                                                                                                                -39.71°
+
+
+
+                                                                                                  Impact Angle
+                                                                                                               -31.39°
+
+
+                                             (a) DTCHull Geometry Examples                                                                               (b) Car-Crash Geometry Deformation Examples           Time
+
+  Figure 20. Examples from DTCHull and Car-Crash benchmarks, which involve diverse geometries and deformations, respectively.
+
+
+As presented in the first subfigure, GeoPT can accurately predict the physics field of challenging simulation tasks, which
+involve complex geometries and diverse simulation settings. For example, in AirCraft, the model needs to predict six
+aerodynamic forces and moments simultaneously and this task contains four variables for different cases: geometry, speed,
+angle of attack and sideslip, making the prediction extremely challenging, while GeoPT can bring over 10% improvement
+over Transolver trained from scratch and consistently benefits from model scaling.
+
+As for DTCHull and Car-Crash, both tasks involve intricate physical interactions, where the former requires the model to
+predict the water-air two-phase interactions and the latter needs to predict the maximum stress during structure deformation
+caused by the crash. Especially for Car-Crash, the stress field can be discontinuous due to the fracture. In these two difficult
+tasks, lifted geometric pre-training can still improve the performance and significantly surpass the baselines.
+
+E. Implementation Details
+
+This section will introduce implementation details for benchmark and data generation, training and baseline implementations.
+
+
+E.1. Benchmarks
+
+We experiment with five industrial design tasks and one radiosity task to examine the model generalizability, where
+DrivAerML (Ashton et al., 2024), NASA-CRM (Bekemeyer et al., 2025) and AirCraft (Luo et al., 2025) are adopted from
+the previous work. We also newly simulate three benchmarks, including DTCHull, Car-Crash and Radiosity.
+
+Table 2. Summary of experimental simulations. #Mesh records the size of the discretized meshes for each sample. #Variable records the
+varied simulation configurations among different samples. #Train and #Test represent the number of training and test samples.
+
+ TYPE     BENCHMARKS #MESH        #VARIABLE        #SIZE #TRAIN #TEST       OUTPUT PHYSICS
+
+         DRIVAERML ∼160M       GEOMETRY      ∼6TB   100    20       PRESSURE & VELOCITY
+ AERO-
+        NASA-CRM ∼450K      GEO, SPEED, AOA    ∼3GB   105    44       PRESSURE COEFFICIENT
+ DYNAMICS
+           AIRCRAFT  ∼330K GEO, SPEED, AOA, SIDESLIP ∼7GB   100    50   AERODYNAMIC SIX COMPONENTS
+
+ HYDRO-   DTCHULL  ∼240K      GEO, YAW ANGLE    ∼2GB   100    20  TIME-AVG PRESSURE & VELOCITY
+
+ CRASH    CAR-CRASH ∼1M        IMPACT ANGLE     ∼8GB   100    30   TIME-MAX 2D VON MISES STRESS
+
+
+DTCHull  This task is to simulate the ship resistance and wave-making process. First, we generate 130 different ship
+geometries by changing the hull parameterization script from (Bagazinski & Ahmed, 2023), which makes it easy to produce
+diverse geometries (Fig. 20). Then, we simulate the two-phase incompressible free-surface flow of water and air surrounding
+different ship geometries for 50 seconds using the Volume-of-Fluid (VoF) multiphase solver in OpenFOAM (Jasak, 2009),
+with constant fluid properties (ρwater = 998.8, νwater = 1.09 × 10−6; ρair = 1, νair = 1.48 × 10−5). The air–water interface
+is initialized as a flat surface located at 0.244 above the zero x–y plane, and we neglect surface tension. Turbulence is
+modeled with Reynolds-averaged Navier-Stokes (RANS) using the k −ω Shear Stress Transport model closure.
+
+                                                18
+
+======================== PDF 第 19 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+We set the water velocity as a normalized value of 1.668 and the air velocity as zero at initialization, which roughly
+corresponds to a 12 m/s moving scenario in the real-world scale. For each case, we randomly sample a yaw angle from
+[−10◦, 10◦] to mimic real-world diversity. Finally, we average the hydrostatic pressure–corrected pressure and surrounding
+velocity over the last 20 seconds as the target, when the dynamics are relatively stable.
+
+
+Car-Crash  This task is to simulate high-speed impact dynamics with large deformations, contact interactions, and potential
+material failure jointly determine the evolving vehicle geometry. We adopt the National Crash Analysis Center Neon model,
+a widely used full-vehicle crash benchmark with detailed part-level meshing and heterogeneous material assignments. Each
+simulation is carried out in OpenRadioss (Altair Engineering Inc., 2026b) using a 3D Lagrangian explicit finite-element
+formulation of transient momentum balance, where external loads and penalty-based contact forces are assembled at
+nodes and internal forces are computed element-by-element from stresses. At the element level, stresses are advanced by
+integrating the constitutive (material) law, including elastic/plastic response and, when enabled, damage/failure/erosion,
+driven by the local deformation history.
+
+For each run, we simulate 17 seconds of dynamics under a rigid-impact configuration, with an impact angle sampled
+uniformly from [−45◦, 45◦], and record the maximum von Mises equivalent stress attained by each element over the entire
+trajectory. As shown in Fig. 20(b), although the initial geometry is fixed, varying the impact angle induces substantially
+different contact sequences and load paths, leading to distinct deformation and final geometry.
+
+
+Radiosity  To evaluate whether GeoPT transfers to physical regimes beyond those evaluated in our main experiments, we
+apply it to radiosity simulation (Goral et al., 1984), a classical light transport problem that computes global illumination by
+modeling diffuse inter-reflections between surfaces. This problem has fundamentally different governing physics from the
+fluid and solid mechanics tasks in our main experiments. We construct a dataset of 200 radiosity renderings in a Cornell
+box scene (Goral et al., 1984) with a Stanford bunny placed at varying positions and scales, illuminated by light sources
+with different intensities, sizes, and directions. We parameterize the dynamics conditions as the light propagation direction,
+analogous to the flow direction in aerodynamics. We finetune GeoPT on 160 training samples and evaluate on 40 held-out
+test samples. Notably, neither the Cornell box geometry nor any light transport physics was seen during pre-training. This
+benchmark examines GeoPT’s potential as a general-purpose prior for diverse simulation tasks.
+
+
+E.2. Experiment Configuration
+
+The detailed configurations can be found in Table 3. All the experiments are conducted in PyTorch (Paszke et al., 2019) on
+NVIDIA A100 40GB GPU. Gradient checkpointing (Chen et al., 2016) is used in the pre-training of GeoPT-large and -huge.
+
+
+                Table 3. Configurations for GeoPT experiments. “B, L, H” represent the base, large and huge models.
+
+             (a) Self-supervision data configuration.                                        (b) Training configurations.
+
+ TERMS                  CONFIGURE                    TERMS                  CONFIGURE
+
+ Used Geometry Data G                                                Pre-Training Stage
+  CAR SUBSET             7,479 SHAPES                      OPTIMIZER          ADMAW (2019)
+  AIRPLANE SUBSET        4,045 SHAPES                    BASE LEARNING RATE      0.001
+  WATERCRAFT SUBSET     1,939 SHAPES                     LEARNING RATE SCHEDULE COSINE
+                                                     BATCH SIZE               8 (B), 24 (L), 20 (H)
+ Geometry bounding box to sampling tracking particles
+                                                WARMUP EPOCHS         10
+  CAR                       [−3.0, 4.2] × [−1.5, 1.5] × [0.0, 2.5]
+                                                       TOTAL EPOCHS           200
+  AIRPLANE                 [−3.0, 4.5] × [−2.8, 2.8] × [0.0, 2.5]
+                                                        LOSS FUNCTION         L2 LOSS
+  WATERCRAFT              [−4.0, 5.0] × [−1.5, 1.5] × [−1.0, 1.0]
+                                                   APPROX GPU HOURS     144 (B), 360 (L), 576 (H)
+ Tracking particles N
+                                                                    Fine-Tuning Stage
+  VOLUME                 32,768
+                                                          OPTIMIZER          ADMAW (2019)
+  SURFACE                 4,096
+                                                      BASE LEARNING RATE      0.001
+ Dynamic process configuration                                LEARNING RATE SCHEDULE ONECYCLELR
+  NUMBER OF STEPS τ       2                              BATCH SIZE               1
+  MAXIMUM VELOCITY vMAX  2                          WARMUP EPOCHS        PYTORCH DEFAULT
+  DYNAMICS PER GEOMETRY 100                             TOTAL EPOCHS           200
+                                                        LOSS FUNCTION          RELATIVE L2 LOSS
+ PRETRAINING SAMPLES     1,346,300 SAMPLES (∼5TB)
+                                                   APPROX GPU HOURS     3 (B), 6 (L), 10 (H)
+
+
+
+                                                19
+
+======================== PDF 第 20 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+Pre-training  During pre-training, we only go through all the unique geometries in each epoch, which does not use all 100
+dynamic trajectories for each geometry but randomly samples one from them within each epoch.
+
+Fine-tuning  For all methods, due to GPU memory limitations when processing extremely large geometries, we split the
+input mesh into several subsets with 50, 000-100, 000 mesh points per subset and train the simulator on these downsampled
+geometries and physics fields. Regarding inference, we utilize the geometry-general property of Transformer solvers
+and directly infer the entire mesh at one forward pass, which is slightly more effective than separately inferring and then
+concatenating results in our experiments. Especially for the DrivAerML benchmark (Ashton et al., 2024) that contains
+160M mesh points per sample, directly inferring the full mesh will cause out-of-memory. Therefore, in this benchmark,
+we split the surface mesh into 20 subsets and the volume mesh into 400 subsets at the beginning, and infer these subsets
+sequentially, where one volume subset is paired with one surface subset for inference.
+
+E.3. Self-Supervision Data
+
+Here, we provide the implementation details of self-supervision data generation in Algorithm 1. All three loops for geometry,
+dynamics and moving steps in the following algorithm can be executed in parallel.
+
+
+Algorithm 1 Self-supervision data generation in GeoPT
+  Input Data: Geometry dataset G
+  Input Config: Number of tracking points N, number of time steps τ, maximum velocity vmax, number of velocity fields
+   per geometry Ndyn
+  Output: Pre-training dataset D with (Ndyn × |G|) samples
+   Initialize dataset D ←∅
+   for G in G do
+       // Step 1: Normalize geometry
+   G ←Rotate(G) // Rotate geometry to align front face to −x direction.
+   G ←Shift(G) // Zero-center x–y coordinates; place bottom on x-y plane.
+   G ←Scale(G) // Scale to unified x-axis length as 5.
+     Build FCPW scene (Sawhney, 2021) for G. Blue symbols indicate FCPW-accelerated operations.
+       // Step 2: Sample query positions
+    {x} ←Sample(ΩG ∪∂G) // Sample from bounding box ΩG and surface ∂G.
+    {x} ←Outside({x}, G) // Remove points inside G; retain N tracking points.
+     for i in {1, . . . , Ndyn} do
+           // Step 3: Sample synthetic velocity field
+      {v} ←{Sample(BC)} where BC = {v ∈RC : ∥v∥2 ≤vmax} // Per-point i.i.d. sampling.
+           // Step 4: Compute feature trajectory following Eq. (4) and Eq. (5)
+         Initialize trajectory hG(x0:τ) ←∅
+      {x0} ←{x}
+       for t in {0, . . . , τ} do
+        hG({xt}) ←VectorDistance({xt}, G) // Compute geometric features.
+        Append hG({xt}) to hG({x0:τ})
+        {xt+1} ←Evolve({xt}, {v}, G) // Update position: xt+1 = xt + v · 1G(xt).
+      end for
+     Add {({x}, {v}, G), hG(x0:τ)} to D
+    end for
+  end for
+  Return D = {({x}, {v}, G), hG(x0:τ)}
+
+
+E.4. Baselines
+
+Here, we detail our implementation for baselines, including backbone selection and geometry usage.
+
+Backbone selection We adopt the implementation of Galerkin Transformer (Cao, 2021), GNOT (Hao et al., 2023)
+and Transolver (Wu et al., 2024) from the open-sourced repository Neural-Solver-Library3, which provides high-quality
+
+    3https://github.com/thuml/Neural-Solver-Library
+
+
+                                                20
+
+======================== PDF 第 21 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+implementations of various neural PDE solvers and has been verified by the authors of these papers. As for Transolver++
+(Luo et al., 2025) and UPT (Alkin et al., 2024), we adopt their official code. For backbone comparison, we configure all the
+Transformer backbones as 8 layers with 256 hidden channels. Besides, we also adopt the same simulation parameterization
+method proposed by GeoPT to incorporate condition information into these baselines.
+
+Geometry usage  Since prior research does not directly study geometric pre-training for physics, we compare GeoPT with
+two reasonable baselines. Here are details for these two geometry usage baselines.
+
+(i) Geometry-only pre-training.  In this type of baseline, we only adopt the       Ground Truth
+geometry-only feature as supervision. Specifically, we train the model to pre-
+dict SDF or vector distance (Faugeras & Gomes, 2000) based on given positions.      Hunyuan3D Latent Token Reconstruction
+
+(ii) Geometry-only conditioning. The prior work (Zhang et al., 2026) has explored
+using frozen geometry representation as the auxiliary information for PDE solving.    Figure 21. Reconstruction examples of
+However, the 3D model used in their work is limited to 3D inductors, which     latent tokens extracted by Hunyuan3D.
+cannot be used in complex industrial designs tested in our paper. Thus, we adopt
+the advanced geometry model Hunyuan3D (Tencent, 2025) to extract the static geometry representation for comparison.
+Specifically, we adopt the pre-trained VAE model4 encoder, which can receive a set of points sampled from a mesh geometry
+as input and encode it into 3,072 geometry tokens with 64 hidden channels. Then we integrate the extracted token sequence
+into Transolver based on an additional cross-attention layer to fuse the geometry tokens into input mesh representations,
+which is also the default usage in (Zhang et al., 2026). As shown in Fig. 21, the geometry representation learned by
+Hunyuan3D can precisely capture the detailed geometry information, thereby enabling accurate geometry reconstruction.
+However, as presented in the main results (Fig. 5), the static geometry representation cannot help the physics learning, even
+though it has already precisely encoded the geometry information.
+
+F. Full Results
+
+Extension to time-dependent simulation  In the main text, we only present the model performance on steady state
+simulation. Here, we applied GeoPT to the transient simulation DTCHull, which is the DTCHull before time-aggregation
+and requires simulating the next transient field based on the current observation. Unlike steady-state, transient field
+correlation is more short-term. Thus, we configure the velocity norm ∥VS∥to be 5× smaller than the steady-state value for
+fine-tuning, where GeoPT still yields benefits compared to training from scratch, as shown in Table 4(a).
+
+Extension to other backbones  As demonstrated in Figure 8(b), we choose Transolver as the default backbone of GeoPT,
+whose performance is also verified in recent research (Zhou et al., 2026). It is worth noticing that GeoPT is an architecture-
+agnostic pre-training model. Therefore, it is also possible to apply lifted geometric pre-training to GNOT (Hao et al., 2023)
+and Galerkin Transformer (Cao, 2021). As shown below, GeoPT can also bring improvements to these models.
+
+
+ Table 4. GeoPT Extension to time-dependent simulation and other backbones. All metrics are tested under full-data and full-training.
+
+(a) Time-dependent simulation of DTCHull.                           (b) Applying GeoPT to other backbones.
+
+ RELATIVE L2   TRANSIENT DTCHULL  RELATIVE L2    DRIVAERML NASA-CRM AIRCRAFT DTCHULL CAR-CRASH
+
+ FROM SCRATCH       0.06189        GALERKIN (2021)    0.127       0.109      0.136     0.210      0.208
+ GEOPT              0.05402        GEOPT-GALERKIN    0.083       0.095      0.099     0.156      0.182
+
+                          GNOT (2023)        0.152       0.105      0.122     0.211      0.400
+                              GEOPT-GNOT       0.116       0.097      0.099     0.180      0.219
+
+
+
+Align with existing benchmarks  In this paper, we fix the training samples around 100 cases to mimic the industrial
+design practice. Here, we further conduct new experiments under aligned training settings with the two latest works: GAOT
+(Wen et al., 2025) and Transolver++ (Luo et al., 2025), to further benchmark GeoPT. As shown in Table 5, in the two largest
+datasets, DrivAerML (surface-only) and NASA-CRM, both Transolver and GeoPT surpass the previous benchmark by a
+large margin. As for AirCraft, GeoPT can also advance Transolver to the state-of-the-art performance. These results further
+justify the effectiveness of GeoPT, which consistently improves the model performance and achieves state-of-the-art.
+
+   4https://huggingface.co/tencent/Hunyuan3D-2/tree/main/hunyuan3d-vae-v2-0-withencoder
+
+
+                                                21
+
+======================== PDF 第 22 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+Table 5. Comparison between GeoPT and the previous method under aligned training settings. The results directly adopted from the
+previous paper are marked as ∗, where the results in DrivAerML (surface-only) and NASA-CRM are both from GAOT (2025) and
+AirCraft is from Transolver++ (2025). † marks our implementation. (a-b) The MSE and Mean AE are calculated on the normalized values.
+
+(a) DrivAerML surface (450 training samples)   (b) NASA-CRM (105 training samples)         (c) AirCraft (140 training samples)
+
+ PRESSURE COE   MSE   MEAN AE  PRESSURE      MSE   MEAN AE  AERODYNAMIC COES   RELATIVE L2
+ GAOT∗(2025)  0.051729  0.12352   GAOT∗(2025)  0.077170  0.16014   TRANSOLVER++∗(2025)    0.064
+ GINO∗(2023B) 0.088124  0.15238   GINO∗(2023B) 0.105688  0.17450   GINO∗(2023B)           0.133
+ TRANSOLVER∗     does not compare    TRANSOLVER∗     does not compare    TRANSOLVER∗             0.092
+ TRANSOLVER†   0.004223  0.04125   TRANSOLVER†   0.011246  0.04938   TRANSOLVER†             0.083
+ GEOPT†        0.003370  0.03617   GEOPT†        0.010722  0.04456   GEOPT†                  0.062
+
+
+Scaling performance  To supplement the scaling results in Fig. 6 of the main text, we further test the corresponding
+performance in DTCHull and Car-Crash in Table 6. It is also observed that pre-training with GeoPT can help avoid potential
+overfitting, especially in industrial design tasks where only limited data is available. Besides, GeoPT can also take advantage
+of diverse geometry and dynamics conditions, highlighting the value of rich 3D geometry assets.
+
+Table 6. Quantitative results for scaling performance and supplement results in DTCHull and Car-Crash. Here “w/o GeoPT” refers to
+Transolver trained from scratch. “Unique Geo” and “Dyn” represent the use ratio of geometry data and sampled dynamics, respectively.
+
+
+                                                                                                                                                                                               (a) Scaling with Model Size
+
+ MODEL     LAYERS DRIVAERML NASA-CRM AIRCRAFT DTCHULL CAR-CRASH
+
+ W/O GEOPT    8       0.0927       0.0996      0.1104     0.1814     0.1977
+ W/O GEOPT    16      0.0847       0.0966      0.1160     0.1648     0.1779         L2
+ W/O GEOPT    32      0.0839       0.0989      0.1153     0.1703     0.1905                                    Relative
+ GEOPT        8       0.0746       0.0880      0.0904     0.1459     0.1772
+ GEOPT       16      0.0702       0.0868      0.0864     0.1438     0.1661
+ GEOPT       32      0.0687       0.0851      0.0836     0.1410     0.1657
+
+                                                                                                                                                    Number of Layers
+                                                                                                                                                                                              (b) Scaling with Pre-Training Data
+ MODEL      RATIO DRIVAERML NASA-CRM AIRCRAFT DTCHULL CAR-CRASH
+
+ UNIQUE GEO  6%     0.0819       0.0969      0.1102     0.1731     0.1798
+ UNIQUE GEO  25%     0.0760       0.0902      0.0996     0.1584     0.1774           L2
+ UNIQUE GEO 100%    0.0746       0.0880      0.0904     0.1459     0.1772                                           Relative
+ UNIQUE DYN  6%     0.0760       0.0913      0.1097     0.1534     0.1781
+ UNIQUE DYN  25%     0.0755       0.0891      0.0954     0.1502     0.1776
+ UNIQUE DYN 100%    0.0746       0.0880      0.0904     0.1459     0.1772
+
+                                                                                                                                                                                            Percent of Pre-Training Data
+
+Statistical test  In Table 7, we also include the standard deviation of key results under 5 runs for statistical analysis. All
+training-data-saving claims are supported by 95% confidence intervals, where the equivalence margin is set as 0.001.
+
+                                     Table 7. Standard deviation of relative L2 under 5 runs.
+
+     Standard deviation (×10−3)          DrivAerML     NASA-CRM       AirCraft      DTCHull       Car-Crash
+
+    From Scratch 100% Training data           0.43           0.94                 1.03         1.34              0.71
+    GeoPT 100% Training data                 0.68           0.35                 1.23         0.88              0.31
+    GeoPT 80% Training data                  0.80           0.66                 1.27         1.10              0.56
+    GeoPT 60% Training data                  0.81           0.93                 1.17         0.49              0.13
+    GeoPT 40% Training data                  0.31           0.76                 1.83         0.91              0.76
+
+Quantitative results  Here, we present the concrete values in Tables 8-12 for five simulation tasks in Fig. 1 and 5. We
+color some results to highlight GeoPT’s capability in improving performance, convergence and reducing data requirements:
+
+(i) Improving performance: We color results that outperform Transolver under the same samples and epochs as  bright blue .
+
+(ii) Accelerating convergence: Under the same training samples, the results surpass the best performance achieved by
+Transolver trained from scratch, are marked in blue , which indicates the convergence speed.
+
+(iii) Reducing data requirements: The results better than Transolver under full-samples-full-epochs are marked in dark blue .
+
+                                                22
+
+======================== PDF 第 23 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+Table 8. Experiments on DrivAerML (Ashton et al., 2024), where we gradually increase the training data from 20 samples to 100 samples
+and training epochs from 50 epochs to 200 epochs. The relative L2 of Transolver (a) trained from scratch, (b) pre-trained with vector
+distance supervision, (c) trained with geometry condition, and (d) pre-trained with GeoPT are recorded.
+
+         (a) Transolver             (b) w/ Geometry Pre-training       (c) w/ Geometry Condition           (d) w/ GeoPT (Ours)
+
+   EPOCH                        EPOCH                        EPOCH                        EPOCH
+        50  100 150 200          50  100 150 200          50  100 150 200          50  100 150 200
+DATA                          DATA                          DATA                          DATA
+
+  20   0.374 0.272 0.231 0.206    20   0.498 0.525 0.394 0.341    20   0.443 0.362 0.289 0.264    20   0.216 0.179 0.160 0.148
+  40   0.328 0.199 0.193 0.140    40   0.486 0.424 0.357 0.256    40   0.339 0.264 0.191 0.169    40   0.165 0.132 0.121 0.111
+  60   0.215 0.170 0.135 0.112    60   0.486 0.320 0.278 0.230    60   0.299 0.175 0.147 0.119    60   0.150 0.113 0.100 0.091
+  80   0.206 0.142 0.108 0.102    80   0.322 0.271 0.237 0.214    80   0.239 0.159 0.133 0.102    80   0.133 0.103 0.089 0.084
+  100   0.197 0.120 0.101 0.093    100   0.326 0.251 0.255 0.202    100   0.200 0.133 0.099 0.094    100   0.118 0.092 0.080 0.075
+
+
+Table 9. Experiments on NASA-CRM (Bekemeyer et al., 2025). The relative L2 error under different training data and epochs is recorded.
+
+         (a) Transolver             (b) w/ Geometry Pre-training       (c) w/ Geometry Condition           (d) w/ GeoPT (Ours)
+
+   EPOCH                        EPOCH                        EPOCH                        EPOCH
+        50  100 150 200           50  100 150 200           50  100 150 200           50  100 150 200
+DATA                          DATA                          DATA                          DATA
+
+  21   0.516 0.412 0.351 0.300     21   0.435 0.350 0.342 0.290     21   0.458 0.390 0.347 0.321     21   0.289 0.268 0.259 0.250
+  42   0.437 0.299 0.225 0.190     42   0.397 0.277 0.248 0.194     42   0.394 0.299 0.271 0.230     42   0.226 0.187 0.169 0.160
+  63   0.329 0.241 0.168 0.137     63   0.286 0.210 0.178 0.163     63   0.343 0.253 0.208 0.188     63   0.173 0.127 0.123 0.114
+  84   0.282 0.170 0.123 0.115     84   0.276 0.157 0.155 0.116     84   0.319 0.223 0.175 0.139     84   0.142 0.108 0.099 0.094
+  105   0.273 0.150 0.112 0.100    105   0.237 0.162 0.121 0.099    105   0.277 0.193 0.167 0.112    105   0.124 0.099 0.093 0.088
+
+
+    Table 10. Experiments on AirCraft (Luo et al., 2025). The relative L2 error under different training data and epochs is recorded.
+
+         (a) Transolver             (b) w/ Geometry Pre-training       (c) w/ Geometry Condition           (d) w/ GeoPT (Ours)
+
+   EPOCH                        EPOCH                        EPOCH                        EPOCH
+        50  100 150 200           50  100 150 200           50  100 150 200           50  100 150 200
+DATA                          DATA                          DATA                          DATA
+
+  20   0.586 0.401 0.207 0.172     20   0.595 0.486 0.365 0.247     20   0.567 0.266 0.211 0.186     20   0.567 0.264 0.197 0.170
+  40   0.319 0.198 0.195 0.138     40   0.562 0.321 0.296 0.237     40   0.317 0.218 0.191 0.142     40   0.240 0.159 0.147 0.122
+  60   0.226 0.247 0.138 0.122     60   0.519 0.304 0.317 0.213     60   0.299 0.234 0.163 0.124     60   0.224 0.159 0.121 0.107
+  80   0.197 0.175 0.158 0.138     80   0.360 0.199 0.189 0.191     80   0.259 0.214 0.153 0.125     80   0.151 0.135 0.113 0.103
+  100   0.153 0.136 0.137 0.110    100   0.199 0.165 0.170 0.199    100   0.238 0.195 0.161 0.118    100   0.134 0.117 0.101 0.090
+
+
+           Table 11. Experiments on DTCHull. The relative L2 error under different training data and epochs is recorded.
+
+         (a) Transolver             (b) w/ Geometry Pre-training       (c) w/ Geometry Condition           (d) w/ GeoPT (Ours)
+
+   EPOCH                        EPOCH                        EPOCH                        EPOCH
+        50  100 150 200          50  100 150 200          50  100 150 200           50  100 150 200
+DATA                          DATA                          DATA                          DATA
+
+  20   0.525 0.444 0.404 0.388    20   0.504 0.464 0.373 0.426    20   0.433 0.435 0.426 0.404     20   0.294 0.258 0.229 0.229
+  40   0.381 0.303 0.228 0.230    40   0.411 0.349 0.242 0.276    40   0.359 0.359 0.337 0.330     40   0.196 0.182 0.177 0.180
+  60   0.343 0.226 0.209 0.190    60   0.339 0.333 0.211 0.223    60   0.325 0.294 0.304 0.271     60   0.164 0.158 0.163 0.160
+  80   0.286 0.210 0.198 0.186    80   0.330 0.269 0.231 0.200    80   0.303 0.278 0.250 0.242     80   0.159 0.154 0.152 0.155
+  100   0.240 0.211 0.198 0.181    100   0.304 0.219 0.225 0.190    100   0.284 0.254 0.247 0.211    100   0.149 0.149 0.146 0.146
+
+
+           Table 12. Experiments on Car-Crash. The relative L2 error under different training data and epochs is recorded.
+
+         (a) Transolver             (b) w/ Geometry Pre-training       (c) w/ Geometry Condition           (d) w/ GeoPT (Ours)
+
+   EPOCH                        EPOCH                        EPOCH                        EPOCH
+        50  100 150 200           50  100 150 200           50  100 150 200           50  100 150 200
+DATA                          DATA                          DATA                          DATA
+
+  20   0.490 0.440 0.384 0.364     20   0.386 0.332 0.306 0.294     20   0.474 0.421 0.391 0.365     20   0.356 0.311 0.278 0.260
+  40   0.438 0.358 0.318 0.282     40   0.398 0.354 0.306 0.296     40   0.421 0.361 0.328 0.298     40   0.296 0.263 0.232 0.219
+  60   0.389 0.319 0.274 0.217     60   0.370 0.307 0.280 0.273     60   0.395 0.330 0.293 0.256     60   0.268 0.237 0.209 0.194
+  80   0.357 0.288 0.231 0.202     80   0.338 0.301 0.269 0.244     80   0.368 0.315 0.255 0.233     80   0.252 0.211 0.194 0.185
+  100   0.337 0.254 0.205 0.198    100   0.318 0.268 0.248 0.225    100   0.345 0.274 0.238 0.193    100   0.236 0.198 0.184 0.177
+
+
+                                                23
+
+======================== PDF 第 24 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+Representation visualization  Due to space limitations in the main text, we present the complete visualization of the
+physics states in Fig. 22-25 as a supplement to Fig. 3 and 7, which includes the learned correlations under various supervisions
+and dynamics-dependent correlations prompted by different configurations of dynamics conditions.
+
+
+
+  (a) Pre-Training w/ Geometry Masked Modeling
+
+
+
+
+
+  (b) Training with Physics Supervision
+
+
+
+
+
+  (c) GeoPT Pre-Training
+
+
+
+
+
+Figure 22. Visualization of physical states learned from different supervision signals, including (a) pre-training by learning to predict
+vector distance, (b) directly training with DrivAerML physics supervision and (c) pre-training with the dynamic process proposed by
+GeoPT. Here, we visualize the last layer. The visualizations from other layers can differ in absolute value but share a similar distribution.
+
+
+
+
+
+                                                24
+
+======================== PDF 第 25 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+
+
+  (a) GeoPT with +x direction, 0.3 normalized speed
+
+
+
+
+
+  (b) GeoPT with 60° shifted direction, 0.3 normalized speed
+
+
+
+
+
+  (c) GeoPT with -60° shifted direction, 0.3 normalized speed
+
+
+
+
+
+  (d) GeoPT with +x direction, 0 normalized speed
+
+
+
+
+
+  (e) GeoPT with +x direction, 2 normalized speed
+
+
+
+
+
+Figure 23. Visualization of DrivAerML physical states in GeoPT “prompted” from different dynamics configurations, including varied
+(a-c) direction and (d-e) velocity norm (speed) configurations. Here, we visualize the fourth layer as a supplement to the last layer
+visualization in Fig. 22. Notably, the states in the fourth layer are less distinguishable in the middle layers when compared with the last
+layer. This can be viewed as an architectural feature of Transolver, which can enable better global interaction among different states.
+
+
+
+                                                25
+
+======================== PDF 第 26 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+
+
+
+  (a) GeoPT with +x direction, 1.2 normalized speed
+
+
+
+
+
+  (b) GeoPT with 30° angle of attack, 1.2 normalized speed
+
+
+
+
+
+  (c) GeoPT with -30° angle of attack, 1.2 normalized speed
+
+
+
+
+
+  (d) GeoPT with +x direction, 0.3 normalized speed
+
+
+
+
+
+  (e) GeoPT with +x direction, 2 normalized speed
+
+
+
+
+
+Figure 24. Visualization of NASA-CRM physical states in GeoPT “prompted” from different dynamics configurations, including varied
+(a-c) direction and (d-e) speed configurations. Here, we visualize the physical states in the last layer. Similar to DrivAerML, changing the
+angle of attack in the y-z plane will affect the state distribution and increasing speed will lead to a more concentrated state distribution.
+
+
+
+                                                26
+
+======================== PDF 第 27 页 ========================
+                       GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+
+
+
+  (a) GeoPT with +x direction, 0.3 normalized speed
+
+
+
+
+
+  (b) GeoPT with 60° angle of attack, 0.3 normalized speed
+
+
+
+
+
+  (c) GeoPT with -60° angle of attack, 0.3 normalized speed
+
+
+
+
+
+  (d) GeoPT with +x direction, 0 normalized speed
+
+
+
+
+
+  (e) GeoPT with +x direction, 2 normalized speed
+
+
+
+
+
+Figure 25. Visualization of DTCHull physical states in GeoPT “prompted” from different dynamics configurations, including varied (a-c)
+direction and (d-e) speed configurations. Here, we visualize the physical states in the last layer. Notably, to ensure a clear presentation of
+the inside ship surface, we downsample the mesh by 10 times for visualization.
+
+
+
+                                                27
+
+======================== PDF 第 28 页 ========================
+                      GeoPT: Scaling Physics Simulation via Lifted Geometric Pre-Training
+
+G. Limitations and Future Work
+
+This paper provides a scalable pathway to utilize off-the-shelf geometries for pre-training neural simulators and has demon-
+strated effectiveness in extensive industrial-fidelity simulation tasks. Despite favorable performance and generalizability,
+GeoPT also has some limitations, lying in the following aspects.
+
+In GeoPT, we propose to parameterize the diverse simulation settings into a point-wise dynamics field, which can cover the
+diversity in geometry, flow direction and speed, as well as material differences of typical simulation benchmarks. Although
+this is one step forward in unifying diverse simulation tasks but still cannot precisely describe all kinds of settings. For
+example, in the crash simulation that considers both elastic and strength properties of materials, the most reasonable to
+parameterize two properties into one dynamic speed value for every element, while this may lose some distinguishability
+due to the dimension reduction. However, since we only focus on the pre-training process, such a limitation can be resolved
+by extending the input channel and tuning new parameters with zero initialization, like ControlNet (Zhang et al., 2023). In
+the future, we would like to explore a more general framework to unify diverse simulation tasks.
+
+GeoPT primarily targets simulations involving complex geometries, a common requirement in industrial design and a setting
+where neural simulators have achieved their most notable successes. Additionally, it is also interesting to see the extension
+of GeoPT to simulations without complex geometry boundaries, such as 3D turbulence in regular grids (Perlman et al.,
+2007). Since such simulations are mainly about computationally intensive physics interactions, the previous explorations
+(Holzschuh et al., 2026) still rely on expensive physics supervision. Taking such regular grid simulation into account, one
+possible way is to leave a certain ratio of pre-training iterations for dynamics under an empty geometry boundary during the
+pre-training process of GeoPT, where all the tracking points are in free-flight motion, which can make the model learn the
+intrinsic isotropic dynamics. We would like to leave this exploration as future work.
+
+
+
+
+
+                                                28

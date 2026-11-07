@@ -1,0 +1,630 @@
+KH-A031 | Learning to Segment Every Thing
+来源：https://arxiv.org/abs/1711.10370
+本地PDF：专题文献/何恺明/KH-A031_Learning_to_Segment_Every_Thing_CVPR2018.pdf
+SHA-256：754e56eef3c17a87ec74ec7a17f5819751038998f38e4034d53a27687a4dead1
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                          Learning to Segment Every Thing
+
+
+             Ronghang Hu1,2,∗   Piotr Doll´ar2   Kaiming He2   Trevor Darrell1   Ross Girshick2
+                         1BAIR, UC Berkeley     2Facebook AI Research (FAIR)
+
+
+
+
+                                                                                                                                        kitchen 0.54
+                        Abstract                                                           oven 0.51                                                               refrigerator 0.54
+                                                                                                                                                  stove 0.56
+          Most methods for object instance segmentation require                           burner 0.52                                   pot 0.74                 handle2018    all training examples to be labeled with segmentation                                                                                               bottle 0.56
+         masks. This requirement makes it expensive to annotate new
+          categories and has restricted instance segmentation models                         knob knob0.83 0.57knob 0.76knob 0.68knob 0.71knob 0.70shelf 0.61
+
+                                                                                                                                         handle 0.51                                     shelf 0.73Mar   to ∼100 well-annotated classes. The goal of this paper is to
+         propose a new partially supervised training paradigm, to-                         door 0.55
+27   gether with a novel weight transfer function, that enables
+          training instance segmentation models on a large set of cat-                                                                                    jar 0.55
+         egories all of which have box annotations, but only a small
+          fraction of which have mask annotations. These contribu-
+          tions allow us to train Mask R-CNN to detect and segment
+        3000 visual concepts using box annotations from the Visual
+                                                                            Figure 1. We explore training instance segmentation models[cs.CV]  Genome dataset and mask annotations from the 80 classes     with partial supervision: a subset of classes (green boxes) have
+          in the COCO dataset. We evaluate our approach in a con-                                                                                 instance mask annotations during training; the remaining classes
+          trolled study on the COCO dataset.  This work is a ﬁrst      (red boxes) have only bounding box annotations.  This image
+          step towards instance segmentation models that have broad     shows output from our model trained for 3000 classes from Visual
+        comprehension of the visual world.                         Genome, using mask annotations from only 80 classes in COCO.
+
+                                                We formulate the partially supervised instance segmen-
+         1. Introduction                                                                               tation task as follows: (1) given a set of categories of in-
+            Object detectors have become signiﬁcantly more accu-       terest, a small subset has instance mask annotations, while
+          rate (e.g., [10, 34]) and gained important new capabilities.      the other categories have only bounding box annotations;
+       One of the most exciting is the ability to predict a fore-      (2) the instance segmentation algorithm should utilize this
+        ground segmentation mask for each detected object (e.g.,     data to ﬁt a model that can segment instances of all object
+          [15]), a task called instance segmentation. In practice, typi-      categories in the set of interest. Since the training data is a
+          cal instance segmentation systems are restricted to a narrow     mixture of strongly annotated examples (those with masks)
+           slice of the vast visual world that includes only around 100     and weakly annotated examples (those with only boxes), we
+                                                                               refer to the task as partially supervised.arXiv:1711.10370v2   object categories.
+       A principle reason for this limitation is that state-of-the-       The main beneﬁt of partially supervised vs. weakly-
+           art instance segmentation algorithms require strong super-     supervised training (c.f. [18]) is it allows us to build a large-
+          vision and such supervision may be limited and expensive      scale instance segmentation model by exploiting both types
+          to collect for new categories [23]. By comparison, bound-     of existing datasets: those with bounding box annotations
+         ing box annotations are more abundant and less expensive     over a large number of classes, such as Visual Genome
+           [4]. This fact raises a question: Is it possible to train high-      [20], and those with instance mask annotations over a small
+          quality instance segmentation models without complete in-    number of classes, such as COCO [23]. As we will show,
+         stance segmentation annotations for all categories? With      this enables us to scale state-of-the-art instance segmenta-
+           this motivation, our paper introduces a new partially su-      tion methods to thousands of categories, a capability that is
+         pervised instance segmentation task and proposes a novel       critical for their deployment in real world uses.
+          transfer learning method to address it.                       To address partially supervised instance segmentation,
+                                                   we propose a novel transfer learning approach built on
+           ∗Work done during an internship at FAIR.                     Mask R-CNN [15].  Mask R-CNN is well-suited to our
+
+======================== PDF 第 2 页 ========================
+task because it decomposes the instance segmentation prob-      for only a small subset of categories. To do this, we develop
+lem into the subtasks of bounding box object detection and     a novel transfer learning approach built on Mask R-CNN.
+mask prediction. These subtasks are handled by dedicated
+                                                   Weight prediction and task transfer learning. Instead of
+network ‘heads’ that are trained jointly. The intuition be-
+                                                                    directly learning model parameters, prior work has explored
+hind our approach is that once trained, the parameters of
+                                                                predicting them from other sources (e.g., [11]). In [8], im-
+the bounding box head encode an embedding of each object
+                                                        age classiﬁers are predicted from the natural language de-
+category that enables the transfer of visual information for
+                                                                   scription of a zero-shot category. In [38], a model regres-
+that category to the partially supervised mask head.
+                                                              sion network is used to construct the classiﬁer weights from
+  We materialize this intuition by designing a parameter-
+                                                            few-shot examples, and similarly in [27], a small neural net-
+ized weight transfer function that is trained to predict a cat-
+                                                   work is used to predict the classiﬁer weights of the compo-
+egory’s instance segmentation parameters as a function of
+                                                                      sition of two concepts from the classiﬁer weights of each in-
+its bounding box detection parameters. The weight transfer
+                                                                dividual concept. Here, we design a model that predicts the
+function can be trained end-to-end in Mask R-CNN using
+                                                               class-speciﬁc instance segmentation weights used in Mask
+classes with mask annotations as supervision. At inference
+                                              R-CNN, instead of training them directly, which is not pos-
+time, the weight transfer function is used to predict the in-
+                                                                     sible in our partially supervised training scenario.
+stance segmentation parameters for every category, thus en-
+                                                    Our approach is also a type of transfer learning [28]
+abling the model to segment all object categories, including
+                                                     where knowledge gained from one task helps with another
+those without mask annotations at training time.
+                                                                      task.  Most related to our work, LSDA [17] transforms
+  We explore our approach in two settings. First, we use
+                                                       whole-image classiﬁcation parameters into object detection
+the COCO dataset [23] to simulate the partially supervised
+                                                           parameters through a domain adaptation procedure. LSDA
+instance segmentation task as a means of establishing quan-
+                                                        can be seen as transferring knowledge learned on an im-
+titative results on a dataset with high-quality annotations
+                                                        age classiﬁcation task to an object detection task, whereas
+and evaluation metrics. Speciﬁcally, we split the full set of
+                                             we consider transferring knowledge learned from bounding
+COCO categories into a subset with mask annotations and
+                                                    box detection to instance segmentation.
+a complementary subset for which the system has access to
+only bounding box annotations. Because the COCO dataset    Weakly supervised semantic segmentation. Prior work
+involves only a small number (80) of semantically well-      trains semantic segmentation models from weak supervi-
+separated classes, quantitative evaluation is precise and re-      sion. Image-level labels and object size constraints are used
+liable. Experimental results show that our method improves      in [30], while other methods use boxes as supervision for
+results over a strong baseline with up to a 40% relative in-     expectation-maximization [29] or iterating between propos-
+crease in mask AP on categories without training masks.         als generation and training [4]. Point supervision and ob-
+   In our second setting, we train a large-scale instance      jectness potentials are used in [3]. Most work in this area
+segmentation model on 3000 categories using the Visual     addresses only semantic segmentation (not instance seg-
+Genome (VG) dataset [20]. VG contains bounding box an-     mentation), treats each class independently, and relies on
+notations for a large number of object categories, however     hand-crafted bottom-up proposals that generalize poorly.
+quantitative evaluation is challenging as many categories       Weakly supervised instance segmentation is addressed in
+are semantically overlapping (e.g., near synonyms) and the     [18] by training an instance segmentation model over the
+annotations are not exhaustive, making precision and recall     bottom-up GrabCut [35] foreground segmentation results
+difﬁcult to measure. Moreover, VG is not annotated with     from the bounding boxes. Unlike [18], we aim to exploit
+instance masks. Instead, we use VG to provide qualitative       all existing labeled data rather than artiﬁcially limiting it.
+output of a large-scale instance segmentation model. Out-    Our work is also complementary in the sense that bottom-up
+put of our model is illustrated in Figure 1 and 5.               segmentation methods may be used to infer training masks
+                                                                   for our weakly-labeled examples. We leave this extension
+2. Related Work                                             to future work.
+
+Instance segmentation. Instance segmentation is a highly     Visual embeddings. Object categories may be modeled by
+active research area [12, 13, 5, 32, 33, 6, 14, 21, 19, 2], with     continuous ‘embedding’ vectors in a visual-semantic space,
+Mask R-CNN [15] representing the current state-of-the-art.     where nearby vectors are often close in appearance or se-
+These methods assume a fully supervised training scenario     mantic ontology. Class embedding vectors may be obtained
+in which all categories of interest have instance mask anno-      via natural language processing techniques (e.g. word2vec
+tations during training. Fully supervised training, however,     [26] and GloVe [31]), from visual appearance information
+makes it difﬁcult to scale these systems to thousands of cat-      (e.g. [7]), or both (e.g. [37]). In our work, the parameters
+egories. The focus of our work is to relax this assumption     of Mask R-CNN’s box head contain class-speciﬁc appear-
+and enable training models even when masks are available     ance information and can be seen as embedding vectors
+
+======================== PDF 第 3 页 ========================
+                                                box                     box         box                         box         box      box labels in      image                                      weights                    head        features                        predictions       loss       < ∪>                training data
+                                                  !?58
+                                                     < ∪>
+                                                                                                       network module
+                  Mask R-CNN        weight transfer function       <: classes with box & mask data     ConvNet
+                           (shaded region)           !456 = @ !?58 ; 1         >: classes with only box data           learned weights
+                                                     < ∪>                                         predicted weights
+                                           mask
+     RPN &         mask       mask                      mask       mask     mask labels in                                                  weights                                                      output tensor
+      RoIAlign         head        features                        predictions       loss        <                                                  !456
+
+                                                class-agnostic mask MLP
+
+Figure 2. Detailed illustration of our MaskX R-CNN method. Instead of directly learning the mask prediction parameters wseg, MaskX
+R-CNN predicts a category’s segmentation parameters wseg from its corresponding box detection parameters wdet, using a learned weight
+transfer function T . For training, T only needs mask data for the classes in set A, yet it can be applied to all classes in set A ∪B at test
+time. We also augment the mask head with a complementary fully connected multi-layer perceptron (MLP).
+
+learned by training for the bounding box object detection      in Faster R-CNN.
+task. The class embedding vectors enable transfer learning        In Mask R-CNN, the last layer in the bounding box
+in our model by sharing appearance information between     branch and the last layer in the mask branch both con-
+visually related classes. We also compare with the NLP-      tain category-speciﬁc parameters that are used to perform
+based GloVe embeddings [31] in our experiments.             bounding box classiﬁcation and instance mask prediction,
+                                                                    respectively, for each category.  Instead of learning the
+3. Learning to Segment Every Thing                 category-speciﬁc bounding box parameters and mask pa-
+   Let C be the set of object categories (i.e., ‘things’ [1])     rameters independently, we propose to predict a category’s
+for which we would like to train an instance segmentation    mask parameters from its bounding box parameters using a
+model. Most existing approaches assume that all training      generic, category-agnostic weight transfer function that can
+examples in C are annotated with instance masks. We re-     be jointly trained as part of the whole model.
+lax this requirement and instead assume that C = A ∪B        For a given category c, let wcdet be the class-speciﬁc ob-
+where examples from the categories in A have masks, while      ject detection weights in the last layer of the bounding box
+those in B have only bounding boxes. Since the examples     head, and wcseg be the class-speciﬁc mask weights in the
+of the B categories are weakly labeled w.r.t. the target task    mask branch.  Instead of treating wcseg as model parame-
+(instance segmentation), we refer to training on the combi-       ters, wcseg is parameterized using a generic weight prediction
+nation of strong and weak labels as a partially supervised     function T (·):
+learning problem.  Noting that one can easily convert in-                    wcseg = T (wcdet; θ),                  (1)
+stance masks to bounding boxes, we assume that bounding     where θ are class-agnostic, learned parameters.
+box annotations are also available for classes in A.             The same transfer function T (·) may be applied to any
+  Given an instance segmentation model like Mask R-     category c and, thus, θ should be set such that T  gen-
+CNN that has a bounding box detection component and a      eralizes to classes whose masks are not observed during
+mask prediction component, we propose the MaskX R-      training. We expect that generalization is possible because
+CNN method that transfers category-speciﬁc information      the class-speciﬁc detection weights wcdet can be seen as an
+from the model’s bounding box detectors to its instance     appearance-based visual embedding of the class.
+mask predictors.                                      T (·) can be implemented as a small fully connected neu-
+                                                                          ral network.  Figure 2 illustrates how the weight transfer3.1. Mask Prediction Using Weight Transfer
+                                                              function ﬁts into Mask R-CNN to form MaskX R-CNN. As
+  Our method is built on Mask R-CNN [15], because it                                                          a detail, note that the bounding box head contains two types
+is a simple instance segmentation model that also achieves                                                              of detection weights: the RoI classiﬁcation weights wccls and
+state-of-the-art results. In brief, Mask R-CNN can be seen                                                                the bounding box regression weights wcbox. We experiment
+as augmenting a Faster R-CNN [34] bounding box detec-                                                          with using either only a single type of detection weights (i.e.
+tion model with an additional mask branch that is a small    wcdet = wccls or wcdet = wcbox) or using the concatenation of
+fully convolutional network (FCN) [24]. At inference time,                                                                the two types of weights (i.e. wcdet = [wccls, wcbox]).
+the mask branch is applied to each detected object in or-
+                                                               3.2. Trainingder to predict an instance-level foreground segmentation
+mask. During training, the mask branch is trained jointly       During training, we assume that for the two sets of
+and in parallel with the standard bounding box head found      classes A and B, instance mask annotations are available
+
+======================== PDF 第 4 页 ========================
+only for classes in A but not for classes in B, while all     experiments, [32] demonstrated if the class-agnostic model
+classes in A and B have bounding box annotations avail-       is trained to predict masks on a subset of the COCO cate-
+able. As shown in Figure 2, we train the bounding box      gories (speciﬁcally the 20 from PASCAL VOC [9]) it can
+head using the standard box detection losses on all classes in     generalize to the other 60 COCO categories at inference
+A ∪B, but only train the mask head and the weight transfer      time. Based on these results, we use Mask R-CNN with
+function T (·) using a mask loss on the classes in A. Given     a class-agnostic FCN mask prediction head as a baseline.
+these losses, we explore two different training procedures:     Evidence from [32] and [15] suggest that this is a strong
+stage-wise training and end-to-end training.                      baseline. Next, we introduce an extension that can improve
+                                                          both the baseline and our proposed weight transfer function.Stage-wise training. As Mask R-CNN can be seen as aug-
+                                          We also compare with a few other baselines for unsuper-menting Faster R-CNN with a mask head, a possible train-
+                                                              vised or weakly supervised instance segmentation in §4.3.ing strategy is to separate the training procedure into detec-
+tion training (ﬁrst stage) and segmentation training (second     3.4. Extension: Fused FCN+MLP Mask Heads
+stage). In the ﬁrst stage, we train a Faster R-CNN using only                                               Two types of mask heads are considered for Mask R-
+the bounding box annotations of the classes in A ∪B, and                                     CNN in [15]: (1) an FCN head, where the M × M mask
+then in the second stage the additional mask head is trained                                                                              is predicted with a fully convolutional network, and (2) an
+while keeping the convolutional features and the bounding                                      MLP head, where the mask is predicted with a multi-layer
+box head ﬁxed.  In this way, the class-speciﬁc detection                                                             perceptron consisting of fully connected layers, more sim-
+weights wcdet of each class c can be treated as ﬁxed class em-       ilar to DeepMask. In Mask R-CNN, the FCN head yields
+bedding vectors that do not need to be updated when train-                                                             higher mask AP. However, the two designs may be com-
+ing the second stage. This approach has the practical bene-                                                             plementary. Intuitively, the MLP mask predictor may better
+ﬁt of allowing us to train the box detection model once and                                                              capture the ‘gist’ of an object while the FCN mask predictor
+then rapidly evaluate design choices for the weight transfer                                             may better capture the details (such as the object boundary).
+function. It also has disadvantages, which we discuss next.                                                     Based on this observation, we propose to improve both the
+End-to-end joint training.  It was shown that for Mask R-      baseline class-agnostic FCN and our weight transfer func-
+CNN, multi-task training can lead to better performance      tion (which uses an FCN) by fusing them with predictions
+than training on each task separately. The aforementioned     from a class-agnostic MLP mask predictor.  Our experi-
+stage-wise training mechanism separates detection training     ments will show that this extension brings improvements
+and segmentation training, and may result in inferior per-      to both the baseline and our transfer approach.
+formance.  Therefore, we would also like to jointly train      When fusing class-agnostic and class-speciﬁc mask pre-
+the bounding box head and the mask head in an end-to-      dictions for K classes, the two scores are added into a ﬁnal
+end manner. In principle, one can directly train with back-   K × M × M output, where the class-agnostic mask scores
+propagation using the box losses on classes in A ∪B and     (with shape 1×M×M) are tiled K times and added to every
+the mask loss on classes in A. However, this may cause      class. Then, the K×M×M mask scores are turned into per-
+a discrepancy in the class-speciﬁc detection weights wcdet      class mask probabilities through a sigmoid unit, and resized
+between set A and B, since only wcdet for c ∈A will re-      to the actual bounding box size as ﬁnal instance mask for
+ceive gradients from the mask loss through the weight trans-      that bounding box. During training, binary cross-entropy
+fer function T (·). We would like wcdet to be homogeneous      loss is applied on the K × M × M mask probabilities.
+between A and B so that the predicted wcseg = T (wcdet; θ)
+                                                          4. Experiments on COCOtrained on A can better generalize to B.
+  To address this discrepancy, we take a simple approach:     We evaluate our method on the COCO dataset [23],
+when back-propagating the mask loss, we stop the gradient     which is small scale w.r.t. the number of categories but
+with respect to wcdet, that is, we only compute the gradient of     contains exhaustive mask annotations for 80 categories.
+the predicted mask weights T (wcdet; θ) with respect to trans-     This property enables rigorous quantitative evaluation us-
+fer function parameter θ but not bounding box weight wcdet.     ing standard detection metrics, like average precision (AP).
+This can be implemented as wcseg = T (stop grad(wcdet); θ)                                                               4.1. Evaluation Protocol and Baselines
+in most neural network toolkits.
+                                          We simulate the partially supervised training scenario on
+3.3. Baseline: Class-Agnostic Mask Prediction                                     COCO by partitioning the 80 classes into sets A and B, as
+  DeepMask [32] established that  it is possible to train     described in §3. We consider two split types: (1) The 20/60
+a deep model to perform class-agnostic mask prediction       split used by DeepMask [32] that divides the COCO cate-
+where an object mask is predicted regardless of the cate-      gories based on the 20 contained in PASCAL VOC [9] and
+gory. A similar result was also shown for Mask R-CNN      the 60 that are not. We refer to these as the ‘voc’ and ‘non-
+with only a small loss in mask quality [15]. In additional     voc’ category sets from here on. (2) We also conduct exper-
+
+======================== PDF 第 5 页 ========================
+                          voc →non-voc     non-voc →voc                                       voc →non-voc     non-voc →voc
+  method            AP on B AP on A AP on B AP on A     method                  AP on B AP on A AP on B AP on A
+  transfer w/ randn          15.4      35.2      19.9      31.1         transfer w/ 1-layer, none             19.2      35.2      25.3      31.2
+  transfer w/ GloVe [31]     17.3      35.2      21.9      31.1         transfer w/ 2-layer, ReLU            19.7      35.3      25.1      31.1
+  transfer w/ cls             18.1      35.1      25.2      31.1         transfer w/ 2-layer, LeakyReLU      20.2      35.2      26.0      31.2
+  transfer w/ box            19.8      35.2      25.7      31.1         transfer w/ 3-layer, ReLU            19.3      35.2      26.0      31.1
+  transfer w/ cls+box        20.2      35.2      26.0      31.2         transfer w/ 3-layer, LeakyReLU      18.9      35.2      25.5      31.1
+  class-agnostic (baseline)    14.2      34.4      21.5      30.7
+  fully supervised (oracle)    30.7      35.0      35.0      30.7
+
+ (a) Ablation on input to T . ‘cls’ is RoI classiﬁcation weights, ‘box’    (b) Ablation on the structure of T . We vary the number of fully connected lay-
+ is box regression weights, and‘cls+box’ is both weights. We also com-    ers in the weight transfer function T , and try both ReLU and LeakyReLU as acti-
+ pare with the NLP-based GloVe vectors [31]. Our transfer function T    vation function in the hidden layers. The results show that ‘2-layer, LeakyReLU’
+ improves the AP on B while remaining on par with the oracle on A.     works best, but in general T  is robust to speciﬁc implementation choices.
+                          voc →non-voc     non-voc →voc                                stop grad   voc →non-voc     non-voc →voc
+  method            AP on B AP on A AP on B AP on A     method        training  on wdet  AP on B AP on A AP on B AP on A
+  class-agnostic             14.2      34.4      21.5      30.7         class-agnostic   sw       n/a       14.2      34.4      21.5      30.7
+  class-agnostic+MLP       17.1      35.1      22.8      31.3         transfer        sw       n/a       20.2      35.2      26.0      31.2
+  transfer                   20.2      35.2      26.0      31.2         class-agnostic   e2e       n/a       19.2      36.8      23.9      32.5
+  transfer+MLP             21.3      35.4      26.6      31.4         transfer         e2e                20.2      37.7      24.8      33.2
+                                                                                transfer         e2e    ✓       22.2      37.6      27.6      33.1
+
+ (c) Impact of the MLP mask branch. Adding the class-agnostic MLP    (d) Ablation on the training strategy. We try both stage-wise (‘sw’) and end-
+mask branch (see §3.4) improves the performance of classes in set B    to-end (‘e2e’) training (see §3.2), and whether to stop gradient from T to wdet.
+ for both the class-agnostic baseline and our weight transfer approach.    End-to-end training improves the results and it is crucial to stop gradient on wdet.
+
+Table 1. Ablation study of our method. We use ResNet-50-FPN as our backbone network, and ‘cls+box’ and ‘2-layer, LeakyReLU’ as
+the default input and structure of T . Results in (a,b,c) are based on stage-wise training, and we study the impact of end-to-end training in
+(d). Mask AP is evaluated on the COCO dataset val2017 split between the 20 PASCAL VOC categories (‘voc’) and the 60 remaining
+categories (‘non-voc’), as in [32]. Performance on the strongly supervised set A is shown in gray.
+
+iments using multiple trials with random splits of different   FCN+MLP structure. In these approaches, instead of pre-
+sizes. These experiments allow us to characterize any bias      dicting each class c’s segmentation parameters wcseg from
+in the voc/non-voc split and also understand what factors in       its bounding box classiﬁcation parameters wcdet, all the cate-
+the training data lead to better mask generalization.             gories share the same learned segmentation parameters wcseg
+                                                          (no weight transfer function is involved). Evidence from
+Implementation details. We train our model on the COCO                                                DeepMask and Mask R-CNN, as discussed in §3.3, suggests
+train2017 split and test on val2017.1 Each class has a                                                                     that this approach is a strong baseline. In addition, we com-
+1024-d RoI classiﬁcation parameter vector wccls and a 4096-     pare our approach with unsupervised or weakly supervised
+d bounding box regression parameter vector wcbox in the      instance segmentation approaches in §4.3.
+detection head, and a 256-d segmentation parameter vec-                                          We also evaluate an ‘oracle’ model:  Mask R-CNN
+tor wcseg in the mask head. The output mask resolution is      trained on all classes in A ∪B with access to instance
+M × M = 28 × 28. In all our experimental analysis be-                                                 mask annotations for all classes in A and B at training time.
+low, we use either ResNet-50-FPN or ResNet-101-FPN [22]                                                          This fully supervised model is a performance upper bound
+as the backbone architecture for Mask R-CNN, initialized                                                                   for our partially supervised task (unless the weight transfer
+from a ResNet-50 or a ResNet-101 [16] model pretrained                                                              function can improve over directly learning wcseg).
+on the ImageNet-1k image classiﬁcation dataset [36].
+                                                               4.2. Ablation Experiments  We follow the training hyper-parameters suggested for
+Mask R-CNN in [15]. Each minibatch has 16 images ×     Input to T . In Table 1a we study the impact of the input
+512 RoIs-per-images, and the network is trained for 90k it-      to the weight transfer function T . For transfer learning to
+erations on 8 GPUs. We use 1e-4 weight decay and 0.9     work, we expect that the input should capture information
+momentum, and an initial learning rate of 0.02, which is     about how the visual appearance of classes relate to each
+multiplied by 0.1 after 60k and 80k iterations. We evaluate      other. To see if this is the case, we designed several in-
+instance segmentation performance using average precision     puts to T : a random Gaussian vector (‘randn’) assigned
+(AP), which is the standard COCO metric and equal to the      to each class, an NLP-based word embedding using pre-
+mean of average precision from 0.5 to 0.95 IoU threshold      trained GloVe vectors [31] for each class, the weights from
+of all classes.                                                   the Mask R-CNN box head classiﬁer (‘cls’), the weights
+                                                     from the box regression (‘box’), and the concatenation of
+Baseline and oracle. We compare our method to class-
+                                                          both weights (‘cls+box’). We compare the performance of
+agnostic mask prediction using either an FCN or fused
+                                                          our transfer approach with these different embeddings to the
+   1The COCO train2017 and val2017 splits are the same as the     strong baseline: class-agnostic Mask R-CNN.
+trainval35k and minival splits used in prior work, such as [15].             First, Table 1a shows that the random control (‘randn’)
+
+======================== PDF 第 6 页 ========================
+ B                                                         of training samples per class in set A. This indicates that to
+  in 40                                               maximize transfer performance to classes in set B it may be
+                                                   more effective to collect a larger number of instance mask
+       30                                                  samples for each object category in set A.           (percent)
+
+                                                   Impact of the MLP mask branch. As discussed in §3.4,       20                                     20 random classes          increase                                       30 random classes             a class-agnostic MLP mask branch can be fused with either
+                                              40 random classes
+  AP       10                                     50 random classes              the baseline or our transfer approach. In Table 1c we see
+                                              60 random classes                that either mask head fused with the MLP mask branch con-
+                                              20 VOC classes          relative 0                                     60 non-VOC classes               sistently outperforms the corresponding unfused version.
+         5000  7500  10000 12500 15000 17500 20000 22500 25000           This conﬁrms our intuition that FCN-based mask heads and
+               average #training-samples-per-class in A              MLP-based mask heads are complementary in nature.
+Figure 3. Each point corresponds to our method on a random A/B
+split of COCO classes. We vary |A| from 20 to 60 classes and     Effect of end-to-end training. Up to now,  all ablation
+plot the relative change in mask AP on the classes in set B (those     experiments use stage-wise training, because it is signiﬁ-
+classes without mask annotations) vs. the average number of mask      cantly faster (the same Faster R-CNN detection model can
+annotations per class in set A.                                be reused for all experiments). However, as noted in §3.2,
+                                                              stage-wise training may be suboptimal.  Thus, Table 1dyields results on par with the baseline; they are slightly bet-
+                                                      compares stage-wise training to end-to-end training. In theter on voc→non-voc and worse in the other direction, which
+                                                            case of end-to-end training, we investigate if it is neces-may be attributed to noise.  Next, the GloVe embedding
+                                                              sary to stop gradients from T  to wdet, as discussed.  In-shows a consistent improvement over the baseline, which
+                                                             deed, results match our expectation that end-to-end train-indicates that these embeddings may capture some visual
+                                                             ing can bring improved results, however only when back-information as suggested in prior work [39]. However, in-
+                                                          propagation from T  to wdet is disabled. We believe thisputs ‘cls’, ‘box’ and ‘cls+box’ all strongly outperform the
+                                                         modiﬁcation is necessary in order to make the embeddingNLP-based embedding (with ‘cls+box’ giving the best re-
+                                                              of classes in A homogeneous with those in B; a propertysults), which matches our expectation since they encode vi-
+                                                                     that is destroyed when only the embeddings for classes insual information by design.
+                                   A are modiﬁed by back-propagation from T .
+  We note that all methods compare well to the fully su-
+pervised Mask R-CNN oracle on the classes in set A.  In     4.3. Results and Comparison of Our Full Method
+particular, our transfer approach slightly outperforms the                                                              Table 2 compares our full MaskX R-CNN method (i.e.,
+oracle for all input types.  This results indicates that our                                               Mask R-CNN with ‘transfer+MLP’ and T  implemented
+approach does not sacriﬁce anything on classes with strong                                                              as ‘cls+box, 2-layer, LeakyReLU’) and the class-agnostic
+supervision, which is an important property.                                                               baseline using end-to-end training.  In addition, we also
+                                                     compare with the following baseline approaches:  a) un-Structure of T . In Table 1b we compare different imple-
+                                                             supervised mask prediction using GrabCut [35] foregroundmentations of T : as a simple afﬁne transformation, or as a
+                                                           segmentation over the Faster R-CNN detected object boxes
+neural network with 2 or 3 layers. Since LeakyReLU [25]
+                                                            (Faster R-CNN tested w/ GrabCut) and b) weakly super-
+is used for weight prediction in [27], we try both ReLU and
+                                                              vised instance segmentation similar to [18], which trains an
+LeakyReLU as activation function in the hidden layers. The
+                                                               instance segmentation method (here we use Mask R-CNN)
+results show that a 2-layer MLP with LeakyReLU gives the
+                                                    on the GrabCut segmentation of the ground-truth boxes
+best mask AP on set B. Given this, we select the ‘cls+box,
+                                                (Mask R-CNN trained w/ GrabCut).2-layer, LeakyReLU’ implementation of T  for all subse-
+                                                MaskX R-CNN outperforms these approaches by a large
+quent experiments.
+                                                       margin (over 20% relative increase in mask AP). We also
+Comparison of random A/B  splits. Besides  splitting     experiment with ResNet-101-FPN as the backbone network
+datasets into voc and non-voc, we also experiment with ran-      in the bottom half of Table 2. The trends observed with
+dom splits of the 80 classes in COCO, and vary the number     ResNet-50-FPN generalize to ResNet-101-FPN, demon-
+of training classes. We randomly select 20, 30, 40, 50 or 60      strating independence of the particular backbone used thus
+classes to include in set A (the complement forms set B),       far.  Figure 4 shows example mask predictions from the
+perform 5 trials for each split size, and compare the perfor-      class-agnostic baseline and our approach.
+mance of our weight transfer function T on classes in B to
+                                                          5. Large-Scale Instance Segmentationthe class-agnostic baseline. The results are shown in Figure
+3, where it can be seen that our method yields to up to over       Thus far, we have experimented with a simulated ver-
+40% relative increase in mask AP. This plot reveals a corre-     sion of our true objective: training large-scale instance seg-
+lation between relative AP increase and the average number     mentation models with broad visual comprehension. We
+
+======================== PDF 第 7 页 ========================
+                                                                                    person 0.95
+                                                       person 1.00       personpersonpersonperson0.970.950.970.99
+    person 1.00                                                            person                                                                     0.99person 0.99 person 0.99
+                                                                 0.95                                                                                       person perso0.99                                                                                    kite 1.00               person person0.99   0.99 personperson1.000.98         personchair0.910.96kite
+
+                                                                                                                            dog 1.00
+                            frisbee 0.99      frisbee 0.98                                                                                                                                                   person 1.00
+                                                                                                                                                                                            personperson0.990.99          person 0.9
+
+
+
+
+
+                                                                                    person 0.96
+                                                       person 1.00       personpersonperson0.990.930.98
+
+    person 1.00                                                            personkite 0.960.99person 0.98 person 1.00
+                                                                                       person perso1.00                                                                                    kite 1.00               personperson0.99  0.98 personperson0.990.98          personchair0.950.92
+
+                                                                                                                            dog 1.00
+                            frisbee 0.99       frisbee 0.99                                                                                                                                                   person 1.00
+                                                                                                                                                                                            personperson0.990.99         person 0.9
+
+
+
+Figure 4. Mask predictions from the class-agnostic baseline (top row) vs. our MaskX R-CNN approach (bottom row). Green boxes
+are classes in set A while the red boxes are classes in set B. The left 2 columns are A = {voc} and the right 2 columns are A = {non-voc}.
+                                                voc →non-voc: test on B = {non-voc}              non-voc →voc: test on B = {voc}
+ backbone   method                   AP   AP50   AP75   APS  APM   APL   AP   AP50   AP75   APS  APM   APL
+               class-agnostic                     19.2    36.4    18.4    11.5    23.3    24.4    23.9    42.9    23.5    11.6    24.3    33.7
+               Faster R-CNN tested w/ GrabCut    12.6    24.0    11.9     4.3     12.0    23.5    12.1    27.7     8.9      4.3     12.0    23.5
+ R-50-FPN  Mask R-CNN trained w/ GrabCut   19.5    39.2    17.0     6.5     20.9    34.3    19.5    46.2    14.2     4.7     15.9    32.0
+          MaskX R-CNN (ours)              23.7    43.1    23.5    12.4    27.6    32.9    28.9    52.2    28.6    12.1    29.0    40.6
+                fully supervised (oracle)            33.0    53.7    35.0    15.1    37.0    49.9    37.5    63.1    38.9    15.1    36.0    53.1
+               class-agnostic                     18.5    34.8    18.1    11.3    23.4    21.7    24.7    43.5    24.9    11.4    25.7    35.1
+               Faster R-CNN tested w/ GrabCut    13.0    24.6    12.1     4.5     12.3    24.4    12.3    27.6     9.5      4.5     12.3    24.4
+ R-101-FPN  Mask R-CNN trained w/ GrabCut   19.7    39.7    17.0     6.4     21.2    35.8    19.6    46.1    14.3     5.1     16.0    32.4
+          MaskX R-CNN (ours)              23.8    42.9    23.5    12.7    28.1    33.5    29.5    52.4    29.7    13.4    30.2    41.0
+                fully supervised (oracle)            34.4    55.2    36.3    15.5    39.0    52.6    39.1    64.5    41.4    16.3    38.1    55.1
+Table 2. End-to-end training of MaskX R-CNN. As in Table 1, we use ‘cls+box, 2-layer, LeakyReLU’ implementation of T and add the
+MLP mask branch (‘transfer+MLP’), and follow the same evaluation protocol. We also report AP50 and AP75 (average precision evaluated
+at 0.5 and 0.75 IoU threshold respectively), and AP over small (APS), medium (APM), and large (APL) objects. Our method signiﬁcantly
+outperforms the baseline approaches in §4.3 on set B without mask training data for both ResNet-50-FPN and ResNet-101-FPN backbones.
+
+believe this goal represents an exciting new direction for     using ResNet-101-FPN as our backbone network following
+visual recognition research and that to accomplish it some      the hyper-parameters in §4.1.  Then, in the second stage,
+form of learning from partial supervision may be required.    we add the mask head using our weight transfer function
+  To take a step towards this goal, we train a large-    T and the class-agnostic MLP mask prediction (i.e., ‘trans-
+scale MaskX R-CNN model following the partially super-     fer+MLP’), with the ‘cls+box, 2-layer, LeakyReLU’ imple-
+vised task, using bounding boxes from the Visual Genome     mentation of T . The mask head is trained on subset of 80
+(VG) dataset [20] and instance masks from the COCO   COCO classes (set A) using the mask annotations in the
+dataset [23]. The VG dataset contains 108077 images, and    train2017 split of the COCO dataset.
+over 7000 category synsets annotated with object bounding
+boxes (but not masks). To train our model, we select the     Qualitative results. Mask AP is difﬁcult to compute on
+3000 most frequent synsets as our set of classes A ∪B for   VG because it contains only box annotations.  Therefore
+instance segmentation, which covers all the 80 classes in    we visualize results to understand the performance of our
+COCO. Since the VG dataset images have a large overlap     model trained on all the 3000 classes in A ∪B using our
+with COCO, when training on VG we take all the images     weight transfer function. Figure 5 shows mask prediction
+that are not in COCO val2017 split as our training set,     examples on validation images, where it can be seen that
+and validate our model on the rest of VG images. We treat     our model predicts reasonable masks on those VG classes
+all the 80 VG classes that overlap with COCO as our set A     not overlapping with COCO (set B, shown in red boxes).
+with mask data, and the remaining 2920 classes in VG as        This visualization shows several interesting properties of
+our set B with only bounding boxes.                         our large-scale instance segmentation model.  First, it has
+                                                              learned to detect abstract concepts, such as shadows and
+Training. We train our large-scale MaskX R-CNN model      paths. These are often difﬁcult to segment. Second, by sim-
+using the stage-wise training strategy. Speciﬁcally, we train     ply taking the ﬁrst 3000 synsets from VG, some of the con-
+a Faster R-CNN model to detect the 3000 classes in VG     cepts are more ‘stuff’ like than ‘thing’ like. For example,
+
+======================== PDF 第 8 页 ========================
+   treeskysky0.720.750.51           tree 0.93                               sky 0.63                                                                                                                                                    wall 0.80                       wall 0.57                  window 0.65                                                                                              room 0.51              wall 0.60
+                                                                   sign 0.66                   tree 0.92           window 0.77   curtain 0.74vent 0.58
+                                                      bus 0.82                                             buildi                 lamp 0.67
+                                                                                                                           lamp 0.94                   electric_refrigerator 0.54
+                                                                                                                                        headboard                                                                                                                                                               0.80                                                                                                             bed                                                                                                                               0.92                                                                                                                                                                                handle                                                                                                                                                                                            0.58
+       roofbuilding           0.88 0.55                                             trunk 0.52
+                                                                                                                                                               pillow                                                                                                                                                        0.67                                                     van 0.70bus window0.83   0.51                                                                                                                               chair                                                                                                                             0.64                                                                                                                                                                                         0.57                                                                                                                                           pillow 0.82                                                                                                                                                                          0.5               door                                                                                                                                                                 pillow                                                                                                                                                                     pillow                                                                                                                                                          0.85pillow0.92                                                                                cart 0.66   shirtman0.70car0.56van0.730.90                                                                                                                                                      table 0.72                                                                                                                                                                                                                              chair 0.95   bench         0.66                               shrub 0.79                                                                                                   bag 0.59
+                                                          grass 0.58
+                                        chair 0.91          curb 0.65                                                                                                                handle 0.84
+
+                                                                                                                                                                                                                           floor 0.71
+  shadow 0.73
+              shadow 0.64
+
+
+
+                                                              tree                                                              0.62                                                                                                   pole                                                                                                     0.81                                                                       tree 0.61                   tree                      0.72                                                                                                       sign                                                                                                      0.73                                                tree                                                 0.75                                                                                                              man         building                 0.62                                      tree                                        0.62                                                                                                                                       0.74                                                                                                                                                                  hair0.77                                                                                                                                                         0.72                                                                                                       sign                                                                                                      0.68                                                                                                    manman                                                                                                                                          0.62                          building                                 0.83          tree              0.72
+                                                                                                                                                                    sky                                                                                                                                                                         0.80                                                                                                       sign                                                                                                       0.77                                                                                                                                                                                                                            pole                                                                                                                                                                                                 0                                                                                                                                                          suit                                                                                                                                      0.87                                                                                                        man                                                                                                         man                                                                                                                                             necktie                                                                                                                                             0.620.810.66                                                                                                       sign                                                                                                       0.72                                                                       window                                                                                           0.52                                                                                                                                                                                                                     0.80                                                                                                              bag                                                                                                                               0.72                                                                                                                                                                                                                          buildingroof                                                                                                                                                                                                                 0.71
+                                                                                                                                                   necktie                                                                                                                                                    0.50                                                                                                                                                                               pole                                                                                                                                                                             0.52                                                                                                                                                      necklace                                                                                                                                                               0.81                                                                                                       sign                                                                                                      0.63                                                                                                  win                                                                                                                                                                                    pole                                                                                                                                                                                   0.71            0.61   bus       0.77pole                                                                                                                                                                                                                 pole                                                                                                                                                                                                               0.68window                                                                                                                                                                                                                                   0.7                                                                                                     sign                                                                                                     0.71                                                                                                                                                                               window                                                                                                                                                                                                                     0.54                           bus                                 0.87                                                                                                                                                                                                             sign         window                   0.52                                                                                                                                                                                                                 0.59                                                                                                                                                                                                 tree                                                                                                                                                                                       0.54    window             0.60
+                                                  0.750.5                                                                                                                                                                                                          pole                                                                                                                                                                                                       0.680.54light                                       window0.62                                                                sign                                                                 0.62                                                                                                                                                                                                         train                                                                                                                                                                                     0.79                               windowwindow                                    window0.58                            window                                        0.64                                                                                         sign                                                                                         0.72                                                                                                                                                                  window                                                                                                                                                                                                       0.57                                                                                                                     laptop                                                                                                                       0.71                                                                                           0.64                                                                                     0.53window                                                                                             0.66                                              bicycle                                                 0.93                                                                                                                                                        button                                                                                                                                                              0.92                                                                                                                                                                                                   box                                                                                                                                                                                                                                   0.7                                                                                                                                                                       fence                                                                                                                                                                           0.76                                                                                                 car                                                                                                  0.59                                                                                                                                                                                                                     sign                                                                                                                                                                                                               0.75                                                                              jacketman 0.66window0.53 window                                              man                                                                 0.58                                                                                                             keyboard                                                                                                                             0.64                                    0.59                                                                                                         car                                                                                                          0.61                                                                                                                                                                 path                                                                                                                                                                          0.62                      windowwindow                                 0.68                   window                              0.65                                           sign                                             0.85                                                                                                                                                              0.72                                                                                                                                                 button                                                                                                                                                       button0.79                                                                                         sign                                                                                         0.57              man                       0.51                                                                bicycle                                                                 0.94                                                                                                                                                      accountant                                                                                                                                                                                                          path                                                                                                                                                                                                                   0.76
+                                                                                                                                                  trouser                                                                                                                                                   0.74                                           sign                                             0.74
+                                                                                                                             shoe 0.65
+
+
+   skypole0.630.74                                                               tree 0.79                tree 0.56                                                                                           manshirt 0.610.57                                            ceiling 0.61
+                                                                                      man 0.58
+                                                                                                                                               helm                                                                                                                          short_pants                                                                                                                                  0.50                                                                                                                                      helmet                                                              truck 0.84                                                                                                                                           helmet0.82                                                                                                                                                         0.76helmet                                                                                                                                                                 0.78helm                                 wall 0.70                                                                                                                             helmet                                                                                                                                           0.84                                                                                                                   helmet 0.89                                                                                                                                                               0.84                                                                                                                                                     0.83helmet                                                                                                                                  helmet                                                                                                                                       helmet0.64                              building 0.79                                                                                 truck 0.72 window 0.52window 0.50
+                                                                                                                                                                        bicyc                                                                                                                           helmet                                                                                                                                         0.77                                                                                                                                                                                                       wall                                                                                                                                                                                                0.50                                                                                                             helmet                                                                                                                         0.90                                                                                                                man                                                                                                                                                        0.78                                                                                                                                             window 0.70                                                                                                                                                                                  doorway 0.54      tree 0.62                                                                                                                                                           bicycle                                                                                                                                                     0.88                                                                                                                                                                                     door                                                                                                                                                                                                  0.70                                                             benchtire 0.570.54                                                                                                                 tire 0.55
+                                                                                            tire 0.66                                                                                                                                                                             towel 0.62                                                                                                                                            bicycle                                                                                                                                       0.92             treebuilding0.51 sign0.67tree0.880.68                                                                                                                           bicycle                                                                                                                       0.98                                                                                                                                                                              shirt                                                                                                                                                         0.91                                               truck 0.79
+                                           car   car 0.65                                              0.53                                                                                                                                       floorfloor0.640.87                                            0.840.86                                                                                                                                                                                                       pillow            coneconecone0.80cone0.540.720.78        conecone                                                                                                                                                                                                       pillowpillow0.530.740.81
+
+
+
+
+                                            tree 0.69
+                                                windowwomansign0.560.610.55              hair 0.94                    tree 0.66sky 0.65 pole 0.61
+                                                                                                                                                                                         pole 0.72
+                                                                                    nose 0.53                                                                                                                                    tree                                                                                                                               0.66                                                                                                                                              clock 0.69                      tree 0.71             building 0.87                                      hat0.80                                         0.63                                                                                                                                        traffic_light                                                                                                                           0.51                    woman                          man0.64             man                      0.91
+                                                                                                                                                                                                                                                     traffic_light                                                                                                                                                                                                                     0.53                                                                                                shirt 0.53                                                                                                                               pole                                                                                                                               0.59                                shirt0.87 0.53                     shirtbeard                      0.88                                        shirt                                       0.84                                                                                                                                                                      window                                                                                                                                                                                                           0.51                                                                                                                         shirt 0.7
+                                                                                                                                                                                                                    light 0.54
+                                                                                                                                                                                                                                            light 0.62 sign 0.68                                                            handhand0.670.51
+                   jean 0.61 jean                                  0.68jean                                         frisbee0.62 0.93        hand 0.73                                                                                                                                   carcar0.58car0.590.76    car 0.65car 0.90     car 0
+                                 frisbee                                     0.94                                                        bagbagbox0.860.660.78bag 0.55table 0.65
+                                                                                       glove 0.72                                                                                               pole 0.62      railing 0.62
+
+                                      shoe 0.69                                                                                    curb 0.54 line 0.51
+                                                                                           banana 0                     line 0.70                        line 0.64
+
+
+  roomwall 0.630.62                       ceilingfixture0.730.56             sky 0.86                    pole 0.72
+
+                                                                                                                              building                                                                                                                               0.68
+       door 0.87                                                                                                                                   buildingroof                                                                                                                                 0.620.72     chimneybuilding0.86roof 0.710.63         field 0.50    mancap0.630.56        cap 0.55cap 0.58
+                             microwave                                           0.95
+                                                                                                                                                                                                    uniform                                                                                                                                                                                                                 0.56                                                              tree                                                             0.91                                                                                                                     window                                                                                                                                                 0.53                                                                              signlogo0.870.51                                                                                                                                  window                                                                                                                                       window0.65        bat 0.78
+                                                                                                tree 0.86                                                                                                                                                    light                                                                                                                                 0.52                                                              building                                                                  0.70                                                                                                             bus                                                                                                                          0.96                                       0.69      switch 0.66          switchcounter                                0.57                                                                                                                                                                                                                      bat 0.59
+                                                                                                                          sign                                                                                                                        0.75                                                                                                                                                              hand                                                                                                                                                                                         0.58                                                                                                                          window                                                                                                                                                       0.50                                                                  building                                                                      0.63                                                                                                         window                                                                                                                                                                                                                  0.65                                                                                                      window                                                                                                                               0.68window                                                                                                                                                                                                           glove                                                                                                                                                                                                                    trouser0.69belt 0.59                                       chair                                          0.75                                                                                                                            window0.65window0.68                                                                                                                                                          0.530.59                                                                                                                                   0.62windowmirror0.65                                                                                                                        window0.740.55window                                                                                                                                                                                               trouser                                                              window                                                                                0.68                                                                                                                                                                    hand0.930.69                                            pillow                                               0.61
+   floor 0.75
+                                                                 windowwindow0.540.51fencefence0.580.68                                                           sign 0.56
+                                                                       door 0.79                                                                                                                     sock 0.57sock 0.78
+
+             pillow 0.60                                   sidewalkfence 0.560.55                                                           license_plate 0.56                                           shoe 0.67shoe 0.55   shoeshoe0.550.57
+
+Figure 5. Example mask predictions from our MaskX R-CNN on 3000 classes in Visual Genome. The green boxes are the 80 classes
+that overlap with COCO (set A with mask training data) while the red boxes are the remaining 2920 classes not in COCO (set B without
+mask training data). It can be seen that our model generates reasonable mask predictions on many classes in set B. See §5 for details.
+
+the model does a reasonable job segmenting isolated trees,      notations. We propose a novel transfer learning approach,
+but tends to fail at segmentation when the detected ‘tree’ is     where a learned weight transfer function predicts how each
+more like a forest. Finally, the detector does a reasonable      class should be segmented based on parameters learned
+job at segmenting whole objects and parts of those objects,      for detecting bounding boxes. Experimental results on the
+such as windows of a trolley car or handles of a refrigera-   COCO dataset demonstrate that our method greatly im-
+tor. Compared to a detector trained on 80 COCO categories,     proves the generalization of mask prediction to categories
+these results illustrate the exciting potential of systems that     without mask training data. Using our approach, we build a
+can recognize and segment thousands of concepts.               large-scale instance segmentation model over 3000 classes
+                                                                   in the Visual Genome dataset. The qualitative results are en-
+6. Conclusion                                           couraging and illustrate an exciting new research direction
+                                                                   into large-scale instance segmentation. They also reveal that   This paper addresses the problem of large-scale instance
+                                                                scaling instance segmentation to thousands of categories,segmentation by formulating a partially supervised learn-
+                                                           without full supervision, is an extremely challenging prob-ing paradigm in which only a subset of classes have in-
+                                                    lem with ample opportunity for improved methods.stance masks during training while the rest have box an-
+
+======================== PDF 第 9 页 ========================
+References                                                      [21] Y. Li, H. Qi, J. Dai, X. Ji, and Y. Wei. Fully convolutional
+                                                                         instance-aware semantic segmentation. In CVPR, 2017. 2
+ [1] E. H. Adelson. On seeing stuff: the perception of materials
+                                                                     [22] T.-Y. Lin, P. Doll´ar, R. Girshick, K. He, B. Hariharan, and
+    by humans and machines. In Human Vision and Electronic
+                                                                             S. Belongie. Feature pyramid networks for object detection.
+     Imaging, 2001. 3
+                                                                           In CVPR, 2017. 5
+ [2] M. Bai and R. Urtasun. Deep watershed transform for in-
+                                                                     [23] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ra-
+     stance segmentation. In CVPR, 2017. 2
+                                                                manan, P. Doll´ar, and C. L. Zitnick. Microsoft COCO: Com-
+ [3] A. Bearman, O. Russakovsky, V. Ferrari, and L. Fei-Fei.                                                    mon objects in context. In ECCV, 2014. 1, 2, 4, 7
+    Whats the point: Semantic segmentation with point super-
+                                                                     [24]  J. Long, E. Shelhamer, and T. Darrell. Fully convolutional
+      vision. In ECCV, 2016. 2
+                                                                    networks for semantic segmentation. In CVPR, 2015. 3
+ [4]  J. Dai, K. He, and J. Sun.  Boxsup: Exploiting bounding
+                                                                     [25] A. L. Maas, A. Y. Hannun, and A. Y. Ng. Rectiﬁer nonlin-
+     boxes to supervise convolutional networks for semantic seg-
+                                                                                      earities improve neural network acoustic models. In ICML,
+     mentation. In ICCV, 2015. 1, 2
+                                                               volume 30, 2013. 6
+ [5]  J. Dai, K. He, and J. Sun. Convolutional feature masking for
+                                                                     [26] T. Mikolov, K. Chen, G. Corrado, and J. Dean.  Efﬁcient
+      joint object and stuff segmentation. In CVPR, 2015. 2
+                                                                           estimation of word representations in vector space.  arXiv
+ [6]  J. Dai, K. He, and J. Sun. Instance-aware semantic segmen-                                                                             preprint arXiv:1301.3781, 2013. 2
+      tation via multi-task network cascades. In CVPR, 2016. 2
+                                                                     [27]  I. Misra, A. Gupta, and M. Hebert. From red wine to red
+ [7] V. Dumoulin, J. Shlens, M. Kudlur, A. Behboodi, F. Lemic,                                                                       tomato: Composition with context. In CVPR, 2017. 2, 6
+     A. Wolisz, M. Molinaro, C. Hirche, M. Hayashi, E. Bagan,
+                                                                     [28] S. J. Pan and Q. Yang. A survey on transfer learning. IEEE
+      et al. A learned representation for artistic style.  arXiv
+                                                                          Trans. on Knowl. and Data Eng., 2010. 2
+     preprint arXiv:1610.07629, 2016. 2
+                                                                     [29] G. Papandreou, L.-C. Chen, K. Murphy, and A. L. Yuille.
+ [8] M. Elhoseiny, B. Saleh, and A. Elgammal. Write a classi-
+                                                                 Weakly-and semi-supervised learning of a DCNN for seman-
+      ﬁer: Zero-shot learning using purely textual descriptions. In
+                                                                                             tic image segmentation. In ICCV, 2015. 2
+    ICCV, 2013. 2
+                                                                     [30] D. Pathak, P. Krahenbuhl, and T. Darrell. Constrained con-
+ [9] M. Everingham, L. Van Gool, C. K. Williams, J. Winn, and
+                                                                             volutional neural networks for weakly supervised segmenta-
+     A. Zisserman. The PASCAL Visual Object Classes (VOC)
+                                                                                      tion. In ICCV, 2015. 2
+     Challenge. IJCV, 2010. 4
+                                                                     [31]  J. Pennington, R. Socher, and C. Manning. GloVe: Global
+[10] R. Girshick, J. Donahue, T. Darrell, and J. Malik. Rich fea-
+                                                                            vectors for word representation. In EMNLP, 2014. 2, 3, 5
+      ture hierarchies for accurate object detection and semantic
+                                                                     [32]  P. O. Pinheiro, R. Collobert, and P. Dollar. Learning to seg-
+     segmentation. In CVPR, 2014. 1
+                                                              ment object candidates. In NIPS, 2015. 2, 4, 5
+[11] D. Ha, A. Dai, and Q. V. Le. HyperNetworks. arXiv preprint
+                                                                     [33]  P. O. Pinheiro, T.-Y. Lin, R. Collobert, and P. Doll´ar. Learn-
+     arXiv:1609.09106, 2016. 2
+                                                                         ing to reﬁne object segments. In ECCV, 2016. 2
+[12] B. Hariharan, P. Arbel´aez, R. Girshick, and J. Malik. Simul-
+                                                                     [34] S. Ren, K. He, R. Girshick, and J. Sun. Faster R-CNN: To-
+     taneous detection and segmentation. In ECCV. 2014. 2
+                                                                 wards real-time object detection with region proposal net-
+[13] B. Hariharan, P. Arbel´aez, R. Girshick, and J. Malik. Hyper-
+                                                                     works. In NIPS, 2015. 1, 3
+     columns for object segmentation and ﬁne-grained localiza-
+                                                                     [35] C. Rother, V. Kolmogorov, and A. Blake. GrabCut: Interac-
+      tion. In CVPR, 2015. 2
+                                                                                     tive foreground extraction using iterated graph cuts. In ACM
+[14] Z. Hayder, X. He, and M. Salzmann. Boundary-aware in-
+                                                                ToG, 2004. 2, 6
+     stance segmentation. In CVPR, 2017. 2
+                                                                     [36] O. Russakovsky, J. Deng, H. Su, J. Krause, S. Satheesh,
+[15] K. He, G. Gkioxari, P. Doll´ar, and R. Girshick. Mask R-
+                                                                             S. Ma, Z. Huang, A. Karpathy, A. Khosla, M. Bernstein,
+    CNN. In ICCV, 2017. 1, 2, 3, 4, 5
+                                                                A. C. Berg, and L. Fei-Fei. ImageNet Large Scale Visual
+[16] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning                                                                      Recognition Challenge. IJCV, 2015. 5
+      for image recognition. In CVPR, 2016. 5
+                                                                     [37] Y.-H. H. Tsai, L.-K. Huang, and R. Salakhutdinov. Learn-
+[17]  J. Hoffman, S. Guadarrama, E. S. Tzeng, R. Hu, J. Donahue,                                                                         ing robust visual-semantic embeddings.   arXiv preprint
+     R. Girshick, T. Darrell, and K. Saenko. LSDA: Large scale                                                                      arXiv:1703.05908, 2017. 2
+     detection through adaptation. In NIPS, 2014. 2
+                                                                     [38] Y.-X. Wang and M. Hebert.  Learning to learn: Model re-
+[18] A. Khoreva,  R. Benenson,  J. Hosang, M.  Hein,  and                                                                           gression networks for easy small sample learning. In ECCV,
+     B. Schiele. Simple does it: Weakly supervised instance and                                                                     2016. 2
+     semantic segmentation. In CVPR, 2017. 1, 2, 6
+                                                                     [39] Y. Xian, Z. Akata, G. Sharma, Q. Nguyen, M. Hein, and
+[19] A. Kirillov, E. Levinkov, B. Andres, B. Savchynskyy, and                                                                    B. Schiele. Latent embeddings for zero-shot classiﬁcation.
+     C. Rother. InstanceCut: from edges to instances with multi-                                                                           In CVPR, 2016. 6
+      cut. In CVPR, 2017. 2
+[20] R. Krishna, Y. Zhu, O. Groth, J. Johnson, K. Hata, J. Kravitz,
+      S. Chen, Y. Kalantidis, L.-J. Li, D. A. Shamma, M. Bern-
+      stein, and L. Fei-Fei. Visual genome: Connecting language
+     and vision using crowdsourced dense image annotations.
+     IJCV, 2017. 1, 2, 7

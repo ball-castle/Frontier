@@ -1,0 +1,703 @@
+WUT-A019 | Denoise and Align: Towards Source-Free UDA for Robust Panoramic Semantic Segmentation
+来源：https://openaccess.thecvf.com/content/CVPR2026/html/Chang_Denoise_and_Align_Towards_Source-Free_UDA_for_Robust_Panoramic_Semantic_CVPR_2026_paper.html
+本地PDF：专题文献/武汉理工AI_CCF-A/WUT-A019_Denoise_Align_CVPR2026.pdf
+SHA-256：4eb0dd8f2bb7e0e00a3635064397341efa5f673430fb9ec0e61a6b078ba4b49d
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                  This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                             Except for this watermark, it is identical to the accepted version;
+                            the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+
+ Denoise and Align: Towards Source-Free UDA for Robust Panoramic Semantic
+                             Segmentation
+
+
+           Yaowen Chang1,∗   Zhen Cao1,* Xu Zheng2   Xiaoxin Mi3   Zhen Dong1,†
+         1Wuhan University  2HKUST (Guangzhou)  3Wuhan University of Technology
+ {yaowenchang, zhen.cao, dongzhenwhu}@whu.edu.cn, zhengxu128@gmail.com, xiaoxin.mi@whut.edu.cn
+
+
+
+
+                   Pseudo Label Noise              Long-Tailed Class                                                                                                                     Better Detail
+                                                  DAPASS
+        RGB                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    DAPASS(Ours)
+                 Car               Traffic Light                                                       Less Noise
+                                                                                                      Detail
+                                                                       Denoise
+                                                                                                Attention
+
+                                           PCGD     CRAM                              Source-Only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    DAPASS(Ours)
+                Noise            Wrong Detail
+                                                                                          DAPASS(B1/B2)   360SFUDA++(B1/B2)   Source-Only
+
+                                                                                         +2.05
+                                                                                                                            +2.97              Truth                                                                                                                                                                                                                          mIoU(%)                 +1.54   B2         mIoU(%)                   +3.02  B1
+                Ground
+                                                                                                     C-to-D        Spin-to-Span              C-to-D         Spin-to-Span
+
+Figure 1. Teaser of our DAPASS. Compared with source-only (Only use the pinhole source domain image datasets train the model without
+adaptation) and existing SOTA SFUDA methods [1], DAPASS effectively removes pseudo-label noise and recovers fine details for different
+classes, benefiting from its PCGD and CRAM modules. Performance improvements are shown across cross-domain tasks.
+
+                 Abstract                                fer knowledge without source data.  First, our Panoramic
+                                                         Confidence-Guided Denoising (PCGD) module generates
+  Panoramic semantic segmentation is pivotal for com-
+                                                                        high-fidelity,  class-balanced pseudo-labels by enforcing
+prehensive 360° scene understanding in critical applica-
+                                                              perturbation consistency and incorporating neighborhood-
+tions like autonomous driving and virtual reality.  How-
+                                                                     level confidence to filter noise. Second, a Cross-Resolution
+ever, progress in this domain is constrained by two key
+                                                                Attention Module (CRAM) explicitly addresses scale vari-
+challenges:  the severe geometric distortions inherent in
+                                                       ance and distortion by adversarially aligning fine-grained
+panoramic projections and the prohibitive cost of dense an-
+                                                                    details from  high-resolution crops with global seman-
+notation. While Unsupervised Domain Adaptation (UDA)
+                                                                           tics from  low-resolution  contexts.   DAPASS  achieves
+from label-rich pinhole-camera datasets offers a viable al-
+                                                                     state-of-the-art  performances on  outdoor  (Cityscapes-
+ternative, many real-world tasks impose a stricter source-
+                                                        to-DensePASS) and indoor (Stanford2D3D) benchmarks,
+free (SFUDA) constraint where source data is inaccessible
+                                                                yielding 55.04% (+2.05%) and 70.38% (+1.54%) mIoU,
+for privacy or proprietary reasons. This constraint signif-
+                                                                    respectively.  Code and models are publicly available at
+icantly amplifies the core problems of domain shift, lead-
+                                                          https://github.com/ZZZPhaethon/DAPASS.
+ing to unreliable pseudo-labels and dramatic performance
+degradation, particularly for minority classes. To overcome     1. Introduction
+these limitations, we propose the DAPASS framework. DA-
+PASS introduces two synergistic modules to robustly trans-    As autonomous driving perception systems  [2, 3] and
+                                                                      virtual reality scene reconstruction [4, 5] have advanced
+   *Equal Contribution                                                 rapidly, 360° panoramic images that are capable of cap-
+   *Corresponding author                                            turing an entire scene in a single frame have increasingly
+
+
+
+                                                     32226
+
+======================== PDF 第 2 页 ========================
+replaced pinhole cameras with limited 60°–120° fields of     marks, attaining 55.04% (+2.05%) and 70.38% (+1.54%)
+view as an important medium for scene understanding.    mIoU, respectively, as illustrated in Figure 1.
+Consequently, researchers have turned to semantic segmen-
+tation of panoramic images to enhance scene interpretation.     2. Related Work
+However, such images often suffer from severe distortions
+due to equirectangular projection [3], making many exist-     2.1. Panoramic Semantic Segmentation
+ing methods, originally developed for pinhole images, in-                                                       Panoramic images offer a broader field of view, enabling
+effective for panoramic segmentation [6]. Beyond distor-                                                                    better scene understanding and enhancing the perception
+tion, the scarcity of annotated data poses a major obsta-                                                      and navigation capabilities of intelligent systems in com-
+cle to the advancement of panoramic semantic segmenta-                                                             plex environments [16, 17].  To better utilize the advan-
+tion [7]. Creating large-scale annotations [8] is notoriously                                                               tages of panoramic images, researchers have proposed var-
+time-consuming and costly.  To address this, researchers                                                              ious methods to obtain more accurate segmentation results.
+have proposed frameworks [9] that transfer knowledge from                                              Some researchers have designed attention mechanisms, de-
+pinhole image domains, leading to the development of                                                          formable modules [18] and deformable convolution net-
+several unsupervised domain adaptation (UDA) techniques                                                     works [19, 20] to deal with image distortion, the inher-
+[9, 10]. However, UDA methods typically require access to                                                                ent problem in panoramic semantic segmentation. A panel
+labeled source-domain data, which may be unavailable in                                                                representation that successfully avoids the spatial distor-
+certain scenarios [11]. To overcome this, recent work [1]                                                                   tion caused by equirectangular projection (ERP) in the po-
+has proposed the Source-Free UDA (SFUDA) setting for                                                                          lar regions was proposed [21]. Because panoramic datasets
+panoramic segmentation, where only a pre-trained source                                                              lack high quality labels, common methods used in pinhole
+model (from pinhole images) and unlabeled panoramic im-                                                                  datasets have limited performance in panoramic semantic
+ages are accessible.                                                             segmentation.
+
+   However, self-training domain adaptation methods [12,
+                                                               2.2. Unsupervised Domain Adaptation (UDA)
+13] rely heavily on high-quality pseudo-labels.  This re-
+liance becomes problematic when the source domain has   UDA aims to transfer knowledge from a labelled source do-
+an uneven class distribution [14]. The long-tailed distribu-     main to an unlabelled target domain [22–28].  To obtain
+tion [15] leads to under-training on tail classes, further am-      pixel-level segmentation prediction for panoramic images,
+plifying bias during adaptation and causing significant per-    many studies employ UDA to adapt models trained on pin-
+formance drops for those categories in target domain. To     hole datasets to panoramic datasets [2, 6, 10, 29, 30]. For
+address the challenges of domain shift, data scarcity, and     example, Trans4pass [6] proposed a deformable network to
+class imbalance in SFUDA panoramic semantic segmen-     handle panoramic distortions and domain shifts. However,
+tation, this paper proposes a novel framework (DAPASS).     most UDA methods require direct access to source data dur-
+As shown in Figure 1, DAPASS improves panoramic seg-     ing adaptation, which is impractical in many real-world ap-
+mentation performance under adaptation constraints with-      plications due to data privacy or storage constraints.  To
+out requiring source data and target labels.  Specifically,     deal with such situations, some researchers propose a so-
+to combat the issue of unreliable generated pseudo-labels,      lution called Source-Free Unsupervised Domain Adap-
+we designed the Panoramic Confidence-Guided Denois-     tation (SFUDA) [31–33], which enables adapting a pre-
+ing (PCGD) module. PCGD is able to perform pseudo-      trained source model to the target domain without access-
+label denoising to improve the quality of supervision in     ing the source data. To address this constraint, 360SFUDA
+the target domain. To achieve robustness against the in-     [34] was the first framework to introduce SFUDA to the
+herent distortions and scale variations of panoramic im-     panoramic semantic segmentation task.  However, exist-
+ages, we introduce the Cross-Resolution Attention Mod-     ing methods suffer from a significant decrease in segmen-
+ule (CRAM), which unifies fine-grained local details and      tation performance for imbalanced categories and in re-
+wide-angle global context through an attention-driven fu-     gions affected by ERP-induced distortions.  This degra-
+sion strategy. The combination boosts the knowledge acuqi-     dation is particularly pronounced in 360° panoramic im-
+sition and denoise the knowledge transfer from the source      agery, where the equirectangular projection (ERP) stretches
+domain to the target domain. We conduct extensive ex-      object boundaries and compresses polar areas, leading to
+periments on both outdoor and indoor real-world bench-      spatially varying distortions that do not appear in conven-
+marks.  Our proposed DAPASS consistently outperforms      tional pinhole images.  Moreover, panoramic scenes con-
+prior state-of-the-art (SOTA) SFUDA methods.  Specifi-      tain diverse viewing angles and complex global-local inter-
+cally, compared to the previous best-performing method [1],      actions, which often result in inconsistent model responses
+DAPASS achieves new SOTA results on the Cityscapes-to-     across different regions. To address these challenges, we
+DensePASS (outdoor) and Stanford2D3D (indoor) bench-     propose DAPASS, a framework specifically designed to en-
+
+
+
+                                                    32227
+
+======================== PDF 第 3 页 ========================
+               Target Domain                  HR Encoder              CRAM        Source domain Pretrain                                       HR Network
+                          HR Detail                                                                                                    Encoder               Decoder
+
+                                                  Encoder          Decoder                                            Memory
+
+                                                                                                                           Panoramic Confidence-Guided Denoising
+                                                           Share Weights                           Fused            𝓓𝑻
+
+                                           LR Encoder
+                             LR Context                                                                       Segm.                      𝓓𝑻𝒄         𝟊𝐒     𝓓𝑻𝒊𝒄
+                     resize                        Encoder               Head
+                                                                                                Fused             Divided       K      Divided
+                                                                                                                   Attention Map                       CS top P%
+                                                                                  Attention.
+              Frozen Modules              Feature Maps                             Head                                                 Confidence                               Confidence
+               Trainable Modules            Feature Maps      LR Network                                                           Maps        𝟊𝐓           Maps
+               Input                       Feature Maps
+
+
+Figure 2. An overview of the proposed DAPASS. The framework consists of two key modules: a Panoramic Confidence-Guided Denoising
+(PCGD) module to filter noisy pseudo-labels, and a Cross-Resolution Attention Module (CRAM) to enhance detail-level segmentation by
+combining HR and LR contexts.
+
+hance robustness against panoramic distortions while miti-     panoramic adaptation, where the domain gap is particularly
+gating category imbalance and spatial inconsistency dur-      large and geometric distortion further degrades pseudo-
+ing source-free adaptation.                                       label reliability.  Therefore, PCGD explicitly divides the
+                                                                     target dataset DT into consistent and inconsistent subsets
+3. Methodology                                         according to a consistency score computed from perturbed
+                                                                predictions of the frozen source model FS. Consistent re-
+Overview.  Given a pre-trained source model FS and an                                                            gions serve as reliable supervision to guide the learning of
+unlabeled target panoramic domain dataset DT = {xt | t ∈                                                                 inconsistent ones, facilitating a more stable and balanced
+[1, Nt]}, where Nt denotes the number of target images, the                                                              adaptation process.
+goal of this SFUDA task is to adapt FS to DT , yielding a
+                                                                                                                                                                                 {     C S}^{i,\tau(1)target model FT that performs well on panoramic semantic                   \re s i zebox  {  0.8 5 \linewidth    }{! }{$   \mathrmsegmentation. To achieve robust segmentation performance
+in panoramic settings, we propose DAPASS. An overview                                                     where DKL(· ∥·) is the Kullback-Leibler (KL) divergence,
+of the proposed framework is illustrated in Figure 2.               xi,lT  is the l th pixel of the i th image from the target domain.
+                                            Θ0 is the initial parameters of the source model. Θτ is the
+3.1. Panoramic Confidence-Guided Denoising
+                                                           parameters of the model after τ iterations of self-training on
+Although the overall DAPASS framework aims to adapt a      the target domain. The higher CS, the more consistent sam-
+source-pretrained model to the target panoramic domain,      ples are. We choose the highest top-P% scores from CS as
+the  reliability of pseudo-labels remains  critical for sta-     a basis to divide into consistent sets DT c and inconsistent
+ble adaptation.  In the source-free setting, pseudo-labels      sets DT ic.
+generated by the pretrained model inevitably contain bi-     Bi-Level Denoising and Class-Balancing. After splitting
+ases: some regions are consistently predicted with high      the dataset, two challenges remain:  the pseudo-labels in
+confidence, while others remain uncertain or are system-    DT ic are noisy, and the reliable subset DT c is still imbal-
+atically ignored.  Such uneven supervision hampers sta-     anced and lacks sufficient samples from minority classes
+ble learning and limits adaptation to diverse target struc-       (e.g., Rider). To address these issues, PCGD adopts a dual-
+tures. To address this issue, we introduce the Panoramic     path optimization strategy, as detailed in Algorithm 1.
+Confidence-Guided Denoising (PCGD) module, which     Path A: Bi-Level Neighbor Denoising.   To mitigate
+improves pseudo-label reliability by separating stable and     pseudo-label noise, we employ a bi-level optimization strat-
+unstable samples via a consistency-based split, leveraging     egy inspired by [35]. The key idea is that an update on a
+reliable samples to guide noisy ones, and enriching super-     noisy sample xi ∈DT ic is considered reliable only if it
+vision through class-aware copy-paste augmentation, as il-      also improves performance on a stable sample xj ∈DT c.
+lustrated in Figure 3.                                        Since using the full subsets may suffer from domain or cat-
+Consistent/Inconsistent Sets Splitting.  In UDA tasks,     egory mismatch, we instead adopt a neighbor-guided strat-
+self-training methods [22, 35] observe that samples with     egy: for each xi, we retrieve its most similar stable neighbor
+stable predictions tend to generalize better, while unsta-     xj ∈DT c in the feature space and perform bi-level opti-
+ble ones often cause persistent errors due to noise accu-     mization on the pair (xi, xj) during adaptation.
+mulation. This issue becomes more severe in source-free     Path B: Class Balancing Copy Paste. While the neighbor-
+
+
+
+                                                     32228
+
+======================== PDF 第 4 页 ========================
+                                           Consistent/Inconsistent Sets Splitting
+                            𝜒!"#%                                                                                 Consistent Set     𝓓𝑻c
+                              𝜒!"#$
+                                 𝜒!"                                                           Top P%
+                                          Encoder   ϜS    Decoder                     𝐂𝐒 Rank
+                                                                                                                     Split      Inconsistent Set     𝓓𝑻ic
+      𝓓𝑻                                                                              𝜒!" > 𝜒!"#%> 𝜒!"#$
+
+
+                                                        Path A: Bi-level optimization Denoise                        Path B: Copy Paste
+               Trainable Modules       Frozen Modules       𝓓𝑻𝐜𝐚                                                           𝓓𝑻𝐜𝐚              Consistent samples
+                                                             𝓓𝑻ic                              Pseudo label
+         𝓓𝑻c       𝓓𝑻ic     𝓓𝑻𝐜𝐚                       road                   Encoder    𝑂𝑢𝑡𝑒𝑟                           road
+                                                                           Decoder
+                                                        bike         Query                                                    bike              Resize
+           Consistent Set Inconsistent Set   Consistent                       EMA                                          category set                    𝓓𝑻c
+                                                                              Encoder    𝑖𝑛𝑛𝑒𝑟                                rider                                                           r𝑖𝑑𝑒𝑟 +
+        PCGD module                          Copy paste           Decoder            neighboor
+
+
+                   Figure 3. Illustration of the proposed Panoramic Confidence-Guided Denoising (PCGD) module.
+
+
+denoising path alleviates pseudo-label noise, it does not ex-     Algorithm 1 Panoramic Confidence-Guided Denoising
+plicitly address minority-class scarcity.  Existing methods    (PCGD)
+such as SND [35] may still struggle when reliable samples     Require: Target set DT , source model FS, target model
+for rare classes are insufficient. To compensate for this im-       FT (Θ)
+balance, we introduce a parallel balancing path.  Specif-     Ensure: Adapted target model FT (Θ)
+ically, we first construct a Top-K Class-Balancing Pool         1: Consistency-based split:
+DcT ca, which stores high-quality samples for each minority         2: for xt ∈DT do
+class c. We then apply a copy-paste strategy to provide ad-         3:    Compute CS(xt) using Eq. 1
+ditional supervision for these rare classes.                                4: end for
+  To execute reliable bi-level optimization, for each in-         5: DT c ←Top-P% samples ranked by CS,  DT ic ←
+consistent sample xi ∈DT ic, the goal is to retrieve its      DT \ DT c
+most similar counterpart xconi  ∈DT c from the consistent         6: Build per-class Top-K pool DcT ca from DT c
+set, based on style and layout features. However, the re-         7: for each training iteration do
+trieved domain-associated neighbor may still lack certain         8:    Path A: Neighbor denoising
+categories, causing semantic incompleteness. To address         9:     for xi ∼DT ic do
+this, we propose to borrow the missing class objects from       10:        Retrieve nearest stable neighbor xj ∈DT c
+other consistent samples and paste them onto the neighbor       11:         Θinner ←Θ −α∇ΘCE(FT (xi | Θ), FS(xi))
+for compensation. To enrich the diversity of tail categories,       12:          Louter ←CE(FT (xj | Θinner), FS(xj))
+we additionally maintain a Top-K ranked category-specific       13:       Update Θ with ∇ΘLouter
+consistent set DcT ca =  {(xi, ˆyi)|xi ∈DT c, CSi,m,c ∈       14:    end for
+Top-K} for each category c as a supplementary resource       15:    Path B: Class-balancing copy-paste
+in mth iteration. Subsequently, the nearest stable neighbor       16:    Sample xp ∼DcT ca and xb ∼DT
+xconi  ∈DT c is augmented using the following copy-paste       17:     (xaug, yaug) ←COPYPASTE(xb, xp) using Eq. 2
+strategy:                                                                   18:     Lbal ←CE(FT (xaug | Θ), yaug)
+                                                                             19:    Update Θ with ∇ΘLbal
+       (\hat    {x}_{i   } ^ {\mathrm { con}},     \ hat {y }_{i}^{\mathrm{con}})=\mathrm{CP}[(x_{i}^{\mathrm{con}},{y}_{i}^{\mathrm{con}}),(x_{\mathrm{y}_{\mathrm{mix}})]{eq:copy_paste}  (2)       20: end for
+                                                                             21: return Θ
+CP(· ∥·) denotes the copy-paste operation, which copies
+objects from the latter to the former. The generated samples
+are then used in training to further denoise pseudo-labels.
+                                                                        this issue, CRAM employs two complementary branches:
+3.2. Cross-Resolution Attention Module                                                          a high-resolution (HR) crop branch for preserving locally
+ERP panoramas  exhibit  latitude-dependent  distortions,      reliable details, and a low-resolution (LR) panorama branch
+where polar regions are heavily stretched while equato-      for maintaining globally consistent context. Unlike generic
+rial regions remain relatively stable.  Such geometric in-      multi-resolution fusion, CRAM is designed for panoramic
+consistency hinders standard feature learning and becomes    SFUDA, where HR local details are used to calibrate LR
+more problematic in the source-free setting. To mitigate     global semantics under distortion and scale variation.
+
+
+
+                                                     32229
+
+======================== PDF 第 5 页 ========================
+LR and HR Crops. The combination of multi-resolution     aligned HR prediction ˆyHRLR . The final fused prediction is
+inputs enables the model to capture both local details and     computed as
+global scene layout under ERP distortions.  The low-
+resolution context crop xLRt    is obtained by cropping the       \hat   {y}_ { LR,F}  =\ze ta   ((1-a'_ {L R })od\ ot\hat{y}_{LR},s)\zeta(a'_{LR},s)\odot\hat{y}_{LR}^{HR}.\label{eq:scale_fusion}(5)
+original high-resolution target image xHRt   and then down-
+sampling the cropped region by a factor of s using bilinear       The encoder, segmentation head, and attention head are
+interpolation:                                                       jointly trained using both the fused multi-resolution predic-
+                                                                   tion and the HR detail prediction. The target loss LTCRAM is
+
+                   ^          x { LR }_{t} =\    z eta \!\b igl(\operatorname{Crop}(x_{t}^{HR},\,\mathbf{b}_{L}),\,1/s\bigr\label{eq:lr_crop}         (3)     defined as
+
+where Crop  denotes  the  cropping  operation, bL =       \beg i n { ali gned }math\      c al {L} _ {\math r
+                                                                                                                             (6)(bL,1, bL,2, bL,3, bL,4) denotes the cropping region, and ζ                                &                                         m  { CRAM }^{T} =   ( 1-\l a mbda\mathcal{L}_{\mathrm{ce}}\!\bigl(\hat{y}_{LR,F}^{T},\,p_{LR,F}^{T},\,q_{LR,F}^{T}\bigr\\[2pt]&\quad\lambda\mathcal{L}_{\mathrm{ce}}\!\bigl(\hat{y}_{HR}^{T},\,p_{HR}^{T},\,q_{HR}^{T}\bigr{aligned}\label{eq:l_cram_target}denotes bilinear downsampling. We sample the cropping
+region bL in three steps.  First, we compute the grid in-                                                     where λd ∈[0, 1] is the balance factor between the low-
+terval k = s · o, where o ≥1 is the output stride of the
+                                                                 resolution context branch and the high-resolution detail
+segmentation network. We then partition the row and col-
+                                                             branch.  Lce(·, ·, τ) denotes the temperature-scaled cross-
+umn indices of the high-resolution image into two regular
+                                                                entropy, where temperature τ sharpens (τ < 1) or smooths
+grids with step size k, and only grid points are regarded as
+                                                                   (τ > 1) the pseudo-label distribution.  ˆyTLR,F denotes thevalid top-left corners for a crop. From each grid, one index
+                                                                      logits of the fused context prediction after upsampling to
+is uniformly sampled to obtain the vertical and horizontal
+                                                                the original image size, and pTLR,F denotes the correspond-
+start coordinates (bL,1, bL,3). To keep the crop inside the
+                                                             ing pseudo-label map. ˆyTHR denotes the logits predicted onimage and to fix its size, we set the bottom-right corner as
+                                                                the high-resolution detail crop, and pTHR denotes the corre-bL,2 = bL,1 + s hL and bL,4 = bL,3 + s wL. As a result, all
+                                                         sponding pseudo-labels for the detail crop.
+crop boundaries lie on the feature-map grid, which guar-
+antees pixel-level correspondence during the subsequent
+multi-resolution fusion stage.                                4. Experiments
+  The high-resolution detail crop is then randomly ex-                                                               4.1. Experiment Setup
+tracted from the LR context crop:
+                                                             Datasets. We validate our method on three benchmark
+             x } _{t,LR}=       \operatorname{Crop}(x^{LR}_{t},\,\mathbf{b}_{H}),\label{eq:hr_crop}            (4)      datasets  that encompass outdoor and indoor scenarios.                 ^{HR
+                                                         Cityscapes [8] is a real-world dataset featuring urban street
+where bH =  (bH,1, bH,2, bH,3, bH,4) denotes the detail      scenes, widely adopted for autonomous driving research.
+cropping region with size hH ×wH. The context prediction       It offers precise pixel-wise annotations across 19 semantic
+is denoted as ˆyLRt  = FST (xLRt   ), and the detail prediction      categories. The dataset’s official split includes 2975 images
+is denoted as ˆyHRt,LR = FST (xHRt,LR), where FST denotes the      for training and 500 images for validation. In this paper, we
+segmentation network.                                                utilise the official training set (2975 images) as the source
+Multi-Resolution Fusion.  To balance fine-grained de-     domain data for pre-training the source model. DensePASS
+tails with global context, we use a learnable scale-attention      [2] is a panoramic dataset designed to capture diverse street-
+mechanism to adaptively fuse predictions from the HR      level perspectives and contains 2,500 panoramic images in
+detail crop and  the LR  context  crop.  An  attention       total. Of these, 100 panoramas are meticulously annotated
+decoder FT A  predicts the scale-attention map aLR =      to cover categories that are especially critical for naviga-
+σ FT A(FT E(xLRt  ))  , which weighs the trustworthiness of      tion; this annotated subset serves as the test set during eval-
+LR context and HR detail predictions. The sigmoid function      uation. In the C-to-D setting, we regard the training por-
+σ constrains the attention weights to [0, 1], where larger val-      tion of DensePASS as unlabeled target-domain panoramic
+ues indicate higher reliance on HR detail predictions. The      data.  Stanford2D3D [40] contains 70,496 pinhole-view
+attention is predicted from the LR context crop because it     images labeled with 13 semantic classes.  In contrast, the
+better captures the global scene layout. Since the predic-     Stanford 2D-3D Panoramic (SPan) dataset offers 1,413 in-
+tions are smaller than the inputs due to the output stride     door panoramas, each annotated with the same 13 classes
+o, the crop coordinates are scaled accordingly in the sub-     as SPin. For our experiments, we concentrate only on the
+sequent fusion steps. Outside the detail crop, the attention      eight semantic classes that appear in both datasets. Accord-
+is set to zero because no HR detail prediction is available      ingly, our experiments are conducted under both real-world
+there, yielding the masked attention map a′LR. The HR de-     adaptation settings (Cityscapes-to-DensePASS, abbreviated
+tail prediction is aligned with the upsampled context crop     as C-to-D, and Stanford2D3D-pinhole-to-Stanford2D3D-
+by zero-padding it to a size of shLo × swLo   , resulting in the     panoramic, SPin-to-SPan). This rigorous setup allows for
+
+
+
+                                                     32230
+
+======================== PDF 第 6 页 ========================
+   Image                                                                                                                                        Image      Image
+
+
+
+
+
+   Source-Only                                                                                                                                                        Source-Only      Source-Only
+
+
+
+
+
+  SFDA                                                                                                                             SFDA      SFDA
+
+
+
+
+
+  360SFUDA++                                                                                                                             360SFUDA++    360SFUDA++
+
+
+
+
+
+ PCBDAPASSPCBPCB                                                                                                                                    DAPASS     DAPASS
+
+
+
+
+
+ GTGTGTGT                                                                                                                GT     GT
+
+Figure 4. Visualization results on C-to-D scenario. From top to bottom: input image, Source-Only, SFDA, 360SFUDA++ [1], our DA-
+PASS, and ground truth (GT). Compared to prior methods, DAPASS yields more accurate boundaries, reduces noise, and better recognizes
+occluded objects (highlighted in dashed boxes).
+
+
+ Method             SF mIoU Road S.W. Build. Wall Fence Pole Light Sign Vegt.  Terr.  Sky  Pers. Rider Car Truck Bus  Train Motor Bike
+
+ ECANet [3]       × 43.02 81.60 19.46 81.00 32.02 39.47 25.54 3.85 17.38 79.01 39.75 94.60 46.39 12.98 81.96 49.25 28.29 0.00 55.36 29.47
+ P2PDA [36]       × 41.99 70.21 30.24 78.44 26.72 28.44 14.02 11.67 5.79 68.54 38.20 85.97 28.14 0.00 70.36 60.49 38.90 77.80 39.85 24.02
+ SIM[37]         × 44.58 68.16 32.59 80.58 25.68 31.38 23.60 19.39 14.09 72.65 26.41 87.88 41.74 16.09 73.56 47.08 42.81 56.35 47.72 39.30
+ PCS[38]         × 53.83 78.10 46.24 86.24 30.33 45.78 34.04 22.74 13.00 79.98 33.07 93.44 47.69 22.53 79.20 61.59 67.09 83.26 58.68 48.13
+ DAFormer [23]     × 54.67 73.75 27.34 86.35 35.88 45.56 36.28 25.53 10.65 79.87 41.64 94.74 49.69 25.15 77.70 63.06 65.61 86.68 65.12 48.13
+ Trans4PASS-T [6]    × 53.18 78.13 41.19 85.93 29.88 37.02 32.54 21.59 18.94 78.67 45.20 93.88 48.54 16.91 79.58 65.33 55.76 84.63 59.05 37.61
+ DPPASS-T [10]     × 55.30 78.74 46.29 87.47 48.62 40.47 35.38 24.97 17.39 79.23 40.85 93.49 52.09 29.40 79.19 58.73 47.24 86.48 66.60 38.11
+ DATR-S [30]      × 56.81 80.63 51.77 87.80 44.94 43.73 37.23 25.66 21.00 78.61 26.68 93.77 54.62 29.50 80.03 67.35 63.75 87.67 67.57 37.10
+ Source-Only         ✓38.65 65.26 29.40 77.04 15.14 28.72 14.15 9.36 10.55 69.09 21.10 82.91 40.98 10.42 68.56 32.90 44.94 50.98 37.74 25.19
+ SFDA [11]          ✓42.70 68.75 31.59 80.99 19.61 29.60 18.67  7.7  14.08 73.74 24.91 88.38 41.66 8.46 69.97 47.48 33.25 72.02 47.62 32.77
+ DATC [39]          ✓43.06 70.21 35.87 80.60 21.42 28.14 19.10 5.79 15.10 72.76 27.42 88.14 41.65 10.29 72.32 47.80 21.97 80.91 46.65 32.01
+ 360SFUDA++ [1] w/ b1 ✓50.19 68.59 46.70 84.06 29.08 34.41 31.28 20.31 16.84 75.04 23.07 92.20 50.03 18.32 78.75 56.53 49.90 83.63 59.00 35.46
+ 360SFUDA++ [1] w/ b2 ✓52.99 74.00 48.03 85.86 34.41 41.28 31.25 22.59 17.41 76.74 26.24 92.65 54.60 30.76 79.41 55.60 59.84 81.25 59.89 35.02
+ Ours DAPASS (w/ b1)  ✓53.16 78.15 41.51 85.74 29.48 37.46 32.24 21.89 19.14 78.82 45.38 93.73 49.02 16.74 79.32 64.84 56.02 84.52 58.58 37.43
+ Ours DAPASS (w/ b2)  ✓55.04 78.75 41.95 86.28 31.89 44.79 34.32 22.51 17.22 79.47 42.11 93.48 49.79 20.97 81.34 66.84 68.77 84.39 61.23 39.74
+
+Table 1. Experimental results of 19 classes in panoramic semantic segmentation on the C-to-D setting. SF: source-free UDA. Bold values
+indicate the best performance among source-free methods.
+
+a thorough assessment of our model’s effectiveness and ro-        1080\times 1080 and 1024\times 512, respectively. For outdoor sce-
+bustness across varied conditions.                                narios, Cityscapes pinhole images are adjusted to 1024  \times
+Minority/Majority Class Definition.   For class-group     512, whereas DensePASS panoramic images are presented
+analysis, minority classes are defined by low occurrence fre-      at 2048\times 400. To ensure uniformity in the evaluation frame-
+quency in the target domain. In DensePASS (C-to-D), the     work, the resolutions for validation image sets are fixed at
+minority classes are Pole, Light, Sign, Person, Rider, Truck,     2048  \times 1024 for indoor environments and 2048  \times 400 for
+Bus, Train, Motor, and Bike. In SPin-to-SPan, the minor-     outdoor environments.  In Spin-to-Span task, we selected
+ity classes are Chair, Door, Sofa, Table, and Window. The      the hyperparameters top-P%, τ and s as 15.0, 8,000 and
+remaining classes are treated as majority classes.                 2, respectively. In C-to-D setting, we selected the hyperpa-
+Implementation Details. We train our models with 4 3090     rameters top-P%, τ and s as 10.0, 6,000 and 2, respectively.
+GPUs with an initial learning rate of 6×10−5, which is
+                                                               4.2. Experiment Resultsscheduled by the poly strategy with power 0.9 over 200
+epochs. The optimizer is AdamW with epsilon = 10−8,     In this section, we compare DAPASS with previous SOTA
+weight decay 10−4, and a batch size of 4 on each GPU.     approaches in different settings.   Firstly, we underake a
+The adaptation frameworks are trained for 12 K iterations.     comprehensive evaluation of the proposed DAPASS within
+Training images captured by Stanford2D3D pinhole cam-      the C-to-D scenario, including both qualitative and quan-
+eras and panoramic views are processed at resolutions of       titative analyses. As shown in Figure 4 and Table 1, DA-
+
+
+
+                                                    32231
+
+======================== PDF 第 7 页 ========================
+    RGB                                  360SFUDA++                                DAPASS                                  Ground Truth (GT)
+
+
+
+
+
+    RGB                                  360SFUDA++                                DAPASS                                  Ground Truth (GT)
+
+
+
+
+
+    RGB                                  360SFUDA++                                DAPASS                                  Ground Truth (GT)
+
+
+
+
+
+     Figure 5. Visualization results on Spin-to-Span task. From left to right: input image, 360SFUDA++ [1], our DAPASS, and GT.
+
+  Method                SF   mIoU    Ceiling    Chair   Door    Floor    Sofa    Table    Wall   Window   ∆
+
+  PVT-S [6]           ×    57.71     85.69    51.71    18.54    90.78    34.76    65.34    74.87     39.98          -
+  PVT-S w/ MPA [6]      ×    57.95     85.85    51.76    18.39    90.78    35.93    65.43    75.00     40.43          -
+  Trans4PASS w/ MPA [6]   ×    64.52     85.08    58.72    34.97    91.12    46.25    71.72    77.58     50.75          -
+  Trans4PASS+ [6]       ×    63.73     90.63    62.30    24.79    92.62    35.73    73.16    78.74     51.78          -
+  Trans4PASS+ w/ MPA [6]  ×    67.16     90.04    64.04    42.89    91.74    38.34    71.45    81.24     57.54          -
+  SFDA [11]          ✓    54.76     79.44    33.20    52.09    67.36    22.54    53.64    69.38     60.46          -
+  360SFUDA++ w/ b1 [1]   ✓    66.54     86.28    58.25    36.04    87.99    48.74    65.44    77.82     71.78          -
+  360SFUDA++ w/ b2 [1]   ✓    68.84     85.50    57.59    53.15    87.40    53.63    66.49    80.23     66.75          -
+  Ours DAPASS (w/ b1)    ✓    69.56     89.64    65.50    45.83    94.16    47.07    75.96    81.93     56.39     +14.80
+  Ours DAPASS (w/ b2)    ✓    70.38     89.59    64.81    53.33    94.55    46.76    73.90    83.03     57.08     +15.62
+
+
+Table 2. Experimental results of 8 classes on Spin-to-Span setting. Bold values indicate best performance among SF methods. ∆is an
+improvement over SFDA [11].
+
+PASS establishes new SOTA performance on outdoor C-                                    C-to-D       Spin-to-Span
+                                                         Method
+to-D task, demonstrating the adaptation capabilities across                            B1    B2    B1    B2
+urban panoramas. DAPASS surpasses the previous SOTA,                                                                Source-Only                36.43   38.65   43.54   46.75
+360SFUDA++  [1], with mIoU increases of 2.97% and                                                            Unweighted Pseudo-Labels   40.71   42.56   51.35   53.54
+2.05% using SegFormer-B1 and -B2 backbones. And  it      w/o Path A                  47.82   49.10   61.43   63.55
+significantly outperforms SFUDA methods SFDA [11] and      w/o Path B                  48.35   50.02   63.12   64.78
+DATC [39] by 10.46% and 10.10% in mIoU, respectively.     PCGD (Full, ours)           50.23   52.38   65.87   67.32
+The qualitative results illustrate that DAPASS is capable of
+producing finer boundary segmentation, accurately recog-      Table 3. Ablation study of PCGD. Path A: bi-level neighbor de-
+nizing small objects, and maintaining better semantic con-      noising. Path B: class-balancing copy–paste. B1/B2 denote two
+sistency with the ground truth, significantly outperform-     SegFormer backbones. Metric: mIoU.
+ing other compared methods.  Subsequently, we conduct
+                                                                tary material.an evaluation of our DAPASS within the Spin-to-Span sce-
+nario. The outcomes of this assessment are detailed in Ta-
+                                                          5. Ablation Studyble 2 and Figure 5. We compare it with previous SOTA
+360SFUDA++ [1], SFUDA methods and the UDA methods.                                        We conduct a series of ablation studies on the both indoor
+As shown in Table 2, DAPASS outperforms 360SFUDA++                                                         (SPin-to-SPan) and outdoor (C-to-D) scenarios to evalute
+[1] and SFDA [11] by 3.02% and 14.80%, respectively. No-                                                                the effectiveness of our method.
+tably, DAPASS surpasses the UDA methods MPA [6] that is                                                             Effectiveness of PCGD. Ablation experiments were con-
+accessible to source data in training process by 3.22%. The                                                          ducted to analyze the individual contributions of the two
+visualization results in Figure 5 demonstrate that DAPASS                                                      components in PCGD. As shown in Table 3, directly relying
+is able to deal with the severe distortions and structural com-                                                    on the source model or training with unweighted pseudo-
+plexities commonly found in panoramic indoor scenes, pro-                                                                   labels leads to limited improvements under the source-free
+ducing more accurate and consistent segmentation results                                                                       setting. Removing Path A (bi-level neighbor denoising)
+compared to 360SFUDA++ [1]. More quantitative com-                                                            causes a clear performance drop across all settings (e.g.,
+parison and visualization results refer to the supplemen-                                                     from 50.23 →47.82 mIoU on C-to-D B1), confirming
+
+
+
+                                                    32232
+
+======================== PDF 第 8 页 ========================
+                             C-to-D       Spin-to-Span        remain within a small range, indicating that PCGD is rel-
+   Method
+                     B1    B2    B1    B2          atively insensitive to the choice of P. We further vary τ,
+                                                                the number of iterations used for consistency-score compu-   Source-Only            36.43   38.65   43.54   46.75
+                                                                        tation, from 2,000 to 10,000. The results show that different  SFDA                  42.70   44.10   54.76   56.32
+  PCGD (only)            50.23   52.38   65.87   67.32        choices of τ lead to only marginal changes, suggesting that
+  PCGD + CRAM (ours)   53.16   55.04   69.56   70.38        the consistent/inconsistent split is stable. Additional analy-
+                                                                          sis further shows that the copy-paste pool size K ∈[10, 20]
+Table 4.  Ablation analysis for CRAM. B1 and B2 denote two      yields stable performance, the loss weight λd remains ro-
+different SegFormer backbones [41]. Evaluation metric is mIoU.      bust within [0.1, 0.5], and the similarity metric used for Path
+                                    A neighbor retrieval (Cosine vs. L2) results in negligible
+      P (%)       1.0     5.0    10.0    15.0    20.0           differences. Detailed results are provided in the supplemen-
+                                                                   tary material.        C-to-D     54.52   54.76   55.04   54.86   54.91
+      Spin-to-Span   69.35   69.67   69.88   70.38   69.92
+                                                          6. Discussion
+       τ (×1000)     2      4      6      8     10
+                                                       Although our class-balancing copy–paste module improves
+        C-to-D     54.23   54.65   55.04   55.04   55.04                                                                minority-class supervision, the results in Table 1 and Ta-
+      Spin-to-Span   69.35   69.77   69.92   70.38   70.38
+                                                                ble 2 show that several tail classes (e.g., Rider, Person) still
+                                                                  exhibit larger performance fluctuations. This is partly be-
+Table 5.  Sensitivity study of the hyper-parameter P and τ. All
+                                                          cause the module relies on the quality of pseudo-labels forexperiments use SegFormer-B2[41] as the backbone.
+                                                                   rare categories; when such classes appear infrequently or
+that Path A plays a central role in stabilizing pseudo-labels     have unstable masks, the constructed Top-K pool may con-
+and suppressing noisy updates. Removing Path B (class-      tain imperfect samples.
+balancing copy–paste) also results in degraded performance        In addition, the current copy–paste strategy is relatively
+(50.23 →48.35 on C-to-D B1), particularly on Spin-to-      naive: without contextual or geometric alignment, pasted
+Span where tail-class imbalance is more severe. This veri-      objects may appear in unrealistic locations and introduce
+fies that Path B effectively complements Path A by enrich-      noise. Nevertheless, our results suggest that its overall ben-
+ing minority-class samples and improving class coverage.       efit still dominates, and moderate contextual disruption may
+When both paths are enabled, PCGD achieves the best re-     even act as a regularizer by reducing background bias and
+sults, outperforming all variants on both datasets and back-     encouraging stronger object cues.  Future work could ex-
+bones.  These findings demonstrate that Path A and Path     plore geometry-aware pasting or diffusion-based blending
+B address complementary aspects of pseudo-label qual-      for more reliable minority-class modeling.
+ity—noise reduction and class balancing—and that their
+                                                          7. Conclusionsynergy is essential for robust SFUDA adaptation.
+Effectiveness of CRAM. To assess the contribution of the     In this paper, we explored the challenging problem of
+proposed CRAM module, we conduct an ablation study by      source-free unsupervised domain adaptation from pinhole
+comparing the performance of the model with and without      to panoramic domain. To effectively address cross-domain
+CRAM under the same PCGD framework. As shown in Ta-     semantic segmentation difficulties under this setting, we
+ble 4, adding CRAM consistently improves the mIoU across     propose a novel framework named DAPASS. DAPASS
+all settings. For instance, on the C-to-D task, CRAM brings      tackles several domain adaptation challenges, including se-
+an additional gain of 2.93% and 2.66% on B1 and B2 back-     mantic misalignment, inherent distortions in panoramic im-
+bones, respectively.  Similarly, for the Spin-to-Span task,      ages, and the noisy pseudo-labels in self-training. DAPASS
+CRAM improves the mIoU by 3.69% (B1) and 3.06% (B2).     enables robust cross-domain knowledge transfer without ac-
+These consistent improvements demonstrate that CRAM     cess to source data. To be specific, PCGD generates high-
+complements PCGD by enhancing cross-domain represen-      quality and class-balanced pseudo-labels, enhancing the ac-
+tation alignment and reinforcing spatial consistency during     curacy of supervision signals during self-training and fa-
+adaptation.                                                             cilitating efficient knowledge transfer. Meanwhile, CRAM
+Hyperparameter Sensitivity. We analyze the sensitivity      integrates high-resolution details and low-resolution global
+of the hyperparameters P and τ in Eq. 1 under both C-to-D      context, allowing the model to better focus on image details
+and SPin-to-SPan settings. As shown in Table 5, for the top-     under distortion and thus achieve more reliable knowledge
+P% selection ratio, we vary P from 1 to 20. A very small      adaptation. Extensive experiments on indoor and outdoor
+P may fail to capture sufficient informative samples, while     benchmarks demonstrate that DAPASS outperforms exist-
+a large P risks introducing noisy or unreliable samples into     ing SFUDA methods and remains competitive with source-
+the consistent set. Across both tasks, the mIoU fluctuations     dependent UDA approaches.
+
+
+
+                                                    32233
+
+======================== PDF 第 9 页 ========================
+Acknowledgements                                                    tions on Pattern Analysis and Machine Intelligence, 46(12):
+                                                                 8549–8567, 2024. 2
+This  research was  jointly  supported by  the  National                                                                     [10] Xu Zheng, Jinjing Zhu, Yexin Liu, Zidong Cao, Chong Fu,
+Natural Science Foundation of China Projects (Grants                                                                 and Lin Wang.  Both style and distortion matter:  Dual-
+No. 42401543) and the National Natural Science Founda-                                                                        path unsupervised domain adaptation for panoramic seman-
+tion of China (General Program) (Grant No. 42571521).                                                                                             tic segmentation. In Proceedings of the IEEE/CVF Confer-
+                                                                    ence on Computer Vision and Pattern Recognition (CVPR),
+                                                                    pages 1285–1295. IEEE, 2023. 2, 6
+References                                                      [11] Yuang Liu, Wei Zhang, and Jun Wang. Source-free domain
+                                                                           adaptation for semantic segmentation.  In Proceedings of
+ [1] Xu Zheng, Peng Yuan Zhou, Athanasios V. Vasilakos, and
+                                                                            the IEEE/CVF Conference on Computer Vision and Pattern
+     Lin Wang.   360sfuda++:  Towards source-free uda for
+                                                                       Recognition (CVPR), pages 1215–1224. IEEE, 2021. 2, 6, 7
+     panoramic segmentation by learning reliable category proto-
+                                                                     [12] Yang Zou, Zhiding Yu, Xiaofeng Liu, BVK Kumar, and Jin-
+      types. IEEE Transactions on Pattern Analysis and Machine
+                                                                  song Wang.  Confidence regularized self-training.  In Pro-
+      Intelligence (T-PAMI), 2024. 1, 2, 6, 7
+                                                                       ceedings of the IEEE/CVF international conference on com-
+ [2] Chaoxiang Ma, Jiaming Zhang, Kailun Yang, Alina Roit-
+                                                                          puter vision, pages 5982–5991, 2019. 2
+      berg, and Rainer Stiefelhagen. Densepass: Dense panoramic
+                                                                     [13] Yawei Luo, Liang Zheng, Tao Guan, Junqing Yu, and
+     semantic segmentation via unsupervised domain adaptation
+                                                                  Yi Yang.  Taking a closer look at domain shift: Category-
+     with attention-augmented context exchange. In Proceedings
+                                                                                  level adversaries for semantics consistent domain adaptation.
+      of the IEEE International Conference on Intelligent Trans-
+                                                                           In Proceedings of the IEEE/CVF Conference on Computer
+     portation Systems (ITSC), pages 2766–2772. IEEE, 2021. 1,
+                                                                           Vision and Pattern Recognition (CVPR), pages 2507–2516,
+      2, 5
+                                                                     2019. 2
+ [3] Kailun Yang, Jiaming Zhang, Simon Reiß, Xinxin Hu, and
+                                                                     [14] Lu Yang, He Jiang, Qing Song, and Jun Guo. A survey on
+     Rainer Stiefelhagen. Capturing omni-range context for om-
+                                                                               long-tailed visual recognition. International Journal of Com-
+      nidirectional segmentation. In Proceedings of the IEEE/CVF
+                                                                          puter Vision, 130(7):1837–1872, 2022. 2
+     Conference on Computer Vision and Pattern Recognition
+                                                                     [15] Yuchao Wang, Jingjing Fei, Haochen Wang, Wei Li, Tian-
+     (CVPR), pages 1376–1386, 2021. 1, 2, 6
+                                                                peng Bao, Liwei Wu, Rui Zhao, and Yujun Shen. Balancing
+ [4] Ana Serrano, Incheol Kim, Zhili Chen, Stephen DiVerdi,                                                                                     logit variation for long-tailed semantic segmentation. In Pro-
+     Diego Gutierrez, Aaron Hertzmann, and Belen Masia. Mo-                                                                       ceedings of the IEEE/CVF conference on computer vision
+      tion parallax for 360 rgbd video. IEEE Transactions on Visu-                                                              and pattern recognition, pages 19561–19573, 2023. 2
+      alization and Computer Graphics, 25(5):1817–1827, 2019.                                                                     [16] Bruno Berenguel-Baeta, Jesus Bermudez-Cameo, and Jose J
+    1                                                                        Guerrero.   Fredsnet:  Joint monocular depth and seman-
+ [5] Benjamin Davidson, Mohsan S Alvi, and Jo˜ao F Henriques.              tic segmentation with fast fourier convolutions from sin-
+    360 camera alignment via segmentation. In European con-            gle panoramas. In 2023 IEEE International Conference on
+     ference on computer vision, pages 579–595. Springer, 2020.           Robotics and Automation (ICRA), pages 6080–6086. IEEE,
+    1                                                               2023. 2
+ [6] Jiaming Zhang, Kailun Yang, Chaoxiang Ma, Simon Reiß,      [17] Alexander Jaus, Kailun Yang, and Rainer Stiefelhagen.
+    Kunyu Peng, and Rainer Stiefelhagen.  Bending reality:          Panoramic panoptic segmentation:  Insights into surround-
+     Distortion-aware transformers for adapting to panoramic se-           ing parsing for mobile agents via unsupervised contrastive
+     mantic segmentation.   In Proceedings of the IEEE/CVF            learning. IEEE Transactions on Intelligent Transportation
+     Conference on Computer Vision and Pattern Recognition           Systems, 24(4):4438–4453, 2023. 2
+     (CVPR), pages 16917–16927. IEEE, 2022. 2, 6, 7                [18] Xuewei Li, Tao Wu, Zhongang Qi, Gaoang Wang, Ying
+ [7] Zhen Cao, Xiaoxin Mi, Bo Qiu, Zhipeng Cao, Chen Long,           Shan, and Xi Li. SGAT4PASS: Spherical geometry-aware
+     Xinrui Yan, Chao Zheng, Zhen Dong, and Bisheng Yang.           transformer for panoramic semantic segmentation.  arXiv
+     Cross-modal semantic transfer for point cloud semantic seg-            preprint arXiv:2306.03403, 2023. 2
+     mentation. ISPRS Journal of Photogrammetry and Remote      [19] Semih Orhan and Yalin Bastanlar.  Semantic segmentation
+     Sensing, 221:265–279, 2025. 2                                       of outdoor panoramic images. Signal, Image and Video Pro-
+ [8] Marius Cordts, Mohamed Omran, Sebastian Ramos, Timo            cessing, 16(3):643–650, 2022. 2
+     Rehfeld,  Markus  Enzweiler,  Rodrigo  Benenson, Uwe      [20] Xing Hu, Yi An, Cheng Shao, and Huosheng Hu.  Dis-
+     Franke, Stefan Roth, and Bernt Schiele.  The cityscapes            tortion convolution module for semantic segmentation of
+      dataset for semantic urban scene understanding. In Proceed-          panoramic images based on the image-forming principle.
+     ings of the IEEE Conference on Computer Vision and Pattern         IEEE Transactions on Instrumentation and Measurement,
+     Recognition (CVPR), pages 3213–3223, 2016. 2, 5                   71:1–12, 2022. 2
+ [9] Jiaming Zhang, Kailun Yang, Hao Shi, Simon Reiß, Kunyu      [21] Haozheng Yu, Lu He, Bing Jian, Weiwei Feng, and Shan Liu.
+     Peng, Chaoxiang Ma, Haodong Fu, Philip HS Torr, Kai-           Panelnet: Understanding 360 indoor environment via panel
+     wei Wang, and Rainer Stiefelhagen. Behind every domain            representation. In Proceedings of the IEEE/CVF Conference
+      there is a shift: Adapting distortion-aware vision transform-         on Computer Vision and Pattern Recognition (CVPR), pages
+      ers for panoramic semantic segmentation. IEEE Transac-          878–887. IEEE, 2023. 2
+
+
+
+                                                    32234
+
+======================== PDF 第 10 页 ========================
+[22] Nikita Araslanov and Stefan Roth. Self-supervised augmen-            source-free uda for panoramic segmentation. In Proceedings
+      tation consistency for adapting semantic segmentation.  In            of the IEEE/CVF Conference on Computer Vision and Pat-
+     Proceedings of the IEEE/CVF Conference on Computer Vi-            tern Recognition (CVPR), pages 27885–27895, 2024. 2
+     sion and Pattern Recognition (CVPR), pages 15384–15394.      [35] Dong Zhao, Shuang Wang, Qi Zang, Licheng Jiao, Nicu
+     IEEE, 2021. 2, 3                                                  Sebe, and Zhun Zhong.   Stable neighbor denoising for
+[23] Lukas Hoyer, Dengxin Dai, and Luc Van Gool. Daformer:            source-free domain adaptive segmentation. In Proceedings
+     Improving network architectures and training strategies for            of the IEEE/CVF Conference on Computer Vision and Pat-
+     domain-adaptive semantic segmentation. In Proceedings of            tern Recognition (CVPR), pages 23416–23427, 2024. 3, 4
+     the IEEE/CVF Conference on Computer Vision and Pattern      [36] Jiaming Zhang, Chaoxiang Ma, Kailun Yang, Alina Roit-
+     Recognition (CVPR), pages 9924–9935, 2022. 6                        berg, Kunyu Peng, and Rainer Stiefelhagen.  Transfer be-
+[24] Xiaofeng Liu, Chaehwa Yoo, Fangxu Xing, Hyejin Oh,         yond the field of view: Dense panoramic semantic segmen-
+     Georges El Fakhri, Je-Won Kang, Jonghye Woo, et al. Deep            tation via unsupervised domain adaptation. IEEE Transac-
+     unsupervised domain adaptation: A review of recent ad-            tions on Intelligent Transportation Systems (T-ITS), 23(7):
+     vances and perspectives. APSIPA Transactions on Signal and          9478–9491, 2021. 6
+     Information Processing, 11(1), 2022.                            [37] Zhonghao Wang, Mo Yu, Yunchao Wei, Rogerio Feris, Jin-
+[25] Yaroslav Ganin and Victor Lempitsky. Unsupervised domain           jun Xiong, Wen-mei Hwu, Thomas S Huang, and Honghui
+     adaptation by backpropagation. In International conference            Shi. Differential treatment for stuff and things: A simple un-
+    on machine learning, pages 1180–1189. PMLR, 2015.                 supervised domain adaptation method for semantic segmen-
+[26] Mingsheng Long, Han Zhu, Jianmin Wang, and Michael I.             tation. In Proceedings of the IEEE/CVF conference on com-
+     Jordan. Unsupervised domain adaptation with residual trans-           puter vision and pattern recognition, pages 12635–12644,
+      fer networks.  Advances in Neural Information Processing           2020. 6
+     Systems (NeurIPS), 29, 2016.                                    [38] Xiangyu Yue, Zangwei Zheng, Shanghang Zhang, Yang
+[27] Ozan Sener, Hyun Oh Song, Ashutosh Saxena, and Silvio          Gao, Trevor Darrell, Kurt Keutzer, and Alberto Sangiovanni
+     Savarese.  Learning transferrable representations for unsu-            Vincentelli. Prototypical cross-domain self-supervised learn-
+     pervised domain adaptation. Advances in neural information           ing for few-shot unsupervised domain adaptation.  In Pro-
+     processing systems, 29, 2016.                                       ceedings of the IEEE/CVF Conference on Computer Vision
+                                                              and Pattern Recognition (CVPR), pages 13834–13844, 2021.[28] Zhen Cao, Wenxiao Zhang, Xin Wen, Zhen Dong, Yu-Shen
+                                                              6     Liu, Xiongwu Xiao, and Bisheng Yang. Kt-net: knowledge
+      transfer for unpaired 3d shape completion. In Proceedings      [39] Cheng-Yu Yang,  Yuan-Jhe Kuo,  and Chiou-Ting Hsu.
+      of the AAAI conference on artificial intelligence, volume 37,           Source-free domain adaptation for semantic segmentation
+     pages 286–294, 2023. 2                                               via distribution transfer and adaptive class-balanced self-
+                                                                                   training.  In Proceedings of the IEEE International Con-[29] Sujin Jang, Joohan Na, and Dokwan Oh. Dada: Distortion-
+                                                                           ference on Multimedia and Expo (ICME), pages 1–6. IEEE,     aware domain adaptation for unsupervised semantic segmen-
+                                                                     2022. 6, 7      tation. Advances in Neural Information Processing Systems,
+     35:18681–18693, 2022. 2                                       [40] Iro Armeni, Sasha Sax, Amir R. Zamir, and Silvio Savarese.
+                                                                                Joint 2d-3d-semantic data for indoor scene understanding.[30] Xu Zheng, Tianbo Pan, Yunhao Luo, and Lin Wang. Look at
+                                                                      arXiv preprint arXiv:1702.01105, 2017. 5     the neighbor: Distortion-aware unsupervised domain adap-
+                                                                     [41] Enze Xie, Wenhai Wang, Zhiding Yu, Anima Anandkumar,      tation for panoramic semantic segmentation. In Proceedings
+                                                                        Jose M. Alvarez, and Ping Luo.  Segformer: Simple and      of the IEEE/CVF International Conference on Computer Vi-
+                                                                                      efficient design for semantic segmentation with transform-      sion, pages 18687–18698, 2023. 2, 6
+                                                                                        ers.  Advances in Neural Information Processing Systems
+[31] Jiaxing Huang, Dayan Guan, Aoran Xiao, and Shijian Lu.
+                                                                       (NeurIPS), 34:12077–12090, 2021. 8
+    Model adaptation: Historical contrastive learning for unsu-
+     pervised domain adaptation without source data. Advances
+      in Neural Information Processing Systems (NeurIPS), 34:
+     3635–3649, 2021. 2
+[32] Hao-Wei Yeh, Baoyao Yang, Pong C. Yuen, and  Tat-
+     suya Harada.  Sofa: Source-data-free feature alignment for
+     unsupervised domain adaptation.   In Proceedings of the
+    IEEE/CVF Winter Conference on Applications of Computer
+     Vision (WACV), pages 474–483, 2021.
+[33] Jogendra Nath Kundu, Akshay Kulkarni, Amit Singh, Varun
+     Jampani, and R. Venkatesh Babu.  Generalize then adapt:
+     Source-free domain adaptive semantic segmentation.   In
+     Proceedings of the IEEE/CVF International Conference on
+    Computer Vision (ICCV), pages 7046–7056, 2021. 2
+[34] Xu Zheng, Pengyuan Zhou, Athanasios V. Vasilakos, and
+     Lin Wang. Semantics distortion and style matter: Towards
+
+
+
+                                                    32235

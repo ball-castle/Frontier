@@ -1,0 +1,820 @@
+W05 | PromptMoE: Generalizable Zero-Shot Anomaly Detection via Visually-Guided Prompt Mixtures
+来源：https://ojs.aaai.org/index.php/AAAI/article/view/37842
+本地PDF：W05_PromptMoE_AAAI2026.pdf
+SHA-256：f454c65c7f6a0316bb70d56612a5317cb05e84fcc7529052847fa7ae22626742
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+              PromptMoE: Generalizable Zero-Shot Anomaly Detection
+                             via Visually-Guided Prompt Mixtures
+
+              Yuheng Shao1,2, Lizhang Wang1, Changhao Li1, Peixian Chen2, Qinyuan Liu1, 3*
+                                     1School of Computer Science and Technology, Tongji University
+                                                         2Ant Group
+                 3Key Laboratory of Embedded System and Service Computing, Ministry of Education, Tongji University
+                            {yuhengshao, lizhangwang, chli, liuqy}@tongji.edu.cn, peixian.cpx@antgroup.com
+
+
+                               Abstract                                           Abnormal Visual Feature
+                                                                                                Normal Visual Feature       (a) Monolithic Prompt
+             Zero-Shot Anomaly Detection (ZSAD) aims  to  identify                   Visual Querying
+            and localize anomalous regions in images of unseen ob-           & Routing (Normal)          Normal Prompt2025                                                                                                              Visual Querying                ject classes. While recent methods based on vision-language                                                                       & Routing (Abnormal)       Abnormal Prompt
+            models like CLIP show promise, their performance is con-               (b) Compositional Prompt
+               strained by existing prompt engineering strategies. Current
+              approaches, whether relying on single fixed, learnable, orNov
+             dense dynamic prompts, suffer from a representational bottle-                                  Normal
+                                                                                                                       State Pool22      neckgeneralizeand areto pronethe complexityto overfittingand ondiversityauxiliaryof unseendata, failinganoma-to
+                                                                                                                                    Aggregation                  lies. To overcome these limitations, we propose PromptMoE.
+           Our core insight is that robust ZSAD requires a compositional
+             approach to prompt learning. Instead of learning monolithic
+             prompts, PromptMoE learns a pool of expert prompts, which
+              serve as a basis set of composable semantic primitives, and
+             a visually-guided Mixture-of-Experts (MoE) mechanism to[cs.CV]       dynamically combine them for each instance. Our framework                                            Aggregation
+               materializes this concept through a Visually-Guided Mixture
+              of Prompt (VGMoP) that employs an image-gated sparse                                  Abnormal
+         MoE to aggregate diverse normal and abnormal expert state                                        State Pool
+             prompts, generating semantically rich textual representations
+             with strong generalization. Extensive experiments across 15
+               datasets in industrial and medical domains demonstrate the
+                                                                       Figure 1: (a) Monolithic Prompt vs. (b) Compositional               effectiveness and state-of-the-art performance of PromptMoE.
+                                                                    Prompt. Unlike monolithic prompts with fixed representa-
+                                                                                     tions, our compositional prompts employs visual querying to
+                        Introduction                         dynamically aggregate expert prompts, treated as semantic
+        Anomaly detection is a crucial technology with widespread       primitives, into an instance-specific textual representation.
+           applications, such as ensuring quality in industrial manufac-
+           turing (Bergmann et al. 2019; Jezek et al. 2021; Zou et al.
+         2022; Wang et al. 2024) and assisting in medical diagno-       possibilities for ZSAD due to their strong generalization
+            sis (Buda, Saha, and Mazurowski 2019; Huang et al. 2024).      and zero-shot recognition capabilities. CLIP, trained on mas-
+         For example, in automated production lines, models must       sive image-text pairs, learns a shared semantic space thatarXiv:2511.18116v1    accurately detect subtle defects like scratches, blemishes, or       aligns visual and textual information. Motivated by this, re-
+          deformations. In practice, however, new product categories       cent studies have explored adapting CLIP for ZSAD. Some
+         and unforeseen defect types frequently emerge, making it      methods (Jeong et al. 2023; Chen, Han, and Zhang 2023a)
+           infeasible to collect extensive labeled data or retrain models      reformulate ZSAD as an image-text matching task using
+           for every new class. This has highlighted the importance of      hand-crafted prompts to describe “normal” and “abnormal”
+          Zero-Shot Anomaly Detection (ZSAD), which aims to de-        states. To reduce the need for manual design, later methods
+            tect anomalies in object categories that are not seen during       like AnomalyCLIP (Zhou et al. 2024) introduced learnable
+            training. ZSAD is both essential and inherently challenging.      prompts that are optimized on auxiliary datasets.
+             Recently, the emergence of large-scale vision-language        Although prompt-based methods have shown promis-
+          models, particularly CLIP (Radford et al. 2021), offers new      ing results, they face notable limitations in representational
+              *Corresponding author.                                  power and generalization. Firstly, the single-prompt strategy,
+           Copyright © 2026, Association for the Advancement of Artificial      whether manually designed or learned as a single normal/ab-
+            Intelligence (www.aaai.org). All rights reserved.                    normal pair, suffers from a clear representational bottleneck,
+
+======================== PDF 第 2 页 ========================
+as a fixed prompt vector struggles to capture the diverse
+patterns of normality and abnormality in unseen classes.
+Secondly, simply increasing the number of learnable static
+prompts is not a viable solution, as it significantly increases
+the risk of overfitting to the auxiliary data; the model tends
+to memorize specific pattern-prompt combinations from the
+training set instead of learning generalizable abstract con-
+cepts. Furthermore, approaches (Cao et al. 2024; Qu et al.
+2024) inspired by CoCoOp (Zhou et al. 2022) that dynami-
+cally generate prompts from visual instances often rely on a
+single mapping network to handle all visual variations, mak-
+                                                             Figure 2: ZSAD performance of PromptMoE compared toing it difficult to generate specialized prompts for specific,
+                                                                        state-of-the-art methods. Left: I-AUROC. Right: P-PRO.fine-grained anomaly patterns. Finally, the overfitting issue
+inherent in static designs persists even in deep prompting
+approaches. As demonstrated by previous work (Zhou et al.
+2024), when static learnable prompts are inserted into the                    Related Work
+text encoder’s intermediate layers, they are effective only in     Zero-Shot Anomaly Detection
+shallow stages. Applying them to deeper layers harms zero-
+                                                          Recent research in ZSAD has been significantly advancedshot detection on unseen classes, revealing a critical gener-
+                                                     by Vision-Language Models (VLM) like CLIP (Radfordalization failure of static prompt designs.
+                                                                          et al. 2021), which typically reframe the task as image-text
+  To address the aforementioned challenges, we propose
+                                                            matching. Early pioneering works, such as WinCLIP (Jeong
+PromptMoE, a novel framework that shifts prompt learning                                                                          et al. 2023), introduce a prompt ensembling strategy, gener-
+from a monolithic to a compositional paradigm, as conceptu-
+                                                                   ating rich textual descriptions by combining numerous hand-
+ally illustrated in Fig. 1. Our key insight is that to effectively
+                                                                   crafted templates with state words. To overcome the reliance
+represent the open-ended and diverse nature of normal and
+                                                     on manual design, AnomalyCLIP (Zhou et al. 2024) pro-
+abnormal patterns in ZSAD, a compositional representation
+                                                            poses prompt learning, which optimizes learnable vectors to
+capability for prompts is key, rather than learning a fixed
+                                                                 replace fixed textual prompts, thereby automatically learn-
+or single dynamic prompt. Accordingly, PromptMoE shifts                                                               ing general anomaly concepts.
+the paradigm from learning a monolithic state description
+                                                          However, static learnable prompts show limited adapt-
+to learning a basis set of composable semantic primitives
+                                                                         ability to different visual instances, leading subsequent re-
+(i.e., expert prompts) and a router to dynamically combine
+                                                               search toward dynamic, visually-guided prompt generation.
+them based on the visual instance. This Mixture-of-Experts
+                                                          For instance, AdaCLIP (Cao et al. 2024) combines static
+(MoE) approach allows for the creation of a rich variety
+                                                       and dynamic prompts, while VCP-CLIP (Qu et al. 2024) in-
+of instance-specific prompts from a finite set of parame-
+                                                                         jects visual context at multiple stages of the text encoder.
+ters, while the sparse activation inherent to MoE helps mit-
+                                                         Another approach, taken by Bayes-PFL (Qu et al. 2025),
+igate overfitting. Our framework implements this strategy
+                                                       models the prompt space as a learnable probability distri-
+through a novel Visually-Guided Mixture of Prompt (VG-
+                                                               bution and generates diverse prompts via sampling. Sim-
+MoP) module, which employs an image-gated sparse MoE
+                                                                                 ilarly, FAPrompt (Zhu et  al. 2025) learns a set of fine-
+for specialized selection from distinct expert pools to con-
+                                                              grained prompts and adapts them using a visual prior ex-
+struct fine-grained, instance-adaptive textual prompts. This
+                                                                     tracted from the test image. While these methods enhance
+process is further regularized by expert load balancing and
+                                                                     instance-adaptability, they often rely on complex generative
+decoupling losses to enhance the diversity of the expert pool,
+                                                                or probabilistic modeling. In contrast, our work explores us-
+thereby improving generalization to unseen classes.
+                                                               ing a MoE mechanism to achieve visually-guided prompt
+  Our main contributions are summarized as follows:                                                               generation in a compositional manner.
+
+ • We propose PromptMoE, a framework for ZSAD that re-
+                                                 Mixture of Experts   places monolithic prompts with a compositional learning
+   paradigm. It employs a MoE mechanism to dynamically      Mixture-of-Experts  is a  classic conditional computation
+   combine a learned basis of semantic primitives, enhanc-      paradigm that effectively scales model capacity without a
+   ing generalization and mitigating overfitting.                  proportional increase in computational cost by activating
+                                                            only a sparse subset of “expert” subnetworks for each in-
+ • We design a VGMoP module to realize this paradigm.                                                               put (Shazeer et al. 2017). This strategy has recently been
+    It utilizes an image-gated sparse router and distinct ex-                                                           widely and successfully applied to scale large-scale lan-
+   pert pools to dynamically compose specialized normal                                                        guage models to trillions of parameters (Fedus, Zoph, and
+   and abnormal state prompts for each visual instance.                                                           Shazeer 2022) and has also been adapted for vision mod-
+ • Extensive experiments 15 industrial and medical datasets       els (Riquelme et al. 2021). In these mainstream applica-
+   demonstrate that our method achieves SOTA perfor-       tions, MoE typically functions as a dynamic router that se-
+   mance, validating its effectiveness on the ZSAD task.           lects one of several expert MLP layers to process each in-
+                                                               put token. In contrast, our PromptMoE framework explores
+
+======================== PDF 第 3 页 ========================
+             C  Cosine Similarity                                Compositional             Text Encoder
+                                                              Prompt
+                             Vision Encoder
+                                                VGMoP
+
+
+                                                                              Proj.
+                                                                       C
+         PromptMoE                     C   Anomaly Score               Anomaly Map     GT
+
+                                         Figure 3: Framework of PromptMoE.
+
+
+a novel application of MoE in prompt engineering: we re-         Visually-Guided               Normal Expert Weights     Normal Prompt Pool                                                                                                                                                      Top-k
+                                                                                                                                                                                                                                                                                                                                                                                      𝑛𝑛      𝐬𝐬1,2𝑛𝑛     ··· ···        𝐬𝐬1,𝑀𝑀𝑛𝑛purpose the MoE mechanism as a strategy for compositional         Mixture of Prompt                                Selection      𝐬𝐬1,1
+prompt generation. Under this framework, the “experts” are                                                                                                                                         𝐬𝐬2,1                                                                                                                                                                                                                                                                                                                                                                                      𝑛𝑛      𝐬𝐬2,2𝑛𝑛     ··· ···        𝐬𝐬2,𝑀𝑀𝑛𝑛
+learnable prompt embedding segments, and an image-gated                                                                                        ···   ···             ···                                                                                                       ···
+router learns to select a specialized subset of these experts                                    𝒌𝒌𝑛𝑛      𝒗𝒗𝑛𝑛                                                                                                  𝐬𝐬𝐸𝐸,1𝑛𝑛       𝐬𝐬𝐸𝐸,2𝑛𝑛     ··· ···         𝐬𝐬𝐸𝐸,𝑀𝑀𝑛𝑛
+to dynamically construct a highly adaptive textual represen-                    ···                                              Σ
+                                                                                                                                                        Mixture                                                                                                                                                                                                                                  [class] 𝑸𝑸1··· 𝑸𝑸𝑀𝑀𝑞𝑞tation for each visual instance.                                                                                                        𝒒𝒒𝑛𝑛                                   Router                                                                                                                                                                 Text                                                                                                                                                                                            𝒒𝒒𝑎𝑎         Cross-                                                                                                                                                                                                                                                                                                                    Attention                         Prompt               [class] 𝑸𝑸1··· 𝑸𝑸𝑀𝑀𝑞𝑞                                                                                                                                                     ···                                                       Image-GatedSparse                          Σ    Abnormal Prompt Pool               Method
+                                                                                                                                                                                                       𝒌𝒌𝑎𝑎      𝒗𝒗𝑎𝑎                                                                                      𝐬𝐬1,1𝑎𝑎      𝐬𝐬1,2𝑎𝑎     ··· ···         𝐬𝐬1,𝑀𝑀𝑎𝑎
+Problem Formulation                                                                                                                                                  Top-k
+                                                                                                                                                                                                                                                                                                             𝐬𝐬2,1𝑎𝑎      𝐬𝐬2,2𝑎𝑎     ··· ···        𝐬𝐬2,𝑀𝑀𝑎𝑎                                                                                                                                                                   Selection
+The goal of ZSAD is to detect and segment anomalous                                                                                        ···   ···             ···
+regions in images, especially for object classes that are                                    ···                                                 𝐬𝐬𝐸𝐸,1                                                                                                                                                                                                                                                                                                                                                                                                    𝑎𝑎       𝐬𝐬𝐸𝐸,2𝑎𝑎     ··· ···         𝐬𝐬𝐸𝐸,𝑀𝑀𝑎𝑎
+unseen during training. Formally, given an input image              Forezn    Learnable              Abnormal Expert Weights
+x ∈Rh×w×3, the model aims to predict an image-level
+anomaly score s as well as a pixel-level anomaly map M ∈      Figure 4: Architecture of our proposed Visually-Guided
+Rh×w. We utilize an auxiliary training dataset Dtrain =      Mixture of Prompt (VGMoP) module. A sparse router,
+{(xi, ci, mi)}Ntraini=1     , where each sample consists of an im-      guided by cross-attention between learnable queries and im-
+age xi, an image-level label ci, and a pixel-level anomaly      age features, dynamically selects and aggregates top-k ex-
+mask mi. The label ci ∈{0, 1} indicates whether the im-       perts from respective prompt pools to construct instance-
+age is normal (ci =  0) or abnormal (ci =  1), and the       specific normal and abnormal text prompts.
+mask mi ∈{0, 1}h×w provides pixel-wise annotations for
+anomalous regions. The test set Dtest = {xj}Ntestj=1  contains
+images from unseen classes that are disjoint from those in     Visually-Guided Mixture of Prompt
+the training set, i.e., Ctrain ∩Ctest = ∅. The model is trained
+                                                             Previous ZSAD method (Zhou et al. 2024) introduces learn-
+to learn a generalizable patterns of normality and abnormal-
+                                                                able pairs of normal and abnormal text prompts to guide pre-
+ity from Dtrain, and to achieve the detection of anomalies
+                                                                   trained CLIP models in distinguishing these two concepts,
+in unseen classes within Dtest.
+                                                              thereby avoiding tedious manual template design. However,
+Overview                                                such single, fixed prompts possess limited expressive power,
+                                                                  struggling to adequately represent the complex and diverse
+We propose PromptMoE, a framework that utilizes visually-                                                      anomaly patterns found in unseen classes. Although some
+guided prompt mixtures to improve generalization to un-                                                            subsequent studies (Cao et al. 2024; Qu et al. 2024) attempt
+seen classes, thereby enhancing ZSAD performance. As il-                                                                     to dynamically generate prompts using visual features to en-
+lustrated in Fig. 3, given an input image x, a vision en-                                                         hance instance adaptability, their effectiveness is often con-
+coder extracts comprehensive patch-level features F(l)x  ∈       strained by the inherent representational bottlenecks of vi-
+R(HW +1)×Dx and a global feature Fclsx  ∈RDx, where H       sual encoders. Furthermore, simply increasing the number of
+and W denote the number of patches, and Dx is the fea-      prompts or their complexity can easily lead to model overfit-
+ture dimension. The core innovation of PromptMoE is the       ting on seen classes, consequently impairing its generaliza-
+VGMoP module, detailed in Fig. 4. It takes the visual fea-       tion ability to unseen classes.
+tures F(l)x  as input and dynamically generates fine-grained,       To address these  limitations, we propose VGMoP, a
+instance-specific normal and abnormal textual prompts, T(l)n        visually-guided prompt mixture  that  effectively  utilizes
+and T(l)a  , for each visual instance. Finally, layer-wise simi-       richer prompt information to enhance generalization to un-
+                                                            seen classes. Unlike fixed or single dynamically-generated
+larities between textual embeddings F(l)T  and patch features      prompts, VGMoP employs an image-gated sparse MoE
+F(l)x  are aggregated to produce the anomaly map M.            mechanism. This adaptively selects and aggregates a sparse
+
+======================== PDF 第 4 页 ========================
+subset of relevant expert prompts from a pool for the current        Note that we utilize independent expert prompt pools for
+visual query instance, thereby constructing distinct textual      normal and abnormal states, En and Ea respectively, and ap-
+representations for normal and abnormal states.                  ply this Visually-Guided MoE procedure to each. This sep-
+                                                                 arated design is intended to provide specialized representa-Mixture Text Prompt Structure.  Under the VGMoP
+                                                                      tional spaces for normality and abnormality, thereby enhanc-
+strategy, we construct two mixture text prompts for each vi-
+sual instance x: a normal-state prompt Tn ∈RNn×D and      ing generalization to complex patterns in unseen classes.
+an abnormal-state prompt Ta ∈RNa×D, where D denotes      Auxiliary Loss.  For each visual instance, VGMoP selects
+the token embedding dimension. The prompt are defined as:     k expert state prompts from the expert pool. However, dur-
+                                                               ing training, prompts that perform better in the early stages
+         Tn = [Snagg][cls][Qctx],                           are more likely to be repeatedly selected by the sparse router,
+                                                           (1)
+          Ta = [Snagg][Saagg][cls][Qctx],                     leading to imbalanced prompt utilization. This imbalance
+where Snagg ∈RMn×D represents the aggregated normal     may cause the prompt pool to degenerate into a fixed combi-                                                                nation of prompt states, undermining the dynamics and spar-
+state. Inspired by Li et al. (2024), we append an aggregated
+abnormal state suffix Saagg ∈RMa×D to Snagg to construct        sity of selection. Drawing inspiration from prior research                                                             (Shazeer et al. 2017; Fedus, Zoph, and Shazeer 2022), this
+the abnormal-state prompt. Both Snagg and Saagg are generated                                                                     loss encourages a uniform average contribution from all ex-
+by the visually-guided MoE mechanism. Qctx ∈RMq×D       perts across the batch, defined as:
+denotes a set of learnable context tokens shared by both
+prompts, and [cls] denotes the embedding of a given cat-                E     B   !2                                                                                  1egory     name            or              a generic                        placeholder                                 such as “object”.                             X                                           The                Lbalance = α X                                             E X                                                                                                                  p(l)i,j  ,                                                      Bresulting           and                             the text encoder                                          with dynami-                                                                                                                               (4)      Tn           Ta provide                                                                                   j=1                                                                                                 i=1                                                                                    l∈I
+cally adapted, instance-specific semantic guidance.
+                                                                                  p(l) = Softmax(z(l)),
+Visually-Guided MoE  for  State  Aggregation.  To
+achieve  effective compositional  representations and en-      where B is the batch size, E is the number of experts, p(l)
+hance generalization to unseen classes, Snagg and Saagg are        is the router’s output probability distribution over experts at
+generated using a visually-guided MoE procedure applied       layer l, and α is the loss weight. In practice, we find this
+independently for each layer l ∈I. For each layer, the       loss is most effective when combined with a learning rate
+process begins by constructing a comprehensive visual     warmup schedule during the initial training epochs.
+representation F(l)x  ∈ R(HW +1)×Dx, obtained by con-       To further enhance the generalization ability of state
+                                                            prompts, we introduce an expert decoupling loss, Ldecouple,catenating the patch features of the layer with the global
+feature Fclsx  . A set of learnable, layer-specific state queries     aimming to promote representational diversity within the ex-
+                                                                     pert prompt pool, ensuring that individual state prompt learnq(l) ∈RNq×D then attend to F(l)x  via a cross-attention
+                                                                  discriminative features. Let ¯s(l)j = mean(s(l)j  ) ∈RD denotelayer to extract fine-grained, state-relevant visual contextual
+representations O(l) ∈RNq×D, computed as:                     the mean embedding representation of each state prompt s(l)j
+                                                       from the prompt pool E(l). These are then normalized to
+    Q(l) = q(l), K(l) = F(l)x W(l)K , V (l) = F(l)x W(l)V  ,              yield ˆsj = ¯sj/∥¯sj∥2. The normalized mean representations
+                                                          form the rows of a matrix ˆS(l) ∈RE×D. The expert                    Q(l)K(l)⊤ !                      (2)          ˆs(l)j
+    O(l) = Softmax   √      V (l),                       decoupling loss Ldecouple is defined as:
+              D
+                                                                                          F ,       (5)where W(l)K , W(l)V ∈RDx×D are linear projection matrices                   Ldecouple = β X ∥ˆS(l)(ˆS(l))T −IE∥2
+mapping F(l)x  to dimension D. The routing representation is                             l∈I
+                                                       where β is a hyperparameter weight, IE is the identity ma-then obtained by average pooling: r(l) = mean(O(l)) ∈RD.
+                                                                                 trix, and ∥·∥2F denotes the squared Frobenius norm. This loss  This representation r(l) is fed into a layer-specific image-                                                         promotes orthogonality among the mean representations of
+gated sparse router G(l)(·), composed of a two-layer MLP       different expert prompts within each layer’s pool, enhancing
+(i.e., Linear-ReLU-Linear). The router produces routing log-       the overall model’s diversity.
+its z(l) for the corresponding layer-specific expert prompt
+pool E(l) =  {s(l)j  ∈RM×D}Ej=1. From these logits, we     Discussion
+select the top-k values, denoted as z(l)top, and retrieve their       In summary, the design of our PromptMoE framework ad-
+                                                                 dresses several key considerations. First, to effectively uti-
+associated expert prompts {s(l)top,i}ki=1. Normalized gating        lize the rich yet redundant patch features from the visual
+weights are then computed as w(l) = Softmax(z(l)top), which      encoder, we employ a query-driven cross-attention mecha-
+are used to aggregate the layer-specific state prompt S(l)agg:        nism. This mechanism learns to actively distill state-relevant                                                                   visual signals from the numerous patches, avoiding the loss
+                          k                                    of critical local information that can occur with simple av-
+                    S(l)agg = X w(l)i  s(l)top,i.                 (3)      erage pooling. Second, this query-and-distill mechanism is
+                                                           extended layer-wise, enabling the generation of fine-grained                         i=1
+
+======================== PDF 第 5 页 ========================
+textual prompts that correspond to visual features at diverse    AD dataset and then perform zero-shot inference and eval-
+semantic depths. Finally, dedicated auxiliary losses are in-       uation on the other 14 datasets. To evaluate performance on
+troduced to ensure the MoE system trains stably and general-    MVTec AD itself, we train our model on VisA, a dataset
+izes effectively: a load balancing loss maintains the router’s      with a disjoint set of object categories.
+dynamism, while a decoupling loss enhances generalization
+                                                            Metrics.  To evaluate the performance of our model, weto unseen classes by promoting expert diversity.
+                                                              follow the standard protocols used in previous works (Zhou
+Training and Inference                                            et al. 2024). For the image-level anomaly detection, we re-
+                                                                  port the AUROC and AP. For the pixel-level anomaly local-
+PromptMoE computes the pixel-level anomaly map M by                                                                        ization, we use pixel-wise AUROC and the area under the
+aggregating similarity maps over a predefined set of visual                                                           Per-Region Overlap curve (PRO) (Bergmann et al. 2019).
+encoder layers I. For each layer l ∈I, the map is derived
+from the similarity between its patch features F(l)x  and the      Implementation details.  We utilize the pre-trained CLIP
+corresponding textual embedding F(l)T  :                         (Radford et al. 2021) (ViT-L/14@336px) released by Ope-
+                                                   nAI as our backbone, with all of its parameters frozen during
+                                                                       training. All input images are resized to 518 × 518 pixels.
+    M = X Softmax(Up(F(l)x F(l)T ⊤)/τ),        (6)    We extract patch features from the {6, 12, 18, 24}-th layers
+                l∈I                                             of the 24-layer visual encoder. The model is trained for 15
+where Up(·) upsamples the similarity map to (h, w) and τ      epochs using the Adam optimizer with a batch size of 16
+is a temperature parameter. The image-level anomaly score      and a learning rate of 0.001, employing a warm-up strategy
+s combines the peak value of the anomaly map M with the      during the first 3 epochs.
+similarity between the global image feature Fclsx  and the fi-        For our VGMoP module, we set the number of queries
+nal layer’s textual embedding F(max(I))T          :                  Nq = 8 and experts E = 8, from which we sparsely select
+                                                                 the top k = 4 for aggregation; its cross-attention utilizes 8
+      1                                                   heads and its router has a hidden dimension of 256. The re-   s =       + Softmax(Fclsx F(max(I))T     ⊤/τ ′)).   (7)     2(max(M)                                                 sulting normal and abnormal state sequences have lengths
+                                    Mn = 5 and Ma = 6, respectively, while the shared context  Similar to previous works (Zhou et al. 2024; Gu et al.
+                                                      Qctx has a length of Mq = 8. The auxiliary loss coefficients2024; Cao et al. 2024), PromptMoE supervises the anomaly
+                                          α and β are set to 0.01 and 0.005, respectively. All experi-
+map M using Dice (Milletari, Navab, and Ahmadi 2016) and
+                                                        ments are conducted on a RTX3090 using PyTorch 1.13.1.
+Focal (Lin et al. 2017) losses against the ground truth mask
+m. In addition, the anomaly score s is optimized using BCE
+                                                                                                                                                        Hazelnut         pcb1           pcb3             bottle       bracket_white     connector         ISIC        cvc-colondb
+loss with the ground truth label c. The overall loss Ltotal is:
+                                                                                                                                                                                                                                                  Image
+            Ltotal = BCE(s, c) + Lbalance + Ldecouple
+                |  Classify{z   }  |      Auxiliary{z      }
+                                                           (8)        + Dice(M, m) + Focal(M, m) .                                                                                                                                           AnomalyCLIP
+                |            Segment{z           }
+                                                                                                                                                                                                                                                                                                                                                   AdaCLIP
+               Experiments                                                                                                                                                                                      PromptMoE
+Experiment Settings
+Datasets.  To comprehensively evaluate the generaliza-
+                                                             Figure 5: Qualitative comparison of anomaly localization re-
+tion capability of our proposed PromptMoE on the ZSAD
+                                                                         sults across different ZSAD methods.
+task, we conduct extensive experiments on 15 real-world
+datasets spanning both industrial manufacturing and medi-
+cal diagnosis domains. We utilize seven widely-used indus-
+trial benchmarks, including MVTec AD (Bergmann et al.     Comparisons with State-of-the-Art Methods
+2019), VisA (Zou et al. 2022), MPDD (Jezek et al. 2021),                                         We compare PromptMoE against recent SOTA methods, in-
+BTAD (Mishra et al. 2021), SDD (Tabernik et al. 2020),                                                              cluding WinCLIP (Jeong et al. 2023), APRIL-GAN (Chen,
+DAGM (Wieler and Hahn 2007), and DTD-Synthetic (Aota,                                                        Han, and Zhang 2023b), AnomalyCLIP (Zhou et al. 2024),
+Tong, and Okatani 2023); as well as eight medical datasets                                                 AdaCLIP (Cao et al. 2024), and FAPrompt (Zhu et al. 2025).
+from diverse modalities and application scenarios, includ-                                                          For a fair comparison, all results are cited from their origi-
+ing HeadCT (Salehi et al. 2021), BrainMRI (Kanade and                                                                 nal papers, while any missing values are reproduced using
+Gumaste 2015), Br35H (Hamada 2020), ISIC (Codella                                                                 the official code under a unified setting.
+et al. 2018), CVC-ColonDB (Tajbakhsh, Gurudu, and Liang
+2015), CVC-ClinicDB (Bernal et al. 2015), Kvasir (Jha et al.      Quantitative Comparisons.  We quantitatively compare
+2019), and Endo (Hicks et al. 2021). Following the standard     PromptMoE against recent SOTA methods across 15 indus-
+ZSAD setting, we primarily train our model on the MVTec        trial and medical datasets. The detailed results in Table 1,
+
+======================== PDF 第 6 页 ========================
+          Metric         Datasets      CLIP    WinCLIP  APRIL-GAN AnomalyCLIP  AdaCLIP   FAPrompt  PromptMoE
+
+                 MVTec AD    (74.1, 87.6)  (91.8, 96.5)   (86.1, 93.5)    (91.5, 96.2)   (92.0, 96.4)  (91.9, 95.7)  (93.8, 97.2)
+                       VisA       (66.4, 71.5)  (78.1, 81.2)   (78.0, 81.4)    (82.1, 85.4)   (83.0, 84.9)  (84.5, 86.8)  (85.0, 88.2)
+                MPDD      (54.3, 65.4)  (63.6, 69.9)   (73.0, 80.2)    (77.0, 82.0)   (72.1, 77.6)  (80.6, 83.3)  (82.3, 84.5)
+        Image-level     BTAD      (34.5, 52.5)  (68.2, 70.9)   (73.6, 68.6)    (88.3, 87.3)   (91.6, 92.4)  (92.0, 92.2)  (93.4, 95.7)
+     (AUROC, AP)     SDD       (65.7, 45.2)  (84.3, 77.4)   (79.8, 71.4)    (84.7, 80.0)   (81.2, 72.6)  (98.6, 95.9)  (97.4, 94.0)
+               DAGM      (79.6, 59.0)  (91.8, 79.5)   (94.4, 83.8)    (97.5, 92.3)   (96.5, 95.7)  (98.9, 95.7)  (98.9, 96.4)
+                    DTD-Synthetic  (71.6, 85.7)  (93.2, 92.6)   (86.4, 95.0)    (93.5, 97.0)   (92.8, 97.0)  (95.9, 98.3)  (95.9, 98.1)
+
+                       Average     (63.7, 66.7)  (81.6, 81.1)   (81.6, 82.0)    (87.8, 88.6)   (87.0, 88.0)  (91.7, 92.5)  (92.4, 93.4)          Industrial              MVTec AD    (38.4, 11.3)  (85.1, 64.6)   (87.6, 44.0)    (91.1, 81.4)   (86.8, 33.8)  (90.6, 83.3)  (91.8, 83.2)
+                       VisA       (46.6, 14.8)  (79.6, 56.8)   (94.2, 86.8)    (95.5, 87.0)   (95.1, 71.3)  (95.9, 87.5)  (95.6, 89.2)
+                MPDD      (62.1, 33.0)  (76.4, 48.9)   (94.1, 83.2)    (96.5, 88.7)   (96.4, 62.2)  (96.5, 87.9)  (96.8, 88.8)
+         Pixel-level     BTAD       (30.6, 4.4)  (72.7, 27.3)   (60.8, 25.0)    (94.2, 74.8)   (87.7, 17.7)  (95.6, 75.2)  (94.9, 80.6)
+    (AUROC, PRO)    SDD        (39.0, 8.9)  (68.8, 24.2)   (79.8, 65.1)    (90.6, 67.8)   (71.7, 17.6)  (98.3, 93.6)  (98.1, 95.6)
+               DAGM      (28.2, 2.9)  (87.6, 65.7)   (82.4, 66.2)    (95.6, 91.0)   (97.0, 40.9)  (98.3, 95.4)  (97.8, 93.9)
+                    DTD-Synthetic  (33.9, 12.5)  (83.9, 57.8)   (95.3, 86.9)    (97.9, 92.3)   (94.1, 24.9)  (98.3, 93.1)  (98.3, 93.2)
+
+                       Average     (39.8, 12.5)  (79.1, 49.3)   (84.8, 65.3)    (94.5, 83.3)   (89.8, 38.4)  (96.2, 88.0)  (96.2, 89.2)
+
+                   HeadCT     (56.5, 58.4)  (81.8, 80.2)   (89.1, 89.4)    (93.4, 91.6)   (93.4, 92.2)  (94.8, 93.5)  (98.2, 98.2)
+        Image-level     BrainMRI    (73.9, 81.7)  (86.6, 91.5)   (89.3, 90.9)    (90.3, 92.2)   (94.9, 94.2)  (95.5, 95.6)  (96.0, 96.6)
+     (AUROC, AP)     Br35H      (78.4, 78.8)  (80.5, 82.2)   (93.1, 92.9)    (94.6, 94.7)   (95.7, 95.7)  (97.8, 97.5)  (97.9, 97.7)
+
+                       Average     (69.6, 73.0)  (83.0, 84.6)   (90.5, 91.1)    (92.8, 92.8)   (94.7, 94.0)  (96.0, 95.5)  (97.4, 97.5)
+
+                         ISIC        (33.1, 5.8)  (83.3, 55.1)   (89.4, 77.2)    (89.7, 78.4)    (85.4, 5.3)  (90.9, 81.2)  (91.1, 81.4)       Medical                 CVC-ColonDB  (49.5, 15.8)  (70.3, 32.5)   (78.4, 64.6)    (81.9, 71.3)    (79.3, 6.5)  (84.6, 74.7)  (84.3, 74.9)
+         Pixel-level   CVC-ClinicDB  (47.5, 18.9)  (51.2, 13.8)   (80.5, 60.7)    (82.9, 67.8)   (85.3, 14.6)  (84.7, 70.1)  (84.5, 70.9)
+    (AUROC, PRO)      Kvasir      (44.6, 17.7)  (69.7, 24.5)   (75.0, 36.2)    (78.9, 45.6)   (79.4, 12.3)  (81.2, 47.8)  (81.6, 48.8)
+                      Endo       (45.2, 15.9)  (68.2, 28.3)   (81.9, 54.9)    (84.1, 63.6)   (84.0, 10.5)  (86.4, 67.2)  (86.3, 68.0)
+
+                       Average     (44.0, 14.8)  (68.5, 30.8)   (81.0, 58.2)    (83.5, 65.3)    (82.7, 9.8)  (85.6, 68.2)  (85.6, 68.8)
+
+Table 1: ZSAD performance comparison on industrial and medical domains. Best results are in bold, second-best are underlined.
+
+
+visually summarized by the radar chart in Fig. 2, clearly in-       instance, enables a finer-grained image-text alignment that
+dicate that our PromptMoE demonstrates comprehensive su-       leads to superior localization performance.
+periority over competing methods in both image-level and
+pixel-level metrics. For instance, it achieves a 93.8% Image-
+level AUROC on the MVTec AD benchmark (+1.8% over
+the runner-up). This strong generalization is further vali-
+dated on medical datasets, notably on HeadCT, where our
+model surpasses the next-best method by a significant 3.4%
+in AUROC and 4.7% in AP. The exceptional performance
+on the unseen medical domain, despite being trained solely
+on industrial data, strongly validates the success of our
+visually-guided compositional prompts in learning general-
+izable concepts of normality and abnormality.
+
+Qualitative Comparisons.  To provide a visual intuition
+of the superiority of PromptMoE, we present a series of
+anomaly localization results in Fig. 5, comparing qualita-
+tively against AnomalyCLIP and AdaCLIP. As can be ob-                                                             Figure 6: Activation frequencies of normal and abnormal ex-
+served, the results from competing methods are often im-                                                                     perts across training and test datasets.
+precise, suffering from issues such as false positives on nor-
+mal regions or incomplete coverage of defective areas. In
+contrast, the anomaly maps generated by our PromptMoE      Analysis of Expert Activation.  To gain deeper insight
+not only focus more accurately on the true defects but       into the dynamic routing behavior of the VGMoP module,
+also exhibit highlighting that aligns more closely with the     we analyze its expert activation patterns. As illustrated in
+actual anomaly contours. These results suggest that our       Fig. 6, we compute the cumulative activation frequency for
+visually-guided compositional prompt mechanism, by gen-      each expert in both the normal and abnormal prompt pools
+erating more discriminative textual representations for each     on the seen dataset (MVTec AD) and across several unseen
+
+======================== PDF 第 7 页 ========================
+datasets.
+  The results clearly reveal that the normal and abnormal
+branches learn two distinct and highly task-adaptive routing
+strategies. For the normal state, the router’s selections con-
+sistently converge to a small, fixed set of core experts across
+all test datasets. This indicates that our model successfully
+distills a core set of highly generalizable semantic primitives
+for the concept of “normality” from the diverse training data.
+  In stark contrast, the expert activation for the abnormal
+state remains highly dynamic and sparse across different un-
+seen datasets, demonstrating that the model flexibly com-
+poses different expert primitives for varied anomaly pat-                                                             Figure 7: Effect of Ldecouple loss on MoE training dynamics.
+terns. For instance, we observe that a general-purpose expert
+(e.g., E3) is combined with a dataset-specific subset of other
+experts (e.g., higher activation of E7 and E8 on VisA vs.                                                                       that in the absence of Ldecouple (dashed lines), expert rep-
+E1 and E6 on MPDD). Furthermore, the specific activation                                                                   resentations become redundant (reflected by the increasing
+weights for the instances in Fig. 1 reveal that the router as-                                                              value of Ldecouple), which in turn leads to a sharp degradation
+signs non-uniform weights to the selected experts, forming a                                                                of Lbalance and ultimately harms the model’s I-AUC perfor-
+meaningful weighted combination rather than a simple aver-                                                        mance. Conversely, when both losses are used (solid lines),
+age. This provides further evidence of the router’s nuanced,                                                            both auxiliary losses are effectively suppressed to healthy
+instance-specific decision-making.                                                                         levels, and the model achieves superior final performance.
+                                                            This strongly demonstrates that the expert diversity enforced
+Ablation Studies                                                     by Ldecouple is a crucial prerequisite for achieving effective
+Analysis of the Compositional Prompting.  To validate      load balancing and optimal performance.
+the effectiveness of our proposed compositional prompt-
+                                                           Analysis on the Load Balancing loss.  To further validateing strategy, we conduct an ablation study progressively
+                                                                 the necessity of Lbalance, we conduct an ablation study onbuilding from a simple static prompt baseline to our full
+                                                                                     its coefficient α. As shown in Table 3, completely removingPromptMoE model. As shown  in Table  2,  the  “Static
+                                                                 the load balancing loss (α = 0) leads to a significant per-Prompt” baseline (using a single learnable prompt) yields
+                                                        formance drop. A moderate weight (α = 0.01) effectivelylimited performance. While “Static Ensemble”, which uses
+                                                         promotes expert balancing and yields the best performance.a set of static prompts and averages their outputs, pro-
+                                                        However, an excessively high weight (α = 0.1) might over-vides some improvement,  its effectiveness remains con-
+                                                                penalize the router’s specialization, which also negativelystrained. Notably, replacing the static ensemble with “VG-
+                                                            impacts the main task’s performance.MoP” (single-layer, without auxiliary losses) leads to a sig-
+nificant performance boost (a +0.9% gain in I-AUC on
+                                                                    MVTec AD        VisAMVTec AD). This strongly demonstrates that the core ad-                                                              Weight α
+vantage of our method stems from the dynamic, visually-                          I-AUC  PRO  I-AUC  PRO
+guided composition of experts, rather than merely increasing
+                                                α = 0 (w/o Lbalance)    92.1    82.5    83.4    88.2the number of static prompts. Finally, our PromptMoE, ben-
+                                                α = 0.01              93.8    83.2    85.0    89.2
+efiting from its multi-layer prompt design and regularization                                                α = 0.1               92.9    83.1    84.2    89.2
+from auxiliary losses, achieves the best performance, fully
+validating the superiority of our compositional framework.
+                                                                 Table 3: Ablation study on the weight α of Lbalance.
+
+                   MVTec AD        VisA
+     Configuration
+                    I-AUC  PRO  I-AUC  PRO                        Conclusion
+      Static Prompt        91.7    82.0    82.4    88.0            In this paper, we have demonstrated that reframing prompt
+      +Static Ensemble    92.2    82.9    83.3    88.3            learning as a compositional paradigm is an effective ap-
+    +VGMoP           93.1    83.3    84.1    89.0           proach to tackling the generalization challenge in ZSAD.
+     PromptMoE          93.8    83.2    85.0    89.2          Our proposed PromptMoE, through its visually-guided MoE
+                                                       mechanism, successfully learns to dynamically construct
+Table 2: Ablation on the effectiveness of compositional       tailored textual prompts for each instance from a basis set of
+prompting strategy.                                              learnable semantic primitives. This approach overcomes the
+                                                                   representational bottlenecks and overfitting risks associated
+                                                            with monolithic prompts. The SOTA performance achieved
+Synergy of Expert Diversity and Load Balancing.  To       across 15 industrial and medical datasets strongly supports
+validate the synergy between our two auxiliary losses, we      our central conclusion: learning how to compose, rather than
+visualize the evolution of key metrics during training with       learning a single complete prompt, is key to enhancing a
+and without Ldecouple in Fig. 7. The results clearly show      model’s ability to handle the diversity of unseen anomalies.
+
+======================== PDF 第 8 页 ========================
+            Acknowledgments                    Gu, Z.; Zhu, B.; Zhu, G.; Chen, Y.; Tang, M.; and Wang,
+                                                                                   J. 2024. Anomalygpt: Detecting industrial anomalies using
+This  work  was  supported  in  part  by  the  National
+                                                                   large vision-language models. In Proceedings of the AAAI
+Key  Research  and  Development  Program  of  China
+                                                          Conference on Artificial Intelligence, 1932–1940.
+(2022YFB4501704); the National Science Foundation of
+                                                    Hamada, A. 2020. Br35H :: Brain Tumor Detection 2020.China (62222312, 62473285); the Shanghai Science and
+                                                           Kaggle.Technology  Innovation  Action  Plan  Project  of  China
+(22511100700); and the Fundamental Research Funds for      Hicks, S. A.; Jha, D.; Thambawita, V.; Halvorsen, P.; Ham-
+the Central Universities.                                      mer, H. L.; and Riegler, M. A. 2021.   The EndoTect
+                                                     2020 challenge: evaluation and comparison of classifica-
+                                                                          tion, segmentation and inference time for endoscopy.  In                References
+                                                                  International Conference on Pattern Recognition, 263–274.
+Aota, T.; Tong, L. T. T.; and Okatani, T. 2023.  Zero-shot       Springer.
+versus many-shot: Unsupervised texture anomaly detection.                                                       Huang, C.; Jiang, A.; Feng, J.; Zhang, Y.; Wang, X.; and
+In Proceedings of the IEEE/CVF Winter Conference on Ap-                                                    Wang, Y. 2024. Adapting visual-language models for gener-
+plications of Computer Vision, 5564–5572.                                                                     alizable anomaly detection in medical images. In Proceed-
+Bergmann, P.; Fauser, M.; Sattlegger, D.; and Steger, C.       ings of the IEEE/CVF Conference on Computer Vision and
+2019.  MVTec AD–A comprehensive real-world dataset      Pattern Recognition, 11375–11385.
+for unsupervised anomaly detection.   In Proceedings of      Jeong, J.; Zou, Y.; Kim, T.; Zhang, D.; Ravichandran, A.;
+the IEEE/CVF Conference on Computer Vision and Pattern      and Dabeer, O. 2023.  Winclip: Zero-/few-shot anomaly
+Recognition, 9592–9600.                                            classification and segmentation.   In Proceedings of the
+Bernal, J.; S´anchez, F. J.; Fern´andez-Esparrach, G.; Gil, D.;     IEEE/CVF Conference on Computer Vision and Pattern
+Rodr´ıguez, C.; and Vilari˜no, F. 2015. WM-DOVA maps      Recognition, 19606–19616.
+for accurate polyp highlighting in colonoscopy: Validation       Jezek, S.; Jonak, M.; Burget, R.; Dvorak, P.; and Skotak, M.
+vs. saliency maps from physicians. Computerized Medical      2021. Deep learning-based defect detection of metal parts:
+Imaging and Graphics, 43: 99–111.                              evaluating current methods in complex conditions. In 2021
+                                                            13th International Congress on Ultra Modern Telecommuni-Buda, M.; Saha, A.; and Mazurowski, M. A. 2019. Asso-
+                                                                 cations and Control Systems and Workshops (ICUMT), 66–ciation of genomic subtypes of lower-grade gliomas with
+                                                                71. IEEE.shape features automatically extracted by a deep learning
+algorithm. Computers in Biology and Medicine, 109: 218–       Jha, D.; Smedsrud, P. H.; Riegler, M. A.; Halvorsen, P.;
+225.                                           De Lange, T.; Johansen, D.; and Johansen, H. D. 2019.
+                                                                Kvasir-seg: A segmented polyp dataset.  In International
+Cao, Y.; Zhang, J.; Frittoli, L.; Cheng, Y.; Shen, W.; and Bo-                                                          Conference on Multimedia Modeling, 451–462. Springer.
+racchi, G. 2024. Adaclip: Adapting clip with hybrid learn-
+                                                        Kanade, P. B.; and Gumaste, P. 2015. Brain tumor detectionable prompts for zero-shot anomaly detection. In European
+                                                             using MRI images. Brain, 3(2): 146–150.Conference on Computer Vision, 55–72. Springer.
+                                                                      Li, X.; Zhang, Z.; Tan, X.; Chen, C.; Qu, Y.; Xie, Y.; and
+Chen, X.; Han, Y.; and Zhang, J. 2023a. April-gan: A zero-                                                   Ma, L. 2024. Promptad: Learning prompts with only normal
+/few-shot anomaly classification and segmentation method                                                          samples for few-shot anomaly detection. In Proceedings of
+for CVPR 2023 VAND Workshop Challenge Tracks 1&2:                                                                 the IEEE/CVF Conference on Computer Vision and Pattern
+1st Place on Zero-shot AD and 4th Place on Few-shot AD.                                                               Recognition, 16838–16848.
+arXiv Preprint arXiv:2305.17382.
+                                                                 Lin, T.-Y.; Goyal, P.; Girshick, R.; He, K.; and Doll´ar, P.
+Chen, X.; Han, Y.; and Zhang, J. 2023b. A zero-/few-shot      2017. Focal loss for dense object detection. In Proceedings
+anomaly classification and segmentation method for CVPR       of the IEEE International Conference on Computer Vision,
+2023 (VAND) Workshop Challenge Tracks 1 &2. 1st Place      2980–2988.
+on Zero-shot AD and 4th Place on Few-shot AD, 2305:                                                   Ma, J.; Zhao, Z.; Yi, X.; Chen, J.; Hong, L.; and Chi, E. H.
+17382.                                                           2018.  Modeling task relationships in multi-task learning
+Codella, N. C.; Gutman, D.; Celebi, M. E.; Helba, B.;      with multi-gate mixture-of-experts.  In Proceedings of the
+Marchetti, M. A.; Dusza, S. W.; Kalloo, A.; Liopyris, K.;      24th ACM SIGKDD International Conference on Knowl-
+Mishra, N.; Kittler, H.; et al. 2018. Skin lesion analysis to-      edge Discovery & Data Mining, 1930–1939.
+ward melanoma detection: A challenge at the 2017 Inter-       Milletari, F.; Navab, N.; and Ahmadi, S.-A. 2016.  V-net:
+national Symposium on Biomedical Imaging (ISBI), hosted      Fully convolutional neural networks for volumetric medical
+by the International Skin Imaging Collaboration (ISIC). In      image segmentation. In 2016 Fourth International Confer-
+2018 IEEE 15th International Symposium on Biomedical      ence on 3D Vision (3DV), 565–571. IEEE.
+Imaging (ISBI 2018), 168–172. IEEE.                                                             Mishra, P.; Verk, R.; Fornasier, D.; Piciarelli, C.; and Foresti,
+Fedus, W.; Zoph, B.; and Shazeer, N. 2022. Switch trans-      G. L. 2021. VT-ADL: A vision transformer network for im-
+formers: Scaling to trillion parameter models with simple      age anomaly detection and localization. In 2021 IEEE 30th
+and efficient sparsity.  Journal of Machine Learning Re-       International Symposium on Industrial Electronics (ISIE),
+search, 23(120): 1–39.                                      01–06. IEEE.
+
+======================== PDF 第 9 页 ========================
+Qu, Z.; Tao, X.; Gong, X.; Qu, S.; Chen, Q.; Zhang, Z.;      Zou, Y.; Jeong, J.; Pemula, L.; Zhang, D.; and Dabeer, O.
+Wang, X.; and Ding, G. 2025. Bayesian Prompt Flow Learn-      2022.  Spot-the-difference self-supervised pre-training for
+ing for Zero-Shot Anomaly Detection.  In Proceedings of      anomaly detection and segmentation. In European Confer-
+the Computer Vision and Pattern Recognition Conference,      ence on Computer Vision, 392–408. Springer.
+30398–30408.
+Qu, Z.; Tao, X.; Prasad, M.; Shen, F.; Zhang, Z.; Gong, X.;
+and Ding, G. 2024. VCP-CLIP: A visual context prompting
+model for zero-shot anomaly segmentation.  In European
+Conference on Computer Vision, 301–317. Springer.
+Radford, A.; Kim, J. W.; Hallacy, C.; Ramesh, A.; Goh, G.;
+Agarwal, S.; Sastry, G.; Askell, A.; Mishkin, P.; Clark, J.;
+et al. 2021. Learning transferable visual models from nat-
+ural language supervision. In International Conference on
+Machine Learning, 8748–8763. PMLR.
+Riquelme, C.; Puigcerver, J.; Mustafa, B.; Neumann, M.;
+Jenatton, R.; Susano Pinto, A.; Keysers, D.; and Houlsby,
+N. 2021.  Scaling vision with sparse mixture of experts.
+Advances in Neural Information Processing Systems, 34:
+8583–8595.
+Salehi, M.; Sadjadi, N.; Baselizadeh, S.; Rohban, M. H.; and
+Rabiee, H. R. 2021. Multiresolution knowledge distillation
+for anomaly detection.  In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+14902–14912.
+Shazeer, N.; Mirhoseini, A.; Maziarz, K.; Davis, A.; Le, Q.;
+Hinton, G.; and Dean, J. 2017.  Outrageously large neu-
+ral networks: The sparsely-gated mixture-of-experts layer.
+arXiv Preprint arXiv:1701.06538.
+Tabernik, D.; ˇSela, S.; Skvarˇc,  J.; and Skoˇcaj, D. 2020.
+Segmentation-based deep-learning approach for surface-
+defect detection.   Journal of Intelligent Manufacturing,
+31(3): 759–776.
+Tajbakhsh, N.; Gurudu, S. R.; and Liang, J. 2015.  Auto-
+mated polyp detection in colonoscopy videos using shape
+and context information.  IEEE Transactions on Medical
+Imaging, 35(2): 630–644.
+Wang, C.; Zhu, W.; Gao, B.-B.; Gan, Z.; Zhang, J.; Gu, Z.;
+Qian, S.; Chen, M.; and Ma, L. 2024.  Real-iad: A real-
+world multi-view dataset for benchmarking versatile indus-
+trial anomaly detection.  In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition,
+22883–22892.
+Wieler, M.; and Hahn, T. 2007. Weakly supervised learning
+for industrial optical inspection.  In DAGM Symposium in,
+volume 6, 11.
+Zhou, K.; Yang, J.; Loy, C. C.; and Liu, Z. 2022. Conditional
+prompt learning for vision-language models. In Proceedings
+of the IEEE/CVF Conference on Computer Vision and Pat-
+tern Recognition, 16816–16825.
+Zhou, Q.; Pang, G.; Tian, Y.; He, S.; and Chen, J. 2024.
+AnomalyCLIP: Object-agnostic Prompt Learning for Zero-
+shot Anomaly Detection. In The Twelfth International Con-
+ference on Learning Representations.
+Zhu, J.; Ong, Y.-S.; Shen, C.; and Pang, G. 2025.  Fine-
+grained abnormality prompt learning for zero-shot anomaly
+detection.  In Proceedings of the IEEE/CVF International
+Conference on Computer Vision, 22241–22251.
+
+======================== PDF 第 10 页 ========================
+               Appendix                           Analysis of Expert Sharing Strategies.  Inspired by pa-
+This supplementary material provides additional details and      rameter sharing paradigms in multi-task learning, such as
+analyses for our work. Specifically, we supplement with:    MMoE (Ma et al. 2018), we further investigate the possibil-
+(A) complete implementation details; (B) additional abla-        ity of sharing components between the normal and abnor-
+tion studies to validate the effectiveness of our key design     mal state-prompting branches. Although our default design
+choices; (C) visualization analysis of expert semantics; (D)      with separate components aims to ensure expert specializa-
+detailed statistics for all datasets used; and (E) more exhaus-       tion through task isolation, a unified expert pool or a shared
+tive, category-level performance results on key benchmarks.       cross-attention mechanism could theoretically improve pa-
+                                                             rameter efficiency by learning lower-level, shared semantic
+         A. Implementation details                     primitives. To validate the necessity and superiority of our
+                                                                separated design, we conduct the following ablation study.We utilize the pre-trained CLIP model (ViT-L/14@336px)
+released by OpenAI (Radford et al. 2021) as our backbone,
+                                                                Table 5: Ablation study on expert sharing strategies.with all of its parameters frozen during training. All input
+images are resized to 518×518 pixels. We extract patch fea-
+tures from the {6, 12, 18, 24}-th layers of the 24-layer visual          Configuration         MVTec AD        VisA
+encoder. The model is trained for 15 epochs using the Adam                            I-AUC  PRO  I-AUC  PRO
+optimizer with betas set to (0.6, 0.999) and a batch size of
+                                                                      Separate Components     93.8    83.2    85.0    89.2
+16. The learning rate is scheduled with a linear warm-up for
+the first 3 epochs, reaching a final value of 0.001. For our         w/ Shared Prompt Pool    91.4    82.8    83.3    87.8
+VGMoP module, we set the number of queries Nq = 8 and         w/ Shared Cross-Atte.     92.9    83.1    84.2    88.8
+                                                                  w/ Shared Both           90.9    82.5    82.6    87.9experts E = 8 for both the normal and abnormal branches,
+from which we sparsely select the top k = 4 for aggrega-
+tion; its cross-attention utilizes 8 heads and its router has a       As shown in Table 5, the results clearly indicate that all
+hidden dimension of 256. The resulting normal and abnor-      forms of parameter sharing lead to a performance drop com-
+mal state sequences have lengths of Mn = 5 and Ma = 6,      pared to our default Separate Components design. Specifi-
+respectively, while the learnable shared context Qctx has a        cally, sharing either the cross-attention module (‘w/ Shared
+length of Mq = 8. The coefficients for the auxiliary losses,       Cross-Atte.’) or the expert prompt pool (‘w/ Shared Prompt
+α for Lbalance and β for Ldecouple, are set to 0.01 and 0.005,       Pool’) impairs performance, while sharing both components
+respectively. For similarity calculations, the temperature pa-       (‘w/ Shared Both’) results in the most significant degrada-
+rameters for the pixel-level τ and image-level τ ′ computa-        tion. This outcome strongly validates our core design hy-
+tions are set to 0.07 and 0.01. During inference, the final       pothesis: providing independent and specialized represen-
+pixel-level anomaly map M is smoothed with a Gaussian       tational pathways for the semantically adversarial tasks of
+filter with a sigma of 4. All experiments are conducted on a      modeling normality and abnormality is crucial for avoiding
+NVIDIA GeForce RTX 3090 GPU using PyTorch 1.13.1.         negative transfer and achieving optimal zero-shot detection
+                                                            performance.
+           B. Additional Ablations
+                                                           Analysis of MoE Hyperparameters.  We further investi-
+Analysis on Visual Feature Layers  We investigate the                                                                gate the impact of two key hyperparameters in our VGMoP
+impact of using different combinations of feature layers                                                         module: the total number of experts (E) and the number
+from the visual encoder, with results presented in Table 4.                                                                of selected experts (k). As shown in Table 6, we observe
+The experiment clearly indicates that fusing multi-level fea-                                                                       that increasing the total number of experts (from 8 to 16)
+tures consistently improves overall performance compared                                                              provides a richer pool of semantic primitives, which leads
+to using only the final layer’s (L24) features. The strategy of                                                                     to consistent performance gains in pixel-level metrics PRO.
+utilizing all four layers ({6, 12, 18, 24}) achieves the most                                                        However, this does not always translate to a correspond-
+robust and best overall performance across both datasets.                                                               ing improvement in image-level metrics I-AUC. Further-
+                                                          more, the results indicate that selecting half of the experts
+Table 4: Ablation study on the set of visual feature layers.
+                                                  (k/E = 50%) achieves the best performance balance. Con-
+We report average Image-level AUROC and Pixel-level PRO
+                                                                  sidering all factors, our final model adopts the E = 8, k = 4
+score (%).
+                                                                   configuration, as it provides the most robust and efficient
+                                                          performance across all metrics.
+      Selected Layers    MVTec AD        VisA
+     6   12   18   24  I-AUC  PRO  I-AUC  PRO                     C. Visualization
+         !    93.2    83.2    83.9    89.1          Analysis of Expert Semantics.  To gain deeper insight
+    !    !    93.3    84.1    84.0    89.1            into the learned semantic structure of our expert prompt
+                                                                  pools, we visualize the mean embeddings of each expert  ! !    !    93.4    83.1    84.7    89.3
+                                                       from both the normal and abnormal pools using t-SNE, as  !    ! !    93.5    83.2    84.6    89.2
+                                                    shown in Fig. 8.
+  ! ! ! !    93.8    83.2    85.0    89.2                                                     The results clearly reveal two distinct semantic distribu-
+                                                                     tions for the expert pools. The normal experts form a com-
+
+======================== PDF 第 11 页 ========================
+                                                                pact cluster in the feature space, which indicates that our
+                                                     model has learned a semantically consistent set of core rep-
+                                                                   resentations for the relatively convergent concept of “nor-
+                                                                  mality”. In stark contrast, the abnormal experts are highly
+                                                                  dispersed, occupying a broad area of the feature space.
+                                                            This strongly demonstrates that our method has successfully
+                                                               learned a diverse and discriminative set of “semantic primi-
+Table 6: Ablation study on the number of experts (E) and
+                                                                      tives” for the open-ended and varied concept of “abnormal-
+selected experts (k) for VGMoP.
+                                                                            ity”. This observed pattern of “normal converging, abnor-
+                                                     mal diverging” not only visually validates the effectiveness
+       Parameters   MVTec AD        VisA                  of our independent expert pool design but also showcases
+     E     k    I-AUC  PRO  I-AUC  PRO              the significant potential of our compositional framework for
+                                                             handling unseen anomalies.        4     4       92.5    83.0    83.7    88.6
+              1       92.0    83.0    84.0    89.0                          D. Datasets
+        8     2       92.6    83.2    84.3    89.0
+              4       93.8    83.2    85.0    89.2            To comprehensively evaluate the generalization capability
+                                                                of our proposed PromptMoE on the ZSAD task, we utilize
+              2       92.2    82.8    84.1    88.9                                                     15 public datasets spanning industrial manufacturing and
+       16     4       92.9    82.9    84.2    89.1
+                                                           medical diagnosis domains. As detailed in Table 7, these              8       93.0    84.0    84.7    89.3
+                                                                   datasets encompass diverse object and texture classes, dif-
+                                                                     ferent imaging modalities, and a wide range of anomaly pat-
+                                                                         terns.
+
+                                                             E. Detailed Results
+                                                          For a more  detailed comparison,  this  section  presents
+                                                                  category-level results of our PromptMoE on key benchmarks
+                                                               including MVTec AD (Bergmann et al. 2019), VisA (Zou
+                                                                          et al. 2022), MPDD (Jezek et al. 2021), BTAD (Mishra et al.
+                                                              2021), and DTD-Synthetic (Aota, Tong, and Okatani 2023)
+                                                                     in Table 8-12.
+
+
+
+
+
+Figure 8: t-SNE visualization of the mean embeddings of
+experts from the Normal and Abnormal prompt pools. Each
+point represents a single expert.
+
+======================== PDF 第 12 页 ========================
+Table 7: Details of the 15 datasets used in our experiments. For ZSAD, we only utilize the test splits of these datasets. Sample
+counts for MVTec AD and VisA reflect their test sets.
+
+
+ Domain   Dataset                                      Type                 Modalities      Categories (|C|)   Samples (Normal, Anomalous)
+
+         MVTec AD (Bergmann et al. 2019)                   Object & Texture     Photography          15                    (467, 1258)
+           VisA (Zou et al. 2022)                               Object              Photography          12                    (962, 1200)
+       MPDD (Jezek et al. 2021)                            Object              Photography           6                     (176, 282)
+        BTAD (Mishra et al. 2021)                           Object              Photography           3                     (451, 290)                   Industrial    SDD (Tabernik et al. 2020)                           Object              Photography           1                      (181, 74)
+       DAGM (Wieler and Hahn 2007)                       Texture             Photography          10                   (6996, 1054)
+           DTD-Synthetic (Aota, Tong, and Okatani 2023)         Texture             Photography          12                     (357, 947)
+
+          HeadCT (Salehi et al. 2021)                          Brain              Radiology (CT)         1                     (100, 100)
+          BrainMRI (Kanade and Gumaste 2015)                Brain             Radiology (MRI)         1                       (98, 155)
+          Br35H (Hamada 2020)                               Brain             Radiology (MRI)         1                   (1500, 1500)
+           ISIC (Codella et al. 2018)                           Skin                Photography           1                          (0, 379)
+          CVC-ColonDB (Tajbakhsh, Gurudu, and Liang 2015)   Colon              Endoscopy           1                          (0, 380)              Medical          CVC-ClinicDB (Bernal et al. 2015)                  Colon              Endoscopy           1                          (0, 612)
+            Kvasir (Jha et al. 2019)                            Colon              Endoscopy           1                         (0, 1000)
+          Endo (Hicks et al. 2021)                           Colon              Endoscopy           1                          (0, 200)
+
+
+
+
+
+Table 8: Category-level performance on the MVTec AD dataset. We report Image-level (I-AUROC, I-AP) and Pixel-level (P-
+AUROC, PRO) scores (%).
+
+                                                Image-level          Pixel-level
+                             Category
+                                   I-AUROC   I-AP  P-AUROC  PRO
+
+                                   Textures
+
+                                Carpet         100      100       99.0      90.6
+                               Grid            99.6      99.8      97.9      75.9
+                                 Leather        100.0     100.0      99.2      96.9
+                                    Tile            99.2      99.7      96.4      73.0
+                        Wood          97.8      99.4      97.4      94.5
+
+                                 Objects
+
+                                   Bottle          93.8      98.2      91.0      83.8
+                               Cable          82.6      89.5      80.0      70.0
+                               Capsule        91.3      98.2      96.2      87.0
+                                Hazelnut        96.9      98.3      96.9      95.4
+                               Metal Nut      95.7      99.0      79.1      80.6
+                                         Pill             84.1      96.8      87.6      92.4
+                             Screw          87.1      94.4      98.3      84.9
+                                Toothbrush     89.4      95.0      93.5      90.7
+                                    Transistor       92.5      90.7      68.8      55.1
+                                Zipper          96.6      99.0      95.5      77.2
+
+                             Average        93.8      97.2      91.8      83.2
+
+======================== PDF 第 13 页 ========================
+  Table 9: Category-level performance on the VisA dataset.
+
+                   Image-level          Pixel-level
+  Category
+             I-AUROC  I-AP  P-AUROC  PRO
+
+  Candle           87.4      90.2      98.8      95.1
+  Capsules         72.2      84.0      96.8      87.5
+  Cashew          82.3      92.5      88.3      93.2
+  Chewinggum     97.6      99.0      99.1      91.5
+  Fryum            92.1      96.2      96.1      88.4
+  Macaroni1        88.9      89.5      99.2      92.9
+  Macaroni2        74.6      74.7      98.7      89.6
+  PCB1            91.0      91.2      94.0      87.8
+  PCB2            75.6      75.4      93.4      82.2
+  PCB3            66.3      71.5      89.3      76.2
+  PCB4            95.8      95.2      94.2      90.4
+  Pipe Fryum       96.4      98.3      98.8      95.5
+
+  Average          85.0      88.1      95.6      89.2
+
+
+
+
+
+Table 10: Category-level performance on the MPDD dataset.
+
+                    Image-level          Pixel-level
+ Category
+             I-AUROC  I-AP  P-AUROC  PRO
+
+  Bracket black      80.0      81.4      97.8      92.6
+  Bracket brown     63.3      76.0      94.6      87.1
+  Bracket white      91.1      92.6      99.8      96.2
+  Connector         74.8      63.0      95.2      81.1
+  Metal plate        88.7      95.9      94.7      81.2
+ Tubes             95.8      98.3      98.6      94.9
+
+ Average           82.3      84.5      96.8      88.8
+
+
+
+
+
+Table 11: Category-level performance on the BTAD dataset.
+
+                  Image-level          Pixel-level
+   Category
+            I-AUROC  I-AP  P-AUROC  PRO
+
+   01            98.8      99.5      95.4      77.8
+   02            83.4      97.4      93.2      72.4
+   03            98.1      90.3      96.1      91.6
+
+   Average       93.4      95.7      94.9      80.6
+
+======================== PDF 第 14 页 ========================
+Table 12: Category-level performance on the DTD-Synthetic dataset.
+
+                        Image-level          Pixel-level
+    Category
+                I-AUROC   I-AP  P-AUROC  PRO
+
+    Woven 001        100.0     100.0      99.8      99.2
+    Woven 127         87.9      89.6      94.1      89.4
+    Woven 104         98.6      99.7      95.8      92.0
+      Stratified 154      100.0     100.0      99.4      99.2
+     Blotchy 099       100.0     100.0      99.6      96.8
+    Woven 068         96.8      98.1      99.0      92.1
+    Woven 125        100.0     100.0      99.7      96.8
+    Marbled 078       99.2      99.8      99.3      97.7
+     Perforated 037     94.6      98.8      96.2      89.7
+    Mesh 114          87.2      94.7      95.5      79.3
+     Fibrous 183        98.5      99.7      99.4      98.6
+     Matted 069        88.0      96.8      99.5      87.6
+
+    Average           95.9      98.1      98.3      93.2

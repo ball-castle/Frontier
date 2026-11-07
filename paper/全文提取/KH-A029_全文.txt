@@ -1,0 +1,672 @@
+KH-A029 | Detecting and Recognizing Human-Object Interactions
+来源：https://arxiv.org/abs/1704.07333
+本地PDF：专题文献/何恺明/KH-A029_Detecting_and_Recognizing_Human_Object_Interactions_CVPR2018.pdf
+SHA-256：651882bd4bc105da3e860d2fe60c4610aeaca2d63026a5c53d68975e0e139e76
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                  Detecting and Recognizing Human-Object Interactions
+
+
+                        Georgia Gkioxari   Ross Girshick   Piotr Doll´ar  Kaiming He
+
+                                     Facebook AI Research (FAIR)
+
+
+                        Abstract
+
+           To understand the visual world, a machine must not only2018   recognize individual object instances but also how they in-
+           teract.  Humans are often at the center of such interac-                                                                                                                                                                                                    target
+          tions and detecting human-object interactions is an impor-                                                                     prob density                                                                                                                                                                                                                       for cutMar   tant practical and scientiﬁc problem. In this paper, we ad-
+         dress the task of detecting ⟨human, verb, object⟩triplets                       (a)                                (b)
+          in challenging everyday photos. We propose a novel model           cut                                  stand27
+          that is driven by a human-centric approach. Our hypothesis
+            is that the appearance of a person – their pose, clothing,
+         action – is a powerful cue for localizing the objects they
+         are interacting with. To exploit this cue, our model learns                        knife
+          to predict an action-speciﬁc density over target object loca-
+          tions based on the appearance of a detected person. Our[cs.CV]
+        model also jointly learns to detect people and objects, and                       (c)                                (d)
+        by fusing these predictions it efﬁciently infers interaction
+                                                                            Figure 1. Detecting and recognizing human-object interactions.
+           triplets in a clean, jointly trained end-to-end system we call
+                                                                                     (a) There can be many possible objects (green boxes) interacting
+          InteractNet. We validate our approach on the recently intro-                                                                           with a detected person (blue box). (b) Our method estimates an
+        duced Verbs in COCO (V-COCO) and HICO-DET datasets,      action-type speciﬁc density over target object locations from the
+        where we show quantitatively compelling results.                 person’s appearance, which is represented by features extracted
+                                                                    from the detected person’s box. (c) A ⟨human, verb, object⟩
+                                                                                                 triplet detected by our method, showing the person box, action
+         1. Introduction                                                        (cut), and target object box and category (knife). (d) Another pre-
+                                                                                  dicted action (stand), noting that a person can simultaneously take
+            Visual recognition of individual instances, e.g., detect-      multiple actions and an action may not involve any objects.
+         ing objects [10, 9, 26] and estimating human actions/poses
+          [11, 31, 2], has witnessed signiﬁcant improvements thanks
+                                                                             rarely taken by other subjects (e.g., to talk, throw, work).
+          to deep learning visual representations [17, 29, 30, 16].
+                                                          The ﬁne granularity of human actions and their interactionsarXiv:1704.07333v3   However, recognizing individual objects is just a ﬁrst step                                                                   with a wide array of object types presents a new challenge
+          for machines to comprehend the visual world. To under-
+                                                             compared to recognition of entry-level object categories.         stand what is happening in images, it is necessary to also
+         recognize relationships between individual instances.  In        In this paper, we present a human-centric model for rec-
+           this work, we focus on human-object interactions.             ognizing human-object interaction. Our central observation
+          The task of recognizing human-object interactions [12,       is that a person’s appearance, which reveals their action and
+         32, 6, 13, 5] can be represented as detecting ⟨human, verb,     pose, is highly informative for inferring where the target
+         object⟩triplets and is of particular interest in applica-      object of the interaction may be located (Figure 1(b)). The
+          tions and in research. From a practical perspective, pho-     search space for the target object can thus be narrowed by
+          tos containing people contribute a considerable portion of     conditioning on this estimation. Although there are often
+          daily uploads to internet and social networking sites, and    many objects detected (Figure 1(a)), the inferred target lo-
+         thus human-centric understanding has signiﬁcant demand      cation can help the model to quickly pick the correct object
+          in practice. From a research perspective, the person cate-     associated with a speciﬁc action (Figure 1(c)).
+         gory involves a rich set of actions/verbs, most of which are     We implement this idea as a human-centric recognition
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+                                                                                             read                   work_on_computer
+                                                                                                                     laptop        kick
+                                 eat
+                                                                    frisbeethrow
+
+                               donut
+                                                                                 book
+     sports ball
+
+
+
+  talk_on_phone                                                                                                                      surf
+                                     carry                                                                    ride
+                                                                       lay                                 horse           cell phone                            bed
+                                   suitcase
+                                                                                                                        surfboard
+
+
+
+    Figure 2. Human-object interactions detected by our method. Each image shows one detected ⟨human, verb, object⟩triplet.
+
+branch in the Faster R-CNN framework [26]. Speciﬁcally,    Human Action & Pose Recognition. The action and pose
+on a region of interest (RoI) associated with a person, this     of humans is indicative of their interactions with objects or
+branch performs action classiﬁcation and density estimation     other people in the scene. There has been great progress
+for the action’s target object location. The density estimator      in understanding human actions [11] and poses [31, 2, 14]
+predicts a 4-d Gaussian distribution, for each action type,     from images. These methods focus on the human instances
+that models the likely relative position of the target object     and do not predict interactions with other objects. We rely
+to the person. The prediction is based purely on the human     on action and pose appearance cues in order to predict the
+appearance. This human-centric recognition branch, along      interactions with objects in the scene.
+with a standard object detection branch [9] and a simple                                                          Visual  Relationships. Research on  visual  relationship
+pairwise interaction branch (described later), form a multi-                                                       modeling [28, 13, 22, 33] has attracted increasing attention.
+task learning system that can be jointly optimized.                                                              Recently, Lu et al. [22] proposed to recognize visual rela-
+  We evaluate our method, InteractNet, on the challeng-      tionships derived from an open-world vocabulary. The set
+ing V-COCO (Verbs in COCO) dataset [13] for detecting     of relationships include verbs (e.g., wear), spatial (e.g., next
+human-object interactions. Our human-centric model im-       to), actions (e.g., ride) or a preposition phrase (e.g., drive
+proves accuracy by 26% (relative) from 31.8 to 40.0 AP      on). Our focus is related, but different.  First, we aim to
+(evaluated by Average Precision on a triplet, called ‘role     understand human-centric interactions, which take place in
+AP’ [13]), with the gain mainly due to inferring the target      particularly diverse and interesting ways. These relation-
+object’s relative position from the human appearance.  In     ships involve direct interaction with objects (e.g., person
+addition, we prove the effectiveness of InteractNet by re-      cutting cake), unlike spatial or prepositional phrases (e.g.,
+porting a 27% relative improvement on the newly released     dog next to dog). Second, we aim to build detectors that
+HICO-DET dataset [3].  Finally, our method can run at     recognize interactions in images with high precision, which
+about 135ms / image for this complex task, showing good       is a requirement for practical applications. In contrast, in an
+potential for practical usage.                                open-world recognition setting, evaluating precision is not
+                                                                      feasible, resulting in recall-based evaluation, as in [22].
+
+                                                Human-Object Interactions. Human-object interactions
+2. Related Work                                             [12, 32, 6] are related to visual relationships, but present
+                                                                    different challenges. Human actions are more ﬁne-grained
+Object Detection. Bounding-box based object detectors       (e.g., walking, running, surﬁng, snowboarding) than the ac-
+have improved steadily in the past few years. R-CNN, a      tions of general subjects, and an individual person can si-
+particularly successful family of methods [10, 9, 26], is a     multaneously take multiple actions (e.g., drinking tea and
+two-stage approach in which the ﬁrst stage proposes candi-     reading a newspaper while sitting in a chair). These issues
+date RoIs and the second stage performs object classiﬁca-      require a deeper understanding of human actions and the
+tion. Region-wise features can be rapidly extracted [15, 9]      objects around them and in much richer ways than just the
+from shared feature maps by an RoI pooling operation. Fea-     presence of the objects in the vicinity of a person in an im-
+ture sharing speeds up instance-level detection and enables      age. Accurate recognition of human-object interaction can
+recognizing higher-order interactions, which would be com-     beneﬁt numerous tasks in computer vision, such as action-
+putationally infeasible otherwise. Our method is based on     speciﬁc image retrieval [25], caption generation [34], and
+the Fast/Faster R-CNN frameworks [9, 26].                    question answering [34, 23].
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+                                           (a) object detection branch          We discuss each component next, followed by an exten-
+                                            box              b                                          sion that replaces the action classiﬁcation output sah with a
+                                                          class  sh, so      dedicated interaction branch that outputs a score sah,o for an
+                                                                action a based on both the human and object appearances.
+                                           (b) human-centric branch               Finally we give details for training and inference. Figure 3
+                  bh                            action sha         illustrates each component in our full framework.
+                                                      target μha        3.1. Model Components
+
+                                                  (c) interaction branch                Object Detection. The object detection branch of our net-                  bh
+                                                         work, shown in Figure 3(a), is identical to that of Faster R-
+          conv                                      +    action sha,o    CNN [26]. First, a Region Proposal Network (RPN) is used
+          features   bo                                            to generate object proposals [26]. Then, for each proposal
+                                                    box b, we extract features with RoiAlign [14], and perform
+                                                                object classiﬁcation and bounding-box regression to obtain
+Figure 3. Model Architecture. Our model consists of (a) an object
+                                                          a new set of boxes, each of which has an associated score so
+detection branch, (b) a human-centric branch, and (c) an optional
+                                                                   (or sh if the box is assigned to the person category). Theseinteraction branch. The person features and their layers are shared
+                                               new boxes are only used during inference; during trainingbetween the human-centric and interaction branches (blue boxes).
+                                                                              all branches are trained with RPN proposal boxes.
+
+                                                       Action Classiﬁcation. The ﬁrst role of the human-centric3. Method
+                                                         branch is to assign an action classiﬁcation score sah to each
+  We now describe our method for detecting human-object    human box bh and action a. Just like in the object classiﬁca-
+interactions. Our goal is to detect and recognize triplets of      tion branch, we extract features from bh with RoiAlign and
+the form ⟨human, verb, object⟩. To detect an interaction      predict a score for each action a. Since a human can simul-
+triplet, we have to accurately localize the box containing a     taneously perform multiple actions (e.g., sit and drink), our
+human and the box for the associated object of interaction     output layer consists of binary sigmoid classiﬁers for multi-
+(denoted by bh and bo, respectively), as well as identify the      label action classiﬁcation (i.e. the predicted action classes
+action a being performed (selected from among A actions).     do not compete). The training objective is to minimize the
+  Our proposed solution decomposes this complex and     binary cross entropy losses between the ground-truth action
+multifaceted problem into a simple and manageable form.      labels and the scores sah predicted by the model.
+We extend the Fast R-CNN [9] object detection framework                                                        Target  Localization. The second  role  of  the human-
+with an additional human-centric branch that classiﬁes ac-                                                                 centric branch is to predict the target object location based
+tions and estimates a probability density over the target ob-                                                    on a person’s appearance (again represented as features
+ject location for each action.  The human-centric branch                                                         pooled from bh). However, predicting the precise target ob-
+reuses features extracted by Fast R-CNN for object detec-                                                                        ject location based only on features from bh is challenging.
+tion so its marginal computation is lightweight.                                                                  Instead, our approach is to predict a density over possible
+   Speciﬁcally, given a set of candidate boxes, Fast R-CNN                                                                   locations, and use this output together with the location of
+outputs a set of object boxes and a class label for each box.                                                                 actual detected objects to precisely localize the target.
+Our model extends this by assigning a triplet score Sah,o to     We model the density over the target object’s location as
+pairs of candidate human/object boxes bh, bo and an action                                                          a Gaussian function whose mean is predicted based on the
+a. To do so, we decompose the triplet score into four terms:                                                human appearance and action being performed. Formally,
+             Sah,o = sh · so · sah · gah,o               (1)      the human-centric branch predicts µah, the target object’s 4-
+                                                    d mean location given the human box bh and action a. We
+While the model has multiple components, the basic idea     then write our target localization term as:
+is straightforward. sh and so are the class scores from Fast
+                                                                   gah,o = exp(∥bo|h −µah∥2/2σ2)           (2)R-CNN of bh and bo containing a human and object. Our
+human-centric branch outputs two extra terms. First, sah is   We can use g to test the compatibility of an object box bo
+the score assigned to action a for the person at bh. Second,     and the predicted target location µah. In the above, bo|h is
+µah is the predicted location of the target of interaction for a      the encoding of bo in coordinates relative to bh, that is:
+given human/action pair, computed based on the appearance
+                                                 −xh  yo −yh    wo     hoof the human.  This, in turn, is used to compute gah,o, the             bo|h = {xo         ,             , log      , log   }    (3)
+                                                        wh     hh     wh    hhlikelihood that an object with box bo is the actual target of
+interaction. We give details shortly and show that this target     This is a similar encoding as used in Fast R-CNN [9] for
+localization term is key for obtaining good results.            bounding box regression. However, in our case bh and bo
+
+
+                                                 3
+
+======================== PDF 第 4 页 ========================
+                                                            carry.92
+             work_on_computer.65                                                                                                                     throw.74
+                                                                                                                       hit.98
+
+
+                                                                                                                                                                                                                                           sit.76
+
+
+
+
+
+                                                eat.90
+                                                                                                                                                                    surf1.00
+                                                                                                                       ski.99                                                                              carry.66            talk_on_phone.95
+
+
+
+
+Figure 4. Estimating target object density from the person features. We estimate a 4-d Gaussian density whose mean µah represents a
+4-d offset for the target object of action a (illustrated as yellow boxes); the variance of the density is illustrated in red for the 2-d translation
+offsets of (x, y) (the scaling offsets’ variance is not visualized). These target locations will be combined with the object detections bo to
+detect human-object interaction triplets. This ﬁgure also shows the predicted actions and their scores from the person RoIs. The rightmost
+column shows two intriguing examples: even though there are no target objects, our model predicts reasonably densities from the human
+pose (these predictions will be rejected by the object detection module, which will not ﬁnd an object in the high density regions).
+
+
+are two different objects and moreover bo is not necessar-       The computation of sah,o reuses the computation from sah
+ily near or of the same size as bh. The training objective is     and additionally in parallel performs a similar computation
+to minimize the smooth L1 loss [9] between µah and bo|h,     based on features extracted from bo. The outputs from the
+where bo is the location of the ground truth object for the     two action classiﬁcation heads, which are A-dimensional
+interaction. We treat σ as a hyperparameter that we empiri-      vectors of logits, are summed and passed through a sigmoid
+cally set to σ = 0.3 using the validation set.                      activation to yield A scores. This process is illustrated in
+   Figure 4 visualizes the predicted distribution over the tar-     Figure 3(c). As before, the training objective is to minimize
+get object’s location for example human/action pairs. As      the binary cross entropy losses between the ground-truth ac-
+we can see, a carrying appearance suggests an object in the      tion labels and the predicted action scores sah,o.
+person’s hand, a throwing appearance suggests an object in
+front of the person, and a sitting appearance implies an ob-     3.2. Multi-task Training
+ject below the person. We note that the yellow dashed boxes                                          We approach learning human-object interaction as a
+depicting µah shown in Figure 4 are inferred from bh and a      multi-task learning problem:  all three branches shown in
+and did not have direct access to the objects.                                                            Figure 3 are trained jointly. Our overall loss is the sum of
+   Intuitively, our formulation is predicated on the hypothe-                                                                              all losses in our model including: (1) the classiﬁcation and
+sis that the features computed from bh contain a strong sig-                                                               regression loss for the object detection branch, (2) the ac-
+nal pointing to the target of an action, even if that target                                                                   tion classiﬁcation and target localization loss for the human-
+object is outside of bh. We argue that such ‘outside-the-                                                                   centric branch, and (3) the action classiﬁcation loss of the
+box’ regression is possible because the person’s appearance                                                                   interaction branch. This is in contrast to our cascaded infer-
+provides a strong clue for the target location. Moreover, as                                                         ence described in §3.3, where the output of the object detec-
+this prediction is action-speciﬁc and instance-speciﬁc, our                                                                   tion branch is used as input for the human-centric branch.
+formulation is effective even though we model the target
+                                          We adopt image-centric training [9]. All losses are com-
+location using a uni-modal distribution.  In Section 5 we
+                                                          puted over both RPN proposal and ground truth boxes as in
+discuss a variant of our approach which allows us to handle
+                                                                Faster R-CNN [26]. As in [9], we sample at most 64 boxes
+conditionally multi-modal distributions and predict multiple
+                                                     from each image for the object detection branch, with a ra-
+targets for a single action.
+                                                                          tio of 1:3 of positive to negative boxes. The human-centric
+InteractionRecognition. Our human-centric model scores     branch is computed over at most 16 boxes bh that are asso-
+actions based on the human appearance. While effective,      ciated with the human category (i.e., their IoU overlap with
+this does not take into account the appearance of the target     a ground-truth person box is ≥0.5). The loss for the inter-
+object. To improve the discriminative power of our model,      action branch is only computed on positive example triplets
+and to demonstrate the ﬂexibility of our framework, we can        (i.e., ⟨bh, a, bo⟩must be associated with a ground truth inter-
+replace sah in (1) with an interaction branch that scores an      action triplet). All loss terms have a weight of one, except
+action based on the the appearance of both the human and      the action classiﬁcation term in the human-centric branch
+target object. We use sah,o to denote this alternative term.       has a weight of two, which we found performs better.
+
+
+                                                 4
+
+======================== PDF 第 5 页 ========================
+3.3. Cascaded Inference                                 4. Datasets and Metrics
+
+  At inference, our goal is to ﬁnd high-scoring triplets ac-       There exist a number of datasets for human-object inter-
+cording to Sah,o in (1). While in principle this has O(n2)      actions [18, 4, 27, 13, 3]. The most relevant for this work
+complexity as it requires scoring every pair of candidate      are V-COCO (Verbs in COCO) [13] and HICO-DET [3]. V-
+boxes, we present a simple cascaded inference algorithm   COCO serves as the primary testbed on which we demon-
+whose dominant computation has O(n) complexity.              strate the effectiveness of InteractNet and analyze its vari-
+   Object Detection Branch: We ﬁrst detect all objects (in-     ous components. The newly released HICO-DET [3] con-
+cluding the person class) in the image. We apply non-      tains ∼48k images and 600 types of interactions and serves
+maximum suppression (NMS) with an IoU threshold of 0.3      to further demonstrate the efﬁcacy of our approach. The
+[9] on boxes with scores higher than 0.05 (set conservatively     older TUHOI [18] and HICO [4] datasets only have image-
+to retain most objects). This step yields a new smaller set      level labels and thus do not allow for grounding interactions
+of n boxes b with scores sh and so. Unlike in training, these      in a detection setting, while COCO-a [27] is promising but
+new boxes are used as input to the remaining two branches.     only a small beta-version is currently available.
+  Human-Centric Branch:  Next, we apply the human-      V-COCO is a subset of COCO [21] and has ∼5k images
+centric branch to all detected objects that were classiﬁed      in the trainval set and ∼5k images in the test set.1
+as human. For each action a and detected human box bh,    The trainval set includes ∼8k person instances and on
+we compute sah, the score assigned to a, as well as µah, the     average 2.9 actions/person. V-COCO is annotated with 26
+predicted mean offset of the target object location relative    common action classes (listed in Table 2). Of note, there are
+to bh. This step has a complexity of O(n).                       three actions (cut, hit, eat) that are annotated with two types
+   Interaction Branch:  If using the optional interaction     of targets: instrument and direct object. For example, cut
+branch, we must compute sah,o for each action a and pair    + knife involves the instrument (meaning ‘cut with a knife’),
+of boxes bh and bo. To do so we ﬁrst compute the logits for     and cut + cake involves the direct object (meaning ‘cut a
+the two action classiﬁcation heads independently for each      cake’). In [13], accuracy is evaluated separately for the two
+box bh and bo, which is O(n). Then, to get scores sah,o,     types of targets. To address this, for the target estimation,
+these logits are summed and passed through a sigmoid for    we train and infer two types of targets for these three actions
+each pair. Although this last step is O(n2), in practice its        (i.e., they are treated like six actions for target estimation).
+computational time is negligible.                                                            Following [13], we evaluate two Average Precision (AP)
+  Once all individual terms have been computed, the com-                                                                 metrics. We note that this is a detection task, and both AP
+putation of (1) is fast. However, rather than scoring every                                                              metrics measure both recall and precision. This is in con-
+potential triplet, for each human/action pair we ﬁnd the ob-                                                                           trast to metrics of Recall@N that ignore precision.
+ject box that maximizes Sah,o. That is we compute:                                                    The AP of central interest in the human-object interac-
+                                                                   tion task is the AP of the triplet ⟨human, verb, object⟩,          bo∗= arg max  so · sah,o · gah,o            (4)
+                              bo                                     called ‘role AP’ (AProle) in [13]. Formally, a triplet is con-
+                                                               sidered as a true positive if: (i) the predicted human box bh
+Recall that gah,o  is computed according to (2) and mea-     has IoU of 0.5 or higher with the ground-truth human box,
+sures the compatibility between bo and the expected target                                                                                     (ii) the predicted object box bo has IoU of 0.5 or higher with
+location µah.  Intuitively, (4) encourages selecting a high-      the ground-truth target object, and (iii) the predicted and
+conﬁdence object near the predicted target location of a                                                              ground-truth actions match. With this deﬁnition of a true
+high-scoring action. With bo selected for each bh and action                                                                     positive, the computation of AP is analogous to standard
+a, we have a triplet of ⟨human, verb, object⟩= ⟨bh, a,                                                                object detection (e.g., PASCAL [8]). Note that this metric
+bo⟩. These triplets, along with the scores Sah,o, are the ﬁnal     does not consider the correctness of the target object cate-
+outputs of our model. For actions that that do not interact                                                         gory (but only the target object box location). Nevertheless,
+with any object (e.g., smile, run), we rely on sah and the in-     our method can predict the object categories, as shown in
+teraction output sah,o is not used, even if present. The score      the visualized results (Figure 2 and Figure 5).
+of such a predicted ⟨human, verb⟩pair is simply sh · sah.                                          We also evaluate the AP of the pair ⟨human, verb⟩,
+  The above cascaded inference has a dominant complex-
+                                                                 called ‘agent AP’ (APagent) in [13], computed using the
+ity of O(n), which involves extracting features for each of
+                                                       above criteria of (i) and (iii). APagent is applicable when the
+the n boxes and forwarding through a small network. The
+                                                                action has no object. We note that APagent does note requirepairwise O(n2) operations require negligible computation.
+                                                                  localizing the target, and is thus of secondary interest.
+In addition, for the entire system, a portion of computation
+is spent on computing the full-image shared convolutional                                                               1V-COCO’s trainval set is a subset of COCO’s train set, and its
+feature maps.  Altogether, our system takes ∼135ms on a     test set is a subset of COCO’s val set. See [13] for more details. In this
+typical image running on a single Nvidia M40 GPU.              work, COCO’s val images are not used during training in any way.
+
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+                                            talk_on_phone
+                                       drink                                                          read
+          ride                                                      cell phone                  hit tennis racket                        skateboarding      motorcycle                  cup                                                                                          book
+
+
+
+
+                                                                                                                   skateboard
+                     throw                              ride
+   work_on_computer                                                                                                    ride
+                               sports ball               bicycle
+        laptop                                                                                              elephant
+                                                                               lay
+                                                             bed
+                                                                                                                                      kick
+
+      sports ball        cut                        eat                         catch     frisbee
+                                  knife
+      hit                                                                                        hold
+                                                                                                                     cat        sports ball
+
+                                                           pizza
+
+         Figure 5. Our results on some V-COCO test images. Each image shows one detected ⟨human, verb, object⟩triplet.
+
+5. Experiments                                     ResNet-50-FPN backbone as ours.  In addition, [13] only
+                                                              reported AProle on a subset of 19 actions, but we are inter-
+Implementation Details. Our implementation is based on                                                               ested in all actions (listed in Table 2). We therefore report
+Faster R-CNN [26] with a Feature Pyramid Network (FPN)                                                         comparisons in both the 19-action and all-action cases.
+[20] backbone built on ResNet-50 [16]; we also evaluate                                                    The baselines from [13] are shown in Table 1. Our reim-
+a non-FPN version in ablation experiments. We train the                                                            plementation of [13] is solid:  it has 37.5 AProle on the 19
+Region Proposal Network (RPN) [26] of Faster R-CNN                                                                action classes tested on the val set, 11 points higher than
+following [20].  For convenient ablation, RPN is frozen                                                                the 26.4 reported in [13]. We believe that this is mainly due
+and does not share features with our network (we note                                                                   to ResNet-50 and FPN. This baseline model, when trained
+that feature sharing is possible [26]). We extract 7×7 fea-                                                    on the trainval set, has 31.8 AProle on all action classes
+tures from regions by RoiAlign [14], and each of the three                                                                   tested on the test set.  This is a strong baseline (31.8
+model branches (see Figure 3) consist of two 1024-d fully-                                                                  AProle) to which we will compare our method.
+connected layers (with ReLU [24]) followed by speciﬁc out-                                                    Our method, InteractNet, has an AProle of 40.0 evaluated
+put layers for each output type (box, class, action, target).                                                    on all action classes on the V-COCO test set. This is an
+  Given a model pre-trained on ImageNet [7], we ﬁrst train                                                              absolute gain of 8.2 points over the strong baseline’s 31.8,
+the object detection branch on the COCO train set (ex-                                                     which is a relative improvement of 26%. This result quan-
+cluding the V-COCO val images). This model, which is in                                                                          titatively shows the effectiveness of our approach.
+essence Faster R-CNN, has 33.8 object detection AP on the
+COCO val set. Our full model is initialized by this object     Qualitative Results. We show our human-object interac-
+detection network. We prototype our human-object inter-      tion detection results in Figure 2 and Figure 5. Each sub-
+action models on the V-COCO train split and perform      plot illustrates one detected ⟨human, verb, object⟩triplet,
+hyperparameter selection on the V-COCO val split. After     showing the location of the detected person, the action taken
+ﬁxing these parameters, we train on V-COCO trainval     by this person, and the location (and category) of the de-
+(5k images) and report results on the 5k V-COCO test set.      tected target object for this person/action. Our method can
+                                                                successfully detect the object outside of the person bound-  We ﬁne-tune our human-object interaction models for
+10k iterations on the V-COCO trainval set with a learn-     ing box and associate it to the person and action.
+                                                              Figure 7 shows our correctly detected triplets of one per-ing rate of 0.001 and an additional 3k iterations with a rate
+                                                        son taking multiple actions on multiple objects. We noteof 0.0001. We use a weight decay of 0.0001 and a momen-
+                                                                     that in this task, one person can take multiple actions andtum of 0.9. We use synchronized SGD [19] on 8 GPUs, with
+                                                                     affect multiple objects. This is part of the ground-truth andeach GPU hosting 2 images (so the effective mini-batch size
+                                                               evaluation and is unlike traditional object detection tasks [8]per iteration is 16 images). The ﬁne-tuning time is ∼2.5
+hours on the V-COCO trainval set on 8 GPUs.               in which one object has only one ground-truth class.
+                                                           Moreover, InteractNet can detect multiple interaction in-
+Baselines. To have a fair comparison with Gupta & Ma-     stances in an image. Figure 6 shows two test images with
+lik [13], which used VGG-16 [29], we reimplement their      all detected triplets shown. Our method detects multiple
+best-performing model (‘model C’ in [13]) using the same     persons taking different actions on different target objects.
+
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+          hold     couch     lay      couch      sit            sit                   eat                hold                drink                                                    couch
+                                                                                          fork
+                 fork                                                                                            bowl              bowl
+
+     jump                        skateboarding
+                                                                       hold                                                                                      benchsit                     sitbench                                                              sit
+                                                                        skateboard                                                                         bench
+       skateboard                  skateboard
+
+
+
+        Figure 6. All detected triplets on two V-COCO test images. We show all triplets whose scores (1) are higher than 0.01.
+
+     drink                 hold                        sit                                                      baseline [13]      InteractNet     InteractNet
+                                                                                                              our impl.     w/o target loc.
+         wine glass            wine glass                                                                APagent  AProle  APagent  AProle  APagent  AProle
+                                                    chair                              carry                62.2     8.1     63.9    14.4    64.8    33.1
+                                                                                            catch                47.0    37.0    53.4    38.5    57.1    42.5
+                                                                                            drink                11.9    18.1    37.5    25.4    46.0    33.8
+    work_on_computer    hold                        sit                              hold                 79.4     4.0     77.3    10.6    80.1    26.4                                                                            jump                75.5    40.6    75.6    39.3    74.7    45.1
+                                                                                           kick                 60.9    67.9    68.6    70.6    77.5    69.4
+         laptop                 laptop
+                                                      chair                           lay                  50.1    17.8    51.1    18.6    47.6    21.0
+                                                                                        look                 68.8     2.8     61.0     2.7     59.4    20.2
+                                                                                           read                 34.9    23.3    43.2    22.0    41.6    23.9
+                                                                                                    ride                  73.2    55.3    76.2    55.0    74.2    55.2
+                                                                                                                            sit                   76.8    15.6    75.6    15.1    76.1    19.9
+Figure 7. Results of InteractNet on test images. An individual per-            skateboard           89.9    74.0    90.9    71.7    90.0    75.5
+son can take multiple actions and affect multiple objects.                          ski                  84.0    29.7    83.9    28.2    84.7    36.5
+                                                                                snowboard           81.3    52.8    81.1    50.6    81.1    63.9
+                                                                                                    surf                  94.6    50.2    94.5    50.3    93.5    65.7
+                                     19 actions    all actions                                                                                          talk-on-phone        63.3    23.0    74.7    23.8    82.0    31.8
+   mean AProle evaluated on                (on val)   (on test)               throw                54.0    36.0    53.9    35.7    58.1    40.4
+   model B of [13] [VGG-16]                   7.9       N/A                  work-on-computer    70.2    46.1    72.6    46.9    75.7    57.3
+   model C of [13] [VGG-16]                 26.4       N/A                           (object)                  16.5            17.7            23.0
+                                                                                                cut                  61.2            69.1            73.6
+   model C of [13] [ResNet-50-FPN] ours      37.5         31.8                         (instrument)              15.1            19.5            36.4
+   InteractNet [ResNet-50-FPN]              41.9         40.0                      eat  (object)          75.6    26.5    80.4    26.5    79.6    32.4
+                                                                                                   (instrument)               2.7              2.9              2.0
+Table 1. Comparisons with Gupta & Malik [13].  To have an                  (object)                  56.7            55.3            62.3
+                                                                                                               hit                   82.8            83.9            88.0
+apples-to-apples comparisons, we reimplement [13]’s ‘model C’                 (instrument)              42.4            41.3            43.3
+using ResNet-50-FPN. In addition, [13] reported AProle on a sub-             point                  5.0     –       4.0     –       1.8     –
+set consisting of 19 actions, and only on the val set. As we eval-            run                  76.9     –      77.8     –      77.2     –
+                                                                                          smile                60.6     –      60.3     –      62.5     –
+uate on all actions (more details in Table 2), for fair comparison,             stand                88.5     –      88.3     –      88.0     –
+we also report the mean AProle on these 19 actions of val, with           walk                 63.9     –      63.5     –      65.4     –
+models trained on train. Our reimplemented baseline of [13] is         mean AP            65.1    31.8    67.8    32.6    69.2    40.0
+solid, and InteractNet is considerably better than this baseline.                                                                  Table 2. Detailed results on V-COCO test. We show two main
+                                                                       baselines and InteractNet for each action. There are 26 actions de-
+                                                          ﬁned in [13], and because 3 actions (cut, eat, hit) involve two types
+  The multi-instance, multi-action, and multi-target results                                                                     of target objects (instrument and direct object), there are 26+3 en-
+in Figure 6 and Figure 7 are all detected by one forward pass       tries (more details in § 4). We bold the leading entries on AProle.
+in our method, running at about 135ms per image on a GPU.
+
+Ablation Studies. In Table 3–5 we evaluate the contribu-        Table 3 (a) vs. (c) shows that our target localization con-
+tions of different factors in our system to the results.              tributes signiﬁcantly to AProle. Removing it shows a degra-
+   With vs. without target localization. Target localization,     dation of 5.6 points from 37.5 to 31.9. This result shows the
+performed by the human-centric branch, is the key compo-      effectiveness of our target localization (see Figure 4). The
+nent of our system. To evaluate its impact, we implement     per-category results are in Table 2.
+a variant without target localization. Speciﬁcally, for each        With vs. without the interaction branch. We also evalu-
+type of action, we perform k-means clustering on the off-      ate a variant of our method when removing the interaction
+sets between the target RoIs and person RoIs (via cross-     branch. We can instead use the action prediction from the
+validation we found k = 2 clusters performs best). This     human-centric branch (see Figure 3).  Table 3 (b) vs. (c)
+plays a role similar to density estimation, but is not aware of     shows that removing the interaction branch reduces AProle
+the person appearance and thus is not instance-dependent.      just slightly by 0.7 point. This again shows the main effec-
+Aside from this, the variant is the same as our full approach.      tiveness of our system is from the target localization.
+
+
+                                                 7
+
+======================== PDF 第 8 页 ========================
+                                           APagent                                                          AProle                                                                                                                              drink                                                 sit                                                    verb⟩    ⟨human,                                                  ⟨human,                                                                            verb, object⟩              talk_on_phone
+                                                                                                                                       cell phone
+  baseline [13] (our implementation)         62.1            31.0
+                                                                                                                           wine glass                      chair
+  (a) InteractNet w/o target localization      65.1            31.9
+  (b) InteractNet w/o interaction branch      65.5            36.8
+  (c) InteractNet                           68.0            37.5
+                                                                                                                                             eat                     hitTable 3. Ablation studies on the V-COCO val set, evaluated by
+                                                                                                         skiAPagent (i.e., AP of the ⟨human, verb⟩pairs) and AProle (i.e., AP
+of the ⟨human, verb, object⟩triplets). All methods are based                                            sandwich                        tennis racket
+                                                                                                                                  skis
+on ResNet-50-FPN, including our reimplementation of [13]. Ta-
+ble 2 shows the detail numbers of three entries: baseline, Interact-
+Net without target density estimation, and our complete method
+                                                                          Figure 8. False positive detections of our method.on the V-COCO test set.
+
+                                                                      method                          full        rare     non-rare                                       APagent          AProle
+                                             ⟨human, verb⟩    ⟨human, verb, object⟩                   results from [3]             7.81       5.37       8.54
+    InteractNet w/ ResNet-50           65.0            35.9                        baseline [13] (our impl.)     9.09       7.02       9.71
+    InteractNet w/ ResNet-50-FPN      68.0            37.5                        InteractNet                 9.94       7.16      10.77
+Table 4. Ablation on the V-COCO val for vanilla ResNet-50 vs.      Table 6. Results on HICO-DET test set.  InteractNet outper-
+ResNet-50-FPN [20] backbones.                                  forms the approach in [3] with a 27% relative improvement. We
+                                                                        also include our baseline approach, as described in Table 1.
+                                          APagent        AProle
+                                                 ⟨human, verb⟩ ⟨human, verb, object⟩       transform (or there is insufﬁcient data to learn this).
+  InteractNet w/ pairwise concat + MLP    67.1          37.5
+  InteractNet                             68.0          37.5               Per-action accuracy. Table 2 shows the AP for each ac-
+                                                                   tion category deﬁned in V-COCO, for the baseline, Inter-Table 5. Ablation on the V-COCO val set about the design of the
+                                                            actNet without target localization, and our full system. Wepairwise interaction branch. See main text for explanations.
+                                                           observe leading performance of AProle consistently. The ac-
+                                                                   tions with largest improvement are those with high variance
+   With vs. without FPN. Our model is a generic human-      in the spatial location of the object such as hold, look, carry,
+object detection framework and can support various net-     and cut. On the other hand, actions such as ride, kick, and
+work backbones. We recommend using the FPN [20] back-     read show small or no improvement.
+bone, because it performs well for small objects that are                                                           Failure Cases. Figure 8 shows some false positive detec-
+more common in human-object detection.                                                                       tions. Our method can be incorrect because of false inter-
+   Table 4 shows a comparison between ResNet-50-FPN      action inferences (e.g., top left), target objects of another
+and a vanilla ResNet-50 backbone. The vanilla version fol-     person (e.g., top middle), irrelevant target objects (e.g., top
+lows the ResNet-based Faster R-CNN presented in [16].      right), or confusing actions (e.g., bottom left, ski vs.surf).
+Speciﬁcally, the full-image convolutional feature maps are    Some of them are caused by a failure of reasoning, which
+from the last residual block of the 4-th stage (res4), on       is an interesting open problem for future research.
+which the RoI features are pooled. On the RoI features,
+                                                    Mixture Density Networks. To improve target localiza-each of the region-wise branches consists of the residual
+                                                                   tion prediction, we tried to substitute the uni-modal regres-blocks of the 5-th stage (res5). Table 4 shows a degradation
+                                                              sion network with a Mixture Density Network (MDN) [1].of 1.6 points in AProle when not using FPN. We argue that
+                                                  The MDN predicts the mean and variance of M relativethis is mainly caused by the degradation of the small ob-
+                                                                 locations for the objects of interaction conditioned on thejects’ detection AP, as shown in [20]. Moreover, the vanilla
+                                                human appearance. Note that MDN with M = 1 is an ex-ResNet-50 backbone is much slower, 225ms versus 135ms
+                                                               tension of our original approach that also learns the variancefor FPN, due to use of res5 in the region-wise branches.
+                                                                   in (2). However, we found that the MDN layer does not im-   Pairwise Sum vs. MLP. In our interaction branch, the
+                                                          prove accuracy. More details and discussion regarding thepairwise outputs from two RoIs are added (Figure 3). Al-
+                                 MDN experiments can be found in Appendix A.though simple, we have found that more complex variants
+do not improve results. We compare with a more complex    HICO-DET Dataset. We additionally evaluate InteractNet
+transform in Table 5. We concatenate the two 1024-d fea-     on HICO-DET [3] which contains 600 types of interactions,
+tures from the ﬁnal fully-connected layers of the interaction    composed of 117 unique verbs and 80 object types (identi-
+branch for the two RoIs and feed it into an 2-layer MLP      cal to COCO objects). We train InteractNet on the train
+(512-d with ReLU for its hidden layer), followed by action       set, as speciﬁed by the authors, and evaluate performance
+classiﬁcation. This variant is slightly worse (Table 5), indi-     on the test set using released evaluation code. Results are
+cating that it is not necessary to perform a complex pairwise    shown in Table 6 and discussed more in Appendix B.
+
+
+                                                 8
+
+======================== PDF 第 9 页 ========================
+Appendix A: Mixture Density Networks                                                                 ⟨human,APagentverb⟩    ⟨human,AProleverb, object⟩
+                                                                                   InteractNet                        68.0            37.5
+  The target localization module in InteractNet learns to
+                                                                                   InteractNet w/ MDN (M = 1)      68.2            37.7
+predict the location of the object of interaction conditioned           InteractNet w/ MDN (M = 2)      68.0            37.3
+on the appearance of the human hypothesis h. As an al-
+                                                                  Table 7. Ablation studies for MDN on the V-COCO val set, eval-
+ternative, we can allow the relative location of the object                                                                   uated by APagent (i.e., AP of the ⟨human, verb⟩pairs) and AProle
+to follow a multi-modal conditional distribution. For this,                                                                                                (i.e., AP of the ⟨human, verb, object⟩triplets). All methods
+we replace our target localization module with a Mixture      are based on ResNet-50-FPN.
+Density Network (MDN) [1], which parametrizes the mean,
+variance and mixing coefﬁcients of M components of the                    umbrella
+conditional normal distribution (M  is a hyperparameter).                    hold                   horse     pet             hold  cat
+This instantiation of InteractNet is ﬂexible can can capture
+different modes for the location of the objects of interaction.
+  The localization term for scoring bo|h is deﬁned as:
+                                                                                                                       eat                               bear
+                                                                                              ride
+          M−1                                                                 bicycle                                           feed
+       gah,o = X wa,mh    · N  bo|h | µa,mh   , σa,mh          (5)
+           m=0                                                                                             pizza
+
+The mixing coefﬁcients are required to have wmh ∈[0, 1]                                                                  Figure 9. Our results on the HICO-DET test set. Each image
+and Pm wa,mh  = 1. We parametrize µ as a 4-D vector for                                                          shows one detected ⟨human, verb, object⟩triplet. The red
+each component and action type. We assume a diagonal co-                                                          box denotes the detected human instance, while the green box the
+variance matrix and thus parametrize σ as a 4-D vector for                                                                     detected object of interaction.
+each component and action type. Compare the localization
+term in (5) with the term in (2).  Inference is unchanged,
+except we use the new form of gah,o when evaluating (4).                                          Appendix B: HICO-DET Dataset
+  To instantiate MDN, the human-centric branch of our
+network must predict w, µ, and σ. We train the network to                                                 As discussed, we also test InteractNet on the HICO-DET
+minimize −log(gah,o) given bo (the location of the ground      dataset [3]. HICO-DET contains approximately 48k images
+truth object for each interaction). We use a fully connected                                                      and is annotated with 600 interaction types. The annota-
+layer followed by a softmax operation to predict the mixing                                                                   tions include boxes for the humans and the objects of inter-
+coefﬁcients wa,mh    . For µ and σ, we also use fully connected      actions. There are 80 unique object types, identical to the
+layers. However, in the case of σ, we use a softplus oper-                                     COCO object categories, and 117 unique verbs.
+ation (f(x) = log(ex + 1)) to enforce positive values for
+                                                              Objects are not exhaustively annotated on HICO-DET.
+the covariance coefﬁcients.  This leads to stable training,
+                                                  To address this, we ﬁrst detect objects using a ResNet50-
+compared to a variant which parametrizes log σ2 and be-
+                                          FPN object detector trained on COCO as described in [20].
+comes unstable due to an exponential term in the gradients.
+                                                      These detections are kept frozen during training, by setting
+In addition, we found that enforcing a lower bound on the
+                                                          a zero-valued weight on the object detection loss of Inter-
+covariance coefﬁcients was necessary to avoid overﬁtting.
+                                                                actNet. To train the human-centric and interaction branch,
+We set this value to 0.3 throughout our experiments.
+                                             we assign ground truth labels from the HICO-DET anno-
+   Table 7 shows the performance of InteractNet with MDN
+                                                                    tations to each person and object hypothesis based on box
+and compare it to our original model. Note that the MDN
+                                                                 overlap. To diversify training, we jitter the object detections
+with M = 1 is an extension of our original approach, with
+                                                                   to simulate a set of region proposals. We deﬁne 117 action
+the only difference that it learns the variance in (2). The
+                                                              types and use the object detector to identify the type for the
+performance of MDN with M = 1 is similar to our original
+                                                                object of interaction, e.g. orange vs. apple.
+model, which suggests that a learned variance does not lead
+to an improvement. With M = 2, we do not see any gains     We train InteractNet on the train set deﬁned in [3],
+in performance, possibly because the human appearance is      for 80k iterations and with a learning rate of 0.001 (a 10x
+a strong cue for predicting the object’s location and possi-      step decay is applied after 60k iterations). In the interaction
+bly due to the limited number of objects per action type in     branch, we use dropout with a ratio of 0.5. We evaluate per-
+the dataset. Based on these results, along with the relative     formance on the test set using released evaluation code.
+complexity of MDN, we chose to use our simpler proposed        Results are shown in Table 6. We show a 27% relative
+target localization model instead of MDN. Nonetheless, our     performance gain compared to the published results in [3]
+experiments demonstrate that MDN can be trained within     and a 9% relative gain compared to our baseline approach.
+the InteractNet framework, which may prove useful.            Figure 9 shows example predictions made by InteractNet.
+
+
+                                                 9
+
+======================== PDF 第 10 页 ========================
+References                                                      [22] C. Lu, R. Krishna, M. Bernstein, and L. Fei-Fei. Visual re-
+                                                                               lationship detection with language priors.  In ECCV, 2016.
+ [1] C. M. Bishop. Mixture density networks. Technical report,                                                              2
+     1994. 8, 9
+                                                                     [23] A. Mallya and S. Lazebnik. Learning models for actions and
+ [2] Z. Cao, T. Simon, S.-E. Wei, and Y. Sheikh.  Realtime
+                                                                          person-object interactions with transfer to question answer-
+     multi-person 2D pose estimation using part afﬁnity ﬁelds. In
+                                                                                 ing. In ECCV, 2016. 2
+    CVPR, 2017. 1, 2
+                                                                     [24] V. Nair and G. E. Hinton. Rectiﬁed linear units improve re-
+ [3] Y.-W. Chao, Y. Liu, X. Liu, H. Zeng, and J. Deng. Learn-
+                                                                                    stricted boltzmann machines. In ICML, 2010. 6
+     ing to detect human-object interactions.  In arXiv preprint
+                                                                     [25] V. Ramanathan, C. Li,  J. Deng, W. Han, Z. Li, K. Gu,
+     arXiv:1702.05448, 2017. 2, 5, 8, 9
+                                                                          Y. Song, S. Bengio, C. Rossenberg, and L. Fei-Fei. Learning
+ [4] Y.-W. Chao, Z. Wang, Y. He, J. Wang, and J. Deng. HICO:
+                                                                      semantic relationships for better action retrieval in images.
+   A benchmark for recognizing human-object interactions in
+                                                                           In CVPR, 2015. 2
+     images. In ICCV, 2015. 5
+                                                                     [26] S. Ren, K. He, R. Girshick, and J. Sun. Faster R-CNN: To-
+ [5] C.-Y. Chen and K. Grauman. Predicting the location of inter-
+                                                                 wards real-time object detection with region proposal net-
+     actees in novel human-object interactions. In ACCV, 2014.
+                                                                     works. In NIPS, 2015. 1, 2, 3, 4, 6
+    1
+                                                                     [27] M. R. Ronchi and P. Perona.  Describing common human [6] V. Delaitre, I. Laptev, and J. Sivic. Recognizing human ac-
+                                                                              visual actions in images. In BMVC, 2015. 5      tions in still images: a study of bag-of-features and part-
+                                                                     [28] M. Sadeghi and A. Farhadi.   Recognition using visual     based representations. In BMVC, 2010. 1, 2
+                                                                             phrases. In CVPR, 2011. 2 [7]  J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li, and L. Fei-
+      Fei. ImageNet: A large-scale hierarchical image database.      [29] K. Simonyan and A. Zisserman.  Very deep convolutional
+     In CVPR, 2009. 6                                               networks for large-scale image recognition. In ICLR, 2015.
+ [8] M. Everingham, L. Van Gool, C. K. Williams, J. Winn, and             1, 6
+     A. Zisserman. The PASCAL Visual Object Classes (VOC)      [30] C.  Szegedy,  W.  Liu,  Y.  Jia,  P.  Sermanet,  S.  Reed,
+     Challenge. 2010. 5, 6                                         D. Anguelov, D. Erhan, V. Vanhoucke, and A. Rabinovich.
+ [9] R. Girshick. Fast R-CNN. In ICCV, 2015. 1, 2, 3, 4, 5              Going deeper with convolutions. In CVPR, 2015. 1
+[10] R. Girshick, J. Donahue, T. Darrell, and J. Malik. Rich fea-      [31] S.-E. Wei, V. Ramakrishna, T. Kanade, and Y. Sheikh. Con-
+      ture hierarchies for accurate object detection and semantic            volutional pose machines. In CVPR, 2016. 1, 2
+     segmentation. In CVPR, 2014. 1, 2                              [32] B. Yao and L. Fei-Fei. Modeling mutual context of object
+[11] G. Gkioxari, R. Girshick, and J. Malik.  Contextual action          and human pose in human-object interaction activities.  In
+     recognition with R*CNN. In ICCV, 2015. 1, 2                  CVPR, 2010. 1, 2
+[12] A. Gupta, A. Kembhavi, and L. S. Davis. Observing human-      [33] M. Yatskar, L. Zettlemoyer, and A. Farhadi. Situation recog-
+     object interactions: Using spatial and functional compatibil-             nition: Visual semantic role labeling for image understand-
+      ity for recognition. TPAMI, 2009. 1, 2                                   ing. In CVPR, 2016. 2
+[13] S. Gupta and J. Malik. Visual semantic role labeling. arXiv      [34] L. Yu, E. Park, A. C. Berg, and T. L. Berg. Visual Madlibs:
+     1505.04474, 2015. 1, 2, 5, 6, 7, 8                                             Fill in the blank Image Generation and Question Answering.
+[14] K. He, G. Gkioxari, P. Doll´ar, and R. Girshick. Mask R-           In ICCV, 2015. 2
+    CNN. In ICCV, 2017. 2, 3, 6
+[15] K. He, X. Zhang, S. Ren, and J. Sun. Spatial pyramid pooling
+      in deep convolutional networks for visual recognition.  In
+    ECCV, 2014. 2
+[16] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning
+      for image recognition. In CVPR, 2016. 1, 6, 8
+[17] A. Krizhevsky, I. Sutskever, and G. Hinton. ImageNet clas-
+     siﬁcation with deep convolutional neural networks. In NIPS,
+     2012. 1
+[18] D. Le, R. Bernardi, and J. Uijlings. TUHOI: trento universal
+    human object interaction dataset.  In Vision and Language
+    Workshop at COLING, 2014. 5
+[19] Y. LeCun, B. Boser,  J. S. Denker, D. Henderson, R. E.
+     Howard, W. Hubbard, and L. D. Jackel.  Backpropagation
+     applied to handwritten zip code recognition. 1989. 6
+[20] T.-Y. Lin, P. Doll´ar, R. Girshick, K. He, B. Hariharan, and
+      S. Belongie. Feature pyramid networks for object detection.
+     In CVPR, 2017. 6, 8, 9
+[21] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ra-
+     manan, P. Doll´ar, and C. L. Zitnick. Microsoft COCO: Com-
+    mon objects in context. In ECCV, 2014. 5
+
+
+                                                 10

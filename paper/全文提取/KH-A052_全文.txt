@@ -1,0 +1,794 @@
+KH-A052 | Scaling Language-Image Pre-training via Masking
+来源：https://arxiv.org/abs/2212.00794
+本地PDF：专题文献/何恺明/KH-A052_Scaling_Language_Image_Pre_training_via_Masking_CVPR2023.pdf
+SHA-256：7ff284ccde1e1a391aef1a33517576574f3a0e27042fee7a298bb04f10dc5d49
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                     Scaling Language-Image Pre-training via Masking
+
+
+            Yanghao Li∗   Haoqi Fan∗   Ronghang Hu∗   Christoph Feichtenhofer†   Kaiming He†
+
+                                                    ∗equal technical contribution, †equal advising
+
+                                         Meta AI, FAIR
+
+                    https://github.com/facebookresearch/flip
+2023                   Abstract
+                                                                                     73
+         We present Fast Language-Image Pre-training (FLIP), a                                                3.7  speedup
+         simple and more efficient method for training CLIP [52].
+                                                                                     72Mar  Our method randomly masks out and removes a large por-             (%)
+
+
+                                                                                     7130   tionlearnoffromimagemorepatchesimage-textduringpairstraining.givenMaskingthe sameallowswall-clockus to                                  accuracy
+         time and contrast more samples per iteration with similar
+       memory footprint. It leads to a favorable trade-off between           70         accuracy and training time. In our experiments on 400 mil-                                       zero-shot
+          lion image-text pairs, FLIP improves both accuracy and           69                          mask 0% (our CLIP repro.)
+         speed over the no-masking baseline. On a large diversity of                                      mask 50%
+                                                                                                            mask 75%[cs.CV]   downstream tasks, FLIP dominantly outperforms the CLIP
+                                                                                     68
+         counterparts trained on the same data. Facilitated by the             0        50       100       150       200       250
+         speedup, we explore the scaling behavior of increasing the                                       training time (hours)
+        model size, data size, or training length, and report encour-      Figure 1. Accuracy vs. training time trade-off.  With a high
+         aging results and comparisons. We hope that our work will     masking ratio of 50% or 75%, our FLIP method trains faster and
+          foster future research on scaling vision-language learning.        is more accurate than its CLIP counterpart. All entries are bench-
+                                                                   marked in 256 TPU-v3 cores. Training is done on LAION-400M
+                                                                                     for 6.4, 12.8, or 32 epochs, for each masking ratio. Accuracy is
+         1. Introduction                                                evaluated by zero-shot transfer on the ImageNet-1K validation set.
+                                                                The model is ViT-L/16 [20]. More details are in Fig. 3. As the
+           Language-supervised visual pre-training, e.g., CLIP [52],     CLIP baseline takes ∼2,500 TPU-days training, a speedup of 3.7×
+         has been established as a simple yet powerful methodology     can save ∼1,800 TPU-days.
+          for learning representations. Pre-trained CLIP models stand
+         out for their remarkable versatility: they have strong zero-    Even using high-end infrastructures, the wall-clock training
+         shot transferability [52]; they demonstrate unprecedented     time is still a major bottleneck hindering explorations on
+          quality in text-to-image generation (e.g., [53, 55]); the pre-      scaling vision-language learning.arXiv:2212.00794v2
+          trained encoder can improve multimodal and even unimodal     We present Fast Language-Image Pre-training (FLIP), a
+          visual tasks. Like the role played by supervised pre-training     simple method for efficient CLIP training. Inspired by the
+         a decade ago [40], language-supervised visual pre-training     sparse computation of Masked Autoencoders (MAE) [29],
+            is new fuel empowering various tasks today.              we randomly remove a large portion of image patches dur-
+           Unlike classical supervised learning with a pre-defined     ing training.  This design introduces a trade-off between
+          label set, natural language provides richer forms of supervi-    “how carefully we look at a sample pair” vs. “how many
+          sion, e.g., on objects, scenes, actions, context, and their re-     sample pairs we can process”. Using masking, we can: (i)
+           lations, at multiple levels of granularity. Due to the complex     see more sample pairs (i.e., more epochs) under the same
+         nature of vision plus language, large-scale training is essen-     wall-clock training time, and (ii) compare/contrast more
+            tial for the capability of language-supervised models. For     sample pairs at each step (i.e., larger batches) under simi-
+         example, the original CLIP models [52] were trained on 400      lar memory footprint. Empirically, the benefits of process-
+          million data for 32 epochs—which amount to 10,000 Ima-     ing more sample pairs greatly outweigh the degradation of
+        geNet [16] epochs, taking thousands of GPU-days [52, 36].     per-sample encoding, resulting in a favorable trade-off.
+
+======================== PDF 第 2 页 ========================
+                                                                                                                                      contrastive
+  By removing 50%-75% patches of a training image, our                                                   loss
+method reduces computation by 2-4×; it also allows using
+2-4× larger batches with little extra memory cost, which                      image encoder                        text encoder
+boost accuracy thanks to the behavior of contrastive learn-
+ing [30, 11]. As summarized in Fig. 1, FLIP trains >3×
+faster in wall-clock time for reaching similar accuracy as its                     visible patches                                       text
+CLIP counterpart; with the same number of epochs, FLIP
+reaches higher accuracy than its CLIP counterpart while
+still being 2-3× faster.
+  We show that FLIP is a competitive alternative to CLIP                     masked image
+on various downstream tasks.   Pre-trained on the same
+                                                                  Figure 2. Our FLIP architecture. Following CLIP [52], we per-
+LAION-400M dataset [56], FLIP dominantly outperforms                                                           form contrastive learning on pairs of image and text samples. We
+its CLIP counterparts (OpenCLIP [36] and our own repro-     randomly mask out image patches with a high masking ratio and
+duction), as evaluated on a large variety of downstream     encode only the visible patches. We do not perform reconstruction
+datasets and transfer scenarios. These comparisons suggest      of masked image content.
+that FLIP can readily enjoy the faster training speed while
+still providing accuracy gains.
+   Facilitated by faster training, we explore scaling FLIP      limited by the scaling behavior of image-only contrastive
+pre-training. We study these three axes: (i) scaling model      learning.
+size, (ii) scaling dataset size, or (iii) scaling training sched-
+ule length. We analyze the scaling behavior through care-     Language-supervised learning. In the past years, CLIP
+fully controlled experiments. We observe that model scal-     [52] and related works (e.g., [37, 51]) have popularized
+ing and data scaling can both improve accuracy, and data      learning visual representations with language supervision.
+scaling can show gains at no extra training cost. We hope    CLIP is a form of contrastive learning [28] by comparing
+our method, results, and analysis will encourage future re-     image-text sample pairs. Beyond contrastive learning, gen-
+search on scaling vision-language learning.                       erative learning methods have been explored [17, 65, 2, 74],
+                                                                optionally combined with contrastive losses [74].  Our
+2. Related Work                                   method focuses on the CLIP method, while we hope it can
+                                                       be extended to generative methods in the future.
+Learning with masking. Denoising Autoencoders [63]
+with masking noise [64] were proposed as an unsupervised                                                          3. Method
+representation learning method over a decade ago. One of
+its most outstanding applications is masked language mod-        In a nutshell, our method simply masks out the input data
+eling represented by BERT [18]. In computer vision, explo-      in CLIP [52] training and reduces computation. See Fig. 2.
+rations along this direction include predicting large missing        In our scenario, the benefit of masking is on wisely
+regions [50], sequence of pixels [10], patches [20, 29, 71],     spending computation.  Intuitively, this leads to a trade-
+or pre-computed features [6, 66].                                  off between how densely we encode a sample against how
+  The Masked Autoencoder (MAE) method [29] further    many samples we compare as the learning signal. By in-
+takes advantage of masking to reduce training time and     troducing masking, we can: (i) learn from more image-text
+memory. MAE sparsely applies the ViT encoder [20] to      pairs under the same wall-clock training time, and (ii) have
+visible content. It also observes that a high masking ratio is     a contrastive objective over a larger batch under the same
+beneficial for accuracy. The MAE design has been applied    memory constraint. We show by experiments that for both
+to videos [61, 22], point clouds [49], graphs [59, 9, 32], au-      aspects, our method is at an advantage in the trade-off. Next
+dio [4, 47, 13, 35], visual control [70, 57], vision-language    we introduce the key components of our method.
+[23, 41, 31, 19], and other modalities [5].
+  Our work is related to MAE and its vision-language ex-    Image masking. We adopt the Vision Transformer (ViT)
+tensions [23, 41, 31, 19].  However, our focus is on the     [20] as the image encoder. An image is first divided into
+scaling aspect enabled by the sparse computation; we ad-     a grid of non-overlapping patches. We randomly mask out
+dress the challenge of large-scale CLIP training [52], while     a large portion (e.g., 50% or 75%) of patches; the ViT en-
+previous works [23, 41, 31, 19] are limited in terms of scale.     coder is only applied to the visible patches, following [29].
+Our method does not perform reconstruction and is not a     Using a masking ratio of 50% (or 75%) reduces the time
+form of autoencoding. Speeding up training by masking is     complexity of image encoding to 1/2 (or 1/4); it also allows
+studied in [69] for self-supervised contrastive learning, e.g.,     using a 2× (or 4×) larger batch with a similar memory cost
+for MoCo [30] or BYOL [27], but its accuracy could be      for image encoding.
+
+======================== PDF 第 3 页 ========================
+Text masking. Optionally, we perform text masking in the       Our implementation is based on JAX [8] with the t5x
+same way as image masking. We mask out a portion of the      library [54] for large-scale distributed training. Our training
+text tokens and apply the encoder only to the visible tokens,       is run on TPU v3 infrastructure.
+as in [29].  This is unlike BERT [18] that replaces them
+with a learned mask token. Such sparse computation can     4. Experiments
+reduce the text encoding cost. However, as the text encoder
+                                                               4.1. Ablationsis smaller [52], speeding it up does not lead to a better over-
+all trade-off. We study text masking for ablation only.         We first ablate the FLIP design. The image encoder is
+                                                        ViT-L/16 [20], and the text encoder has a smaller size as
+Objective. The image/text encoders are trained to mini-
+                                                             per [52]. We train on LAION-400M [36] and evaluate zero-
+mize a contrastive loss [48]. The negative sample pairs for
+                                                              shot accuracy on ImageNet-1K [16] validation.
+contrastive learning consist of other samples in the same
+                                                              Table 1 shows the ablations trained for 6.4 epochs. Fig. 1
+batch [11].   It has been observed that a large number of
+                                                                   plots the trade-off for up to 32 epochs [52]. The results are
+negative samples is critical for self-supervised contrastive
+                                                     benchmarked in 256 TPU-v3 cores, unless noted.
+learning on images [30, 11]. This property is more promi-
+nent in language-supervised learning.                     Masking ratio. Table 1a studies the image masking ratios.
+  We do not use a reconstruction loss, unlike MAE [29].     Here we scale the batch size accordingly (ablated next),
+We find that reconstruction is not necessary for good per-     so as to roughly maintain the memory footprint.1The 0%
+formance on zero-shot transfer. Waiving the decoder and     masking entry indicates our CLIP counterpart.  Masking
+reconstruction loss yields a better speedup.              50% gives 1.2% higher accuracy than the CLIP baseline,
+                                                      and masking 75% is on par with the baseline. Speed-wise,
+Unmasking. While the encoder is pre-trained on masked                                                      masking 50% or 75% takes only 0.50× or 0.33× wall-clock
+images, it can be directly applied on intact images without                                                                   training time, thanks to the large reduction on FLOPs.
+changes, as is done in [29]. This simple setting is sufficient
+to provide competitive results and will serve as our baseline     Batch size. We ablate the effect of batch size in Table 1b.
+in ablation experiments.                                       Increasing the batch size consistently improves accuracy.
+  To close the distribution gap caused by masking, we can        Notably, even using the same batch size of 16k, our 50%
+set the masking ratio as 0% and continue pre-training for     masking entry has a comparable accuracy (68.5%, Table 1b)
+a small number of steps. This unmasking tuning strategy     with the 0% masking baseline (68.6%, Table 1a). It is pos-
+produces a more favorable accuracy/time trade-off.               sible that the regularization introduced by masking can re-
+                                                       duce overfitting, partially counteracting the negative effect
+3.1. Implementation                                        of losing information in this setting. With a higher mask-
+                                                             ing ratio of 75%, the negative effect is still observed when
+  Our implementation follows CLIP [52] and OpenCLIP
+                                                          keeping the batch size unchanged.
+[36], with a few modifications we describe in the following.
+                                                    Our masking-based method naturally encourages using
+Hyper-parameters are in the appendix.
+                                                                  large batches. There is little extra memory cost if we scale
+  Our image encoder follows the ViT paper [20]. We do
+                                                                the batch size according to the masking ratio, as we report
+not use the extra LayerNorm [3] after patch embedding, like
+                                                                   in Table 1a. In practice, the available memory is always a
+[20] but unlike [52]. We use global average pooling at the
+                                                                   limitation for larger batches. For example, the setting in Ta-
+end of the image encoder. The input size is 224.
+                                                                ble 1a has reached the memory limit in our high-end infras-
+  Our text encoder is a non-autoregressive Transformer
+                                                                   tructure (256 TPU-v3 cores with 16GB memory each).2 The
+[62], which is easier to adapt to text masking for ablation.
+                                               memory issue is more demanding if using fewer devices,
+We use a WordPiece tokenizer as in [18]. We pad or cut the
+                                                      and the gain of our method would be more prominent due
+sequences to a fixed length of 32. We note that CLIP in [52]
+                                                                   to the nearly free increase of batch sizes.
+uses an autoregressive text encoder, a BytePairEncoding to-
+kenizer, and a length of 77. These designs make marginal     Text masking. Table 1c studies text masking. Randomly
+differences as observed in our initial reproduction.            masking 50% text decreases accuracy by 2.2%. This is in
+  The outputs of the image encoder and text encoder are      line with the observation [29] that language data has higher
+projected to the same-dimensional embedding space by a
+                                                                                  1Directly comparing TPU memory usage can be difficult due to its
+linear layer.  The cosine similarities of the embeddings,     memory optimizations. We instead validate GPU memory usage using
+scaled by a learnable temperature parameter [52], are the       [36]’s reimplementation of FLIP, and find the memory usage is 25.5G,
+input to the InfoNCE loss [48].                                  23.9G and 24.5G for masking 0%, 50% and 75% on 256 GPUs.
+                                                                    2The “mask 50%, 64k” entry in Table 1b requires 2× memory vs. those   In zero-shot transfer, we follow the prompt engineering
+                                                                                   in Table 1a. This entry can be run using 2× devices; instead, it can also
+in the code of [52]. We use their provided 7 prompt tem-      use memory optimization (e.g., activation checkpointing [12]) that trades
+plates for ImageNet zero-shot transfer.                              time with memory, which is beyond the focus of this work.
+
+======================== PDF 第 4 页 ========================
+    mask  batch  FLOPs   time     acc.                batch    mask 50%  mask 75%                 text mask      text len    time    acc.
+    0%   16k   1.00×  1.00×   68.6               16k         68.5         65.8                   baseline, 0%    32    1.00×  68.2
+    50%   32k   0.52×  0.50×   69.6               32k         69.6         67.3               random, 50%    16    0.92×  66.0
+    75%   64k   0.28×  0.33×   68.2               64k         70.4         68.2                 prioritized, 50%    16    0.92×  67.8
+
+ (a) Image masking yields higher or compara-       (b) Batch size. A large batch has big gains over        (c) Text masking performs decently, but the
+ ble accuracy and speeds up training.  Entries       smaller batches.                                 speed gain is marginal as its encoder is smaller.
+ are subject to the same memory limit.                                                         Here the image masking ratio is 75%.
+
+
+                  mask 50%  mask 75%                   mask 50%  mask 75%                        mask 50%  mask 75%
+  w/ mask               66.4       60.9                baseline       69.6         68.2                   baseline         69.6         68.2
+  w/ mask, ensemble     68.1       65.1           + tuning       70.1         69.5              + MAE         69.4         67.9
+  w/o mask              69.6       68.2
+
+ (d) Inference unmasking. Inference on intact        (e) Unmasked tuning. The distribution shift        (f) Reconstruction. Adding the MAE recon-
+ images performs strongly even without tuning.      by masking is reduced by a short tuning.             struction loss has no gain.
+
+Table 1. Zero-shot ablation experiments. Pre-training is on LAION-400M for 6.4 epochs, evaluated by zero-shot classification accuracy
+on ImageNet-1K validation. The backbone is ViT-L/16 [20]. Unless specified, the baseline setting is: image masking is 50% (batch 32k)
+or 75% (batch 64k), text masking is 0%, and no unmasked tuning is used.
+
+information-density than images and thus the text masking                                                     2.0   , 0.9%
+ratio should be lower.                                                 73                                   2.9   , 0.6%
+  As variable-length text sequences are padded to gener-
+                                                                                                                            3.7
+ate a fixed-length batch, we can prioritize masking out the           (%) 72
+padding tokens. Prioritized sampling preserves more valid
+tokens than randomly masking the padded sequences uni-          71formly. It reduces the degradation to 0.4%.                                                                                                 accuracy
+  While our text masking is more aggressive than typi-
+                                                                       70
+cal masked language models (e.g., 15% in [18]), the over-                                                                                                                                                                                                                                                                                                                     zero-shot                               mask 0%
+all speed gain is marginal.  This is because the text en-                                        mask 50% (w/o tuning)
+coder is smaller and the text sequence is short. The text          69                             mask 50%
+                                                                                                  mask 75% (w/o tuning)
+encoder costs merely 4.4% computation vs. the image en-                                        mask 75%
+coder (without masking). Under this setting, text masking          68
+is not a worthwhile trade-off and we do not mask text in our            0        50       100       150       200       250
+                                                                                                                    training time (hours)
+other experiments.
+                                                                  Figure 3. Accuracy vs. training time trade-off in detail. The
+Inference unmasking. By default, we apply our models       setting follows Table 1a. Training is for 6.4, 12.8, or 32 epochs,
+on intact images at inference-time, similar to [29]. While      for each masking ratio. Unmasked tuning, if applied, is for 0.32
+masking creates a distribution shift between training and in-      epoch. All are benchmarked in 256 TPU-v3 cores. Zero-shot accu-
+ference, simply ignoring this shift works surprisingly well      racy is on IN-1K validation. The model is ViT-L/16. Our method
+                                                                 speeds up training and increases accuracy.(Table 1d, ‘w/o mask’), even under the zero-shot setting
+where no training is ever done on full images.
+   Table 1d reports that if using masking at inference time,     able trade-off for 75% masking; it has a comparable trade-
+the accuracy drops by a lot (e.g., 7.3%).  This drop can      off for 50% masking but improves final accuracy.
+be partially caused by information loss at inference, so we
+                                                          Reconstruction. In Table 1f we investigate adding a recon-also compare with ensembling multiple masked views [10],
+                                                                   struction loss function. The reconstruction head follows thewhere the views are complementary to each other and put
+                                                            design in MAE [29]: it has a small decoder and reconstructstogether cover all patches. Ensembling reduces the gap (Ta-
+                                                          normalized image pixels. The reconstruction loss is addedble 1d), but still lags behind the simple full-view inference.
+                                                                   to the contrastive loss.
+Unmasked tuning. Our ablation experiments thus far do        Table 1f shows that reconstruction has a small nega-
+not involve unmasked tuning. Table 1e reports the results      tive impact for zero-short results. We also see a similar
+of unmasked tuning for extra 0.32 epoch on the pre-training     though slight less drop for fine-tuning accuracy on Ima-
+dataset. It increases accuracy by 1.3% at the high masking     geNet.  While this can be a result of suboptimal hyper-
+ratio of 75%, suggesting that tuning can effectively reduce     parameters (e.g., balancing two losses), to strive for sim-
+the distribution gap between pre-training and inference.           plicity, we decide not to use the reconstruction loss. Waiv-
+   Fig. 3 plots the trade-off affected by unmasked tuning     ing the reconstruction head also helps simplify the system
+(solid vs. dashed). Unmasked tuning leads to a more desir-     and improves the accuracy/time trade-off.
+
+======================== PDF 第 5 页 ========================
+                               case                     data         epochs    B/16    L/16    L/14    H/14
+                         CLIP [52]         WIT-400M       32       68.6         -       75.3         -
+                         OpenCLIP [36]    LAION-400M      32       67.1         -       72.8         -
+                             CLIP, our repro.   LAION-400M      32       68.2     72.4     73.1         -
+                        FLIP           LAION-400M      32       68.0     74.3     74.6     75.5
+Table 2. Zero-shot accuracy on ImageNet-1K classification, compared with various CLIP baselines. The image size is 224. The entries
+noted by grey are pre-trained on a different dataset. Our models use a 64k batch, 50% masking ratio, and unmasked tuning.
+
+                        case                           data        epochs   model    zero-shot    linear probe    fine-tune
+                   CLIP [52]             WIT-400M      32      L/14      75.3         83.9†             -
+                   CLIP [52], our transfer    WIT-400M      32      L/14      75.3         83.0         87.4
+                   OpenCLIP [36]        LAION-400M     32      L/14      72.8         82.1         86.2
+                      CLIP, our repro.       LAION-400M     32      L/16      72.4         82.6         86.3
+                  FLIP              LAION-400M     32      L/16      74.3         83.6         86.9
+
+Table 3. Linear probing and fine-tuning accuracy on ImageNet-1K classification, compared with various CLIP baselines. The entries
+noted by grey are pre-trained on a different dataset. The image size is 224. †: CLIP in [52] optimizes with L-BFGS; we use SGD instead.
+
+
+Accuracy vs. time trade-off. Fig. 3 presents a detailed    ImageNet zero-shot transfer. In Table 2 we compare with
+view on the accuracy vs. training time trade-off. We extend      the CLIP baselines on ImageNet-1K [16] zero-shot transfer.
+the schedule to up to 32 epochs [52].                      As a sanity check, our CLIP reproduction has slightly
+  As shown in Fig. 3, FLIP has a clearly better trade-off     higher accuracy than OpenCLIP trained on the same data.
+than the CLIP counterpart. It can achieve similar accuracy    The original CLIP has higher accuracy than our reproduc-
+as CLIP while enjoying a speedup of >3×. With the same      tion and OpenCLIP, which could be caused by the differ-
+32-epoch schedule, our method is ∼1% more accurate than     ence between the pre-training datasets.
+the CLIP counterpart and 2× faster (masking 50%).               Table 2 reports the results of our FLIP models, using
+  The speedup of our method is of great practical value.      the best practice as we have ablated in Table 1 (a 64k
+The CLIP baseline takes ∼10 days training in 256 TPU-v3      batch, 50% masking ratio, and unmasked tuning).  For
+cores, so a speedup of 2-3× saves many days in wall-clock     ViT-L/14,3 our method has 74.6% accuracy, which is 1.8%
+time. This speedup facilitates exploring the scaling behav-     higher than OpenCLIP and 1.5% higher than our CLIP re-
+ior, as we will discuss later in Sec. 4.3.                         production. Comparing with the original CLIP, our method
+                                                            reduces the gap to 0.7%. We hope our method will improve
+4.2. Comparisons with CLIP                                                                the original CLIP result if it were trained on the WIT data.
+   In this section, we compare with various CLIP baselines
+                                                  ImageNet linear probing. Table 3 compares the linearin a large variety of scenarios. We show that our method is
+                                                          probing results, i.e., training a linear classifier on the tar-a competitive alternative to CLIP; as such, our fast training
+                                                                get dataset with frozen features. FLIP has 83.6% accuracy,method is a more desirable choice in practice.
+                                                  1.0% higher than our CLIP counterpart.   It is also 0.6%
+  We consider the following CLIP baselines:                                                             higher than our transfer of the original CLIP checkpoint,
+                                                            using the same SGD trainer.
+   • The original CLIP checkpoints [52], trained on the pri-
+     vate dataset WIT-400M.                                                  ImageNet fine-tuning. Table 3 also compares full fine-
+   • OpenCLIP [36], trained on LAION-400M.                tuning results.  Our fine-tuning implementation follows
+                                   MAE [29], with the learning rate tuned for each entry.  It
+   • Our CLIP reproduction, trained on LAION-400M.
+                                                                              is worth noting that with our fine-tuning recipe, the original
+The original CLIP [52] was trained on a private dataset, so    CLIP checkpoint reaches 87.4%, much higher than previ-
+a direct comparison with it should reflect the effect of data,     ous reports [68, 67, 33] on this metric. CLIP is still a strong
+not just methods. OpenCLIP [36] is a faithful reproduction     model under the fine-tuning protocol.
+of CLIP yet trained on a public dataset that we can use, so it       FLIP outperforms the CLIP counterparts pre-trained on
+is a good reference for us to isolate the effect of dataset dif-      the same data. Our result of 86.9% (or 87.1% using L/14)
+ferences. Our CLIP reproduction further helps isolate other       is behind but close to the result of the original CLIP check-
+implementation subtleties and allows us to pinpoint the ef-      point’s 87.4%, using our fine-tuning recipe.
+fect of the FLIP method.
+                                                                           3For a legacy reason, we pre-trained our ViT-L models with a patch   For all tasks studied in this subsection, we compare with
+                                                                                    size of 16, following the original ViT paper [20]. The CLIP paper [52]
+all these CLIP baselines. This allows us to better understand       uses L/14 instead. To save resources, we report our L/14 results by tuning
+the influence of the data and of the methods.                         the L/16 pre-trained model, in a way similar to unmasked tuning.
+
+======================== PDF 第 6 页 ========================
+                                                                                                                                                                                                       Pets
+                               data                        Food101                CIFAR10                  CIFAR100                 Birdsnap              SUN397         Cars                  Aircraft                VOC2007       DTD              Oxford                       Caltech101                       Flowers102           MNIST           STL10                EuroSAT                  RESISC45           GTSRB           KITTI                      Country211          PCam              UCF101                         Kinetics700           CLEVR                           HatefulMemes         SST2
+ CLIP [52]              WIT-400M   92.9   96.2   77.9   48.3   67.7   77.3   36.1   84.1   55.3   93.5   92.6   78.7   87.2   99.3   59.9   71.6   50.3   23.1   32.7   58.8   76.2   60.3   24.3   63.3   64.0
+ CLIP [52], our eval.      WIT-400M   91.0   95.2   75.6   51.2   66.6   75.0   32.3   83.3   55.0   93.6   92.4   77.7   76.0   99.3   62.0   71.6   51.6   26.9   30.9   51.6   76.1   59.5   22.2   55.3   67.3
+ OpenCLIP [36], our eval. LAION-400M  87.4   94.1   77.1   61.3   70.7   86.2   21.8   83.5   54.9   90.8   94.0   72.1   71.5   98.2   53.3   67.7   47.3   29.3   21.6   51.1   71.3   50.5   22.0   55.3   57.1
+  CLIP, our repro.        LAION-400M  88.1   96.0   81.3   60.5   72.3   89.1   25.8   81.1   59.3   93.2   93.2   74.6   69.1   96.5   50.7   69.2   50.2   29.4   21.4   53.1   71.5   53.5   18.5   53.3   57.2
+ FLIP                LAION-400M  89.3   97.2   84.1   63.0   73.1   90.7   29.1   83.1   60.4   92.6   93.8   75.0   80.3   98.5   53.5   70.8   41.4   34.8   23.1   50.3   74.1   55.8   22.7   54.0   58.5
+
+Table 4. Zero-shot accuracy on more classification datasets, compared with various CLIP baselines. This table follows Table 11 in [52].
+The model is ViT-L/14 with an image size of 224, for all entries. Entries in green are the best ones using the LAION-400M data.
+
+
+                                                                                            text retrieval                                   image retrieval
+                                                                   Flickr30k           COCO                  Flickr30k           COCO
+  case                  model          data     R@1  R@5  R@10  R@1  R@5  R@10  R@1  R@5  R@10  R@1  R@5  R@10
+ CLIP [52]             L/14@336   WIT-400M    88.0   98.7   99.4    58.4   81.5   88.1    68.7   90.6   95.2    37.8   62.4   72.2
+ CLIP [52], our eval.     L/14@336   WIT-400M    88.9   98.7   99.9    58.7   80.4   87.9    72.5   91.7   95.2    38.5   62.8   72.5
+ CLIP [52], our eval.      L/14        WIT-400M    87.8   99.1   99.8    56.2   79.8   86.4    69.3   90.2   94.0    35.8   60.7   70.7
+ OpenCLIP [36], our eval.  L/14      LAION-400M   87.3   97.9   99.1    58.0   80.6   88.1    72.0   90.8   95.0    41.3   66.6   76.1
+  CLIP, our impl.          L/14      LAION-400M   87.4   98.4   99.5    59.1   82.5   89.4    74.4   92.2   95.5    43.2   68.5   77.5
+  FLIP                   L/14      LAION-400M   89.1   98.5   99.6    60.2   82.6   89.9    75.4   92.5   95.9    44.2   69.2   78.4
+
+Table 5. Zero-shot image/text retrieval, compared with various CLIP baselines. The image size is 224 if not noted. Entries in green are
+the best ones using the LAION-400M data.
+
+                                                         IN-V2   IN-A    IN-R   ObjectNet   IN-Sketch       IN-Vid        YTBB
+                             model           data        top-1    top-1    top-1      top-1       top-1    PM-0   PM-10   PM-0   PM-10
+      CLIP [52]             L/14@336   WIT-400M     70.1    77.2    88.9     72.3      60.2     95.3    89.2    95.2    88.5
+      CLIP [52], our eval.      L/14@336   WIT-400M     70.4    78.0    89.0     69.3      59.7     95.9    88.8    95.3    89.4
+      CLIP [52], our eval.       L/14        WIT-400M     69.5    71.9    86.8     68.6      58.5     94.6    87.0    94.1    86.4
+      OpenCLIP [36], our eval.  L/14       LAION-400M   64.0    48.3    84.3     58.8      56.9     90.3    81.4    86.5    77.8
+       CLIP, our repro.          L/14       LAION-400M   65.6    46.3    84.7     58.0      58.7     89.3    80.5    85.7    77.8
+      FLIP                   L/14       LAION-400M   66.8    51.2    86.5     59.1      59.9     91.1    83.5    89.4    83.3
+
+Table 6. Zero-shot robustness evaluation, compared with various CLIP baselines. This table follows Table 16 in [52]. The image size is
+224 if not noted. Entries in green are the best ones using the LAION-400M data.
+
+                                                 COCO caption                       nocaps     VQAv2
+      case                      model        data       BLEU-4  METEOR  ROUGE-L   CIDEr   SPICE   CIDEr   SPICE     acc.
+     CLIP [52], our transfer       L/14    WIT-400M      37.5      29.6       58.7      126.9     22.8     82.5     12.1     76.6
+     OpenCLIP [36], our transfer   L/14   LAION-400M    36.7      29.3       58.4      125.0     22.7     83.4     12.3     74.5
+      CLIP, our repro.             L/16   LAION-400M    36.4      29.3       58.4      125.6     22.8     82.8     12.2     74.5
+     FLIP                      L/16   LAION-400M    37.4      29.5       58.8      127.7     23.0     85.9     12.4     74.7
+
+Table 7. Image Captioning and Visual Question Answering, compared with various CLIP baselines. Entries in green are the best ones
+using LAION-400M. Here the results are on the COCO captioning test split of [38], nocaps val split, and VQAv2 test-dev split, respectively.
+
+
+Zero-shot classification on more datasets. In Table 4 we     forms all CLIP competitors, including the original CLIP
+compare on the extra datasets studied in [52]. As the re-     (evaluated on the same 224 size). The WIT dataset has no
+sults can be sensitive to evaluation implementation (e.g.,     advantage over LAION for these two retrieval datasets.
+text prompts, image pre-processing), we provide our evalu-
+ations of the original CLIP checkpoint and OpenCLIP.         Zero-shot robustness evaluation. In Table 6 we compare
+   Notably, we observe clear systematic gaps caused by     on robustness evaluation, following [52]. We again observe
+pre-training data, as benchmarked using the same evalu-     clear systematic gaps caused by pre-training data. Using
+ation code. The WIT dataset is beneficial for some tasks      the same evaluation code (“our eval” in Table 6), CLIP
+(e.g., Aircraft, Country211, SST2), while LAION is benefi-      pre-trained on WIT is clearly better than other entries pre-
+cial for some others (e.g., Birdsnap, SUN397, Cars).             trained on LAION. Taking IN-Adversarial (IN-A) as an ex-
+                                                         ample: the LAION-based OpenCLIP [36] has only 48.3%   After isolating the influence of pre-training data, we ob-
+                                                           accuracy (or 46.6% reported by [36]). While FLIP (51.2%)serve that FLIP is dominantly better than OpenCLIP and our
+                                                        can outperform the LAION-based CLIP by a large margin,CLIP reproduction, as marked by green in Table 4.
+                                                                                             it is still 20% below the WIT-based CLIP (71.9%).
+Zero-shot retrieval. Table 5 reports image/text retrieval        Discounting the influence of pre-training data, our FLIP
+results on Flickr30k [73] and COCO [42]. FLIP outper-      training has clearly better robustness than its CLIP counter-
+
+======================== PDF 第 7 页 ========================
+parts in all cases. We hypothesize that masking as a form       Data scaling (Fig. 4b), on the other hand, performs sim-
+of noise and regularization can improve robustness.               ilarly at the first half of training, but starts to present a good
+                                                             gain later. Note that there is no extra computational cost inImage Captioning. See Table 7 for the captioning perfor-
+                                                                        this setting, as we control the total number of sampled data.mance on COCO [42] and nocaps [1]. Our captioning im-
+                                                            Schedule scaling (Fig. 4c) trains 2× longer. To provide aplementation follows the cross-entropy training baseline in
+                                                   more intuitive comparison, we plot a hypothetical curve that[7].  Unlike classification in which only a classifier layer
+                                                                              is rescaled by 1/2 along the x-axis (dashed line). Despiteis added after pre-training, here the fine-tuning model has
+                                                                the longer training, the gain is diminishing or none (morea newly initialized captioner (detailed in appendix). In this
+                                                     numbers in Table 8).task, FLIP outperforms the original CLIP checkpoint in sev-
+eral metrics. Compared to our CLIP baseline, which is pre-     Transferability. Table 8 provides an all-around compari-
+trained on the same data, FLIP also shows a clear gain, es-     son on various downstream tasks regarding the scaling be-
+pecially in BLEU-4 and CIDEr metrics.                          havior.  Overall, model scaling and data scaling both can
+                                                                 consistently outperform the baseline in all metrics, in someVisual Question Answering. We evaluate on the VQAv2
+                                                              cases by large margins.dataset [26], with a fine-tuning setup following [21]. We
+use a newly initialized multimodal fusion transformer and     We categorize the downstream tasks into two scenarios:
+an answer classifier to obtain the VQA outputs (detailed in       (i) zero-shot transfer, i.e., no learning is performed on the
+appendix).  Table 7 (rightmost column) reports results on     downstream dataset; (ii) transfer learning, i.e., part or all
+VQAv2. All entries pre-trained on LAION perform simi-     of the weights are trained on the downstream dataset. For
+larly, and CLIP pre-trained on WIT is the best.                  the tasks studied here, data scaling is in general favored
+                                                                   for zero-shot transfer, while model scaling is in general fa-
+Summary of Comparisons. Across a large variety of sce-                                                          vored for transfer learning. However, it is worth noting that
+narios, FLIP is dominantly better than its CLIP counterparts                                                                the transfer learning performance depends on the size of the
+(OpenCLIP and our reproduction) pre-trained on the same                                                     downstream dataset, and training a big model on a too small
+LAION data, in some cases by large margins.                                                     downstream set is still subject to the overfitting risk.
+  The difference between the WIT data and LAION data                                                                                         It is encouraging to see that data scaling is clearly benefi-
+can create large systematic gaps, as observed in many                                                                             cial, even not incurring longer training nor additional com-
+downstream tasks. We hope our study will draw attention                                                                  putation. On the contrary, even spending more computation
+to these data-dependent gaps in future research.                                                    by schedule scaling gives diminishing returns. These com-
+4.3. Scaling Behavior                                       parisons suggest that large-scale data are beneficial mainly
+                                                         because they provide richer information.
+   Facilitated by the speed-up of FLIP, we explore the scal-                                                        Next we scale both model and data (Table 8, second last
+ing behavior beyond the largest case studied in CLIP [52].                                                             row).  For all metrics, model+data scaling improves over
+We study scaling along either of these three axes:                                                                scaling either alone. The gains of model scaling and data
+                                                                scaling are highly complementary: e.g., in zero-shot IN-1K,   • Model scaling. We replace the ViT-L image encoder
+                                                    model scaling alone improves over the baseline by 1.2%    with ViT-H, which has ∼2× parameters. The text en-
+                                                   (74.3%→75.5%), and data scaling alone improves by 1.5%     coder is also scaled accordingly.
+                                                   (74.3%→75.8%). Scaling both improves by 3.3% (77.6%),
+   • Data scaling. We scale the pre-training data from 400                                                   more than the two deltas combined. This behavior is also
+     million to 2 billion, using the LAION-2B set [36]. To                                                          observed in several other tasks. This indicates that a larger
+     better separate the influence of more data from the in-                                                    model desires more data to unleash its potential.
+     fluence of longer training, we fix the total number of                                                                        Finally, we report joint scaling all three axes (Table 8,
+    sampled data (12.8B, which amounts to 32 epochs of                                                                           last row). Our results show that combining schedule scal-
+   400M data and 6.4 epochs of 2B data).                                                             ing leads to improved performances across most metrics.
+   • Schedule scaling. We increase the sampled data from     This suggests that schedule scaling is particularly beneficial
+    12.8B to 25.6B (64 epochs of 400M data).             when coupled with larger models and larger-scale data.
+                                                    Our result of 78.8% on zero-shot IN-1K outperforms
+We study scaling along one of these three axes at each time                                                                the state-of-the-art result trained on public data with ViT-
+while keeping others unchanged. The results are summa-                                    H (78.0% of OpenCLIP). Also based on LAION-2B, their
+rized in Fig. 4 and Table 8.                                                                      result is trained with 32B sampled data, 1.25× more than
+Training curves. The three scaling strategies exhibit dif-      ours. Given the 50% masking we use, our training is esti-
+ferent trends in training curves (Fig. 4).                     mated to be 2.5× faster than theirs if both were run on the
+  Model scaling (Fig. 4a) presents a clear gap that persists    same hardware. As OpenCLIP’s result reports a training
+throughout training, though the gap is smaller at the end.        cost of ∼5,600 GPU-days, our method could save ∼3,360
+
+======================== PDF 第 8 页 ========================
+    76                                                          76                                                          76
+
+    74                                                          74                                                          74
+
+    72                                                          72                                                          72
+
+  (%) 70                                                                                   (%) 70                                                                                   (%) 70
+   acc. 68                                                                                                               acc. 68                                                                                                               acc. 68
+    66                                                          66                                                          66
+
+    64                                                          64                                                          64       zero-shot                                                                                                                                                                                                                                                                     zero-shot                                                                                                                                                                                                                                                                     zero-shot
+    62                                                          62                                                          62
+    60                                                          60                                                          60                                                                     64 epochs
+    58                                  ViT-HugeViT-Large         58                            LAION-2BLAION-400M         58                                                                     6432 epochs,epochs rescaled plot
+    56                                                          56                                                          56
+      0       2       4       6       8      10      12             0       2       4       6       8      10      12             0                  5                  10                 15                 20                 25
+                        sampled data (billion)                                             sampled data (billion)                                                                       sampled data (billion)
+
+             (a) Model scaling                         (b) Data scaling                                          (c) Schedule scaling
+
+Figure 4. Training curves of scaling. The x-axis is the number of sampled data during training, and the y-axis is the zero-shot accuracy
+on IN-1K. The blue curve is the baseline setting: ViT-Large, LAION-400M data, 32 epochs (12.8B sampled data). In each subplot, we
+compare with scaling one factor on the baseline. In schedule scaling (Fig. 4c), we plot an extra hypothetical curve for a better visualization.
+
+
+                                                               zero-shot transfer                             transfer learning
+                                                            zero-shot       text retrieval       image retrieval     lin-probe   fine-tune       captioning       vqa
+    case              model   data   sampled   IN-1K    Flickr30k  COCO   Flickr30k  COCO   IN-1K    IN-1K   COCO   nocaps  VQAv2
+    baseline            Large  400M   12.8B     74.3      88.4     59.8     75.0     44.1     83.6      86.9     127.7    85.9    74.7
+   model scaling      Huge  400M   12.8B     75.5      89.2     62.8     76.4     46.0     84.3      87.3     130.3    91.5    76.3
+    data scaling         Large   2B    12.8B     75.8      91.7     63.8     78.2     47.3     84.2      87.1     128.9    87.0    75.5
+   schedule scaling     Large  400M   25.6B     73.9      89.7     60.1     75.5     44.4     83.7      86.9     127.9    86.8    75.0
+   model+data scaling  Huge   2B    12.8B     77.6      92.8     67.0     79.9     49.5     85.1      87.7     130.4    92.6    77.1
+    joint scaling       Huge   2B    25.6B     78.8      93.1     67.8     80.9     50.5     85.6      87.9     130.2    91.2    77.3
+
+Table 8. Scaling behavior of FLIP, evaluated on a diverse set of downstream tasks: classification, retrieval (R@1), captioning (CIDEr),
+and visual question answering. In the middle three rows, we scale along one of the three axes (model, data, schedule), and the green entries
+denote the best ones among these three scaling cases. Data scaling is in general favored under the zero-shot transfer scenario, while model
+scaling is in general favored under the transfer learning scenario (i.e., with trainable weights in downstream).
+
+
+GPU-days based on a rough estimation. Additionally, with-    CLIP baselines, which help us to break down the gaps con-
+out enabling 2× schedule, our entry of “model+data scal-      tributed by different factors. We show that FLIP outper-
+ing” is estimated 5× faster than theirs and can save ∼4,480     forms its CLIP counterparts pre-trained on the same LAION
+GPU-days. This is considerable cost reduction.                   data. By comparing several LAION-based models and the
+                                                                   original WIT-based ones, we observe that the pre-training
+5. Discussion and Conclusion                           data creates big systematic gaps in several tasks.
+                                                    Our study provides controlled experiments on scaling  Language is a stronger form of supervision than classi-
+                                                                behavior. We observe that data scaling is a favored scal-cal closed-set labels. Language provides rich information
+                                                             ing dimension, given that it can improve accuracy with nofor supervision. Therefore, scaling, which can involve in-
+                                                                 extra cost at training or inference time. Our fast methodcreasing capacity (model scaling) and increasing informa-
+                                                          encourages us to scale beyond what is studied in this work.tion (data scaling), is essential for attaining good results in
+language-supervised training.
+  CLIP [52] is an outstanding example of “simple algo-    Broader impacts. Training large-scale models costs high
+rithms that scale well”.  The simple design of CLIP al-     energy consumption and carbon emissions.  While our
+lows it to be relatively easily executed at substantially larger     method has reduced such cost to 1/2-1/3, the remaining cost
+scales and achieve big leaps compared to preceding meth-       is still sizable. We hope our work will attract more attention
+ods. Our method largely maintains the simplicity of CLIP      to the research direction on reducing the cost of training
+while pushing it further along the scaling aspect.               vision-language models.
+  Our method can provide a 2-3× speedup or more. For       The numerical results in this paper are based on a pub-
+the scale concerned in this study, such a speedup can re-      licly available large-scale dataset [56]. The resulting model
+duce wall-clock time by a great amount (e.g., at the order     weights will reflect the data biases, including potentially
+of thousands of TPU/GPU-days). Besides accelerating re-     negative implications. When compared using the same data,
+search cycles, the speedup can also save a great amount of      the statistical differences between two methods should re-
+energy and commercial cost. These are all ingredients of       flect the method properties to a good extent; however, when
+great importance in large-scale machine learning research.     compared entries using different training data, the biases of
+  Our study involves controlled comparisons with various      the data should always be part of the considerations.
+
+======================== PDF 第 9 页 ========================
+A. Implementation Details                                  Embed Vision Transformer   Text Transformer   # params (M)
+                                                               Model  dim   layers width heads layers width heads vision text total
+A.1. Pre-training                                               B/16    512    12   768   12    12   512    8    86   53  141
+                                                                     L/16    768    24   1024   16    12   768   12   303  109 414
+Encoders. Table 9 shows the architecture we use. The de-      H/14   1024   32   1280   16    24   1024   16   631  334 967
+sign follows CLIP [52]. Our image encoder involves ViT-B,
+-L, -H [20], using the same patch size as in [20] (16 for                       Table 9. Encoder specifics.
+B and L, 14 for H). We use global average pooling after
+the image encoder. The corresponding text encoder is of a                  config                              value
+                                                                                                 optimizer                 AdamW [45]
+smaller size, following [52]. We train ViT-B/-L with 256                 base learning rate                   4e-6
+TPU-v3 cores, and ViT-H with 512 cores.  Table 9 also                weight decay                        0.2
+                                                                                                 optimizer momentum             β1, β2=0.9, 0.95 [10]
+shows the model size of the image encoder, text encoder,                  learning rate schedule                cosine decay [44]
+and the entire model (including output projection layers).                warmup (in samples)             51.2M (B/L), 256M (H)
+                                                                                             numerical precision                   float32
+Hyper-parameters. Our default pre-training configuration
+is shown in Table 10. We use the linear learning rate scaling                     Table 10. Pre-training setting.
+rule [24]: lr = base lr×batchsize / 256. We observe that us-
+ing this rule allows us to change the batch size in ablations                  config                              value
+                                                                                                 optimizer                  LARS [72]
+without extra learning rate search. The numerical precision                 base learning rate                   0.01
+we use is float32 by default. We also experimented with                 weight decay                    0
+                                                                                                 optimizer momentum                0.9
+bfloat16, but only observed a ∼1.1× speedup, which is con-                 batch size                       16384
+sistent with the results reported in Google’s blog 4.                              learning rate schedule                cosine decay
+                                                                            warmup epochs                  10
+  Unmasked tuning, which is a form of pre-training while                   training epochs                   90
+disabling masking, follows Table 10, except that we lower                 augmentation                    RandomResizedCrop
+the base learning rate to 4e-8 and shorten the warmup
+                                                                                Table 11. Linear probing setting.
+schedule to 25.6M samples.
+
+A.2. ImageNet Classification                                                      config                              value
+                                                                                                 optimizer                 AdamW
+Zero-shot. We follow the prompt engineering in [52].                 baseweightlearningdecay rate                   5e-50.05
+Their code provides 80 templates.5 We use a subset of 7                  optimizer momentum             β1, β2=0.9, 0.999
+templates they recommend; using all 80 templates gives                  layer-wise lr decay [14]              0.75                                                                                                batch size                       1024
+similar results but is slower at inference.                                             learning rate schedule                cosine decay
+                                                                            warmup epochs                  5
+Linear probing and fine-tuning. The setting follows [29].                   training epochs                   50 (L/H)
+See Table 11 and Table 12.                                                         augmentationlabel smoothing [58]             RandAug0.1        (9, 0.5) [15]
+                                                                                 mixup [76]                          0.8
+A.3. Zero-shot Retrieval                                                       cutmix [75]                          1.0
+                                                                                          drop path [34]                       0.2 (L/H)
+  We evaluate the performance of zero-shot retrieval on
+two standard benchmarks: Flickr30K [73] and COCO [42],                      Table 12. Fine-tuning setting.
+respectively with 1K and 5K image-text pairs in their test
+sets. Following the protocol in CLIP [52], we extract the
+                                                              [52] to use the class names without prompts. In YTBB, weimage and text embeddings from the corresponding en-
+                                                          use the VOC prompts provided by [52].coders and perform retrieval based on the cosine similarities
+over candidate image-text pairs; no prompt is used.                                                       A.5. More Zero-shot Datasets
+A.4. Zero-shot Robustness Evaluation                     For the experiments in Table 4, we use the prompts
+                                                           provided by [52].7 We follow the data preparation scripts   In our zero-shot robustness evaluation on the ImageNet-
+                                                           provided by [25] and [46] and load data using Tensorflowrelated sets, we use the 7 prompts provided by [52], only
+                                                                Datasets. Following [52], we report the mean accuracy perexcept in IN-R we use all 80 prompts that are better than the
+                                                                   class for FGVC Aircraft, Oxford-IIIT Pets, Caltech-101,7 prompts by noticeable margins. The dataset preparation
+                                                      and Oxford Flowers 102 datasets; we report the mean ofand split follow OpenCLIP [36].6  In ObjectNet, we follow
+                                                              top-1 and top-5 accuracy for Kinetics-700, ROC AUC for
+  4https://cloud.google.com/blog/products/ai- machine-     Hateful Memes, and 11-point mAP for Pascal VOC 2007
+learning/bfloat16- the- secret- to- high- performance- on-
+cloud-tpus                                                         Classification; we report top-1 accuracy for the rest of the
+   5https://github.com/openai/CLIP/blob/main/notebooks/
+Prompt_Engineering_for_ImageNet.ipynb                           6https://github.com/LAION-AI/CLIP_benchmark
+
+======================== PDF 第 10 页 ========================
+datasets. We note that the Birdsnap dataset on Internet is     weight decay of 1e-2, a warmup of 15% of iterations, and a
+shrinking over time and only 1850 test images are available     cosine decay learning rate schedule. The input image size
+for us (vs. 2149 images tested in [52], and 2443 originally).       is 512×512 for ViT-L/16 and 448×448 for ViT-H/14.
+                                                                All models are fine-tuned for 20 epochs on the VQAv2
+A.6. Captioning                                                                 train+val set, with additional question-answer pairs from
+  We build a sequence-to-sequence encoder-decoder trans-     Visual Genome [39], following [60]. We report results on
+former model on top of the ViT image encoder, with 3 en-      the test-dev split from the evaluation server.
+coder layers and 3 decoder layers following [7].  Specifi-
+cally, the ViT image features are first linearly projected to a    References
+384-dimensional sequence and further encoded by a 3-layer                                                                               [1] Harsh Agrawal, Karan  Desai,  Yufei Wang,  Xinlei Chen,
+transformer encoder (of 384 width and 6 heads). For auto-          Rishabh Jain, Mark Johnson, Dhruv Batra, Devi Parikh, Ste-
+regressive caption generation, we discard the pre-trained            fan Lee, and Peter Anderson. Nocaps: Novel object captioning
+text encoder in FLIP and use a randomly initialized 3-layer             at scale. In ICCV, 2019.
+transformer decoder (of 384 width and 6 heads) with cross-        [2] Jean-Baptiste Alayrac,  Jeff Donahue, Pauline Luc, Antoine
+attention to encoder outputs. The model is trained to predict          Miech, Iain Barr, Yana Hasson, Karel Lenc, Arthur Mensch,
+the next text token using the tokenizer in [52].                         Katie Millican, and Malcolm Reynolds. Flamingo: a visual lan-
+                                                                    guage model for few-shot learning. arXiv:2204.14198, 2022.   For simplicity, we supervise the image captioning model
+only with teacher forcing using a word-level cross-entropy        [3] Jimmy Lei Ba, Jamie Ryan Kiros, and Geoffrey E Hinton. Layer
+                                                                              normalization. arXiv:1607.06450, 2016.loss [7]; we do not use the CIDEr score optimization in [7].
+The full model is fine-tuned end-to-end with the AdamW        [4] Alan Baade, Puyuan Peng, and David Harwath.  MAE-
+                                                            AST: Masked autoencoding audio spectrogram transformer.
+optimizer, a batch size of 256, a learning rate of 1e-4 for
+                                                                         arXiv:2203.16691, 2022.
+newly added parameters, a weight decay of 1e-2, a warmup
+                                                                               [5] Roman Bachmann, David Mizrahi, Andrei Atanov, and Amir
+of 15% iterations, and a cosine decay learning rate schedule.
+                                                                          Zamir.  MultiMAE: Multi-modal multi-task masked autoen-
+The learning rate for the pre-trained ViT parameters is set to                                                                               coders. arXiv:2204.01678, 2022.
+1e-5 for ViT-L (and 5e-6 for ViT-H). The input image size is
+                                                                               [6] Hangbo Bao, Li Dong, and Furu Wei. BEiT: BERT pre-training
+512×512 for ViT-L/16 and 448×448 for ViT-H/14 (to keep            of image Transformers. arXiv:2106.08254, 2021.
+the same sequence lengths).
+                                                                               [7] Manuele Barraco, Marcella Cornia, Silvia Cascianelli, Lorenzo
+   All models are fine-tuned for image captioning on the            Baraldi, and Rita Cucchiara. The unreasonable effectiveness of
+COCO training split of [38] for 20 epochs. During infer-             clip features for image captioning: An experimental analysis. In
+ence, the image captions are predicted with auto-regressive         CVPR, 2022.
+decoding, and we report their performance on the COCO        [8] James Bradbury, Roy Frostig, Peter Hawkins, Matthew James
+test split of [38] under different metrics.                               Johnson,  Chris Leary, Dougal Maclaurin, George Necula,
+  To evaluate how the COCO-trained models generalize        Adam  Paszke,  Jake  VanderPlas,  Skye Wanderman-Milne,
+to novel objects, we evaluate these models directly on the          and Qiao Zhang.   JAX: composable  transformations  of
+                                                            Python+NumPy programs, 2018.
+nocaps [1] validation set, with no further fine-tuning.
+                                                                               [9] Hongxu Chen, Sixiao Zhang, and Guandong Xu. Graph masked
+A.7. Visual Question Answering                                    autoencoder. arXiv:2202.08391, 2022.
+                                                                         [10] Mark Chen, Alec Radford, Rewon Child, Jeffrey Wu, Heewoo
+   In our VQA experiments, we follow the architecture de-                                                                               Jun, David Luan, and Ilya Sutskever.  Generative pretraining
+scribed in [21].  Specifically, the VQA task is casted as a          from pixels. In ICML, 2020.
+classification problem over all answer classes. The input                                                                         [11] Ting Chen, Simon Kornblith, Mohammad Norouzi, and Geof-
+images are encoded by the ViT encoders. The input ques-            frey Hinton. A simple framework for contrastive learning of
+tions are encoded by a pre-trained RoBERTa text encoder            visual representations. In ICML, 2020.
+[43], following the practice in [21]. A multimodal fusion      [12] Tianqi Chen, Bing Xu, Chiyuan Zhang, and Carlos Guestrin.
+Transformer (4 layers, 768-d, 12 heads, with merged atten-           Training deep nets with sublinear memory cost. arXiv preprint
+tion [21]) is applied to combine the image and text repre-           arXiv:1604.06174, 2016.
+sentations. A two-layer MLP is applied on the class token      [13] Dading Chong, Helin Wang, Peilin Zhou, and Qingcheng Zeng.
+of the fusion module to obtain the VQA output [21].               Masked spectrogram prediction for self-supervised audio pre-
+  We fine-tune the VQA model end-to-end. The loss func-             training. arXiv:2204.12768, 2022.
+tion is a binary sigmoid loss using soft scores [60]. We use      [14] Kevin Clark, Minh-Thang Luong, Quoc V Le, and Christo-
+a batch size of 256, a learning rate of 1e-4 for randomly ini-           pher D Manning. ELECTRA: Pre-training text encoders as dis-
+                                                                              criminators rather than generators. In ICLR, 2020.
+tialized parameters, and a learning rate of 1e-5 (ViT-L) or
+5e-6 (ViT-H) for the pre-trained ViT parameters. We use a      [15] Ekin D Cubuk, Barret Zoph, Jonathon Shlens, and Quoc V Le.
+                                                                   Randaugment: Practical automated data augmentation with a
+   7https://github.com/openai/CLIP/blob/main/data/prompts.md           reduced search space. In CVPR Workshops, 2020.
+
+======================== PDF 第 11 页 ========================
+[16]  Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li      [31] Sunan He, Taian Guo, Tao Dai, Ruizhi Qiao, Chen Wu, Xiujun
+      Fei-Fei. ImageNet: A large-scale hierarchical image database.           Shu, and Bo Ren. VLMAE: Vision-language masked autoen-
+     In CVPR, 2009.                                                           coder. arXiv:2208.09374, 2022.
+[17] Karan Desai and Justin Johnson. Virtex: Learning visual repre-      [32] Zhenyu Hou, Xiao Liu, Yuxiao Dong, Chunjie Wang, and Jie
+      sentations from textual annotations. In CVPR, 2021.                     Tang. GraphMAE: Self-supervised masked graph autoencoders.
+                                                                         arXiv:2205.10803, 2022.
+[18] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina
+                                                                         [33] Zejiang Hou, Fei Sun, Yen-Kuang Chen, Yuan Xie, and Sun-     Toutanova.  BERT: Pre-training of deep bidirectional Trans-
+                                                               Yuan Kung. MILAN: Masked image pretraining on language     formers for language understanding. In NAACL, 2019.
+                                                                                   assisted representation. arXiv:2208.06049, 2022.
+[19] Xiaoyi Dong, Yinglin Zheng, Jianmin Bao, Ting Zhang, Dong-
+                                                                         [34] Gao Huang, Yu Sun, Zhuang Liu, Daniel Sedra, and Kilian Q
+    dong Chen, Hao Yang, Ming Zeng, Weiming Zhang, Lu Yuan,
+                                                                          Weinberger. Deep networks with stochastic depth. In ECCV,
+     and Dong Chen. MaskCLIP: Masked self-distillation advances
+                                                                        2016.
+      contrastive language-image pretraining.   arXiv:2208.12262,
+     2022.                                                              [35] Po-Yao Huang, Hu Xu, Juncheng Li, Alexei Baevski, Michael
+                                                                                Auli, Wojciech Galuba, Florian Metze, and Christoph Feicht-
+[20] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk            enhofer. Masked autoencoders that listen. arXiv:2207.06405,
+     Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa De-           2022.
+     hghani, Matthias Minderer, Georg Heigold, Sylvain Gelly,
+                                                                         [36] Gabriel Ilharco, Mitchell Wortsman, Ross Wightman, Cade
+     Jakob Uszkoreit, and Neil Houlsby. An image is worth 16x16
+                                                                     Gordon, Nicholas Carlini, Rohan Taori, Achal Dave, Vaishaal
+     words: Transformers for image recognition at scale. In ICLR,
+                                                                          Shankar, Hongseok Namkoong, John Miller, Hannaneh Ha-
+     2021.
+                                                                                                jishirzi, Ali Farhadi, and Ludwig Schmidt. OpenCLIP, 2021.
+[21] Zi-Yi Dou, Yichong Xu, Zhe Gan, Jianfeng Wang, Shuohang                                                                         [37] Chao Jia, Yinfei Yang, Ye Xia, Yi-Ting Chen, Zarana Parekh,
+    Wang, Lijuan Wang, Chenguang Zhu, Pengchuan Zhang, Lu                                                                   Hieu Pham, Quoc Le, Yun-Hsuan Sung, Zhen Li, and Tom
+     Yuan, Nanyun Peng, et al. An empirical study of training end-                                                                           Duerig.  Scaling up visual and vision-language representation
+     to-end vision-and-language transformers. In CVPR, 2022.                                                                               learning with noisy text supervision. In ICML, 2021.
+[22] Christoph Feichtenhofer, Haoqi Fan, Yanghao Li, and Kaim-      [38] Andrej Karpathy and Li Fei-Fei. Deep visual-semantic align-
+     ing He.  Masked Autoencoders as spatiotemporal learners.          ments for generating image descriptions. In CVPR, 2015.
+     arXiv:2205.09113, 2022.
+                                                                         [39] Ranjay Krishna, Yuke Zhu, Oliver Groth, Justin Johnson, Kenji
+[23] Xinyang Geng, Hao Liu, Lisa Lee, Dale Schuurams, Sergey           Hata, Joshua Kravitz, Stephanie Chen, Yannis Kalantidis, Li-
+     Levine, and Pieter Abbeel. Multimodal Masked Autoencoders             Jia Li, David A Shamma, et al.  Visual genome: Connecting
+      learn transferable representations. arXiv:2205.14204, 2022.              language and vision using crowdsourced dense image annota-
+                                                                                         tions. International journal of computer vision, 123(1):32–73,
+[24] Priya Goyal, Piotr Doll´ar, Ross Girshick, Pieter Noordhuis,
+                                                                        2017.
+     Lukasz Wesolowski, Aapo Kyrola, Andrew Tulloch, Yangqing
+       Jia, and Kaiming He. Accurate, large minibatch SGD: Training      [40] Alex Krizhevsky, Ilya Sutskever, and Geoff Hinton.  Ima-
+     ImageNet in 1 hour. arXiv:1706.02677, 2017.                           genet classification with deep convolutional neural networks. In
+                                                                      NeurIPS, 2012.
+[25] Priya Goyal, Quentin Duval, Jeremy Reizenstein, Matthew
+                                                                         [41] Gukyeong Kwon, Zhaowei Cai, Avinash Ravichandran, Er-      Leavitt, Sum Min, Benjamin Lefaudeux, Mannat Singh, Vini-
+                                                                   han Bas, Rahul Bhotika, and Stefano Soatto. Masked vision      cius Reis, Mathilde Caron, Piotr Bojanowski, Armand Joulin,
+                                                                   and language modeling for multi-modal representation learning.     and Ishan Misra.   VISSL.  https://github.com/
+                                                                         arXiv:2208.02131, 2022.    facebookresearch/vissl, 2021.
+                                                                         [42] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays,
+[26] Yash Goyal, Tejas Khot, Douglas Summers-Stay, Dhruv Batra,
+                                                                                 Pietro Perona, Deva Ramanan, Piotr Doll´ar, and C Lawrence
+     and Devi Parikh. Making the V in VQA matter: Elevating the
+                                                                                   Zitnick.  Microsoft COCO: Common objects in context.  In
+      role of image understanding in visual question answering.  In
+                                                          ECCV, 2014.
+    CVPR, 2017.
+                                                                         [43] Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi,
+[27] Jean-Bastien  Grill, Florian Strub, Florent Altch´e, Corentin          Danqi Chen, Omer Levy, Mike Lewis, Luke Zettlemoyer, and
+      Tallec,  Pierre Richemond, Elena Buchatskaya,  Carl Doer-            Veselin Stoyanov. RoBERTa: A robustly optimized BERT pre-
+      sch, Bernardo Avila Pires, Zhaohan Guo, Mohammad Ghesh-             training approach. arXiv preprint arXiv:1907.11692, 2019.
+      laghi Azar, Bilal Piot, Koray Kavukcuoglu, Remi Munos, and
+                                                                         [44] Ilya Loshchilov and Frank Hutter. SGDR: Stochastic gradient
+     Michal Valko. Bootstrap your own latent - a new approach to
+                                                                            descent with warm restarts. In ICLR, 2017.
+      self-supervised learning. In NeurIPS, 2020.
+                                                                         [45] Ilya Loshchilov and Frank Hutter. Decoupled weight decay reg-
+[28] Raia Hadsell, Sumit Chopra, and Yann LeCun. Dimensionality                                                                                      ularization. In ICLR, 2019.
+     reduction by learning an invariant mapping. In CVPR, 2006.
+                                                                         [46] Norman Mu, Alexander Kirillov, David Wagner, and Saining
+[29] Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li, Piotr             Tie. SLIP: Self-supervision meets language-image pre-training.
+       Doll´ar, and Ross Girshick. Masked autoencoders are scalable            In ECCV, 2022.
+      vision learners. arXiv:2111.06377, 2021.
+                                                                         [47] Daisuke Niizumi, Daiki Takeuchi, Yasunori Ohishi, Noboru
+[30] Kaiming He, Haoqi Fan, Yuxin Wu, Saining Xie, and Ross Gir-           Harada, and Kunio Kashino.  Masked spectrogram modeling
+      shick. Momentum contrast for unsupervised visual representa-           using masked autoencoders for learning general-purpose audio
+      tion learning. In CVPR, 2020.                                              representation. arXiv:2204.12260, 2022.
+
+======================== PDF 第 12 页 ========================
+[48] Aaron  van  den  Oord,  Yazhe  Li,  and  Oriol  Vinyals.      [61] Zhan Tong, Yibing Song, Jue Wang, and Limin Wang. Video-
+     Representation learning with  contrastive  predictive coding.        MAE: Masked autoencoders are data-efficient learners for self-
+     arXiv:1807.03748, 2018.                                               supervised video pre-training. arXiv:2203.12602, 2022.
+[49] Yatian Pang, Wenxiao Wang,  Francis EH  Tay, Wei  Liu,      [62] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit,
+    Yonghong Tian, and Li Yuan. Masked autoencoders for point           Llion Jones, Aidan N Gomez, Lukasz Kaiser, and Illia Polo-
+     cloud self-supervised learning. arXiv:2203.06604, 2022.                  sukhin. Attention is all you need. In NeurIPS, 2017.
+[50] Deepak Pathak, Philipp Krahenbuhl, Jeff Donahue, Trevor Dar-      [63] Pascal Vincent, Hugo Larochelle, Yoshua Bengio, and Pierre-
+       rell, and Alexei A Efros. Context encoders: Feature learning by           Antoine Manzagol. Extracting and composing robust features
+      inpainting. In CVPR, 2016.                                           with denoising autoencoders. In ICML, 2008.
+                                                                         [64] Pascal Vincent, Hugo Larochelle, Isabelle Lajoie, Yoshua Ben-
+[51] Hieu Pham,  Zihang  Dai,  Golnaz  Ghiasi,  Hanxiao  Liu,
+                                                                                     gio, Pierre-Antoine Manzagol, and L´eon Bottou. Stacked de-
+    Adams Wei Yu, Minh-Thang Luong, Mingxing Tan, and
+                                                                             noising autoencoders: Learning useful representations in a deep
+    Quoc V Le. Combined scaling for zero-shot transfer learning.
+                                                                      network with a local denoising criterion. JMLR, 2010.     arXiv:2111.10050, 2021.
+                                                                         [65] Zirui Wang, Jiahui Yu, Adams Wei Yu, Zihang Dai, Yulia
+[52] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh,
+                                                                            Tsvetkov, and Yuan Cao. SimVLM: Simple visual language
+     Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell,
+                                                                 model pretraining with weak supervision.  arXiv:2108.10904,
+     Pamela Mishkin,  Jack Clark, Gretchen Krueger, and  Ilya
+                                                                        2021.
+     Sutskever.  Learning transferable visual models from natural
+     language supervision. In ICML, 2021.                              [66] Chen Wei, Haoqi Fan, Saining Xie, Chao-Yuan Wu, Alan
+                                                                                      Yuille, and Christoph Feichtenhofer.  Masked feature predic-
+[53] Aditya Ramesh, Prafulla Dhariwal, Alex Nichol, Casey Chu,                                                                                   tion for self-supervised visual pre-training. arXiv:2112.09133,
+     and Mark Chen. Hierarchical text-conditional image generation                                                                        2021.
+     with clip latents. arXiv:2204.06125, 2022.
+                                                                         [67] Yixuan Wei, Han Hu, Zhenda Xie, Zheng Zhang, Yue Cao, Jian-
+[54] Adam Roberts, Hyung Won Chung, Anselm Levskaya, Gaurav         min Bao, Dong Chen, and Baining Guo. Contrastive learning
+     Mishra, James Bradbury, Daniel Andor, Sharan Narang, Brian             rivals masked image modeling in fine-tuning via feature distil-
+      Lester, Colin Gaffney, Afroz Mohiuddin, Curtis Hawthorne,             lation. arXiv:2205.14141, 2022.
+     Aitor Lewkowycz, Alex Salcianu, Marc van Zee, Jacob Austin,
+                                                                         [68] Mitchell Wortsman, Gabriel Ilharco, Jong Wook Kim, Mike
+     Sebastian Goodman, Livio Baldini Soares, Haitang Hu, Sasha
+                                                                                     Li, Simon Kornblith, Rebecca Roelofs, Raphael Gontijo Lopes,
+     Tsvyashchenko, Aakanksha Chowdhery, Jasmijn Bastings, Jan-
+                                                                Hannaneh Hajishirzi, Ali Farhadi, Hongseok Namkoong, et al.
+      nis Bulian, Xavier Garcia, Jianmo Ni, Andrew Chen, Kath-
+                                                                     Robust fine-tuning of zero-shot models. In CVPR, 2022.
+     leen Kenealy, Jonathan H. Clark, Stephan Lee, Dan Garrette,
+     James Lee-Thorp, Colin Raffel, Noam Shazeer, Marvin Rit-      [69] Zhirong Wu, Zihang Lai, Xiao Sun, and Stephen Lin. Extreme
+       ter, Maarten Bosma, Alexandre Passos, Jeremy Maitin-Shepard,          masking for learning instance and distributed visual representa-
+    Noah Fiedel, Mark Omernick, Brennan Saeta, Ryan Sepa-             tions. arXiv:2206.04667, 2022.
+       ssi, Alexander Spiridonov, Joshua Newlan, and Andrea Ges-      [70] Tete  Xiao,  Ilija  Radosavovic,  Trevor  Darrell,  and  Jiten-
+    mundo.  Scaling up models and data with t5x and seqio.           dra Malik.  Masked visual pre-training for motor control.
+     arXiv:2203.17189, 2022.                                             arXiv:2203.06173, 2022.
+[55] Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick      [71] Zhenda Xie, Zheng Zhang, Yue Cao, Yutong Lin, Jianmin Bao,
+      Esser, and Bj¨orn Ommer. High-resolution image synthesis with           Zhuliang Yao, Qi Dai, and Han Hu. SimMIM: A simple frame-
+      latent diffusion models. In CVPR, 2022.                            work for masked image modeling. arXiv:2111.09886, 2021.
+[56] Christoph Schuhmann, Romain Beaumont, Richard Vencu,      [72] Yang You, Igor Gitman, and Boris Ginsburg. Large batch train-
+    Cade Gordon, Ross Wightman, Mehdi Cherti, Theo Coombes,           ing of convolutional networks. arXiv:1708.03888, 2017.
+     Aarush Katta, Clayton Mullis, Mitchell Wortsman,  Patrick      [73] Peter Young, Alice Lai, Micah Hodosh, and Julia Hockenmaier.
+     Schramowski, Srivatsa Kundurthy, Katherine Crowson, Ludwig         From image descriptions to visual denotations: New similarity
+     Schmidt, Robert Kaczmarczyk, and Jenia Jitsev. LAION-5B:            metrics for semantic inference over event descriptions. Trans-
+    An open large-scale dataset for training next generation image-            actions of the Association for Computational Linguistics, 2014.
+      text models. In NeurIPS, 2022.                                                                         [74] Jiahui Yu, Zirui Wang, Vijay Vasudevan, Legg Yeung, Mojtaba
+[57] Younggyo Seo,  Danijar Hafner, Hao  Liu, Fangchen  Liu,           Seyedhosseini, and Yonghui Wu. CoCa: Contrastive captioners
+     Stephen James, Kimin Lee, and Pieter Abbeel. Masked world            are image-text foundation models. arXiv:2205.01917, 2022.
+     models for visual control. arXiv:2206.14244, 2022.                 [75] Sangdoo Yun, Dongyoon Han, Seong Joon Oh, Sanghyuk
+[58] Christian Szegedy, Vincent Vanhoucke, Sergey Ioffe, Jonathon          Chun, Junsuk Choe, and Youngjoon Yoo. Cutmix: Regulariza-
+     Shlens, and Zbigniew Wojna. Rethinking the inception archi-             tion strategy to train strong classifiers with localizable features.
+      tecture for computer vision. In CVPR, 2016.                              In ICCV, 2019.
+                                                                         [76] Hongyi Zhang, Moustapha Cisse, Yann N Dauphin, and David[59] Qiaoyu Tan, Ninghao Liu, Xiao Huang, Rui Chen, Soo-Hyun
+                                                                        Lopez-Paz.  mixup: Beyond empirical risk minimization.  In     Choi, and Xia Hu.  MGAE: Masked autoencoders for self-
+                                                                   ICLR, 2018.     supervised learning on graphs. arXiv:2201.02534, 2022.
+
+[60] Damien Teney, Peter Anderson, Xiaodong He, and Anton Van
+    Den Hengel.  Tips and tricks for visual question answering:
+     Learnings from the 2017 challenge. In CVPR, 2018.

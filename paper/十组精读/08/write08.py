@@ -1,0 +1,97 @@
+from pathlib import Path
+import json, re
+
+out = Path(__file__).resolve().parent.parent
+papers = [
+    {
+        "id": "B11",
+        "title": "How Far Can Coding Agents Go in Visual Generation?",
+        "source_url": "https://arxiv.org/abs/2610.19025",
+        "screenshot_check": "已实看截图09第二行第二格：英文标题与PDF首页逐词对应，截图中文标题为编码Agent视觉生成能力；UCLA/Tsinghua作者信息吻合。2026-10 arXiv预印本，未把视频标题当会议录用。",
+        "problem": "通用代码Agent能否用可执行程序构造图像，以及这种表示保留了哪些视觉信息？论文把约束满足、感知实现和整体偏好分开，避免把文字、计数准确误当成自然图像质量。更进一步的内部视觉表征说法只是待检验假设。",
+        "mechanism": "200条AgentDrawBench提示覆盖七类，比较Canvas 2D、SVG、几何形状、GUI、Blender等接口。代码可被执行、检查和迭代，形成外部视觉表示。WorldBench实验先看图重建SVG、之后才揭示问题，并用独立上下文比较原图、代码与渲染。内部假设写成I_h=D_h(z)，用跨接口布局相关性、逐像素独立会话、30个自布置房间的视角一致性作行为探针；公式不是已识别的神经机制。",
+        "evidence": [
+            {"claim": "表1中Astra/Canvas结构通过率85.8%，GPT-image-1为68.8%，GPT-image-2为90.7%；表3中其整体胜率47.7%，设计/符号92.0%，人物/有机体仅6.0%。结构优势高度依赖任务。", "page_or_table": "PDF第4页表1；第6页表3"},
+            {"claim": "WorldBench 200题原图74.0%、SVG源代码69.0%、SVG渲染65.0%；代码通常优于自己的渲染，但总体低于原图。附录计数原图→代码30次损失、20次反向增益，不能把答错直接等同于信息消失。", "page_or_table": "PDF第6页§5.1.2/图3；第17–18页附录B"},
+            {"claim": "预算提高4倍，结构85.6%→86.8%，整体偏好胜率50.5%，无明显整体收益；正文该设置的85.6%与表1的85.8%分开引用。", "page_or_table": "PDF第7页§5.2.1"}
+        ],
+        "compute": "无专项训练，主要成本是闭源API、交互轮次及渲染。标准代码接口最多12轮，扩展48轮；预算定义B=输入token+5×输出token。附录说明不同接口算力与反馈不完全匹配。2–4人可用现有资源做小样本复核，GPU不是首要瓶颈。",
+        "limits": "主要消融单一Agent、自动裁判为主；画风迁移只有定性展示。房间实验测自选布局的一致性，不是外界真实空间准确性；逐像素探针仅5个主体。程序长度、裁判与闭源会话实现均可能影响结论，不能宣称发现内部世界模型。",
+        "transfer_hypothesis": "可迁移的是查询揭示前构造表示、查询后检验信息可用性的协议。候选假设：同字节预算下，事件图/程序记忆与视觉特征保留不同证据；这是新探针，论文未验证流式视频事件。无需重启旧video相位路线。",
+        "pilot": "建议先选约100个预先标注的延迟事件样本，固定编码与预算，比较原历史、帧特征、文字摘要和结构化记录；恢复被删证据后检查是否修复，按视频划分并盲审。若结构记录只在文字可解题占优，或未胜强视觉选择器，停止此分支。未执行。",
+        "priority": "P3：表征与评估协议参考；不宜作为新主攻，不能挤占ESN收尾或有限记忆识别探针。"
+    },
+    {
+        "id": "B12",
+        "title": "VISTA: A Visual Harness for Reasoning in an Interactive World",
+        "source_url": "https://arxiv.org/abs/2610.02200",
+        "screenshot_check": "已实看截图09第二行第三格：VISTA标题、Qiushi Han/Keya Hu/Linlu Qiu/Cathy Wu/Kaiming He和MIT均与PDF首页一致。属于2026-10技术报告；PDF代码地址为https://github.com/joshhhhhan/VISTA（注意用户名拼写）。",
+        "problem": "交互时最初编码或摘要可能丢掉之后才有用的细节，固定上下文又限制长程推理。VISTA让模型事后重看原始证据，解决的是可访问性；它选择保存全部历史，并未解决有限总存储下的写入与丢弃。",
+        "mechanism": "每个动作产生的所有原帧（含动画中间帧）按turn/frame存档。模型接收末帧，用inspect选任意旧帧和局部放大，用read_pixels取精确像素；GUIDE记录规则，WORKING记录临时计划，换上下文仍可访问历史。系统只机械执行工具，无新训练。RHAE按动作数相对人类计分：完成关卡min(1.15,(h/a)^2)，再按关卡加权和完成比例封顶；检索并不计游戏动作。",
+        "evidence": [
+            {"claim": "同GPT-5.6 Sol设置，已有连续会话和笔记时RHAE为70.05；加入无损视觉记忆与inspect后94.10，再加精确像素读数99.00。后两设置也改为自动只发末帧，因此不是单独存储部件的纯消融。", "page_or_table": "PDF第6页图5；第15–16页附录A.2"},
+            {"claim": "100K上下文取得98.6、每游戏17.3M token；200K为99.0、30.7M；780K降至93.9、105.7M。上下文更长并不保证更好；图8开放权重GLM的无视觉工具13.27→完整66.93。", "page_or_table": "PDF第7页图7(a)、图8"},
+            {"claim": "Opus完成25个公开游戏，7,302动作对人类17,135，RHAE100；但官方40.68参考使用high而VISTA用xhigh，且官方API与实验CLI不一致。不能把全部差值归于记忆。", "page_or_table": "PDF第5页表1；第15页附录A.1–A.2"}
+        ],
+        "compute": "不训练，但闭源推理消耗大；默认单游戏最高2,000动作、48小时。原始历史存储随过程增长，任意crop重编码、检查工具和笔记都应收费。4–8高端GPU适合较小开放模型探针，不代表能低成本复现320B及完整闭源成绩。",
+        "limits": "公共游戏可能进入基础模型训练集；只测BabyVision的39个子类题，不代表全388题。无严格存储上限，不能称恒定内存算法。游戏动作效率不等于端到端时间、token或存储效率；API/CLI与早停协议需分别控制。",
+        "transfer_hypothesis": "这是有限记忆路线的强碰撞与完整历史参照。可研究差异是：未来问题未知时，在相同总字节、读写次数和编码成本下，哪些短暂证据必须保留。仅添加外部视觉记忆、主动放大或换检索器已不足新颖。",
+        "pilot": "建议冻结视觉编码和访问协议，在预先标注的自然事件上做完整历史→预算限制→回填被删证据三段识别；同时比较均匀/最近帧、去重、强token选择和递归摘要。先用一个小模型查失败能否被回填修复，再用第二家族复核；若强基线已解决则停止。未执行。",
+        "priority": "P1：有限记忆候选必读、必对照；优先验证预算差异，不复刻无预算全历史系统作为新贡献。"
+    },
+    {
+        "id": "B13",
+        "title": "Eat Your Precision: Precision Objective Mitigates Reward Hacking in Rubric-based RL",
+        "source_url": "https://arxiv.org/abs/2610.33512",
+        "screenshot_check": "已实看截图09第二行第四格：Eat Your Precision标题与作者KAIST/CMU信息对应PDF。截图中的“精度”在这里指内容精确率precision，和数值精度/量化位宽无关。2026-10预印本。",
+        "problem": "rubric奖励主要计算要求覆盖率，模型可通过越来越长的答案碰到更多条目，同时生成冗余和错误内容。FORK把是否覆盖要求与每个实际输出单元是否必要、正确分开，针对奖励规格不完整导致的投机。",
+        "mechanism": "先把答案拆成近似句子的内容单元，去掉纯标题和寒暄。每条rubric向匹配的K_j个单元平分一份必要性信用，c_i=Σ_j m_ji/K_j；裁判选择动态阈值τ，N_i=1[c_i≥τ]。另判事实正确C_i，P=平均N_iC_i；召回R是带权rubric覆盖率。奖励Fβ=(1+β²)PR/(β²P+R)。重复内容分薄信用，错误或无关内容进入分母，从而限制“写得多就得分”。",
+        "evidence": [
+            {"claim": "Medical标准覆盖奖励：R35.7/P25.5/胜率3.1/9,195字符；FORK β=1：R32.5/P53.2/胜率68.0/3,533字符。β=1.25在表6为R35.8/P49.0/F1=38.6。β=1并非完全不损召回，不能混用两组结果。", "page_or_table": "PDF第7页表1；第9页表6"},
+            {"claim": "科学域ResearchQA标准奖励召回64.4、胜率16.1；FORK召回58.9、胜率67.1。显示偏好收益也伴随覆盖率权衡，不应写成所有外部任务均保持相同召回。", "page_or_table": "PDF第7页表2"},
+            {"claim": "40条Medical回答共723单元的删除实验中，按信用移除前40%单元几乎不降低召回；训练裁判在必要性上的相关仅0.534，整体五项平均0.714。裁判选择不是人工真值验证。", "page_or_table": "PDF第8–9页图4；第13页附录B/表7"}
+        ],
+        "compute": "Qwen2.5-7B-Instruct，GRPO每提示16次rollout、batch128、上下文2,000，3轮训练用8×H100；另有Qwen3.6-35B-A3B训练裁判与GPT-5.4评测成本。4–8高端GPU能承载缩小版，但应先审计奖励，不直接复制全训练矩阵。",
+        "limits": "必要性仍绑定既定rubric，可能误伤未列出的有用信息；句子切分和阈值由LLM决定，评价独立性有限。主要结果一个7B策略，未给多seed置信区间。Fβ是已有形式，不能把加精确率本身重新宣称新贡献。",
+        "transfer_hypothesis": "可借鉴为视觉记忆摘要的评估：同时查事件证据覆盖和新增无依据断言。但文本精确率高不等于未来视觉问题信息完整，尤其未知查询下“必要”没有固定清单；视频claim级奖励也已是其相关工作。",
+        "pilot": "建议对冻结的约200个事件回答或记忆摘要先做离线审计，人工盲标必要性与证据支持，比较覆盖奖励、长度惩罚、FORK和直接偏好。检测是否通过少写来藏错，并独立测试未来问答。只有人评和任务收益一致才考虑训练，失败即停止。未执行。",
+        "priority": "P2：奖励和评估工具，服务有限记忆探针；不是当前独立主攻，不以医疗基准结果外推视觉结论。"
+    },
+    {
+        "id": "B14",
+        "title": "Function-Space Temporal Self-Distillation for Policy Optimization",
+        "source_url": "https://arxiv.org/abs/2610.19687",
+        "screenshot_check": "已实看截图10第一行第一格：完整标题、Aryan Das/Arnab Bhattacharya/Vinay Kumar Verma对应PDF首页。2026-10预印本；视频“无额外EMA教师”仅指不保留常驻教师参数，仍有特权教师前向。",
+        "problem": "同一策略生成学生与反馈增强教师时，stop-gradient只能隔离当前更新，跨步教师仍移动；EMA稳定目标却多占一份参数。FSPO把历史教师输出冻结在函数空间，并处理自生成指导不可靠和回放重复的问题。",
+        "mechanism": "学生只见题目，教师额外见已验证同组答案、历史轨迹或参考答案；当前分布用学生top-100加尾桶作JSD。对log p−log q>γ的过高估计token另加惩罚。历史缓存保存轨迹、教师top-32及尾质量，延迟刷新而非保存参数。目标L=(1−ρ)Lcur+ρLtemp+λCE LCE；失败率平滑控制参考CE，ρ周期性提高。缓存按质量与签名覆盖保留，并分组均匀回放。",
+        "evidence": [
+            {"claim": "4×GH200、5小时内最佳avg@16：Qwen3-8B为76.2，SDPO72.0；Olmo3-7B为72.4，SDPO68.0。是预算窗口内峰值，基线来自SDPO论文，不是本文全部重新跑的终点均值。", "page_or_table": "PDF第6页表1；第7页§3.1"},
+            {"claim": "Olmo Biology/Tool Use平均：完整64.5，去历史项60.1，去参考CE61.7，去负向纠正63.8；EMA(0.99)63.2、轨迹CE回放58.5，支持分布回放的附加价值。", "page_or_table": "PDF第8页表2 Case1/Case3"},
+            {"claim": "论文核算Olmo峰值56GB对70GB；图8平均942缓存项占4.8MB。附录却明确多选题“结构签名”是预测选项，工具任务才是动作序列；不能把覆盖解释为推理策略多样性。", "page_or_table": "PDF第8页图6；第17页附录A.1；第22–23页图8/附录A.5"}
+        ],
+        "compute": "每个5小时训练单元约20 GH200 GPU小时，不含完整消融及额外评测；batch32、8 rollouts、最长回答8,192、bf16。主机缓存、刷新前向和回放计算仍需收费；6T模型节省12TB只是参数核算外推。4–8高端GPU适合单任务复核。",
+        "limits": "任务为科学选择题和结构化工具使用，不能直接推断长视觉交互。无多seed误差条，峰值选取需要独立验证集防止选择偏差；多个新增组件并存。4.8MB是该实验统计，不是任意长轨迹的通用上界；训练缓存也不是推理期记忆。",
+        "transfer_hypothesis": "可迁移的原则是用固定历史输出稳定轻量记忆策略训练，同时把教师存储与学生状态分账。它不提供未知未来查询的视觉保留准则，不能据“时间记忆”二字重启旧SSM/接口选择器路线。",
+        "pilot": "待有限记忆识别探针成立后，再冻结主干，比较即时蒸馏、EMA、CE回放、稀疏分布回放；固定演示、rollout、字节及墙钟预算，分离历史项和参考CE收益。预先固定评估时点，至少3 seed；若收益仅来自额外参考标签或更长预算，不继续。未执行。",
+        "priority": "P2：训练成本与稳定性工具，排在VISTA协议审计之后；目前不单开一条新的后训练主线。"
+    }
+]
+
+(out / '08.json').write_text(json.dumps(papers, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+labels = {'screenshot_check':'截图核对','problem':'问题','mechanism':'核心机制','compute':'算力与实现','limits':'边界','transfer_hypothesis':'可迁移假设','pilot':'最小探针（建议，未执行）','priority':'优先级'}
+lines = ['第08组深读：视觉代码、交互记忆、奖励精确率与时间自蒸馏', '核验日期：2026-11-05；页码均为本地PDF物理页码（从1开始）。', '已实看截图09/10，读取四篇正文方法、实验及相关附录，并视觉检查关键表页。原文结果与迁移建议分列；未训练、未改原项目。', '总体建议：B12为有限记忆路线的必对照；B13/B14服务评估和训练；B11作表示协议参考。延续“ESN证书收成＋一个有限记忆小探针”，不同时启动多条新主线。', '']
+for p in papers:
+    lines += [p['id']+' '+p['title'], '来源：'+p['source_url']]
+    for key in ['screenshot_check','problem','mechanism']:
+        lines.append(labels[key]+'：'+p[key])
+    lines.append('具体原文证据：')
+    for i,e in enumerate(p['evidence'], 1):
+        lines.append(f"{i}. {e['claim']}【{e['page_or_table']}】")
+    for key in ['compute','limits','transfer_hypothesis','pilot','priority']:
+        lines.append(labels[key]+'：'+p[key])
+    lines += ['', '']
+(out / '08.txt').write_text('\n'.join(lines), encoding='utf-8')
+for p in papers:
+    text = json.dumps(p, ensure_ascii=False)
+    print(p['id'], 'Chinese chars', len(re.findall('[\u4e00-\u9fff]',text)), 'evidence',len(p['evidence']))
+print('Wrote 08.json and 08.txt')

@@ -1,0 +1,2131 @@
+KH-A061 | Is Noise Conditioning Necessary for Denoising Generative Models?
+来源：https://arxiv.org/abs/2502.13129
+本地PDF：专题文献/何恺明/KH-A061_Is_Noise_Conditioning_Necessary_for_Denoising_Generative_Models_ICML2025.pdf
+SHA-256：6d5da1a7224e06598da2ea727af0e6fa4f4a962312837f235fc4c14d0b03be95
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+               Is Noise Conditioning Necessary for Denoising Generative Models?
+
+
+
+                             Qiao Sun * 1 Zhicheng Jiang * 1 Hanhong Zhao * 1 Kaiming He 1
+
+                         Abstract
+
+                     It is widely believed that noise conditioning is
+               indispensable for denoising diffusion models to
+            work successfully. This work challenges this be-
+                     lief. Motivated by research on blind image denois-
+                 ing, we investigate a variety of denoising-based2025         generative models in the absence of noise con-
+                ditioning. To our surprise, most models exhibit
+                graceful degradation, and in some cases, they even
+              perform better without noise conditioning. WeNov
+               provide a theoretical analysis of the error caused                         (a)                                   (b)
+17        by removing noise conditioning and demonstrate         Figure 1: (a) A denoising generative model takes a noisy                 that our analysis aligns with empirical observa-
+                                                                      data z and a noise level indexed by t (such as σt) as the
+                  tions. We further introduce a noise-unconditional
+                                                                           inputs to the neural network NNθ. (b) This work investigates
+             model that achieves a competitive FID of 2.23
+                                                                          the scenario of removing noise conditioning in the network.
+             on CIFAR-10, significantly narrowing the gap to
+               leading noise-conditional models. We hope our
+                                                                       estimated from corrupted data, making blind denoising (i.e.,
+                findings will inspire the community to revisit the[cs.CV]                                                             without knowing the noise level) a feasible task. Notably,               foundations and formulations of denoising gener-
+                                                                             noise-level estimation and blind image denoising have been
+                 ative models.
+                                                                              active research topics for decades (Stahl et al., 2000; Salmeri
+                                                                                 et al., 2001; Rabie, 2005), with neural networks offering
+                                                                            effective solutions (Chen et al., 2018; Guo et al., 2019;          1. Introduction
+                                                         Zhang et al., 2023).  This raises an intriguing question:
+         At the core of denoising diffusion models (Sohl-Dickstein    can related research on image denoising be generalized to
+            et al., 2015) lies the idea of corrupting clean data with    denoising-based generative models?
+          various levels of noise and learning to reverse this process.
+                                                                 Motivated by this, in this work, we systematically com-
+        The remarkable success of these models has been partially
+                                                                    pare a variety of denoising-based generative models —
+          underpinned by the concept of “noise conditioning” (Sohl-                                                                     with and without noise conditioning. Contrary to common
+           Dickstein et al., 2015; Song & Ermon, 2019; Ho et al., 2020):
+                                                                                  belief, we find that many denoising generative models per-
+          a single neural network is trained to perform denoising
+                                                              form robustly even in the absence of noise conditioning. In
+           across all noise levels, with the noise level provided as a
+                                                                                   this scenario, most methods exhibit only a modest degrada-
+          conditioning input. The concept of noise conditioning has
+                                                                             tion in generation performance. More surprisingly, we findarXiv:2502.13129v2    been predominantly incorporated in diffusion models and is
+                                                                              that some relevant methods—particularly flow-based ones
+          widely regarded as a critical component.
+                                                           (Lipman et al., 2023; Liu et al., 2023), which originated
+           In this work, we examine the necessity of noise conditioning    from different perspectives—can even produce improved
+            in denoising-based generative models. Our intuition is that,    generation results without noise conditioning. Among all
+            in natural data such as images, the noise level can be reliably    the popular methods we studied, only one variant fails dis-
+                                                                             astrously. Overall, our empirical results reveal that noise
+             *Equal  contribution   1MIT.  Correspondence  to:   Qiao                                                                        conditioning may not be necessary for denoising generative
+         Sun <sqa24@mit.edu>, Zhicheng Jiang <jzc 2007@mit.edu>,
+                                                              models to function properly.         Hanhong  Zhao  <zhh24@mit.edu>,  Kaiming He  <kaim-
+          ing@mit.edu>.                                            We present a theoretical analysis of the behavior of these
+                              nd                                 models in the absence of noise conditioning. Specifically,           Proceedings of the 42    International Conference on Machine
+           Learning, Vancouver, Canada. PMLR 267, 2025. Copyright 2025   we investigate the inherent uncertainty in the noise level dis-
+          by the author(s).                                                      tribution, the error caused by denoising without noise condi-
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+tioning, and the accumulated error in the iterated sampler.    2023; Albergo et al., 2023) reformulate and generalize the
+Put together, we formulate an error bound that can be com-   framework by learning flow fields that map one distribution
+puted without involving any training, depending solely on     to another. In all these methods, noise conditioning (also
+the noise schedules and the dataset. Experiments show that     called time conditioning) is the de facto choice.
+this error bound correlates well with the noise-unconditional
+                                                  Beyond diffusion models, Consistency Models (Song et al.,
+behaviors of the models we studied—particularly in cases
+                                                      2023) have emerged as a new family of generative models
+where the model fails catastrophically, its error bound is
+                                                                for non-iterative generation.  It has been found (Song &
+orders of magnitudes higher.
+                                                           Dhariwal, 2024) that noise conditioning and its implementa-
+Because noise-unconditional models have been rarely con-    tion details are critical for the success of consistency models,
+sidered, it is worthwhile to design models specifically for    highlighting the central role of noise conditioning.
+this underexplored scenario. To this end, we present a sim-
+ple alternative derived from the EDM model (Karras et al.,    Blind Image Denoising.  In the field of image processing,
+2022). Without noise conditioning, our variant can achieve a    blind image denoising has been studied for decades. It refers
+strong performance, reaching an FID of 2.23 on the CIFAR-    to the problem of denoising an image without any prior
+10 dataset. This result significantly narrows the gap between    knowledge about the level, type, or other characteristics of
+a noise-unconditional system and its noise-conditional coun-    the noise. Relevant studies include noise level estimation
+terpart (e.g., 1.97 FID of EDM).                          from noisy images (Stahl et al., 2000; Shin et al., 2005; Liu
+                                                                      et al., 2013; Chen et al., 2015), as well as directly learning
+Looking ahead, we hope that removing noise conditioning
+                                                                   to perform blind denoising from data (Liu et al., 2007; Chen
+will pave the way for new advancements in denoising-based
+                                                                     et al., 2018; Batson & Royer, 2019; Zhang et al., 2023).
+generative modeling. For example, only in the absence of
+                                                 Modern neural networks, including the U-Net (Ronneberger
+noise conditioning can a score-based model learn a unique
+                                                                        et al., 2015) commonly used in diffusion models, have been
+score function and enable the classical, physics-grounded
+                                                 shown highly effective for these tasks.
+Langevin dynamics.1 Overall, we hope that our findings
+will motivate the community to re-examine the fundamental   Our research is closely related to classical work on blind
+principles of related methods and explore new directions in    denoising. However, the iterative nature of the generative
+the area of denoising generative models.                       process, where errors can accumulate, introduces new chal-
+                                                              lenges. In addressing these challenges, our work opens up
+2. Related Work                                new research opportunities that extend classical approaches.
+
+Noise Conditioning.  The seminal work of diffusion mod-    3. Formulation
+els (Sohl-Dickstein et al., 2015) proposes iteratively perturb-
+ing clean data and learning a model to reverse this process.    In this section, we present a reformulation that can summa-
+In this pioneering work, the authors introduced a “time de-    rize the training and sampling processes of various denoising
+pendent readout function”, which is an early form of noise    generative models. The core motivation of our reformula-
+conditioning.                                                  tion is to isolate the neural network NNθ, allowing us to
+                                                           focus on its behavior with respect to noise conditioning.
+The modern implementation of noise conditioning is popu-
+larized by the introduction of Noise Conditional Score Net-
+                                                                    3.1. Denoising Generative Modelsworks (NCSN) (Song & Ermon, 2019). NCSN is originally
+developed for score matching. This architecture is adopted    Training Objective.  During training, a data point x is
+and improved in Denoising Diffusion Probabilistic Models    sampled from the data distribution ppxq, and a noise ϵ is
+(DDPM) (Ho et al., 2020), which explicitly formulate gen-   sampled from a noise distribution ppϵq, such as a normal
+eration       as an iterative                     denoising                             problem.                                 The practice                                                     of     distribution Np0, Iq. A noisy image z is given by:noise conditioning                  has                    been inherited                                        in iDDPM                                              (Nichol
+                                                                 z “ aptqx ` bptqϵ.                  (1)& Dhariwal, 2021), ADM (Dhariwal & Nichol, 2021), and
+nearly all subsequent derivatives.                           Here, aptq and bptq are schedule functions that are method-
+                                                         dependent. The time step t, which can be a continuousDDIM (Song et al., 2021a) and EDM (Karras et al., 2022)
+                                                            or discrete scalar, is sampled from pptq. Without loss ofreformulate the reverse diffusion process into an ODE solver,
+                                                                   generality, we refer to bptq, or simply t, as the noise level.enabling deterministic sampling from a single initial noise.
+Flow Matching (FM) models (Lipman et al., 2023; Liu et al.,    In general, a denoising generative model involves minimiz-
+                                                            ing a loss function that can be written as:
+    1Otherwise, it relies on the annealed Langevin dynamics (Song                     ”& Ermon, 2019)) that does not correspond to a unique underlying                                                               ››2ı                                       “ Ex,ϵ,t wptq››NNθpz|tq ´ rpx, ϵ, tq     .   (2)probability distribution independent of noise levels.                  Lpθq
+
+                                                2
+
+======================== PDF 第 3 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Table 1: Schedules used by different models in our reformu-
+lation. Notations and details are in Section D.                                                             rpx1, ϵ1, t1q
+
+               iDDPM, DDIM        EDM        FM
+           a
+     aptq                  ¯αptq          b  1            1 ´ t                                   z
+                                      t2`σ2d                                                             Rpzq          a
+     bptq             1´¯αptq         b  t                  t
+                                      t2`σ2d
+                                                                                                                rpx2, ϵ2, t2q
+     cptq             0            b t          ´1
+                                           σd t2`σ2d
+     dptq             1         ´ b σd            1
+                                       t2`σ2d
+                                                           Figure 2: Illustration of the effective target Rpzq. A given
+                                                      z corresponds to multiple triplets px, ϵ, tq. Here, we take
+ Here, NNθ is a neural network (e.g., U-Net) to be learned,
+                                                   Flow Matching (Lipman et al., 2023) as an example. On the
+rpx, ϵ, tq is a regression target, and wptq is a weight. The     left are the samples of ϵ, and on the right are samples of x.
+regression target r can be written as:                       For a noisy sample z “ p1 ´ tqx ` tϵ, it can be produced
+                                                    by different triplets. Each triplet gives a different regression
+               rpx, ϵ, tq “ cptqx ` dptqϵ,              (3)     target r. The effective target Rpzq is the expectation of all
+                                                              possible r.
+where cptq and dptq are also method-specific schedule func-
+tions. Common choices of r include ϵ-prediction (Ho et al.,
+2020), x-prediction (Salimans & Ho, 2022), or v-prediction
+(Salimans & Ho, 2022; Lipman et al., 2023).                                                                                (left). This is commonly implemented as t-embedding, such
+The specifics of the schedule functions of several existing    as Fourier (Tancik et al., 2020) or positional embedding
+methods are in Table 1. It is worth noting that, in our refor-    (Vaswani, 2017). This t-embedding provides time-level in-
+mulation, we concern the regression target r with respect to    formation as an additional input to the network. Our study
+the neural network NNθ’s direct output.2                    concerns the influence of this noise conditioning, that is,
+                                           we consider NNθpzq vs. NNθpz|tq. See Fig. 1 (right). Note
+Sampling.  Given trained NNθ, the sampler performs it-    that NNθpzq or NNθpz|tq involves all learnable parameters
+erative denoising. Specifically, with an initial noise x0 „     in the model, while the schedules (aptq, bptq, etc.) are pre-
+Np0, bptmaxq2Iq, the sampler iteratively computes:           designed and not learned.
+         xi`1 :“ κixi ` ηiNNθpxi|tiq ` ζi˜ϵi.        (4)    4. Analysis of Noise-Unconditional Models
+
+Here, a discrete set of time steps ttiu is pre-specified and    Based on the above formulation, we present a theoretical
+indexed by 0 ď i ă N. The schedules, κi, ηi, and ζi,    analysis of the influence of removing noise conditioning.
+can be computed from the training-time noise schedules in   Our analysis involves both the training objectives and the
+Table 1 (see their specific forms in Section D). In Eq. (4),    sampling process. We first analyze the effective target of
+˜ϵi „ Np0, Iq is a sampling-time noise that only takes effect    regression at the training stage and its error in a single
+in SDE-based solvers; there is no noise added in ODE-based    denoising step (Sections 4.1 to 4.3), and then give an upper
+solvers, i.e., ζi “ 0.                                  bound on the accumulated error in the iterative sampler
+                                                              (Section 4.4). Overall, our analysis provides an error boundEq. (4) is a general formulation that can encapsulate many
+                                                                    that is to be examined by experiments.first-order samplers, such as (annealed) Langevin sampling
+and Euler-based ODE solver. Higher-order samplers (e.g.,
+                                                                    4.1. Effective TargetsHeun) can be formulated similarly with extra schedules. In
+this paper, our theoretical analysis is based on Eq. (4), and    While the loss function is often written in a form like Eq. (2),
+higher-order cases are evaluated empirically.                                                              the underlying unique regression target for NNθpz|tq is not
+                                                          rpx, ϵ, tq. The function NNθpz|tq, which is w.r.t. z and t, is
+3.2. Noise Conditional Networks                            regressed onto multiple r values corresponding to different
+                                                               possible triplets px, ϵ, tq that produce the same z (see Fig. 2).In existing methods, the neural network NNθpz|tq is con-
+                                                                       Intuitively, the unique effective target, denoted as Rpz|tq toditioned on the noise level specified by t.  See Fig. 1
+                                                     emphasize its dependence on z and t, is the expectation of
+   2For methods like EDM where the network output is wrapped    r over all possible triplets.
+with a precondition, we rewrite the schedules to expose the term
+of NNθ (see Section D.3). This network NNθ is called the “raw    Formally, optimizing the loss in Eq. (2) is equivalent to
+network” in EDM (see Eq. (8) in (Karras et al., 2022)).             optimizing the following loss, where each term inside the
+
+                                                3
+
+======================== PDF 第 4 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+
+
+                                                                                                              800expectation Er¨s has a unique effective target:
+
+                                                                                                              700                                                          ››2ı     “ Ez„ppzq,t„ppt|zq ”››NNθpz|tq ´ Rpz|tq     .   (5)           600   Lpθq
+Here, ppzq is the marginalized distribution of z:“aptqx `           500
+
+                                                                                                              400bptqϵ in Eq. (1), under the joint distribution ppx, ϵ, tq :“         PDF
+ppxqppϵqpptq.3 It is easy to show that:                                               300
+                                    “         ‰
+          Rpz|tq “ Epx,ϵq„ppx,ϵ|z,tq rpx, ϵ, tq ,        (6)           200
+                                                                                                              100
+that is, the expectation over all px, ϵq subject to the condi-             0
+tional distribution. One can show (Section C.1) that mini-               0.00      0.10      0.20      0.30      0.40      0.50t       0.60      0.70      0.80      0.90      1.00
+mizing Eq. (5) is equivalent to minimizing Eq. (2), and sim-
+ilar analysis has also been done in previous work(Lehtinen    Figure 3: The Posterior distribution ppt|zq is concen-
+et al., 2018).                                                   trated. We picked z “ p1 ´ t˚qx ` t˚ϵ with t˚ from 0.1 to
+                                                             0.9 for illustration. This plot is empirically simulated from
+Effective Targets without Noise Conditioning.   Similarly,   15,000 images in the AFHQ-v2 dataset with a size 64ˆ64
+if the network NNθpzq does not accept t as the condition, its    (see Section A.2).
+unique effective target Rpzq should depend on z only. In
+this case, the loss is:
+                                                     ››2ı                 Intuitively,data inducesthisa sharplystatementpeakedsuggestsppt | thatzq. Inhigh-dimensionalSection C.2, we        “ Ez„ppzq ”››NNθpzq ´ Rpzq     ,        (7)        Lpθq                                              derive a rigorous upper bound on this variance and extend
+                                                               the analysis to the multi–data–point setting. To corroboratewhere the unique effective target is:
+                                                             these theoretical findings, we empirically run a simulation                                 “       ‰
+            Rpzq “ Et„ppt|zq Rpz|tq .              (8)   on a real dataset and plot ppt|zq (see Fig. 3). The empiri-
+                                                                cal distribution of ppt|zq is well concentrated. Moreover,
+Eq. (8) suggests that if the conditional distribution ppt|zq is    a smaller t˚ leads to a more concentrated ppt|zq, as also
+close to a Dirac delta function, the effective target would be    indicated by Eq. (9).
+the same with and without conditioning on t. If so, assuming
+the network is capable enough to fit the target, the noise-    4.3. Error of Effective Regression Targets
+unconditional variant would produce the same output as the
+                                                   With ppt|zq, we investigate the error between the effectiveconditional one.
+                                                              regression targets Rpzq and Rpz|tq. Formally, we consider:
+                                                                            ”
+4.2. Concentration of Posterior ppt|zq                                                        Epzq :“ Et„ppt|zq }Rpz|tq ´ Rpzq}2ı.     (10)
+Next, we investigate how similar ppt|zq is to a Dirac delta
+function.  For high-dimensional data such as images,  it   We show that this error Epzq is substantially smaller than
+has been long realized that the noise level can be reliably    the norm of Rpzq:
+estimated (Stahl et al., 2000; Salmeri et al., 2001; Shin et al.,
+                                                     Statement 2 (Error of effective regression targets). Con-2005), implying a concentrated ppt|zq. We note that the
+                                                              sider the scenario in Statement 1 and the Flow Matchingconcentration of ppt|zq depends on data dimensionality:
+                                                               case. The error defined in Eq. (10) satisfies:
+Statement 1 (Concentration of ppt|zq). Consider a single
+                                                                          1       xdatapoint          P             r´1,                                  Iq,                                                   1s, and                                           z “                   Epzq «                     1sd, ϵ„Np0,                               t„Ur0,                                                                         2p1 ` σ2dq               (11)                (the                Flow                      Matching                                     case).                                    Given                                        a noisy            tϵp1  ´ tqx `
+image z “ p1 ´ t˚qx ` t˚ϵ produced by a given t˚, the                                        1           1                                                 when the data dimension d satisfies d ! t˚ and d ! 1 ´ t˚.variance of t under the conditional distribution ppt|zq, is:                                                        Here, σd denotes the per-pixel standard deviation of the
+                                                                 dataset. (Derivation in Section C.3)
+                                       t2˚
+                   Vart„ppt|zqrts « 2d,                 (9)     Intuitively, Statement 2 suggests that for sufficiently high-
+                                    1           1            dimension d, the error Epzq is substantially smaller («1)
+when the data dimension d satisfies d ! t˚ and d ! 1 ´ t˚.    than the L2 norm of the target Rpzq («d). In our real-data
+(Derivation in Section C.2)                                                                   verification, we find that Epzq is at the order of 1{103 of
+   3For simplicity, we consider wptq“1, which happens to be the    Rpzq (see Section A.2). In this case, regressing to Rpz|tq
+case for all methods in Table 1 when we expose NNθ explicitly.      can be reliably approximated by regressing to Rpzq.
+
+                                                4
+
+======================== PDF 第 5 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+4.4. Accumulated Error in Sampling                      5. A Noise Unconditional Diffusion Model
+
+Thus far, we have been concerned with the error of a sin-    In addition to investigating existing models, we also design
+gle regression step. In a denoising generative model, the    a diffusion model specifically tailored for noise uncondition-
+sampler at inference time is iterative. We investigate the     ing. Our motivation is to find schedule functions that are
+accumulated error in the iterative sampler.                 more robust in the absence of noise conditioning, while still
+                                                            maintaining competitive performance. To this end, we build
+To facilitate our analysis, we assume the network NNθ is
+                                                  upon the highly effective EDM framework (Karras et al.,
+sufficiently capable of fitting the effective regression target
+                                                      2022) and modify its schedules.
+Rpz|tq or Rpzq. Under this assumption, we replace NNθ in
+Eq. (4) with R. This leads to the following statement:     A core component of EDM is a “preconditioned” denoiser:
+                                                                                     `        ˘
+Statement 3 (Bound of accumulated error).  Consider                                                                                            cskipptqˆz ` coutptqNNθ  cinptqˆz | t
+a sampling process, Eq. (4), of N steps, starting from the
+same initial noise x0 “ x10. With noise conditioning, the    Here,  ˆz :“ x ` tϵ is the noisy input before the nor-
+sampler computes:                                         malization performed by cinptq,4 which we simply set as
+                                                                      cinptq “ ? 1    . The main modification we adopt for the
+          xi`1 “ κixi ` ηiRpxi|tiq ` ζi˜ϵi,                           1`t2
+                                                            noise unconditioning scenario is to set:
+and without noise conditioning, it computes:
+                                                                                                 coutptq “ 1.
+             x1i`1 “ κix1i ` ηiRpx1iq ` ζi˜ϵi.
+                                              As a reference, EDM set coutptq “ ? σdt   where σd is the
+                                                                                                 σ2d `t2
+Assuming }Rpx1i|tiq ´ Rpxi|tiq} { }x1i ´ xi} ď Li and    data std. As coutptq is the coefficient applied to NNθ, we
+}Rpx1iq ´ Rpx1i|tiq} ď δi, it can be shown that the error    expect setting it to a constant will free the network from
+between the sampler outputs xN and x1N is bounded:         modeling a t-dependent scale. In experiments (Section 6.2),
+                                                                        this simple design exhibits a lower error bound (Statement 3)
+ }xN´x1N} ď A0B0 ` A1B1 ` . . . ` AN´1BN´1, (12)                                                          than EDM. We name this model as uEDM, which is short
+ where:                                                        for (noise-)unconditional EDM. For completeness, the re-
+         N´1ź
+                                                                 sulting schedules of uEDM are provided in Section D.5.
+     Ai “      pκi ` |ηi|Liq  and  Bi “ |ηi|δi.
+           j“i`1
+                                                        6. Experiments
+depend on the schedules and the dataset. (Derivation in
+Section C.4)                                          Experimental Settings.  We empirically evaluate the im-
+                                                             pact of noise conditioning across a variety of models:
+Here, the assumption on δi can be approximately satisfied as
+per Statement 2. The assumption on Li models the function                                                                            • Diffusion: iDDPM (Nichol & Dhariwal, 2021), DDIM
+Rp¨|tq as Lipschitz-continuous. Although it is unrealistic for                                                          (Song et al., 2021a), ADM (Dhariwal & Nichol, 2021),
+this assumption to hold exactly in real data, we empirically
+                                     EDM (Karras et al., 2022), and uEDM (Sec. 5)
+find that an appropriate choice of Li can ensure the Lipchitz
+condition holds with high probability (Section A.3).                • Flow-based Models: we adopt the implementation of
+                                                                   Rectified Flow (1-RF) (Liu et al., 2023), which is a
+Statement 3 suggests that the schedules κi and ηi are influ-       form of Flow Matching (Lipman et al., 2023) (FM).
+ential to the estimation of the error bound. With different
+                                                                            • Consistency Models: iCT (Song & Dhariwal, 2024)schedules across methods, their behavior in the absence of
+                                                         and ECM (Geng et al., 2025).noise conditioning can be dramatically different.
+                                                Our main experiments are on class-unconditional gener-
+Discussions.  Remarkably, the bound estimation can be    ation on CIFAR-10 (Krizhevsky et al., 2009), with extra
+computed without training the neural networks: it can be     results on ImageNet 32ˆ32 (Deng et al., 2009), and FFHQ
+evaluated solely based on the schedules and the dataset.      64ˆ64 (Karras et al., 2019). We evaluate Fr´echet Inception
+                                                         Distance (FID) (Heusel et al., 2017) and report Number
+Furthermore, our analysis of the “error” bound implies
+                                                            of Function Evaluations (NFE). For a fair comparison, all
+that the noise-conditional variant is more accurate, with
+                                                    methods are based on our re-implementation as faithful asthe noise-unconditional variant striving to approximate it.
+                                                             possible (see Section B.3): with and without noise condi-
+In fact, there is no reason to assume that the former should
+                                                                tioning are run in the same implementation for each method.
+be a more accurate generative model. Nonetheless, in ex-
+periments, we find that the noise-unconditional case can        4To make notations consistent with our reformulation in Eq. (2),
+outperform its noise-conditional counterpart in some cases.   we denote z “ cinptqˆz. See details in Section D.3.
+
+                                                5
+
+======================== PDF 第 6 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Table 2: Changes of FID scores in the absence of noise
+                                                                                106                                        DDIMconditioning, for different methods on CIFAR-10. Here                                               EDM
+‘w/o t’ means without noise conditioning. A color of yellow                                                FM (1-RF)
+                                                                                104                                      uEDMdenotes a non-disastrous (and often decent) degradation;                   (AiBi)
+ green denotes improvement; red denotes failure.
+                                                                                102                                                                                                                                                                       Bound
+                                           FID
+     model             sampler   NFE
+                                         w/ t Ñ  w/o t                              Error  100
+    iDDPM          SDE      500     3.13 Ñ   5.51
+    iDDPM (x-pred)    SDE      500     5.64 Ñ   6.33                10−2                                                                                                                                                                                                                                                                           Per-step
+                 ODE      100     3.99 Ñ  40.90
+    DDIM          SDE      100     8.07 Ñ  10.85                10−4
+                   SDE     1000     3.18 Ñ   5.41
+
+   ADM           SDE      250     2.70 Ñ   5.27                      0       20       40       60       80      100
+                                                                                                      Step index i
+                     Heun       35     1.99 Ñ   3.36
+   EDM
+                           Euler       50     2.98 Ñ   4.55                     Model           accum. bound   FID w/ t Ñ w/o t
+
+                           Euler      100     3.01 Ñ   2.61                 DDIM               3e6         3.99 Ñ   40.90
+   FM (1-RF)         Heun       99     2.87 Ñ   2.63               EDM                1e3         2.34 Ñ    3.80
+                   RK45    „127     2.53 Ñ   2.63               FM (1-RF)           1e2         3.01 Ñ    2.61
+                                                             uEDM (Sec. 5)        1e2         2.62 Ñ    2.66
+     iCT                         -          2     2.59 Ñ   3.57
+   ECM                        -          2     2.57 Ñ   3.27
+                                                         Figure 4: Error bound and the influence of noise con-
+    uEDM (Sec. 5)      Heun       35     2.04 Ñ   2.23
+                                                             ditioning. ODE with N “ 100 steps is applied for each
+                                                                  variant. The plot shows the per-step error bound AiBi in
+                                                        Eq. (12), and the table shows the accumulated error bound.
+6.1. Main Observations                              The y-axis is log-scale.
+
+Table 2 summarizes the FID changes in different generative
+                                                                  qualitative behavior: the model is still able to make sense
+models, with and without noise conditioning, denoted as
+                                                             of shapes and structures; it is “overshoot” or “undershoot”,
+“w/ t” and “w/o t”. Fig. 5 shows some qualitative results.
+                                                         producing over-saturated or noisy results.
+We draw the following observations:
+
+(i) Contrary to common belief, noise conditioning is not an                                               Summary.  Our experimental findings highlight that noise
+enabling factor for most denoising-based models to function                                                              conditioning, though often helpful for improving quality, is
+properly. Most variants can work gracefully, exhibiting                                                            not essential for the fundamental functionality of denoising
+small but decent degradation (yellow).                                                             generative models.
+(ii) More surprisingly, some flow-based variants can achieve
+improved FID (green) after removing noise conditioning.    6.2. Analysis
+In general, flow-based methods investigated in this paper are
+                                                    Error Bound.  In Fig. 4, we empirically evaluate the error
+insensitive to whether we use noise conditioning or not. We
+                                                    bound in Statement 3 for different methods under a 100-step
+hypothesize that this is partially because FM’s regression
+                                     ODE sampler. The computation of the bound depends only
+target is independent on t (see Table 1: c “ ´1, d “ 1)
+                                                  on the schedules for each methods, as well as the dataset
+(iii) The uEDM variant (Sec. 5) achieves a competitive FID     (detailed in Section A.3).
+of 2.23 without noise conditioning, narrowing the gap to the
+                                                               Fig. 4 shows a strong correlation between the theoretical
+strong baseline of the noise-conditional methods (here, 1.99
+                                                  bound and the empirical behavior. Specifically, DDIM’s
+of EDM, or 1.97 reported in Karras et al. (2022)).
+                                                                catastrophic failure can be explained by its error bound that
+(iv) Consistency Models (here, iCT and ECM), which are re-     is orders of magnitudes higher. On the other hand, EDM,
+lated to diffusion models but present a substantially different   FM, and uEDM all have small error bounds throughout.
+objective function, can also perform gracefully. While iCT    This is consistent with their graceful behavior in the lack of
+was found highly sensitive to the subtleties of t-conditioning    noise conditioning.
+(see Song & Dhariwal (2024)), we find that removing it does
+                                                    These findings suggest that the error bound derived in our
+not lead to disastrous failure.
+                                                              analysis serves as a reliable predictor of a model’s robust-
+(v) Among all variants we investigate, only “DDIM w/ ODE    ness to the removal of noise conditioning. Importantly, the
+sampler” results in a catastrophic failure (red), with FID    bound can be computed solely based on the model’s for-
+significantly worsened to 40.90. Fig. 5 (a) demonstrates its    mulation and dataset statistics, without training the neural
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+
+
+
+
+                 (a) DDIM (FID: 3.99 Ñ 40.90)                                         (b) EDM (FID: 1.99 Ñ 3.36)
+
+
+
+
+
+               (c) FM (1-RF) (FID: 3.01 Ñ 2.61)                                       (d) uEDM (FID: 2.04 Ñ 2.23)
+
+Figure 5: Samples of noise-conditional vs. noise-unconditional models. Samples are generated by (a) DDIM, (b)
+EDM, (c) FM (1-RF), and (d) uEDM, on the CIFAR-10 class-unconditional case. For each subfigure, the left panel is the
+noise-conditional case, and the right panel is the noise-unconditional counterpart, with the same random seeds. The change
+of FID is from “w/ t” to “w/o t”. See also Table 2 for more quantitative results.
+
+
+       35                                                          further investigate the level of stochasticity in Fig. 6.
+                                                   SDE
+                                              ODE            Specifically, with the flexibility of DDIM (Song et al.,       30
+                                                         2021a), one can introduce a parameter λ that interpolates
+  t 25                                                between the ODE and SDE samplers by adjusting ηi and ζi
+      w/o 20                                                           in Eq. (4) (see Eq. (56) in Section D.2). As shown in Fig. 6,
+      FID                                                               increasing λ (more stochasticity) consistently improves FID
+       15
+                                                                scores. When λ “ 1, DDIM behaves similarly to iDDPM.
+       10
+                                      We hypothesize that this phenomenon can be explained
+        5                                            by error propagation dynamics. Our theoretical bound in
+             0.0          0.2          0.4          0.6          0.8          1.0
+                           λ (stochasticity)                         Statement 3 assumes worst-case error accumulation, but
+                                                                in practice, stochastic sampling enables error cancellation.
+Figure 6: Influence of Stochasticity on DDIM, in the lack   The ODE sampler’s consistent noise patterns lead to cor-
+of noise conditioning. The level of stochasticity is specified     related errors, while the SDE sampler’s independent noise
+by λ, with λ “ 0 denoting the ODE case. Here, the number     injections at each step promote error cancellation. This error
+of sampling steps is fixed as 500.                              cancellation mechanism can improve performance with in-
+                                                             creasing stochasticity, as further evidenced by iDDPM and
+                                          ADM’s results (Table 2) produced by SDE.
+network. Consequently, it can provide a valuable tool for
+estimating whether a given denoising generative model can
+function effectively without noise conditioning, prior to    Alternative Noise-conditioning Scenarios.  Thus far, we
+model training.                                          have focused on removing noise conditioning from existing
+                                                       models. This is analogous to blind image denoising in the
+Level of Stochasticity.  In Table 2, DDIM only fails with     field of image process. Following the research topic on noise
+the deterministic ODE sampler (the default sampler in (Song     level estimation, we can also let the network explicitly or
+et al., 2021a)); it still performs decently with the SDE sam-    implicitly predict the noise level. Specifically, we consider
+pler (i.e., the DDPM sampler). With this observation, we    the following four cases (Fig. 7):
+
+                                                7
+
+======================== PDF 第 8 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+                                                        Table 3: Changes of FID scores in the absence of noise
+                                                              conditioning, on class-unconditional ImageNet 32ˆ32 and
+                                        FFHQ 64ˆ64, and class-conditional CIFAR-10.
+
+                                                                                                               FID
+                                                                                  Model       Sampler   NFE
+                                                                                                                   w/ t Ñ w/o t
+                                                                                  ImageNet 32ˆ32
+                                                           FM (1-RF)     Euler     100     5.15 Ñ 4.85
+                                                             FFHQ 64ˆ64
+                                                          EDM        Heun     79     2.64 Ñ 3.59
+                                                                             CIFAR-10 Class-conditional
+       (a)              (b)              (c)             (d)                 EDM        Heun     35     1.76 Ñ 3.11
+                                                           FM (1-RF)     Euler     100     2.72 Ñ 2.55
+
+               Model           (a)      (b)      (c)      (d)
+
+            iDDPM       2.69    4.91    4.95    4.68
+           EDM         1.99    3.27    3.39    3.36                  6.3. Extra Datasets and Tasks.
+           FM (1-RF)    3.01    2.58    2.65    2.61
+                                                    Thus far, our experiments have been on the CIFAR-10 class-
+                                                           unconditional task. To show the generalizability of ourFigure 7: Alternative Noise-conditional Scenarios. (a)
+                                                                   findings, we further evaluate class-unconditional generationNoise-conditional baseline. (b) Noise-conditional, but on
+t1 predicted by a noise level predictor P. (c) Similar to (b),   on ImageNet 32ˆ32, FFHQ 64ˆ64, and class-conditional
+                                                            generation on CIFAR-10. See Table 3.but the noise level predictor is not supervised and is trained
+jointly.  (d) Noise un-conditional baseline. For iDDPM,   The behavior is in general similar to that in our previous
+EDM, and FM, all of (b), (c), and (d) perform similarly.       experiments. Specifically, removing noise conditioning can
+                                                              also be effective for other datasets or the class-conditional
+                                                             generation task. FM can exhibit improvement in the absence
+ (a) The standard noise-conditioning baseline, which is    of noise conditioning; EDM has a decent degradation, but
+    what we have been comparing with. See Fig. 7(a).       experience no catastrophic failure.
+
+ (b) A noise-conditioning variant, in which the noise level     6.4. Classifier-Free Guidance
+      is predicted by another network. In this variant, the
+     noise predictor P is a small network pre-trained to   We further examine the impact of omitting noise condition-
+     regress t. This predictor is then frozen when training    ing when using classifier-free guidance (CFG) (Dhariwal &
+    NNθ, and NNθ is conditioned on the predicted t1, rather    Nichol, 2021), a standard technique for significantly improv-
+                                                           ing sample quality in class-conditional diffusion models.     than the true t. See Fig. 7(b).
+                                                 Our experiments with CFG are conducted on the ImageNet
+ (c) An “unsupervised” noise-conditioning variant. This
+                                               256ˆ256 dataset on SiT (Ma et al., 2024), which is a flow-
+     architecture is exactly the same as the variant (b), ex-
+                                                     matching variant of DiT (Peebles & Xie, 2023). For com-
+     cept that the noise predictor P is trained from scratch
+                                                                 parison, we train SiT-B/2 under the original paper’s configu-
+     without any ground-truth t. If we consider P and NNθ                                                                ration for both noise-conditional and unconditional model.
+      jointly as a larger network, this also represents a design
+                                                  At inference, we employ an Euler sampler with 250 steps
+     for noise-unconditional modeling. See Fig. 7(c).
+                                                     and vary the CFG scale. See more details in Section B.
+
+ (d) The standard noise-unconditional baseline, which is   The results in Fig. 8 indicate that removing the noise condi-
+    what we have been investigating. See Fig. 7(d).           tioning incurs almost no degradation at different guidance
+                                                                   scales, corroborating our analysis.
+Fig. 7 compares all four variants. Notably, consistent be-
+havior is observed for all models (iDDPM, EDM, and FM)    7. Discussion and Conclusion
+studied here: the results of (b), (c), and (d) are similar. This
+suggests that (b), (c), and (d) could be subject to the same   We hope that rethinking the role of noise conditioning will
+type of error, that is, the uncertainty of t estimation. Note    open up new opportunities. Modern diffusion models are
+that even in the case of (b) where the noise predictor is    closely related to Score Matching (Hyv¨arinen & Dayan,
+pre-trained with the true t given, its prediction cannot be    2005; Song & Ermon, 2019; Song et al., 2021b), which pro-
+perfect due to the small yet inevitable uncertainty in ppt|zq    vides an effective solution to Energy-Based Models (EBM)
+(see Section 4.2). As a result, the supervised pre-trained    (Hopfield, 1982; Ackley et al., 1985; LeCun et al., 2006;
+noise predictor (b) does not behave much different with the    Song & Kingma, 2021). The key idea of EBM is to represent
+unsupervised counterpart (c).                               a probability distribution ppxq by ppxq “ e´Epxq{Z, where
+
+                                                8
+
+======================== PDF 第 9 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+                                                                    tunities Program (UROP). We thank Cheng Jiang, Yiyang
+       45                                                   Lu, Mingyang Deng, Xingjian Bai, and Xianbang Wang for
+                                                     w/ t
+       40                                                        w/o t             their comments and discussions.
+       35
+       30                                     Impact Statement
+      FID 25
+                                                          This paper presents work whose goal is to advance the field
+       20
+                                                            of Machine Learning. There are many potential societal
+       15                                                consequences of our work, none which we feel must be
+       10                                                            specifically highlighted here.
+        5                                             7.83  7.96
+             1.0        1.5        2.0        2.5        3.0        3.5        4.0
+               (No CFG)                 CFG scale
+                                             References
+Figure 8: Classifier-free guidance results for SiT-B/2 on
+                                                           Ackley, D. H., Hinton, G. E., and Sejnowski, T. J. A learning
+ImageNet 256ˆ256. We use an Euler sampler with 250                                                             algorithm for boltzmann machines. Cognitive science, 9
+steps. The best guidance scale in each setting is marked
+                                                             (1):147–169, 1985.
+with a star. All other experimental details follow the original
+paper. Removing noise conditioning leads to almost no    Albergo, M. S., Boffi, N. M., and Vanden-Eijnden, E.
+degradation regardless of guidance scale.                        Stochastic interpolants: A unifying framework for flows
+                                                       and diffusions. arXiv preprint arXiv:2303.08797, 2023.
+
+                                                         Batson, J. and Royer, L. Noise2self: Blind denoising byEpxq is the energy function. With the score function of ppxq
+                                                                                        Conference on Machine                                                                     self-supervision.                                                                                 In International(that                one can                       sample                             from                                        the underlying                                               ppxq       is, ∇xEpxq),                                                            Learning,                                                                         pp. 524–533.                                                             PMLR, 2019.by Langevin            dynamics.                      This                               classical                                    formulation                                          models
+the data distribution ppxq by a single energy function Epxq                                                           Bradbury, J., Frostig, R., Hawkins, P., Johnson, M. J., Leary,
+that is solely dependent on x. Therefore, a classical EBM                                                                     C., Maclaurin, D., Necula, G., Paszke, A., VanderPlas, J.,
+is inherently t-unconditional. However, with the presence                                                      Wanderman-Milne, S., and Zhang, Q. JAX: composable
+of t-conditioning, the sampler becomes annealed Langevin                                                               transformations of Python+NumPy programs, 2018.
+dynamics (Song & Ermon, 2019), which implies a sequence
+of energy functions tEpx, tqut indexed by t, with one sam-   Chen, G., Zhu, F., and Ann Heng, P. An efficient statistical
+pling step performed on each energy. Our study suggests      method for image noise level estimation.  In Proceed-
+that it is possible to pursue a single energy function Epxq,      ings of the IEEE International Conference on Computer
+aligning with the goal of classical EBM.                          Vision, pp. 477–485, 2015.
+
+Our study also reveals that certain families of models, e.g.,    Chen, J., Chen, J., Chao, H., and Yang, M. Image blind de-
+Flow Matching (Lipman et al., 2023; Liu et al., 2023; Al-      noising with generative adversarial network based noise
+bergo et al., 2023), can be more robust to the removal of      modeling.  In Proceedings of the IEEE conference on
+t-conditioning. Although these models are closely related to      computer vision and pattern recognition, pp. 3155–3164,
+diffusion, they can be formulated from a substantially differ-      2018.
+ent perspective—estimating a flow field between two distri-
+                                                      Deng, J., Dong, W., Socher, R., Li, L.-J., Li, K., and Fei-Fei,butions. While these models can inherit the t-conditioning
+                                                            L. Imagenet: A large-scale hierarchical image database.design of diffusion models, their native formulation does not
+                                                                 In 2009 IEEE conference on computer vision and patternrequire the flow field to be dependent on t. Our study sug-
+                                                                  recognition, pp. 248–255. Ieee, 2009.gests that there exists a single flow field for these methods
+to work effectively.                                                        Dhariwal, P. and Nichol, A. Diffusion models beat gans
+In summary, noise conditioning has been predominant in      on image synthesis.  Advances in neural information
+modern denoising-based generative models and related ap-      processing systems, 34:8780–8794, 2021.
+proaches. We encourage the community to explore new                                                   Geng, Z., Pokle, A., Luo, W., Lin, J., and Kolter, J. Z.
+models that are not constrained by this design.                                                           Consistency models made easy. In The Thirteenth Inter-
+                                                               national Conference on Learning Representations, 2025.
+Acknowledgements
+                                                    Guo, S., Yan, Z., Zhang, K., Zuo, W., and Zhang, L. Toward
+We greatly thank Google TPU Research Cloud (TRC) for       convolutional blind denoising of real photographs.  In
+granting us access to TPUs. Q. Sun, Z. Jiang, and H. Zhao      Proceedings of the IEEE/CVF conference on computer
+are supported by the MIT Undergraduate Research Oppor-       vision and pattern recognition, pp. 1712–1722, 2019.
+
+                                                9
+
+======================== PDF 第 10 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Heusel, M., Ramsauer, H., Unterthiner, T., Nessler, B., and    Liu, C., Szeliski, R., Kang, S. B., Zitnick, C. L., and Free-
+  Hochreiter, S. Gans trained by a two time-scale update      man, W. T. Automatic estimation and removal of noise
+   rule converge to a local nash equilibrium. Advances in      from a single image. IEEE transactions on pattern analy-
+  neural information processing systems, 30, 2017.                sis and machine intelligence, 30(2):299–314, 2007.
+
+Ho, J., Jain, A., and Abbeel, P. Denoising diffusion proba-    Liu, L., Jiang, H., He, P., Chen, W., Liu, X., Gao, J., and
+   bilistic models. Advances in neural information process-     Han, J. On the variance of the adaptive learning rate
+  ing systems, 33:6840–6851, 2020.                        and beyond. In International Conference on Learning
+                                                               Representations, 2020.
+Hopfield, J. J. Neural networks and physical systems with
+  emergent collective computational abilities. Proceedings    Liu, X., Tanaka, M., and Okutomi, M. Single-image noise
+   of the national academy of sciences, 79(8):2554–2558,       level estimation for blind denoising. IEEE transactions
+  1982.                                              on image processing, 22(12):5226–5237, 2013.
+
+                                                             Liu, X., Gong, C., and qiang liu. Flow straight and fast:Hyv¨arinen, A. and Dayan, P. Estimation of non-normalized
+                                                           Learning to generate and transfer data with rectified flow.   statistical models by score matching. Journal of Machine
+                                                              In The Eleventh International Conference on Learning  Learning Research, 6(4), 2005.
+                                                               Representations, 2023.
+Karras, T., Laine, S., and Aila, T. A style-based generator
+                                               Ma, N., Goldstein, M., Albergo, M. S., Boffi, N. M.,   architecture for generative adversarial networks. In 2019
+                                                          Vanden-Eijnden, E., and Xie, S.  Sit: Exploring flow  IEEE/CVF Conference on Computer Vision and Pattern
+                                                      and diffusion-based generative models with scalable in-  Recognition (CVPR), pp. 4396–4405, 2019. doi: 10.1109/
+                                                                    terpolant transformers. arXiv preprint, arXiv:2401.08740,  CVPR.2019.00453.
+                                                         2024. doi: 10.48550/arXiv.2401.08740. URL https:
+Karras, T., Aittala, M., Laine, S., H¨ark¨onen, E., Hellsten, J.,    //arxiv.org/abs/2401.08740.
+  Lehtinen, J., and Aila, T. Alias-free generative adversarial
+                                                          Nichol, A. Q. and Dhariwal, P. Improved denoising diffu-
+  networks. Advances in neural information processing
+                                                                sion probabilistic models. In International conference on
+  systems, 34:852–863, 2021.
+                                                       machine learning, pp. 8162–8171. PMLR, 2021.
+Karras, T., Aittala, M., Aila, T., and Laine, S. Elucidating
+                                                              Peebles, W. and Xie, S. Scalable diffusion models with trans-
+  the design space of diffusion-based generative models.
+                                                              formers. In Proceedings of the IEEE/CVF International
+  Advances in neural information processing systems, 35:
+                                                          Conference on Computer Vision (ICCV), pp. 4195–4205,
+  26565–26577, 2022.
+                                                          2023.
+
+Kingma, D. P. and Ba, J. Adam: A method for stochastic                                                          Rabie, T. Robust estimation approach for blind denoising.
+  optimization. In Bengio, Y. and LeCun, Y. (eds.), 3rd                                                IEEE transactions on image processing, 14(11):1755–
+  International Conference on Learning Representations,                                                          1765, 2005.
+  ICLR 2015, San Diego, CA, USA, May 7-9, 2015, Confer-
+  ence Track Proceedings, 2015.                          Ronneberger, O., Fischer, P., and Brox, T.  U-net: Con-
+                                                                volutional networks for biomedical image segmenta-
+Krizhevsky, A., Hinton, G., et al. Learning multiple layers                                                                          tion. In Medical image computing and computer-assisted
+  of features from tiny images. 2009.                                                        intervention–MICCAI 2015: 18th international confer-
+                                                                ence, Munich, Germany, October 5-9, 2015, proceedings,
+LeCun, Y., Chopra, S., Hadsell, R., Ranzato, M., Huang,
+                                                               part III 18, pp. 234–241. Springer, 2015.
+   F., et al. A tutorial on energy-based learning. Predicting
+  structured data, 1(0), 2006.                               Salimans, T. and Ho, J. Progressive distillation for fast sam-
+                                                               pling of diffusion models. In International Conference
+Lehtinen,  J., Munkberg,  J., Hasselgren,  J., Laine,  S.,                                                     on Learning Representations, 2022.
+  Karras,  T., Aittala, M., and Aila, T.  Noise2Noise:
+  Learning image restoration without clean data.  arXiv    Salmeri, M., Mencattini, A., Ricci, E., and Salsano, A.
+   preprint, arXiv:1803.04189, 2018. URL https://      Noise estimation in digital images using fuzzy processing.
+  arxiv.org/abs/1803.04189.                          In Proceedings 2001 International Conference on Image
+                                                           Processing (Cat. No. 01CH37205), volume 1, pp. 517–
+Lipman, Y., Chen, R. T. Q., Ben-Hamu, H., Nickel, M., and                                                            520. IEEE, 2001.
+  Le, M. Flow matching for generative modeling. In The
+  Eleventh International Conference on Learning Repre-    Shin, D.-H., Park, R.-H., Yang, S., and Jung, J.-H. Block-
+   sentations, 2023.                                        based noise estimation using adaptive gaussian filtering.
+
+                                                10
+
+======================== PDF 第 11 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+  IEEE Transactions on Consumer Electronics, 51(1):218–
+  226, 2005.
+
+Sohl-Dickstein, J., Weiss, E., Maheswaranathan, N., and
+  Ganguli, S. Deep unsupervised learning using nonequi-
+  librium thermodynamics. In International conference on
+  machine learning, pp. 2256–2265. PMLR, 2015.
+
+Song, J., Meng, C., and Ermon, S. Denoising diffusion
+   implicit models. In International Conference on Learning
+  Representations, 2021a.
+
+Song, Y. and Dhariwal, P. Improved techniques for train-
+  ing consistency models.  In The Twelfth International
+  Conference on Learning Representations, 2024.
+
+Song, Y. and Ermon, S. Generative modeling by estimating
+  gradients of the data distribution. Advances in neural
+  information processing systems, 32, 2019.
+
+Song, Y. and Kingma, D. P. How to train your energy-based
+  models. arXiv preprint arXiv:2101.03288, 2021.
+
+Song, Y., Sohl-Dickstein, J., Kingma, D. P., Kumar, A., Er-
+  mon, S., and Poole, B. Score-based generative modeling
+  through stochastic differential equations. In International
+  Conference on Learning Representations, 2021b.
+
+Song, Y., Dhariwal, P., Chen, M., and Sutskever, I. Consis-
+  tency models. In International Conference on Machine
+  Learning, pp. 32211–32252. PMLR, 2023.
+
+Stahl, V., Fischer, A., and Bippus, R. Quantile based noise
+  estimation for spectral subtraction and wiener filtering.
+  In 2000 IEEE International Conference on Acoustics,
+  Speech, and Signal Processing. Proceedings (Cat. No.
+  00CH37100), volume 3, pp. 1875–1878. IEEE, 2000.
+
+Tancik, M., Srinivasan, P., Mildenhall, B., Fridovich-Keil,
+   S., Raghavan, N., Singhal, U., Ramamoorthi, R., Barron,
+   J., and Ng, R. Fourier features let networks learn high fre-
+  quency functions in low dimensional domains. Advances
+   in neural information processing systems, 33:7537–7547,
+  2020.
+
+Vaswani, A. Attention is all you need. Advances in Neural
+  Information Processing Systems, 2017.
+
+Zhang, K., Li, Y., Liang, J., Cao, J., Zhang, Y., Tang, H.,
+  Fan, D.-P., Timofte, R., and Gool, L. V. Practical blind
+  image denoising via swin-conv-unet and data synthesis.
+  Machine Intelligence Research, 20(6):822–836, 2023.
+
+
+
+
+
+                                                11
+
+======================== PDF 第 12 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Contents
+
+
+1  Introduction                                                                                   1
+
+
+2  Related Work                                                                                  2
+
+
+3  Formulation                                                                                   2
+
+    3.1  Denoising Generative Models    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .    2
+
+    3.2  Noise Conditional Networks   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .    3
+
+
+4  Analysis of Noise-Unconditional Models                                                            3
+
+    4.1   Effective Targets    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .    3
+
+    4.2  Concentration of Posterior ppt|zq  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .    4
+
+    4.3  Error of Effective Regression Targets .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .    4
+
+    4.4  Accumulated Error in Sampling    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .    5
+
+
+5 A Noise Unconditional Diffusion Model                                                            5
+
+
+6  Experiments                                                                                   5
+
+    6.1  Main Observations   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .    6
+
+    6.2  Analysis  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .    6
+
+    6.3  Extra Datasets and Tasks.  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .    8
+
+    6.4   Classifier-Free Guidance   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .    8
+
+
+7  Discussion and Conclusion                                                                       8
+
+
+Appendices                                                                                      13
+
+
+Appendix A  Details of Numerical Experiments                                                       13
+
+   A.1  Computation of Relavent Quantities   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   13
+
+   A.2  Numerical Experiments  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   15
+
+   A.3  Evaluation of the Bound Values .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   15
+
+
+Appendix B  Additional Experimental Details                                                        17
+
+   B.1  General Experiment Configurations    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   17
+
+   B.2  Special Experiments    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   18
+
+   B.3  Our Reimplementation Faithfulness    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   19
+
+
+Appendix C  Supplementary Theoretical Details                                                      19
+
+   C.1  Proof of the Effective Target   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   19
+
+   C.2  Approximation of the Variance of ppt|zq  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   21
+
+                                                12
+
+======================== PDF 第 13 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+         C.2.1  Rigorous Upper Bound on Variance.  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   21
+
+         C.2.2   Intuitive derivation of the approximate constant  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   24
+
+   C.3  Approximation of Epzq  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   25
+
+   C.4  Bound of Accumulated Error  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   26
+
+
+Appendix D  Derivation of Coefficients for Different Denoising Generative Models                         27
+
+   D.1 iDDPM   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   27
+
+   D.2 DDIM  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   29
+
+   D.3 EDM    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   30
+
+   D.4  Flow Matching   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   31
+
+   D.5  Our uEDM Model in the Formulation    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .   31
+
+
+Appendix E  Additional Samples                                                                   32
+
+Appendices
+
+
+A. Details of Numerical Experiments
+
+In this section, we provide additional details on all our real dataset numerical experiments. By first computing the value of
+some relevant quantities (e.g. the underlying time distribution ppt|zq, effective target Rpz|tq, Rpzq), we are able to evaluate
+Epzq, which is average error introduced by removing noise conditioning. See Section A.1.
+
+As we introduce single data point assumption in our theoretical framework, we verify the accuracy of this assumption by
+comparing the empirical values of ppt|zq and Epzq with the theoretical values derived from our estimations. See Section A.2.
+
+Finally, in Section A.3, we show how we derive the numbers in Fig. 4 by detailing on our estimation of bound values Ai and
+Bi in Statement 3.
+
+A.1. Computation of Relavent Quantities
+                                                                                                        1 řN
+We consider the data distribution pdata constituted solely from the data points in the dataset: pdatapxq “ N   i“1 δpx ´ xiq,
+where xi P Rd are the images in the dataset, and δp¨q is the delta distribution. We denote N as the number of data points in
+the dataset, and d as the dimension of the image.
+
+Calculation of ppt|zq (Section 4.2).   First, we calculate ppz|tq by marginalizing over all the data points:
+
+                                     ż                          ÿN
+                                                       1
+                                    ppz|tq “   ppz|t, xqppxq dx “        ppz|t, xiq.
+                                  N
+                                                                  i“1
+
+The random variable z is given by Eq. (1), which implies
+                                                   `               ˘
+                                             ppz|t, xq “ N  z; aptqx, bptq2Id  ,                                      (13)
+where Npz; µ, Σq denotes the probability density function of the Gaussian distribution with mean µ and covariance Σ.This leads to
+
+                   ÿN    `               ˘                                         1
+                                         ppz|tq “            z; aptqxi, bptq2Id  ,                                   (14)                         N  N                                                  i“1
+
+
+                                                13
+
+======================== PDF 第 14 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+and we can finally obtain:
+
+                                                        Nř   `               ˘
+                                                        pptq
+                                       pptq                                                         i“1 N  z; aptqxi, bptq2Id
+                                        N    `               ˘                              ppt|zq “ ppzqppz|tq “ ż 1  ÿ                                      .                         (15)
+                                                        pptq                                N  z; aptqxi, bptq2Id dt                                                        0                                                          i“1
+
+Note that there is an integral to evaluate in Eq. (15). In practice, the calculation is performed in a two-step manner for a fixed
+z. In the first step, we use a uniform grid of 100 t values in r0, 1s (i.e. t “ 0.00, 0.01, . . . , 0.99). We calculate the value of
+pptqppz|tq for each t value.
+
+Typically, we observe that within an interval rl, rs (where 0 ď l ă r ď 1), the value of pptqppz|tq is significantly larger than
+for other t P r0, 1s 5. We then approximate the integral as:
+
+
+                  ż                               ż                        1  ÿN    `               ˘         r  ÿN    `               ˘
+                         pptq
+                       0                            i“1                N  z; aptqxi, bptq2Id dt «   l pptq i“1 N  z; aptqxi, bptq2Id  dt.                 (16)
+
+In the second step, we evaluate the integral by using a uniform grid of 100 t values in rl, rs. This two-step procedure
+effectively reduces computational costs while maintaining low numerical error.
+
+Calculation of Rpz|tq and Rpzq (Section 4.1).  By definition,
+                                                      „                 ȷ
+                                              ´ aptqx                    Rpz|tq :“ Ex,ϵ„ppx,ϵ|z,tqrrpx, ϵ, tqs “ Ex„ppx|z,tq  cptqx ` dptqz                .
+                                                                                            bptq
+
+                     ppxq
+Notice that ppx|z, tq “ ppz|tqppz|x, tq, and ppz|x, tq is given in Eq. (13). Consequently, we have
+                        ”                  ı              nř                                                                              nř   `               ˘
+             1                                    ˆ                                             ˙
+        N                  ppz|xi, tq  cptqxi ` dptq z´aptqxibptq                                                                        aptqdptq                                                       dptq              i“1                                                                                i“1 N  z; aptqxi, bptq2Id  xi
+  Rpz|tq “               nř            “    z `  cptq ´             nř                                    ,  (17)                          1                               bptq                bptq
+                              ppz|xi, tq                N
+                          i“1                                                                                 i“1 N pz; aptqxi, bptq2Idq
+
+which can be then explicitly calculated by scanning over all the data points xi.
+
+Once we obtain Rpz|tq, using Theorem 2 and ppt|zq, Rpzq can be calculated by
+                                                     ż
+                                                                    1
+                             Rpzq “ Et„ppt|zqrRpz|tqs “    ppt|zqRpz|tq dt.                               (18)
+                                                                   0
+
+
+For the integration, we utilize the selected time steps in rl, rs that were used when computing ppt|zq. On another word, we
+ignore the parts where ppt|zq is negligible.
+
+Calculation of Epzq (Section 4.3).  Epzq can be computed simply utilizing ppt|zq, Rpz|tq and Rpzq:
+                                                     ż
+                                                                    1
+                    Epzq :“ Et„ppt|zq}Rpz, tq ´ Rpzq}2 “    ppt|zq}Rpz|tq ´ Rpzq}2 dt.                     (19)
+                                                                   0
+
+
+We again use the same time steps for estimating the integral term and reuse the terms of ppz|xi, tq. This ensures computational
+efficiency while maintaining accuracy.
+
+    5Actually, this exactly matches our observation that ppt|zq is concentrated, since ppt|zq9pptqppz|tq for a fixed z.
+
+                                                14
+
+======================== PDF 第 15 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Table 4: The variance and E values on the CIFAR-10 dataset. The empirical values are calculated by scanning the entire
+dataset, while the (theoretical) estimated values are derived from Statements 1 and 2. For reference, the values for }Rpzq}2
+are also included to illustrate that Epzq is significant smaller than }Rpzq}2. The results show that our approximation is
+generally accurate, except for the E value in the very noisy case, where the single data point approximation becomes less
+accurate.
+
+                 t˚                  Vart„ppt|zqrts                      Epzq              }Rpzq}2
+                       Empirical (ˆ10´4)   Estimation (ˆ10´4)     Empirical     Estimation    Empirical
+
+                  0.1    0.0143 ˘ 0.0002         0.0163         0.558 ˘ 0.005     0.628     3894 ˘ 87
+
+                  0.3    0.1280 ˘ 0.0002         0.1465         0.561 ˘ 0.006     0.628     3953 ˘ 102
+
+                  0.5    0.3695 ˘ 0.0004         0.4069         0.556 ˘ 0.006     0.628     3878 ˘ 108
+
+                  0.7    0.7008 ˘ 0.0010         0.7975         0.564 ˘ 0.005     0.628     3968 ˘ 88
+
+                  0.9    1.3085 ˘ 0.0007         1.3184         1.822 ˘ 0.245     0.628     3310 ˘ 71
+
+
+
+A.2. Numerical Experiments
+
+Verification of the Single Data Point Assumption.  Recall that Statements 1 and 2 assume that the dataset contains
+a single data point. In this section, we conduct numerical experiments on CIFAR-10 dataset to demonstrate that this
+assumption provides a reasonable approximation of the variance of ppt|zq and the error between the effective targets in
+practice.
+
+For both ppt|zq and Epzq, we calculate their values by scanning the entire dataset as shown in the previous section, and
+compare them with our estimated theoretical values.
+
+For the CIFAR-10 dataset, we have N “ 50000 and d “ 3 ˆ 322 “ 3072, from which we can derive the estimated values
+of ppt|zq and Epzq in Table 4.
+
+As for empirical calculation, we compute the desired values via Monte Carlo sampling. Specifically, we select 5 time levels
+t˚ “ 0.1, 0.3, 0.5, 0.7, 0.9. For each t˚, we sample M “ 25 noisy images zj by zj “ apt˚qxIj ` bpt˚qϵj, j “ 1, 2, . . . , M.
+Here, ϵj are independent samples from Np0, Idq, and Ij are independent random integers from r1, Ns. We then computeVart„ppt|¨qrts, }Rp¨q}2 and Ep¨q for each zj as we specified in Section A.1. Finally, we average the M values to obtain the
+empirical values along with their statistical uncertainties. Results are shown in Table 4.
+
+Table 4 shows that our estimations closely align with the observed values, except when t gets very close to 1 (i.e. in highly
+noisy images), where the single data point approximation becomes less precise. However, even in these cases, the estimated
+values remain within the same order of magnitude, providing acceptable explanations for the concentration of ppt|zq and the
+small error between the two effective targets.
+
+Visualization of ppt|zq.  We plot the value of ppt|zq in Fig. 3 for one z and t˚ from 0.1 to 0.9. This is carried out exactly in
+the same manner as the variance calculation for t, but with AFHQ-v2 dataset at 64ˆ64 resolution for a better visualization
+quality. Fig. 3 functions as a reliable visual verification of the concentration of ppt|zq.
+
+A.3. Evaluation of the Bound Values
+
+In this section, we provide additional experiment details on how we compute the bound values and present the plot of the
+bound terms AiBi in Fig. 4. For reference, we also include separate plots for Ai and Bi in Figs. 9a and 9b 6.
+
+Recall that in Statement 3, we define Ai and Bi as
+
+                                  N´1ź
+                                Ai “      pκi ` |ηi|Liq, Bi “ |ηi|δi.                                    (20)
+                                          j“i`1
+
+   6An interesting fact in Fig. 9b is that, for EDM, there is a “phase change” at around i “ 50, which is caused by a non-smooth δ value.
+We hypothesize that this transition occurs at a noise level high enough that the data distribution can no longer be approximated as a point
+distribution, leading to a noticeable shift in behavior.
+
+
+                                                15
+
+======================== PDF 第 16 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+
+    105                                        DDIM                                                                 DDIM
+                                        EDM                          101                                   EDM
+                                         FM (1-RF)                                                       FM (1-RF)
+    104                                      uEDM                         100                                      uEDM
+
+                                                                              10−1
+    103
+ Ai                                                              Bi 10−2
+    102
+                                                                              10−3
+
+    101                                                                       10−4
+
+                                                                              10−5    100
+
+         0       20       40       60       80      100                        0       20       40       60       80      100
+                                              i                                                                                                       i
+
+(a) The values of Ai for different denoising generative models.              (b) The values of Bi for different denoising generative models.
+
+Figure 9: The bound applied on DDIM, EDM, FM and our uEDM model with a first-order ODE sampling process of
+N “ 100 steps. The figures visualize the different terms Ai and Bi in the bound.
+
+
+Since κi and ηi are already given by the configurations for each model (see Table 8), we only have to evaluate Li and δi.
+Statement 3 requires the following condition to hold:
+                    $
+                    ’&}Rpx1iq ´ Rpx1i|tiq} ď δi
+                                                                                                                 (21)                                        }Rpx1i|tiq ´ Rpxi|tiq}                    ’%                                     ď Li
+                                                    }x1i ´ xi}
+
+
+Now we are going to pick reasonable values of δi and Li. As mentioned in Section 4.4, it is unrealistic for this assumption
+to hold exactly in real data due to bad-behaviors of the effective target R when the noisy image is close to pure noise or pure
+data. However, we aim to make the conditions hold with high probability instead of considering worst case. As a result, our
+choice of δi, Li corresponds to high probability case.
+
+Estimation of δi.  We estimate δi using a maximum among different samples:
+
+                                                 δi “ max }Rpzi,j|tiq ´ Rpzi,jq}.                                       (22)
+                                                              j
+
+where we sample 10 different z from ppz|tq. Rpz|tq and Rpzq values are computed as specified in Section A.1. We use a
+maximum value across different samples to ensure that the condition holds with high probability.
+
+
+Estimation of Li.  The condition of Li is similar to “Lipchitz constant” of Rp¨|tiq. Inspired by this, we evaluate the value
+   }Rpx1i|tiq ´ Rpxi|tiq}
+of                         for xi and x1i that are close to each other.
+         }x1i ´ xi}
+To model this, we sample xi from ppz|tiq, and let x1i “ xi ` δ˜ϵ. Here, we pick δ “ 0.01, and ˜ϵ „ Np0, Iq represents arandom direction, which serves as a first-order estimation.
+
+Based on this, we sample 10 different pairs of xi and x1i for each ti, and evaluate the max value of the “Lipchitz constant”.
+In another word, we are calculating
+
+                                                }Rpzi,j ` δ˜ϵj|tiq ´ Rpzi,j|tiq}
+                                 Li “ max                                                                 (23)
+                                                         j                 δ}˜ϵj}
+
+for j “ 1, 2, . . . , 10. Again, here we use the maximum value across different samples to ensure that the condition holds with
+high probability.
+
+                                                16
+
+======================== PDF 第 17 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Bound Values of the uEDM Model.   It is worth noticing that our uEDM model (see Section 5) has a non-constant
+weighting wptq ‰ 1, which doesn’t match our assumption when deriving the effective target Rpz|tq and Rpzq (as we did in
+Section 4.1). However, we choose not to introduce more mathematical complexities, and instead use the formulas above to
+calculate the bound value for uEDM. This implies that the bound for uEDM is no longer mathematically strict, but it can
+still serve as a reasonable intuition for the choice of our uEDM configuration.
+
+
+Absolute Magnitude of the Bound Values.  As shown in Fig. 4, one might observe that the magnitude of the bound (around                                                   ?
+102 to 106) is actually significantly larger compared to the typical magnitude of }xN} (which is around σd  d „ 101). We
+hypothesize that this is because of the following two reasons:
+
+(1) We are assuming the error accumulating on each step, which might not be the case in practice, as studied in our discussion
+of SDE samplers in Section 6.2.
+
+(2) When the noisy image approaches clean data, some properties of the effective target R become bad (e.g. the Lipchitz
+constant Li will be very big). This leads to a large error estimation, but in real cases, as the neural network will smooth the
+learned function, the error is typically smaller. If we consider ignoring the last 10 steps in our bound value, the bound will
+be in a reasonable range (approximately 10 for FM and uEDM, 140 for EDM, and ą 105 for DDIM).
+
+B. Additional Experimental Details
+
+B.1. General Experiment Configurations
+
+We implement our main code base using Google TPU and the JAX (Bradbury et al., 2018) platform, and run most of our
+experiments on TPU v2 and v3 cores. As the official codes are mostly provided as GPU code, we re-implemented most of
+the previous work in JAX. For the faithfulness of our re-implementation, please refer to Section B.3.
+
+
+FID Evaluation.  For evaluation of the generative models, we calculate FID (Heusel et al., 2017) between 50,000 generated
+images and all available real images without any augmentation. We used the pre-trained Inception-v3 model provided by
+StyleGAN3 (Karras et al., 2021) and converted it into a model class compatible with JAX. As we have reproduced most of
+the results in Section B.3, we believe that our FID calculation is reliable.
+
+
+Noise Conditioning Removal.  When we refer to “removing noise conditioning”, technically we set the scalar before
+passing into the time-embedding to zero. Alternatively, we can also set the embedded time vector to zero. The results turn
+out to have negligible differences.
+
+
+iDDPM (x-pred).  We design a x-prediction version of iDDPM to show the generalizability of our theoretical framework.
+During training time, we simply change the target rpx, ϵ, tq or rpx, ϵq to be x. The sampling algorithm has to be modified
+accordingly, and we directly translate the x-prediction to ϵ-prediction by Eq. (1).
+
+
+ADM.  In the original work of ADM, Dhariwal & Nichol (2021) don’t provide result on the CIFAR-10 dataset in class-
+unconditional settings. In our implementation of ADM, we keep the main method of learning ϵ-prediction and the variance
+Σ simultaneously, but employ it on the class-unconditional CIFAR-10 task. Notice that this ADM formulation is also not
+included in our theoretical framework, but it still gives a reasonable result after removing noise conditioning (see Table 2).
+
+
+Hyperparameters. A table of selected important hyperparameters can be found in Table 5. For ICM and ECM we use the
+RAdam (Liu et al., 2020) optimizer, while for all other models we use the Adam (Kingma & Ba, 2015) optimizer. Also, we
+set the parameter β2 to 0.95 to stabilize the training process.
+
+For all CIFAR-10 experiments, we used the architecture of NCSN++ in Song et al. (2021b), with 56M parameters. For
+the ImageNet 32ˆ32 experiment, we used the same architecture but a larger scale, with a total of 210M parameters. For
+experiments on classifier-free guidance on ImageNet 256ˆ256, we strictly follow the SiT-B/2 model with 400k training
+steps in Ma et al. (2024).
+
+We highlight that for all experiments, we only tune hyperparameters on the noise-conditional model, and then directly use
+exactly the same hyperparameters for the noise-unconditional model and don’t perform any further hyperparameter tuning.
+Thus, we expect that tuning these hyperparameters may further improve the performance of the noise-unconditional model.
+
+
+                                                17
+
+======================== PDF 第 18 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Class-Conditional Generation on CIFAR-10.  For the class-conditional CIFAR-10 experiments, we use exactly the
+same configurations and hyperparameters of EDM and FM with the unconditional generation case, except that we train the
+network with labels. For the conditioning on labels, we use the architecture in Karras et al. (2022). We do not apply any
+kind of guidance at inference time.
+
+
+FFHQ 64ˆ64 Experiments.  For FFHQ 64ˆ64 experiments, we directly use the code provided by Karras et al. (2022)
+and run it on 8 H100 GPUs. We keep all hyperparameters the same as the original code in the experiments. For the removal
+of noise-conditioning, we simply set the cnoise variable in the code to zero.
+
+                       Table 5: Selected important hyperparameters in our main experiments.
+
+
+             Experiment         Duration   Warmup Epochs    Batch Size    Learning Rate  EMA Schedule  EMA Half-life Images    Dropout
+          iDDPM & ADM    100M          200           2048      8ˆ10´4      EDM            50M              0.15
+            iDDPM(x-pred)    200M          200           2048      1.2ˆ10´3      EDM            50M              0.15
+         DDIM           100M          200           512      4ˆ10´4      EDM            50M               0.1
+         FM             100M          200           2048      8ˆ10´4      EDM            50M              0.15
+         FM ImageNet32    256M          64           2048      2ˆ10´4      EDM            50M             0
+        EDM            200M          200           512      1ˆ10´3      EDM             0.5M              0.13
+         uEDM (ours)      200M          200           512      4ˆ10´4      EDM             0.5M               0.2
+          ICM & ECM      400M           0            1024      1ˆ10´4      Const(0.99993)                  -                 0.3
+              SiT-B/2          100M           0            256      1ˆ10´4       Const(0.9999)                   -               0
+
+
+
+B.2. Special Experiments
+
+This section covers the specific experiment details in Section 6.2.
+
+
+DDIM-iDDPM Interpolate Sampler.  In the analysis of stochasticity, we examine VP diffusion models with cosine and
+linear ¯αptq schedule with and without noise conditioning, using a customized interpolate sampler featured by λ, which is
+given by Eq. (56). For the cosine schedule, we use 500 sampling steps, while for the linear schedule, we use 100 sampling
+steps. As discussed in Section D.2, when λ “ 1, the model with the cosine schedule has the same setting as “iDDPM” in
+Table 2; when λ “ 0, the model with the linear schedule has the same setting as “DDIM ODE 100” in Table 2.
+
+Results for the experiment are shown in Table 6, and the result for the cosine schedule model is visualized in Fig. 6.
+From Table 6 one can also find a consistent trend that as λ increase, the degradation of FID becomes smaller for the
+noise-unconditional model, regardless of the specific schedule of ¯αptq.
+
+
+Alternative Architectures: Noise Level Predictor and Noise-like Condition.  In our experiment of Noise Level Predictor,
+we train a very lightweight network to predict the noise level t given the input z. To be specific, our predictor network only
+contains two convolutional layers with relu activation, followed by a global average pooling layer and a linear layer. The
+network has no more than 30K parameters, so it hardly affects the expressiveness of the whole model.
+
+It’s worth noticing that directly predicting the input t is usually not desirable, as the value of t may have different ranges for
+different models. Instead, for each specific model we choose a customized target for the prediction.
+
+Training objectives for different models are shown below (Pϕ represents the predictor network):
+
+   • FM: L “ Ex„pdata,ϵ„Np0,IqEt„Ur0,1s rPϕpp1 ´ tqx ` tϵq ´ ts2 .
+                                                “                                ?       ‰2   • VP models:  “ Ex„pdata,ϵ„Np0,IqEt„Ur0,1s Pϕp?1 ´ tx `   tϵq ´ t    .          L
+                                                   ”                      ı2
+                                                                       1     ´ 1`t1      .                                                         p´1.2,1.22q  Pϕpcinptqpx`tϵqq`1   • EDM models: L “ Ex„pdata,ϵ„Np0,IqEt„expN
+
+Here, for EDM, we apply a transformation y Ñ 1`y,1  mapping the original noise level t P p0, `8q in EDM to r0, 1s.
+
+                                                18
+
+======================== PDF 第 19 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Table 6: Comparison of inference performance between noise-conditional and noise-unconditional models. The left panel
+uses a cosine noise schedule, while the right panel uses a linear noise schedule. Both panels compare the performance of
+noise-conditional and noise-unconditional settings across different values of the ablation sampler coefficient λ, ranging from
+0.0 to 1.0.
+
+
+                                                                cosine schedule                linear schedule
+                                 λ        FID       Change       FID       Change
+
+                                                     0.0    2.98 Ñ 34.56    +31.58    3.99 Ñ 40.90    +36.91
+                                                     0.2    2.60 Ñ 30.34    +27.74    4.09 Ñ 36.04    +31.95
+                                                     0.4    2.52 Ñ 21.33    +18.81    4.45 Ñ 28.08    +23.63
+                                                     0.6    2.59 Ñ 12.47   + 9.88    4.95 Ñ 18.32    +13.37
+                                                     0.8    2.77 Ñ  7.53   + 4.76    5.90 Ñ 10.36   + 4.46
+                                                     1.0    3.13 Ñ  5.51   + 2.38    8.07 Ñ 10.85   + 2.78
+
+
+Experimentally, the MSE loss for all these settings all have a magnitude on the order of 10´4, which means that even our
+very lightweight predictor can predict the noise level with a mean error of about 0.01.
+
+In our Noise-like Conditioning experiment, the same lightweight network as mentioned above is connected to a noise-
+conditional U-Net, as visualized in Fig. 7c. This joint training architecture is noise-unconditional. The main difference
+between this experiment and the “Noise Level Predictor” experiment is that there is no supervision on the intermediate
+output, so it may not be the noise level t itself.
+
+For the experiments in Fig. 7 column (b) and (c), we again use the same set of hyperparameters and configurations as the
+noise-conditional and noise-unconditional experiments (in columns (a) and (d)), to ensure a fair comparison. However, a
+subtle detail is that in the implementation of iDDPM in Fig. 7, the results for noise-conditional and noise-unconditional
+experiments are not the same as the results in Table 2. This is due to that we use T “ 500 instead of T “ 4000 for the
+training process.
+
+
+B.3. Our Reimplementation Faithfulness
+
+As we have mentioned, we reimplement most of the models in the platform of JAX and TPU. Table 7 shows the comparison
+of our reimplementation and the original reported results.
+
+For some models, the reproduction doesn’t meet our expectations. For example, since the official code for iCT is currently
+not open-sourced, we can only follow all configurations mentioned in their work, and get a best FID score of 2.59 (compared
+with the originally reported score of 2.46). For EDM on FFHQ-64, we directly run the given official code with the VP
+configuration on 8 H100 GPUs, but still can’t reproduce the result. We suspect that the difference may come from random
+variance or different package versions used in the experiments.
+
+Note that iDDPM (Nichol & Dhariwal, 2021) only reports results with 1000 and 4000 training steps. Due to computational
+constraints, we only evaluate the model with 500 sampling steps. Since our 500-step result has already been better than the
+1000-step result reported in their work, we believe that we successfully reproduced the model.
+
+After all, our goal is to compare the performance of noise-conditional and noise-unconditional models, and the absolute
+performance is not the focus of our work. Thus, even though we haven’t fully reproduced some of the results, we believe
+that our comparison is still meaningful.
+
+C. Supplementary Theoretical Details
+
+C.1. Proof of the Effective Target
+
+Theorem 1. The original regression loss function with t condition shown in Eq. (2) with wptq “ 1
+                                                                                             ››2ı                        “ Ex,ϵ,t ”››NNθpz|tq ´ rpx, ϵ, tq                                Lpθq
+
+is equivalent to the loss function with the effective target shown in Eq. (5)
+                                                                                                  ››2ı                      “ Ez„ppzq,t„ppt|zq ”››NNθpz|tq ´ Rpz|tq                               L1pθq
+
+                                                19
+
+======================== PDF 第 20 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+                    Table 7: Comparison of our reimplementation and the original reported results.
+
+
+                                                                                       FID
+                                 Model                            Sampler   NFE
+                                                                                        Reproduced    Original
+
+                                CIFAR-10
+
+                                                                              500        3.13              -
+                           iDDPM (Nichol & Dhariwal, 2021)          -       1000            -           3.29
+                                                                             4000            -           2.90
+
+                                                  ODE      100        3.99         4.16
+                          DDIM (Song et al., 2021a)
+                                                  ODE     1000        2.85         4.04
+
+                       EDM (Karras et al., 2022)           Heun      35         1.99         1.97
+
+                                  1-RF (Liu et al., 2023)            RK45    „127       2.53         2.58
+
+                                  iCT (Song & Dhariwal, 2024)                -        2          2.59         2.46
+
+                                CIFAR-10 Class-conditional
+
+                       EDM (Karras et al., 2022)           Heun      35         1.79         1.76
+
+                                 ImageNet 32ˆ32
+
+                        FM (Lipman et al., 2023)               Euler     100        5.15              -
+                        FM (Lipman et al., 2023)           RK45    „125       4.30         5.02
+
+                         FFHQ 64ˆ64
+
+                       EDM (Karras et al., 2022)           Heun      79         2.64         2.39
+
+
+
+only up to a constant term that is independent of θ, where
+                                                                  “         ‰
+                                      Rpz|tq “ Epx,ϵq„ppx,ϵ|z,tq rpx, ϵ, tq .
+
+Here, ppzq is the marginalized distribution of z:“aptqx ` bptqϵ in Eq. (1), under the joint distribution ppx, ϵ, tq :“
+ppxqppϵqpptq.
+
+
+Proof. The original regression loss function with t condition can be rewritten as
+                                                                                         ››2ı         “ Ez„ppzq,t„ppt|zqEpx,ϵq„ppx,ϵ|z,tq ”››NNθpz|tq ´ rpx, ϵ, tq         Lpθq                ”                            “                              “        ‰ı                                                                                                   ‰››2         “ Ez„ppzq,t„ppt|zq }NNθpz|tq ´ Epx,ϵq„ppx,ϵ|z,tq rpx, ϵ, tq  ` Vpx,ϵq„ppx,ϵ|z,tq rpx, ϵ, tq
+                              ”                             ››2       ı         “ Ez„ppzq,t„ppt|zq }NNθpz|tq ´ Rpz|tq ` const
+                              ”                        ››2ı
+         “ Ez„ppzq,t„ppt|zq }NNθpz|tq ´ Rpz|tq  ` const “ L1pθq ` const.                              (24)
+
+This finishes the proof.
+
+Theorem 2. The original regression loss function without noise conditioning
+                                                                                            ››2ı                        “ Ex,ϵ,t ”››NNθpzq ´ rpx, ϵ, tq                                Lpθq
+
+is equivalent to the loss function with the effective target shown in Eq. (7)
+                                                                                            ››2ı                         “ Ez„ppzq ”››NNθpzq ´ Rpzq                                    L1pθq
+
+only up to a constant term that is independent of θ, where
+                                                               “       ‰
+                                     Rpzq “ Et„ppt|zq Rpz|tq .
+
+Defintions on ppzq and ppt|zq are the same as in Theorem 1.
+
+                                                20
+
+======================== PDF 第 21 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Proof. The original regression loss function without noise conditioning can be rewritten as
+                                                                                    ››2ı           “ Ez„ppzqEpx,ϵ,tq„ppx,ϵ,t|zq ”››NNθpzq ´ rpx, ϵ, tq            Lpθq         ”                            “                                “        ‰ı                                                                                             ‰››2           “ Ez„ppzq }NNθpzq ´ Epx,ϵ,tq„ppx,ϵ,t|zq rpx, ϵ, tq  ` Vpx,ϵ,tq„ppx,ϵ,t|zq rpx, ϵ, tq
+                                 ”                            “            ‰››2       ı           “ Ez„ppzq,t„ppt|zq }NNθpzq ´ Epx,ϵ,tq„ppx,ϵ,t|zq rpx, ϵ, tq  ` const
+                                 ”                            “          ‰››2ı           “ Ez„ppzq,t„ppt|zq }NNθpzq ´ Epx,ϵ,tq„ppx,ϵ,t|zq rpx, ϵ, tq   ` const                         (25)
+
+And notice that
+                                  “         ‰                           “         ‰
+                   Epx,ϵ,tq„ppx,ϵ,t|zq rpx, ϵ, tq “ Et„ppt|zqEpx,ϵq„ppx,ϵ|z,tq rpx, ϵ, tq “ Et„ppt|zqRpz|tq.             (26)
+
+So
+                                       ”                            “          ‰››2ı
+                  Lpθq “ Ez„ppzq,t„ppt|zq ”}NNθpzq ´ Epx,ϵ,tq„ppx,ϵ,t|zq rpx, ϵ, tq   ` const                                                                             ››2ı
+               “ Ez„ppzq,t„ppt|zq }NNθpzq ´ Rpzq  ` const “ L1pθq ` const.
+
+This finishes the proof.
+
+C.2. Approximation of the Variance of ppt|zq
+
+We claim in Statement 1 that, for a fixed noisy image z whose true noise level is t˚, the posterior variance of ppt|zq scales
+like t2˚{2d. In this section, we first derive a Opt2˚{dq upper bound on the variance under minimal technical assumptions.While obtaining the exact constant requires delicate optimizations, our Big-O presentation keeps the proof accessible. We
+then present a concise, intuitive argument to recover the t2˚{2d scaling, which— as confirmed by our numerical results in
+Section A.2—serves as an accurate and practical estimate of Varppt|zqrts.
+
+C.2.1. RIGOROUS UPPER BOUND ON VARIANCE.
+
+Single Data Point Case. We first consider the case where N “ 1. For brevity, write x “ x1. Recall that our goal is to
+bound, with high probability over the randomness in z „ ppzq, the posterior variance Vart|zrts.
+
+Note that some ill-behaved z can lead to strange distribution of t. Thus we work under the high-probability regime in which
+z concentrates around its typical behavior.
+Because ϵ „ Np0, Idq is rotationally invariant, we may, without loss of generality, assume x to only have 1 nonzerocoordinate.
+
+Theorem 3. Assume that
+                                                         ”        ı
+                                  ? ?
+                            x “ px, 0, 0, ¨ ¨ ¨ , 0q, x P ´  d,  d
+
+                                    z “ p1 ´ t0qx ` t0ϵ, ϵ “ pϵ0, ϵ1q
+
+Here, ϵ0 is a scalar that is the first coordinate of ϵ, and ϵ1 is its other coordinates.
+
+We further assume that
+                       „1     1 ȷ          ?
+                               t0 P  d, 1 ´ d   ,    ||ϵ12| ´ d| “ Op  d log dq,   |ϵ0|2 ď log d                        (27)
+
+Then, we have Vart|zptq “ Opt20{dq.
+Note that Eq. (27) occur with probability 1 ´ Op dq,1  due to the norm-concentration properties of the Gaussian distribution.
+
+Proof. We directly compute the probability density functions as follows.
+
+                                                21
+
+======================== PDF 第 22 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Firstly, we have
+                               ˜             ˙2¸                                            1        ˆ|z ´ p1 ´ tqx|                                ppt|zq 9 ppz|tqpptq 9   exp ´1
+                                                         td       2           t
+
+
+since the distribution ppz|tq is simply a Gaussian with mean p1 ´ tqx and variance t2 per dimension.
+
+Looking into the exponent, it can be simplified as
+
+                                                                                                 2                    ˆ|z ´ p1 ´ tqx| ˙2   ˆ|pt ´ t0qx ` t0ϵ| ˙2  ˆ     t0 ˙      t0                        “            “    ˇˇˇˇ 1 ´    x `  z ˇˇˇˇ
+                                        t                          t                         t         t
+               ˆˆ    ˙       ˙2     ˙2                                     t0        t0      ˆt0
+             “   1 ´    x `   ϵ0  `          |ϵ1|2
+                                       t         t             t
+                                            ˙2                                   t0             ˆt0
+which is a quadratic function on     . We write it as a   ´ µ  ` C for some constants a, µ, C independent of t, where
+                                     t                       t
+                          a                                        ?
+                      a “ px ´ ϵ0q2 ` |ϵ1|2                           “ x2 ´ xOp  log dq ` d ` Op  d log dq                       ?
+                “ x2 ` d ` Op  d log dq                                                           (28)
+and
+                             a
+                              aµ “ xpx ´ ϵ0q “ x2 ´ Opx  log dq                                    (29)
+by the assumption Eq. (27).
+Substituting back, we get                 ˜         ˙2¸                                          1          ˆt0                                          ppt|zq 9   exp ´1    ´ µ                                                     td      2a   t
+
+We find its maximum by differentiating its log-density:
+                                ˙    ˜    ˙2       ¸                      B log p pt|zq         ˆt0        t0   1   ˆt0                    “ ´d ` a   ´ µ   “    a    ´ aµt0 ´ d
+                            Bt            t         t        t2     t        t            t
+
+Let λ1 ą 0, λ2 ă 0 be the two roots of the equation fpXq :“ aX2 ´ aµX ´ d “ 0 (since a and d are both positive).
+Notice that λ1λ2 “ ´d We claim that                    a.
+                               ˆlog d ˙      ˆ     ˆlog d ˙˙                        λ1 “ 1 `   ?       , λ2 “ ´d  1 `        “ ´Θp1q                        (30)                    O    d          a   O   d
+
+This is because                      ?               ?
+                             fp1q “ Op  d log dq, f 1p1q “ x2 ` 2d ` Op  d log dq
+by Eq. (28) and Eq. (30), from which we derive the desired root bounds.
+
+Using the factorization into roots, we have
+                     ˜    ˙2       ¸         ˙      ˙                    B log ppt|zq   1   ˆt0                 1  ˆt0      ˆt0                   “    a    ´ aµt0 ´ d “  a   ´ λ1    ´ λ2
+                          Bt          t        t            t            t     t             t
+                            ˙
+                               1 ˆt0
+                   “    ´ λ1  Ωpdq
+                                            t    t
+
+by Eq. (28) and Eq. (30).
+
+                                                22
+
+======================== PDF 第 23 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+                t0
+Denote t˚ “     as the unique maximizer of log ppt|zq. As a first step, we show that in range p0, 3t˚s, the probability
+            λ1
+density of ppt|zq is more concentrated than a Gaussian with variance Opt20{dq. Intuitively, it is due to the fact that in thisrange,
+
+                            ˙                     ˆ ˙
+                    B log ppt|zq   1 ˆt0    t0           t0pt˚ ´ tq                 d
+                   “    ´    Ωpdq “         Ωpdq “ pt˚ ´ tqΩ
+                          Bt          t    t    t˚              t2t˚                          t20
+utilizing Eq. (30). This inequality implies that in this range, the gradient of this probability density is sharper than
+Npt˚, Opt20{dqq.
+To be specific, when 0 ă t ă t1 ď t˚ or t˚ ď t1 ă t ď 3t˚, we have
+                                                                             t1ż           ˆ ˙ ´                                        B log ppt|zq        d                     2¯
+                   log ppt1|zq ´ log ppt|zq “             dt “ Ω          ¨  pt ´ t˚q2 ´ pt1 ´ t˚q                  (31)
+                                                 Bt                t20
+                                                              t
+
+where the RHS is exactly the difference in log-probability density of Npt˚, Opt20{dqq at t and t1. This fact supports that in
+this range, ppt|zq is sharper than Npt˚, Opt20{dqq, or
+
+                                   Et„p1rpt ´ t˚q2s ď Et„qrpt ´ t˚q2s “ Opt20{dq
+where p1, q denotes the distribution of ppt|zq and Npt˚, Opt20{dqq restricted on p0, 3t˚s, respectively.
+Finally, we only need to consider the part when 3t˚ ă t ď 1, where we are going to prove that
+                                                           t„ppt|zqrtPr  ą 3t˚s
+
+is small. In this case, according to Eq. (31), for any t1 P rt˚, 2t˚s:
+
+                         ˆ  ˆ ˙        ˙
+                               ppt|zq             d                    ď exp ´Ω          ¨ p4t˚2 ´ t˚2q “ expp´Ωpdqq
+                                 ppt1|zq                 t20
+
+which is actually exponentially small. This implies that
+
+                                                     ˆ  ˙
+                                                                       1       1
+                     t„ppt|zqrtPr  ą 3t˚s ď expp´Ωpdqq ¨ t1Prt˚,2t˚smin   ppt1|zq ď expp´Ωpdqq ¨ t˚ “ O  d3
+
+Consequently, the contribution of this tail to the variance is Op1{d3q, which is negligible compared to Opt20{dq. Combiningthe two regimes, we conclude that
+
+                                         Varppt|zqrts ď Et„ppt|zqrpt ´ t˚q2s “ Opt20{dq
+
+
+
+Multiple Data Points Case.  We now turn to the setting of N ą 1 data points. Intuitively, one can identify the ground-truth
+clean image that generates the given noisy image, as long as the noise is not too large to swamp all signal. This can be done
+simply by comparing inner product: the noisy observation z will correlate most strongly with its corresponding clean sample
+xi, and only weakly with all others.
+Lemma 1. Suppose that x1, x2, . . . , xN are i.i.d Gaussian samples from Np0, Idq, and z “ p1 ´ t0qxi ` tϵ for some i.
+Then, we have the following two properties hold with probability 1 ´ d:1
+              #                              ?
+                                          | ⟨xj, z⟩|         “ Op  dplog N ` log dqq,    @j ‰ i
+                                                              log dq                                          | ⟨xi, z⟩´ p1 ´ t0q|xi|2| “ Op?d
+
+                                                23
+
+======================== PDF 第 24 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Proof. We first deal with the second inequality. We have
+
+               ⟨xi, z⟩´ p1 ´ t0q|xi|2 “ ⟨xi, p1 ´ t0qxi ` tϵ⟩´ p1 ´ t0q|xi|2 “ t0 ⟨xi, ϵ⟩„ Np0, |xi|Idq
+Using standard Gaussian tail bounds, this probability that |         p1 ´ t0q|xi|2| ě k?d log d is at most                                                           ⟨xi, z⟩´
+                      ˆ      ˙
+                                              log d                            exp ´k2d    “ expp´k2 log dq “ d´Ωpk2q
+                                                 |xi|2
+
+                                                               1
+Therefore, there exists a constant k such that the probability above is at most        .
+                                               dN
+For the first inequality, notice that
+
+                                        ⟨xj, z⟩“ p1 ´ tq ⟨xi, xj⟩` t ⟨xj, ϵ⟩
+each term is the dot product of two normal Gaussian variables, which is still sub-exponential.
+
+                                                                        1
+In this way, we derive that each term is at most Opdplog N ` log dqq with probability 1 ´ dN , so union bound over all the i
+gives the desired result.
+                            c
+                                                                    log N ` log d
+Theorem 4. There exists a constant C such that when 1 ´ t0 ě C                           , we can recover the correct i with
+                                                            d
+                   1
+probability at least 1 ´ d.
+
+Proof. Using Lemma 1, we can compute the dot products of all xi with z and take the largest one.
+
+This theorem implies that the concentration property of ppt|zq can be extended to multiple data points case, even when
+there are exponentially-many data points. By first recovering the correct clean image, the multi–data–point setting reduces
+immediately to the single–point analysis, and hence the posterior variance bound Opt20{dq extends to the case of exponentiallymany candidates.
+
+C.2.2. INTUITIVE DERIVATION OF THE APPROXIMATE CONSTANT
+
+In this section, we show the reason why we estimate the variance as t20{2d.
+
+Firstly, as we have seen in Theorem 4, the ground-truth clean image can be recovered with high confidence, even with a
+prior of exponentially-many data points. As a result, we revert to the single data point setting.
+                                        „1     1 ȷ
+For simplicity, we restrict attention to the bulk regime t P  d, 1 ´ d   , postponing edge–case analysis to future work.
+
+Now, we can still view the data point x as px, 0, . . . , 0q due to symmetry, where x stands for the norm of x. Because the
+dominant contribution to the likelihood comes from the d ´ 1 noise dimensions when d is large, we further approximate by
+neglecting the signal component in the first coordinate (i.e., assume x “ 0).
+
+On this assumption, we have
+
+                                                    z1 “ p1 ´ tqx1 ` tϵ1 “ tϵ.
+
+         ?
+and denote |z| “ t0  d. We have
+                                   ˆ   ˙
+                                              1            0                                               ppt|zq 9   exp  ´dt2
+                                                           td         2t2
+
+
+The variance of this distribution can be calculated exactly from integration, as long as we extend the distribution from r0, 1s
+to the whole R:
+
+                                                24
+
+======================== PDF 第 25 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+                       ż       ˆ   ˙   ˆ  ˙ d´2      ˙           ˙
+                  8   1             0     1   2     2  ˆd ´ 2  c    ˆd ´ 2                               exp  ´dt2             Γ             Γ
+                               td´1                                              2t2                                              2                                                              2                                                                     d       2                                                          dt20                                                        ˙                           ˙                       ˆ                            “                                ˆ                                            ˙ “                                    ˙ d´1                 Eppt|zqrts “ ´8ż 8                             1                                                        ˆd ´ 1                                                 0      1   2     2  ˆd ´ 1       2t0 Γ                              exp  ´dt2
+                   ´8 td         2t2      2   dt20    Γ    2                 2
+
+and similarly
+
+                                                     `    ˘
+                                                              1                                                               2 ˘                                                   dt20 Γ ` d´3                                          Eppt|zqrt2s “                                   “ dt20 ¨                                                    d´1
+                                            2 Γ   2         d ´ 3
+
+which yields
+
+                          ¨     ˜     ¸2˛
+                                                 dt20 ˝  2      Γp d´22  q                                                           ‚.                                (32)                                        Varppt|zqrts “       ¨     ´     d´1
+                                          2    d ´ 3    Γp  2  q
+
+Again, here we extend the distribution of ppt|zq from r0, 1s to R, as this relaxation will only increase the variance.
+
+Finally, we use the Stirling’s expansion for the gamma function to get
+               `                   ˘                              `                                   ˘                                                        ˘                                       `                                        d´3                            c                                           ˆ                                                        ˙˙                              d´2
+                                                  2                                                       2                                                    1               d´2                              d´2                                     2          Γ                    e´                                     1                                                                             ¨                             `                                                       op                         `                                                          ˆ1                                                            2                                                                       3                    2                                     2                                                   12                                                     d                                                      dq1                   ˘               `                                                                                                                                                          .          (33)                                  “                                                 ` o                                                                 1 `            “                              `                                  ˘                                       `                                                     `                                                        ˘˘                                        d´2               d´1                              d´1                                                 2                                                             1                                                                              d                                                   1                                                       2                                                               1                                                        d ´                                                                         4pd                                              ´ 1q                              d´1          Γ                                     2                    2                    e´                                     1                                                 o                         `                                                                             ¨                             `                                     2                                                   12                                                     d                                                            d
+
+Plugging Eq. (33) into Eq. (32), we derive our final estimation:
+                          ˆ         ˆ            ˙˙˙
+                                       dt20     2      2          3     ˆ1
+                             Varppt|zqrts “       ¨     ´       1 `     ` o
+                                   2    d ´ 3   d ´ 1      2pd ´ 1q     d                               ˙˙
+                                            t20 ˆ1   ˆ1
+                    “    ` o            ,
+                                 d   2     d
+
+which aligns with our Statement 1.
+
+C.3. Approximation of Epzq
+Statement 1 (Error of effective regression targets). Consider a single datapoint x P r´1, 1sd, ϵ „ Np0, Iq, t „ Ur0, 1s,and z “ p1 ´ tqx ` tϵ (as in Flow Matching). Define Rpzq and Rpz|tq with the Flow Matching configuration in Table 8.
+Given a noisy image z “ p1 ´ t˚qx ` t˚ϵ produced by a given t˚, the mean squared error Epzq in Eq. (10) can be
+approximated by
+
+                                                1
+                                       Epzq « 2p1 ` σ2dq                                             (34)
+under the situation that the data dimension d satisfies d1 ! t˚ and d1 ! 1 ´ t˚. Here, σ2d denotes the mean of squared pixel
+values of the dataset.
+
+Derivation. We start by the definition of Epzq:
+                            Epzq :“ Et„ppt|zq}Rpz|tq ´ Rpzq}2
+                                                                                                                            ››2                     “ Et„ppt|zq ››Rpz|tq ´ Et1„ppt1|zqrRpz|t1qs                                 (35)
+
+Next, we compute Rpz, tq using its definition under the Flow Matching configuration:
+                                                 “         ‰                   “      ‰                                                                        z ´ x
+                     Rpz|tq :“ Epx,ϵq„ppx,ϵ|z,tq rpx, ϵ, tq “ Epx,ϵq„ppx,ϵ|z,tq ϵ ´ x “          .                   (36)
+                                                                                                         t
+
+                                                25
+
+======================== PDF 第 26 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Using Eq. (36), we obtain
+                                                   „1 ȷ
+                                 Epzq “ }z ´ x}2 ¨ Vart„ppt|zq        .                                     (37)
+                                                                                    t
+
+
+We now compute the two terms separately. For the first term, we can rewrite it as
+
+                                   }z ´ x}2 “ t2˚}x ´ ϵ˚}2                                                `
+                          « t2˚ }x}2 ` }ϵ˚}2˘                                                `       ˘
+                          « t2˚ dσ2d ` d “ t2˚dp1 ` σ2dq.                                  (38)
+                                ?
+Here, we employ the fact that x ¨ ϵ˚ ! }x}}ϵ˚}, and that }ϵ˚} «  d with high probability. Also, σ2d “ }x}2{d, since we
+assume that the dataset contains only a single data point.
+
+For the second term, note that the variance of ppt|zq, given in Statement 1, is significantly smaller than the concentrated
+mean t˚ of ppt|zq. Thus, we approximate the variance using a first-order expansion:
+                        „1 ȷ           „ 1    pt ´ t˚q ȷ   1                1
+                       Vart„ppt|zq   « Vart„ppt|zq   ´      “    Vart„ppt|zqrts «                       (39)                                        t                 t˚          t2˚            t4˚                    t2˚d.
+
+Combining Eqs. (38) and (39), we get the estimation in Eq. (34).
+
+
+C.4. Bound of Accumulated Error
+
+Statement 2 (Bound of accumulated error).   Starting from the same noise x0 “ x10, consider a sampling process
+(Eq. (4)) of N steps, with noise conditioning:
+
+                                     xi`1 “ κixi ` ηiRpxi|tiq ` ζi˜ϵi
+
+and without noise conditioning:
+
+                                            x1i`1 “ κix1i ` ηiRpx1iq ` ζi˜ϵi.
+
+If }Rpx1i|tiq ´ Rpxi|tiq} { }x1i ´ xi} ď Li and }Rpx1iq´Rpx1i|tiq} ď δi, it can be shown that the error between the sampler
+outputs xN and x1N is bounded:
+
+                         }xN ´ x1N} ď A0B0 ` A1B1 ` . . . ` AN´1BN´1,                             (40)
+
+where
+
+                                  N´1ź
+                                 Ai “      pκi ` |ηi|Liq, Bi “ |ηi|δi.
+                                          j“i`1
+
+Proof. Define ai :“ κi ` |ηi|Li and bi :“ |ηi|δi. Then, we have:
+                                                            `                ˘                               }x1i`1 ´ xi`1} “ ›››κipx1i ´ xiq ` ηi Rpx1iq ´ Rpxi|tiq    ›››                           (41)
+
+as we assume that the same noise ˜ϵi is added in the sampling process with and without noise conditioning.
+
+Using the triangle inequality, this can be bounded as:
+
+      }x1i`1 ´ xi`1} ď κi}x1i ´ xi} ` |ηi|}Rpx1iq ´ Rpx1i|tiq} ` |ηi|}Rpx1i|tiq ´ Rpxi|tiq} ď ai}x1i ´ xi} ` bi.     (42)
+
+We now use induction on n to establish the bound:
+                               ˜     ¸
+                                              n´1ÿ   n´1ź
+                                          }x1n ´ xn} ď           ak   bj,                                      (43)
+                                                  j“0  k“j`1
+
+
+                                                26
+
+======================== PDF 第 27 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+    śN´1
+where   k“j`1 ak is defined as 1 for j “ N ´ 1.
+
+For the base case n “ 1, we need to show:
+
+                                                   }x11 ´ x1} ď b0,                                               (44)
+
+
+which follows directly from Eq. (42) with i “ 0.
+
+Now, assume the bound holds for some n, i.e.
+                         ˜     ¸       ¸                                    n´1ÿ   n´1ź        ˜n´1ź
+                              }x1n ´ xn} ď           ak   bj `      ak  }x10 ´ x0}.                          (45)
+                                        j“0  k“j`1          k“0
+
+
+We prove it holds for n ` 1. Applying Eq. (42), we obtain:
+
+                                        }x1n`1 ´ xn`1} ď an}x1n ´ xn} ` bn.                                    (46)
+
+Substitute the inductive hypothesis for }x1n ´ xn}:
+                          ˜     ¸        ˜     ¸
+                                      n´1ÿ   n´1ź       ÿn  źn
+                         }x1n`1 ´ xn`1} ď an           ak   bj ` bn “           ak   bj.                     (47)
+                                          j“0  k“j`1              j“0  k“j`1
+
+
+Thus, the bound holds for n ` 1. By induction, the bound holds for all n. Taking n “ N yields the desired result.
+
+D. Derivation of Coefficients for Different Denoising Generative Models
+
+In this section, we build upon our formulation in Section 3.1 to express common diffusion models—iDDPM (Nichol &
+Dhariwal, 2021), DDIM (Song et al., 2021a), EDM (Karras et al., 2022), Flow Matching (FM) (Lipman et al., 2023; Liu
+et al., 2023), and our uEDM Model—using a unified notation. The coefficients corresponding to each model are summarized
+in Table 8 and Table 9, followed by a concise derivation of their formulations.
+
+
+D.1. iDDPM
+
+The loss function of iDDPM (Nichol & Dhariwal, 2021) in DDPM (Ho et al., 2020)’s notation is
+
+                                  ?                                                                                                    ››2ı
+                                                          1 ´ ¯αtϵ, tq                     “ Et,x0,ϵ ”››ϵ ´ ϵθp?¯αtx0 `                                     Lsimple                                                                     .
+
+This can be directly translated into our notation:
+                                         ”
+                     “ Ex,ϵ,t wptq}NNθpz|cnoiseptqq ´ rpx, ϵ, tq}2ı,                           Lpθq
+
+where we have the coefficients
+                 a     a
+                                 aptq “    ¯αptq, bptq “   1 ´ ¯αptq, cptq “ 0, dptq “ 1                             (48)
+
+and with the training weighting and distribution of t being
+
+                                   wptq “ 1,  and  pptq “ Ut1, . . . , Tu.                                    (49)
+
+Notice the presence of the diffusion schedule ¯αptq inside the coefficients. We adapt a modified version of the cosine schedule
+in Nichol & Dhariwal (2021):
+                                ˆ      ˙
+                                             1         πt
+                                                      ¯αptq “    1 ` cos        ,                                          (50)
+                                             2        T
+
+
+                                                27
+
+======================== PDF 第 28 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Table 8: The coefficients of different models. For iDDPM, we assume a cosine diffusion schedule ¯αptq. For both iDDPM
+and DDIM we follow the original notation of DDPM (Ho et al., 2020). Also note that for EDM, all coefficients are calculated
+according to first-order ODE solver, and in the final step we need to multiply the output by σd to get the final image. See
+Section D for more details and derivations.
+
+             iDDPM             DDIM              EDM               FM
+  Training    a            a
+  aptq                  ¯αptq                             ¯αptq             ? 1                        1 ´ t
+        a            a                              t2`σ2d
+  bptq             1 ´ ¯αptq                 1 ´ ¯αptq           ?  t                                 t
+                                                                              t2`σ2d
+  cptq           0                       0                ? t                  ´1
+                                                                             σd  t2`σ2d
+  dptq           1                       1                ´ ? σd                      1
+                                                                                t2`σ2d
+  wptq           1                       1                         1                           1
+  pt             Ut1, . . . , Tu               Ut1, . . . , Tu                exp Np´1.2, 1.22q 7            Ur0, 1s
+
+  Sampling        b            b            c      ´          ¯
+                          ¯αi`1                              ¯αi`1                            σ2d`t2i        tipti´ti`1q  κi                                                            1´   t2i `σ2d         0                                    ¯αi ´b   b    ¯           ¯αi   b                   σ2d`t2i`1
+  ηi                   1             ¯αi       ¯αi`1                        ¯αi`1        b  σdpti´ti`1q                                                                                                                  ti`1 ´ ti                    ?1´¯αi      ¯αi`1 ´      ¯αi                              ?1 ´ ¯αi`1´      ¯αi p1 ´ ¯αiq      pt2i `σ2dqpt2i`1`σ2dq          c´      ¯
+                                           ¯αi    1´¯αi`1                                          0                          0                                                                                                 0  ζi             1´                                       1´¯αi                                ¯αi`1                                                 ˆ     ˆ                                                                                                    1          1     1 ˙˙ρ
+  Schedule t0„N    ti “ N´iN   ¨ T                      ti “ N´iN   ¨ T                        ti “   t max`ρ  Ni   t min´tρ     maxρ            ti “ 1 ´ Ni
+
+  Parameters
+                           `          ˘              t´1ś ´          ¯
+                       ¯αptq “ 12 1 ` cos πtT           ¯αptq “    1´k1´k2 T ´1i      σd “ 0.5, ρ “ 7
+                                                      i“0
+
+                          ¯αi :“ ¯αptiq                        ¯αi :“ ¯αptiq                       tmax “ 80, tmin “ 0.002
+
+              T “ 4000              T “ 1000
+
+                                            k1 “ 10´4, k2 “ 2 ˆ 10´2
+
+
+
+where T “ 4000 is the total number of diffusion steps during training.
+
+Next, consider the sampling process, which in their notations is iteratively given by
+
+                        ˆ             ˙ c
+                                 1         1 ´ αt              1 ´ ¯αt´1
+                         xt´1 “ ?αt  xt ´ ?1 ´ ¯αt ϵθpxt, tq `    1 ´ ¯αt  βtz,
+
+and z „ Np0, Iq is a standard Gaussian random noise. It is also straightforward to translate this sampling equation into ournotation:
+         c          ˆc   c   ˙   dˆ     ˙
+                           ¯αi`1         1              ¯αi        ¯αi`1                         ¯αi   1 ´ ¯αi`1
+                 κi “             , ηi “           ´                , ζi “    1 ´                          ,             (51)                                    ¯αi     ?1 ´ ¯αi      ¯αi`1          ¯αi                    ¯αi`1   1 ´ ¯αi
+
+
+and
+
+                             N ´ i
+                                                                  ti “            ¨ T.                                               (52)
+                              N
+
+
+This will give the first column in Table 8.
+
+                                                28
+
+======================== PDF 第 29 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+D.2. DDIM
+
+DDIM (Song et al., 2021a) shares the training process with DDPM (Ho et al., 2020). However, we choose to use the linear
+schedule for ¯αptq, to demonstrate the generality of our scheme. This schedule has the form
+
+                              ˆ          ˙                                               t´1ź
+                                                                                   i
+                                                 ¯αptq “     1 ´ k1 ´ k2             ,                                      (53)
+                                               T ´ 1                                               i“0
+
+where k1 “ 10´4 and k2 “ 2 ˆ 10´2, and T “ 1000 is the total number of diffusion steps during training.
+
+The sampling process is given by
+
+                              a                              ˆxt ´ ?1 ´ ¯αtϵθpxt, tq ˙                       xt´1 “ ?¯αt´1               `  1 ´ ¯αt´1ϵθpxt, tq                                                 ?¯αt
+
+which is obtained by substituting σt “ 0 in their notation. This is again straightforward to translate into our notation:
+               c           c
+                    a                                         ¯αi`1                         ¯αi`1
+                             κi “             , ηi “   1 ´ ¯αi`1 ´        p1 ´ ¯αiq, ζi “ 0,                          (54)
+                                                     ¯αi                                   ¯αi
+
+and
+
+                             N ´ i
+                                                                  ti “            ¨ T.                                               (55)
+                              N
+
+
+These give the second column in Table 8.
+
+Moreover, we can consider the generalized sampler proposed by Song et al. (2021a), which contains an adjustable parameter
+λ P r0, 1s. In their original notation, the sampler can be written as
+                        ˆxt ´ ?1 ´ ¯αtϵθpxt, tq ˙ b                xt´1 “ ?¯αt´1               `  1 ´ ¯αt´1 ´ λ2σ2t ϵθpxt, tq ` λσtϵt,                                         ?¯αt
+
+where
+                    d
+                                                       p¯αt´1 ´ ¯αtqp1 ´ ¯αt´1q
+                                         σt :“
+                                                         ¯αt´1p1 ´ ¯αtq
+
+and ϵt is an independent Gaussian random noise. In our formulation, it can be equivalently written as
+           $  c
+                                     ¯αi`1
+                         κi “
+                                                ¯αi
+             d                               c           ’’’’’’’’’’’&
+                                                    p¯αi`1 ´ ¯αiqp1 ´ ¯αi`1q      ¯αi`1
+                            ηi “   1 ´ ¯αi`1 ´ λ2             ´        p1 ´ ¯αiq     .                   (56)                                                      ¯αi`1p1 ´ ¯αiq                ¯αi
+              d
+                                      p¯αi`1 ´ ¯αiqp1 ´ ¯αi`1q           ’’’’’’’’’’’% ζi “ λ
+                                        ¯αi`1p1 ´ ¯αiq
+
+
+These expressions are used in our experiment of the “interpolate sampler” in Section 6.2. One can verify that when λ “ 1,
+the coefficients κi, ηi and ζi will be the same as iDDPM (Eq. (51)); and when λ “ 0, the coefficients will be the same as
+DDIM (Eq. (54)).
+
+   7Here, we use the notation exp Npµ, σ2q to denote the distribution of exppuq, where u „ Npµ, σ2q.
+
+                                                29
+
+======================== PDF 第 30 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+D.3. EDM
+
+The original EDM (Karras et al., 2022) training objective is given by
+                                             ”
+                       “ Ex,ϵ,t λptq}Dθpx ` tϵ|tq ´ x}2ı,                                  (57)                               Lpθq
+
+where Dθ is formed by the raw network NNθ wrapped with a precondition:
+
+                            DθpzD|tq “ cskipptqzD ` coutptqNNθpcinptqzD|tq
+
+where zD “ x ` tϵ. Here we directly use t instead of cnoiseptq in the original notation.
+
+As mentioned in Section 3.1, we will consider the regression target with respect to NNθ instead of Dθ and absorb the
+coefficients cskipptq, cinptq and coutptq into the training process. To achieve that, we define z :“ cinptqpx ` tϵq. Then, we can
+get an equivalent training objective for NNθ given by
+
+                                            ”
+                      “ Ex,ϵ,t wptq}NNθpz|tq ´ rpx, ϵ, tq}2ı,                             Lpθq
+
+where
+            $
+            ’’&z “ cinptqx ` tcinptqϵ
+                         wptq “ λptqcoutptq2                                                                   (58)
+            ’’%               1                                      1´cskipptq        tcskipptq
+                          rpx, ϵ, tq “ coutptq ¨ px ´ cskipptqpx ` tϵqq “    coutptq x ´  coutptq ϵ
+
+Now, we can plug in the specific expressions
+
+                            1                                               σdt                                                              σ2d                                                                         σ2d ` t2
+                                                                                                                       , λptq “                        cinptq “ a                                                            , coutptq “ a                                                                                           , cskipptq “
+                           σ2d ` t2           σ2d ` t2          σ2d ` t2         σ2dt2
+
+and σd “ 0.5 to get the coefficients
+
+                          1                    t                      t                 σd                    aptq “ a            , bptq “ a            , cptq “ a            , dptq “ ´ a            ,                (59)
+                        σ2d ` t2         σ2d ` t2       σd  σ2d ` t2           σ2d ` t2
+and wptq “ 1. Also note that pptq is given explicitly by the log-norm schedule exp Np´1.2, 1.22q. This completes thediscussion of the training process.
+
+The (first-order) sampling process is given by
+
+                            ´ pcskipptiqxD,i ` coutptiqNNθpcinptiqxD,i|tiqq                xD,i`1 “ xD,i ` pti`1 ´ tiqxD,i
+                                                                                             ti
+
+Here we use the suffix D to denote this is the sampling process corresponding to Dθ. Since we also have to remove the
+external conditioning in the sampling process, we should let xi “ cinptiqxD,i and rewrite the sampling equation using xi:
+                     ˆ            ˙
+                       ti`1   cinpti`1q       ti`1 ´ ti                    ti ´ ti`1
+            xi`1 “         ¨          1 ´            cskipptiq  xi `          coutptiqcinpti`1qNNθpxi|tiq
+                               ti      cinptiq          ti`1                            ti
+
+This then gives the general sampling coefficients
+                     ˆ            ˙
+                      ti`1   cinpti`1q       ti`1 ´ ti                     ti ´ ti`1
+                κi “         ¨          1 ´            cskipptiq   , ηi “           coutptiqcinpti`1q, ζi “ 0.            (60)
+                              ti      cinptiq          ti`1                             ti
+
+Then, we can plug in the explicit expressions of cinptiq, cskipptiq and coutptiq to get the final coefficients
+          d                     ˆ          ˙
+                                              tipti`1 ´ tiq                                                                   σdpti`1 ´ tiq                       σ2d ` t2i
+                                 1 `                   κi “                                                                                                                                       , ζi “ 0.               (61)                                                                                       , ηi “ ´ b
+                       σ2d ` t2i`1          t2i ` σ2d                 pt2i`1 ` σ2dqpt2i ` σ2dq
+
+                                                30
+
+======================== PDF 第 31 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+Moreover, notice that due to our change-of-variable during the removal of external conditioning, xN  is defined as
+cinptNqxD,N. But the sampling algorithm ensures xD,N to match the data distribution, instead of xN. Thus, we have to
+multiply the output by σd to get the final image, as mentioned in the caption of Table 8.
+
+Finally, the sampling time step is also explicitly given in Karras et al. (2022), so we can directly use it here:
+                   $                        ˆ                                                ˙7                                                                             1                                                          1                   ’&                                               80 7                                                ¨pN´i´1q`0.002                                                                             7 ¨i
+                                                                                                 if i ă N                                       N´1                                               ti “                                                            .                                (62)                   ’%
+                                    0                                    if i “ N
+
+
+These together give the coefficients for EDM, which are shown in the third column of Table 8.
+
+
+D.4. Flow Matching
+
+The training process of FM (Lipman et al., 2023) is given by
+                                         ”
+                     “ Ex,ϵ,t }vθptϵ ` p1 ´ tqx, tq ´ pϵ ´ xq}2ı.                           Lpθq
+
+This can be directly translated into our notation:
+
+                                     aptq “ 1 ´ t, bptq “ t, cptq “ ´1, dptq “ 1,                                  (63)
+
+and with wptq “ 1 and pptq “ Upr0, 1sq. The sampling process is given by solving the ODE
+                                     dx
+                              “ vθpx, tq
+                                               dt
+
+from t “ 1 to t “ 0. Since we assume using a first-order method (i.e. Euler method), the sampling equation is
+
+                                    xi`1 “ xi ` vθpxi, tiq ¨ pti`1 ´ tiq.
+
+This will give
+
+                                           κi “ 0, ηi “ ti`1 ´ ti, ζi “ 0                                        (64)
+
+as well as the sampling time
+
+                              N ´ i
+                                                                    ti “           ,                                                 (65)
+                               N
+
+as in the fourth column of Table 8.
+
+
+D.5. Our uEDM Model in the Formulation
+
+Introduced in Section 5, the uEDM model designed by us is a modified version of EDM (Karras et al., 2022). The only
+modification is that we change cinptq and coutptq by
+              $
+              ’’&cinptq “ a  1          $&          1
+                                                t2 ` σ2d                     cinptq “ ?                              ÝÑ                    t2 ` 1
+              ’’%    a tσd         %                                      coutptq “                                 coutptq “ 1
+                                                 t2 ` σ2d
+
+and remain all other configurations the same as the original EDM model.
+
+In Section D.3, we have already derived the general form of the coefficients of EDM with functions cinptq, coutptq, cskipptq
+and λptq in Eqs. (58) and (60). Plugging in the new set of these functions, we can then derive the coefficients of uEDM, as
+shown in Table 9.
+
+                                                31
+
+======================== PDF 第 32 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+                            Table 9: Comparison of coefficients of EDM and our uEDM.
+
+
+  Coefficients       aptq           bptq            cptq            dptq        wptq                   κi                             ηi
+                                          d       ˜         ¸
+                 1                                      t                                                       t                                                     σd                                                                          σ2d ` t2i                      b              b                                                                                                   tipti´ti`1q   b   σdpti ´ ti`1q                                                                   1 EDM    b                                 ´ b                                                                    1´
+                   t2 ` σ2d       t2 ` σ2d    σd  t2 ` σ2d         t2 ` σ2d               σ2d ` t2i`1        t2i ` σ2d           pt2i ` σ2dqpt2i`1 ` σ2dq
+                                          d      ˜         ¸
+                                      t              t2                 1                                                          tσ2d      σ2d ` t2         t2i ` 1                                                                                                  tipti´ti`1q                tib ´ ti`1                                                                    1´                                 ´ uEDM     ?                ?
+                   t2 ` 1        t2 ` 1        t2 ` σ2d          t2 ` σ2d      σdt          t2i`1 ` 1        t2i ` σ2d                 ti  t2i`1 ` 1
+
+
+E. Additional Samples
+
+Beyond the comparison shown in Fig. 5 for noise-conditional and noise-unconditional models, we also provide additional
+samples for other models, on other datasets, or in class-conditional settings. We use the same configuration as in Table 2.
+Figs. 10 and 11 show the samples of ICM and ECM on CIFAR-10 with both 1 and 2 inference steps. Fig. 12 show the
+samples of FM on ImageNet 32ˆ32 with both Euler and EDM-Heun sampler. Fig. 13 shows the samples of FM and EDM
+on CIFAR-10 in a class-conditional setting.
+
+
+
+
+
+                                                32
+
+======================== PDF 第 33 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+
+
+
+
+               (a) ICM 1 step (FID: 3.37 Ñ 12.03)                                     (b) ICM 2 step (FID: 2.59 Ñ 3.57)
+
+
+Figure 10: Samples generated by ICM on CIFAR-10. From left to right: 1 step w/ t, 1 step w/o t, 2 step w/ t, 2 step w/o t.
+All corresponding samples use the same noise.
+
+
+
+
+
+              (a) ECM 1 step (FID: 3.49 Ñ 12.60)                                    (b) ECM 2 step (FID: 2.57 Ñ 3.27)
+
+
+Figure 11: Samples generated by ECM on CIFAR-10. From left to right: 1 step w/ t, 1 step w/o t, 2 step w/ t, 2 step w/o t.
+All corresponding samples use the same noise.
+
+
+
+
+
+     (a) ImageNet FM, Euler Sampler (FID: 5.15 Ñ 4.85)                  (b) ImageNet FM, Heun Sampler (FID: 4.43 Ñ 4.58)
+
+
+Figure 12: Samples generated by FM on ImageNet 32ˆ32 with Euler and EDM-Heun sampler. From left to right: Euler w/
+t, Euler w/o t, Heun w/ t, Heun w/o t. All corresponding samples use the same noise.
+
+
+
+
+                                                33
+
+======================== PDF 第 34 页 ========================
+                                 Is Noise Conditioning Necessary for Denoising Generative Models?
+
+
+
+
+
+                                                (a) Class-conditional FM (FID: 2.72 Ñ 2.55)
+
+
+
+
+
+                                             (b) Class-conditional EDM (FID: 1.76 Ñ 3.11)
+
+Figure 13: Class-conditional samples generated by FM and EDM on CIFAR-10. In rasterized order: FM w/ t, FM w/o t,
+EDM w/ t, EDM w/o t. All corresponding samples use the same noise and the same label.
+
+
+
+
+
+                                                34

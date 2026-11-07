@@ -1,0 +1,709 @@
+LAI-001 | Visual Prompt Multi-Modal Tracking
+来源：https://openaccess.thecvf.com/content/CVPR2023/html/Zhu_Visual_Prompt_Multi-Modal_Tracking_CVPR_2023_paper.html
+本地PDF：专题文献/赖思邈/LAI-001_ViPT.pdf
+SHA-256：14cc53c2ea2b2dbbb158b6dbbb80089d9c2a9c765556392737e8d409d0beba90
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                       This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                   Except for this watermark, it is identical to the accepted version;
+                                  the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+
+                     Visual Prompt Multi-Modal Tracking
+
+            Jiawen Zhu1†  Simiao Lai1†  Xin Chen1  Dong Wang1B   Huchuan Lu1,2
+             1Dalian University of Technology, China   2Peng Cheng Laboratory, China
+        {jiawen,laisimiao,chenxin3131}@mail.dlut.edu.cn, {wdice,lhchuan}@dlut.edu.cn
+
+
+
+                                                                                     Foundation Task Pre-training
+                 Abstract                                                                                         Large-scale data
+                                                                                                                 Downstream data
+                                                                         RGB           Foundation Model                                                                                                                             Foundation modality
+   Visible-modal object tracking gives rise to a series of                                                                     Auxiliary modality
+                                                                                                                  (a) RGB-based Tracking
+downstream multi-modal tracking tributaries. To inherit the
+powerful representations of the foundation model, a natural          Full Fine-tuning                          Prompt-tuning
+modus operandi for multi-modal tracking is full ﬁne-tuning                                                                                                                                       Feature                                                                         RGB                                                                                                                                     Fusion        RGB               Foundation Model                                                                                                                                          Extractingon the RGB-based parameters. Albeit effective, this man-
+                                                                                                Depth                                                                                                                                           Depthner is not optimal due to the scarcity of downstream data                                                                                                                                        Feature                                                         …   …                                                                                                Thermal                                                                                                                                            Thermal                                                                                                                                          Extractingand poor transferability, etc. In this paper, inspired by the                                                                                                       Event                                          Event      Prompts
+recent success of the prompt learning in language models,
+                                                                                                          (b) Multi-modal Tracking (existing)                         (c) ViPT (ours)
+we develop Visual Prompt multi-modal Tracking (ViPT),
+                                                                  Figure 1.  Existing multi-modal tracking paradigm vs. ViPT.
+which learns the modal-relevant prompts to adapt the frozen
+                                                                              (a) Foundation model training on large-scale RGB sequences.
+pre-trained foundation model to various downstream multi-
+                                                             (a)→(b) Existing multi-modal methods extend the off-the-shelf
+modal tracking tasks. ViPT ﬁnds a better way to stimulate                                                                   foundation model and conduct full ﬁne-tuning on downstream
+the knowledge of the RGB-based model that is pre-trained      tracking tasks. (a)→(c) We investigate the design of a multi-modal
+at scale, meanwhile only introducing a few trainable pa-      tracking method in prompt-learning paradigm. Compared to (b),
+rameters (less than 1% of model parameters). ViPT outper-      the proposed ViPT has a more concise network structure, bene-
+forms the full ﬁne-tuning paradigm on multiple downstream      ﬁts from parameter-friendly prompt-tuning, and narrows the gap
+tracking tasks including RGB+Depth, RGB+Thermal, and     between the foundation and downstream models.
+RGB+Event tracking. Extensive experiments show the po-
+tential of visual prompt learning for multi-modal tracking,                                                RGB+Thermal (RGB-T) [44, 56], and RGB+Event (RGB-
+and ViPT can achieve state-of-the-art performance while                                                       E) [51,52] are represented.
+satisfying parameter efﬁciency. Code and models are avail-
+                                                         However, as the downstream task of RGB-based track-able at https://github.com/jiawen-zhu/ViPT.
+                                                                    ing, the main issue encountered by multi-modal tracking is
+                                                                the lack of large-scale datasets. For example, the widely
+                                                         used RGB-based tracking datasets, GOT-10k [13], Track-
+1. Introduction                                                         ingNet [36], and LaSOT [9], contain 9.3K, 30.1K, and
+                                                     1.1K sequences, corresponding to 1.4M, 14M, and 2.8M  RGB-based tracking, a foundation task of visual object
+                                                         frames for training. Whereas the largest training datasetstracking, gains from large-scale benchmarks [9, 13, 27, 36,
+                                                                   in multi-modal tracking, DepthTrack [47], LasHeR [25],39, 45] provided by the community, and many excellent
+                                                         VisEvent [43], contain 150, 979, 500 training sequences,works [2,3,5,7,22] have spurted out over the past decades.
+                                                           corresponding to 0.22M, 0.51M, 0.21M annotated frameDespite the promising results, object tracking based on
+                                                                       pairs, which is at least an order of magnitude less than thepure RGB sequences is still prone to failure in some com-
+                                                              former. Accounting for the above limitation, multi-modalplex and corner scenarios, e.g., extreme illumination, back-
+                                                               tracking methods [43, 47, 61] usually utilize pre-trainedground clutter, and motion blur.  Therefore, multi-modal
+                                                  RGB-based trackers and perform ﬁne-tuning on their task-tracking is drawing increasing attention due to the ability to
+                                                               oriented training sets (as shown in Figure 1 (a)→(b)).achieve more robust tracking by utilizing inter-modal com-
+                                            DeT [47] adds a depth feature extraction branch to the orig-plementarity, among which RGB+Depth (RGB-D) [47,60],
+                                                                     inal ATOM [7] or DiMP [3] tracker and ﬁne-tunes on RGB-
+   †Equal contribution.                         D training data. Zhang et al. [57] extend SiamRPN++ [21]
+  BCorresponding author: Dr. Dong Wang.                          with dual-modal inputs for RGB-T tracking. They ﬁrst con-
+
+
+
+                                                       9516
+
+======================== PDF 第 2 页 ========================
+struct a unimodal tracking network trained on RGB data,           to downstream multi-modal tracking tasks.  Besides,
+then tune the whole extended multi-modal network with        ViPT is a general method that can be applied to vari-
+RGB-T image pairs.  Similarly, Wang et al. [43] develop         ous tasks, i.e., RGB-D, RGB-T, and RGB-E tracking.
+dual-modal trackers by extending single-modal ones with       • A modality-complementary prompter is designed to
+various fusion strategies for visible and event ﬂows and per-          generate valid visual prompts for the task-oriented
+form extra model training on the RGB-E sequences.  Al-         multi-modal tracking. The auxiliary-modal inputs are
+though effective, the task-oriented full-tuning approach has          streamlined to a small number of prompts instead of
+some drawbacks. (i) Full ﬁne-tuning the model is time ex-          designing an extra network branch.
+pensive and inefﬁcient, and the burden of parameters stor-       • Extensive experiments show that our method achieves
+ing is large, which is unfriendly to numerous applications       SOTA performance on multiple downstream multi-
+and cumbersome to transfer deploying. (ii) Full ﬁne-tuning         modal tracking tasks while maintaining parameter-
+is unable to obtain generalized representation due to the          efﬁcient (<1% trainable parameters).
+limited annotated samples, the inability to utilize the pre-
+trained knowledge of the foundation model trained on large-     2. Related Work
+scale datasets. Thus, a natural question is thrown up:  Is
+there a more effective manner to adapt the RGB-based foun-     2.1. Multi-Modal tracking
+dation model to downstream multi-modal tracking?
+                                                          Assigned an arbitrary object in the initial frame, gen-
+  More recently, in Natural Language Processing (NLP)
+                                                                     eral visual object tracking (single-modal inputs) aims to
+ﬁeld, researchers have injected textual prompts into down-
+                                                                 predict the position and scale of the object in all subse-
+stream language models to effectively exploit the repre-
+                                                          quent frames.  The continued emergence of large-scale
+sentational potential of foundation models, this method,
+                                                                  datasets [9, 13, 36], and the surging development of deep
+is known as prompt-tuning.  After that, a few researchers
+                                                              neural networks [12, 41] have further advanced this ﬁeld.
+have tried to freeze the entire upstream model and add
+                                                  Numerous trackers [2,3,5,22] have been deployed to refresh
+only some learnable parameters to the input side to learn
+                                                                the accuracy and robustness of tracking. Even though the
+valid visual prompts.  Existing researches  [1, 14, 38, 59]
+                                                                  existing performance is already impressive, single-modal
+show its great potential and visual prompt learning is ex-
+                                                                object tracking in some scenarios (e.g., background clutter,
+pected to be an alternative to full ﬁne-tuning.  Intuitively,
+                                                                illumination variation, motion blur, etc.) is still insufﬁcient
+there is a large inheritance between multi-modal and sin-
+                                                                   to meet our demands. As the cost of binocular imaging sen-
+gle RGB-modal tracking, which should share most of prior
+                                                                sors becomes increasingly low, multi-modal tracking has
+knowledge on feature extraction or attention patterns.  In
+                                                                    attracted more attention for it can provide complementary
+this spirit, we present ViPT, a uniﬁed visual prompt-tuning
+                                                             information among different modalities, assisting trackers
+paradigm for downstream multi-modal tracking.  Instead
+                                                                   to handle challenging situations that cannot be addressed
+of fully ﬁne-tuning an RGB-based tracker combined with
+                                                                 solely through RGB inputs. For example, [35] assists with
+an auxiliary-modal branch, ViPT freezes the whole foun-
+                                                                 additional depth information for hand tracking in occlusion
+dation model and only learns a few modal-speciﬁc visual
+                                                                scenes. Similarly, JMMAC [55] fuses two modalities, RGB
+prompts, which inherits the RGB-based model parame-
+                                                      and thermal infrared, to obtain reliable appearance and mo-
+ters trained at scale to the maximum extent (see Figure 1
+                                                                   tion cues. To obtain more robust tracking results, Liu et
+(c)).  Different from the prompt learning of other single-
+                                                                                al.  [28] combines RGB and event ﬂows to predict candi-
+modal vision tasks, ViPT introduces additional auxiliary-
+                                                              date ROIs in complicated scenarios. In addition, numerous
+modal inputs into the prompt-tuning process, adapting the
+                                                     works focus on how to perform effective feature fusion on
+foundation model to downstream tasks while simultane-
+                                                          multi-modal information [6,33,52,58].
+ously learning the association between different modalities.
+                                                         However, an issue has been overlooked. A potentialSpeciﬁcally, ViPT inserts several simple and lightweight
+                                                                     risk of overﬁtting is rising due to the contradiction betweenmodality-complementary prompter (MCP) blocks into the
+                                                                the paucity of large-scale multi-model training sets and thefrozen foundation model to effectively learn the inter-modal
+                                                     huge appetites of the data-driven models. Therefore, exist-complementarities. Notably, ViPT is a general framework
+                                                             ing methods [31,43,47,53,54,60,61] usually design an addi-for various downstream multi-modal tracking tasks, includ-
+                                                                    tional network branch for the inputs of the auxiliary modal-ing RGB-D, RGB-T, and RGB-E tracking. We summarize
+                                                                                    ity, and the ﬁnal model ﬁrst loads the pre-trained parame-the contribution of our work as follows:
+                                                                        ters (from RGB-based model or imagenet [39]) then con-
+  • A visual prompt tracking framework is proposed to     ducts ﬁne-tuning on their downstream task-oriented train-
+     achieve task-oriented multi-modal tracking.   Facili-     ing sets.  In addition, zhang et al. [53] transfer the RGB
+     tated by learned prompts, the off-the-shelf foundation     videos in GOT10k [13] to synthetic TIR videos, and Yan
+    model can be effectively adapted from RGB domain      et al. [47] generate synthetic RGB-D data from LaSOT [9]
+
+
+
+                                                       9517
+
+======================== PDF 第 3 页 ========================
+     D  Modalities             RGB   T                                         Head           Box Head
+ E
+                                                                                 Transformer…Encoder Layer    𝐸𝐸𝐿𝐿 …
+                                                                                 Transformer Encoder Layer  𝐸𝐸𝑙𝑙+1                                                                                                                                                                                                                  Interaction
+                   &
+                                                                                                                                                                                                           𝑃𝑃𝑙𝑙         Embed              Embed
+
+                                                                                 Transformer Encoder Layer    𝐸𝐸𝑙𝑙                                                                                                                                                                                               Extraction                      …
+           Tuned parameters       Prompt tokens
+             Frozen parameters     RGB tokens          Input                                              𝑃𝑃1
+
+
+Figure 2. Overview architecture of our ViPT. The RGB- and auxiliary- modal inputs are ﬁrst fed to the patch embed to generate the
+corresponding RGB and prompt tokens. L-layer stacked vision transformer (ViT) backbone is used for feature extraction and interaction.
+Modality-complementary prompters {P l}Ll=1 are inserted into the foundation model to learn the effective visual prompts.
+
+
+and COCO [27]. They attempted to exploit some model-     fuses source images from two modalities by weighted addi-
+transform algorithms (e.g.,  [34] for monocular depth es-      tion without the tuning process. The prompts in it are not
+timation) to generate auxiliary-modal pseudo-truths from      learnable and thus can gain limited improvements. In this
+RGB sequences to expand the downstream data, whereas     work, we exploit the core idea of visual prompt-tuning and
+this approach just partly alleviates the data anxiety for     design an innovative prompt-learning framework for multi-
+multi-modal tracking.   In this work, taking a different     modal tracking to replace the full ﬁne-tuning paradigm.
+path, we design a parameter-efﬁcient prompt-tuning archi-
+tecture to explore the adaptation from pre-trained RGB-     3. Methodology
+based model to downstream multi-modal tracking tasks.
+                                                                 In this work, we propose ViPT for effectively and ef-
+                                                               ﬁciently adapting the pre-trained RGB-based foundation
+2.2. Visual Prompt Learning                                                               tracking model to downstream multi-modal tasks. Instead
+                                                              of fully ﬁne-tuning upon a pre-trained foundation model,   For a long period, ﬁne-tuning has been adopted to lever-
+                                                 ViPT only tunes a small number of prompt-learning param-age large pre-trained models for performing downstream
+                                                                     eters and achieves promising transfer learning abilities andtasks.  Researchers usually update all the model param-
+                                                                preferable modal complementarities. The overall architec-eters when training on downstream data.  This manner
+                                                                   ture of our ViPT is depicted in Figure 2.is parameter-inefﬁcient and requires many repetitive task-
+oriented copies and storage of the entire pre-trained model.
+                                                               3.1. Preliminary and Notation
+Recently, as a new paradigm, prompt learning has emerged
+and drastically boosted the performance of many down-       Problem Setting. Given a video with an initial target
+stream natural language processing (NLP) tasks [20, 30].     box B0, the goal of the RGB-based tracking is to learn a
+Besides, prompt learning also shows its effectiveness in      tracker FRGB  : {XRGB, B0} →B to predict the box
+many computer vision tasks. VPT [14] prepends a set of   B of the target in all subsequent search frames XRGB.
+learnable parameters to transformer encoders and remark-     For multi-modal tracking,  it introduces an extra spatial-
+ably beats full ﬁne-tuning on 20 downstream recognition     temporal synchronized input ﬂow, extends the model input
+tasks.  AdaptFormer [4] introduces lightweight modules      to (XRGB, XA), where the subscript A signiﬁes the other
+to ViT and outperforms full ﬁne-tuned models on action      auxiliary modalities (e.g., depth, thermal infrared, or event).
+recognition benchmarks. Convpass [15] is proposed to em-     Accordingly, the multi-model tracking can be formulated as
+ploy convolutional bypasses for prompt learning on pre-   FMM : {XRGB, XA, B0} →B, where FMM is the multi-
+trained ViT. ProTrack [48] ﬁrst introduces the prompting     modal tracker.
+concept into the tracking ﬁeld. However, it merely simply       Foundation Model. Typically, the tracker FRGB can be
+
+
+
+                                                       9518
+
+======================== PDF 第 4 页 ========================
+…                     𝑃𝑃𝑙𝑙                𝑃𝑃𝑙𝑙+1   …        andis mappedXA) to anda patchﬂattenedembedintolayerD-dimensionalseparately. Eachlatentinputspace,ﬂow
+                                             we denote them as RGB tokens H0RGB and auxiliary tokens
+                                     H0A. Then, H0RGB is fed to the foundation model, H0RGB ℋ𝑙𝑙−1                                                                   𝒫𝒫𝑙𝑙
+                                            𝐶𝐶                                       ℳ𝑅𝑅𝑅𝑅𝑅𝑅                           and H0A are sent into cascade modality-complementary                         𝛽𝛽× 𝐻𝐻× 𝑊𝑊          𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅 1       ×             …        prompter (MCP) to generate modality-speciﬁc prompts. …
+       1                                     The learned prompts are added to the original RGB ﬂow
+                                                              𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆(𝜆𝜆ȉ ℳ𝑅𝑅𝑅𝑅𝑅𝑅)                           in a form of residuals:                                                                                                                                                                                                                                                                                                                                𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅  𝒫𝒫𝑙𝑙−1                           𝐶𝐶                𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝑆𝐹𝐹𝐹𝐹𝐹𝐹𝐹𝐹𝐹𝐹          1 × 1
+                                             Hl = HlRGB + Pl+1,      l = 0, 1, . . . , L −1     (3)          𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅𝑅 1  𝛽𝛽× 𝐻𝐻× 𝑊𝑊 …    ×                              +       1                       ℳ𝐴𝐴                                                     where Hl is the prompted tokens that will be injected into
+                                                                the next layer of the foundation model, and Pl+1 symbol-
+                                                                   izes prompt token sequences from the (l+1)-th MCP block.
+Figure 3. Detailed design of the proposed MCP. Multi-modal
+                                                          Hereby, we place stage-wise MCP blocks to take full advan-
+input ﬂows are sent to the 1×1 convolutions for distilling to the
+                                                              tage of semantic understanding of diverse levels and diverse
+lower-dimension latent space separately. Foundation embeddings
+                                                                 modalities. Directly adding prompts to the intermediate fea-ﬁrst conduct an spatial fovea operation, and then be fused with
+auxiliary embeddings by element-wise summation.  Finally, the      tures of the foundation model also enables our ViPT to be
+multi-modal hybrid embeddings are mapped to the original dimen-     quickly and easily applied to existing pre-trained founda-
+sion through a 1×1 convolutional layer.                              tion trackers. It is worth noting that, different from prompt-
+                                                             tuning approaches (e.g., SPM [29]) which contain trainable
+                                                            prompt-learning network and prediction head, in our ViPT,
+decomposed into φ ◦f, where f : {XRGB, B0} →HRGB       all the RGB-modal relevant network parameters are frozen,
+represents the feature extraction and interaction function,     including the patch embedding, feature extraction and inter-
+and box head φ : HRGB →B estimates the ﬁnal results.      action, and prediction head.
+Hereby, f is a powerful transformer backbone (i.e., ViT [8])       Modality-Complementary Prompter. Recently, a few
+in our case.  Speciﬁcally, the input exemplar ZRGB and     works begin to explore introducing some trainable parame-
+search frames XRGB are ﬁrst embedded into patches and      ters to the frozen pre-trained model to learn effective visual
+ﬂattened to 1D tokens HzRGB ∈RNz×D and HxRGB ∈     prompts. By ﬁne-tuning only a small number of param-
+RNx×D with positional embedding [41], where Nz and Nx      eters for prompt learning, they achieve impressive perfor-
+symbolize the token number of the exemplar and search in-    mance on a wide range of vision tasks. A more challenging
+puts, and D is the token dimension. Then the token se-      task, however, is not only to close the gap between upstream
+quences are concatenated to H0RGB = [HzRGB, HxRGB].     and downstream tasks but also to make appropriate and ef-
+We feed the token sequences to an L-layer standard visual      fective harness of inter-modal information. As shown in
+transformer encoder. Here we denote Hl−1RGB as inputs to     Figure 2, the proposed MCP blocks are inserted into multi-
+the l-th encoder layer El. The forward propagation process      ple stages of the foundation network. Formally, providing
+is formulated as:                                            token sequences {H0RGB, H0A} of two modalities from a
+                                                     downstream task, and a frozen foundation encoder f∗con-
+     HlRGB = El(Hl−1RGB),         l = 1, 2, . . . , L    (1)      taining L transformer layers {El∗}Ll=1, the designed MCP is
+   B = φ(HLRGB),                                 (2)      to learn the prompts with these two input ﬂows, the process
+                                                        can be written as:
+where the transformer encoder layer El includes Multi-head                                                  Pl = P l(Hl−1, Pl−1),         l = 1, 2, . . . , L    (4)
+Self-Attention (MSA), LayerNorm (LN), Feed-Forward
+Network (FFN), and residual connection, and HLRGB is the     where P                                                                                                                     l denotes the l-th MCP block. Speciﬁcally, H0 =
+output of the last encoder layer. The encoder network com-   H0RGB and P0 = H0A. In this way, MCP sufﬁciently ex-
+pletes the feature extraction and interaction of exemplar and      tracts the feature representations of the downstream task at
+search patches. We refer readers to OSTrack [49] for more      different semantic levels, while learning the complementar-
+details about our RGB-based foundation model.                   ity between the two modalities and generating more robust
+                                                           prompts. The blending representation can contribute to a
+3.2. Multi-Modal Prompt Tracking
+                                                         complementarity between the intermediate foundation fea-
+   Overall Architecture. Formally, multi-modal tracking      ture and the learned prompts, and a balance between the
+provides an extra auxiliary-modal ﬂow which is temporally     foundation and auxiliary modalities.
+synchronized and spatially aligned with the RGB ﬂow. As       The detailed design of MCP is shown in Figure 3, our
+shown in Figure 2, ViPT ﬁrst feeds the two ﬂows (XRGB   MCP has two input branches for adhibiting the token se-
+
+
+
+                                                       9519
+
+======================== PDF 第 5 页 ========================
+quences of the foundation ﬂows Hl−1 and auxiliary ﬂows     models. The overall loss function of ViPT is the same as
+Pl−1,  respectively.  MCP comprises three main steps:      the foundation model without extra adjusting,
+(i) projecting to lower-dimensional latent embeddings; (ii)
+                                              L = Lcls + λiouLiou + λL1L1.         (10)generation of the multi-modal inner complementary repre-
+sentations; and (iii) projecting to original dimension and
+                                                     where Lcls is the weighted focal loss for classiﬁcation, L1
+generating the learned multi-modal visual prompts. Con-
+                                                      and generalized IoU loss Liou are employed for bounding
+cretely, considering that single-modal ﬂow has certain re-
+                                                    box regression, λiou and λL1 are the regularization parame-dundant features, and the prompt block should have as few
+                                                                             ters, and all the corresponding settings are the same as [49].
+parameters as possible for practical purposes, we project
+each ﬂow into [ Cβ × H × W] dimension by:                    3.3. Discussion
+
+                                                 The potential of prompt-tuning tracking. We believe    MRGB = g1(Hl−1), MA = g2(Pl−1),     (5)
+                                                                     that the prompt-tuning paradigm has great potential for
+in our case, the input channel C is 768, and the reducing     multi-modal tracking, mainly in terms of (i) Prompt-tuning
+factor β is set to 7688  in all the prompt blocks.  Hereby,     has better adaptability than full ﬁne-tuning, especially for
+the projection functions g1(·) and g2(·) are simple 1×1     downstream multi-modal tracking where large-scale data
+convolutional layers. The foundation embeddings MRGB       is scarce. Full ﬁne-tuning on the downstream dataset cor-
+then perform the spatial fovea operation, which ﬁrst applies      rupts the quality of pre-trained parameters, so the track-
+a λ-smoothed spatial softmax across all the spatial di-      ers are more likely to over-ﬁt or reach a sub-optimal state.
+mensions, and produces the enhanced embeddings MeRGB      Especially in the task of RGB+auxiliary modality track-
+by applying the channel-wise spatial attention-like mask      ing, the original foundation knowledge can be used directly
+Mfovea over MRGB,                                           for the extraction of RGB-modal features. Prompt-tuning
+                                                       ﬁxes the parameters of the foundation model, retaining the
+      MeRGB = MRGB ⊙Mfovea,           (6)     knowledge of the pre-trained model, and the prompt mod-
+                                eM[:,i,j]RGB                             ule allows for ﬂexible adaptation to task-oriented data. (ii)
+         Mfovea = {         λ},                (7)     Prompt-tuning allows for a closer association between RGB
+                            ΣeM[:,i,j]RGB                       and RGB+auxiliary modality tracking, as well as learn-
+where i = 1, 2, ..., H and j = 1, 2, ..., W, and λ is a learn-     ing about the modal complementarities. RGB and auxiliary
+able weighted parameter per block. Then, we obtain mixed-     modalities have different data distributions, so providing an
+modal embeddings by additive binding, and the learned      additional feature extraction network for auxiliary-modal
+prompts can be gained by,                                      inputs may reduce the inter-modal connectivity.  (iii) The
+                                                         remarkable advantages of practical application. Prompt-
+           Pl = g3(MeRGB + MA),             (8)     tuning tracking has signiﬁcantly fewer trainable parame-
+                                                                        ters than full ﬁne-tuning, often by an order of magnitude
+where g3(·) is the same as g1(·) and g2(·).                      or more.  In our work, ViPT contains only 0.84M train-
+   Optimization. The multi-modal tracking model FMM is     able parameters, less than 1% of the whole model param-
+parameter-initialized by the foundation model FRGB. Dur-      eters (93.36M). The difference in trainable parameters is
+ing prompt-tuning, data ﬂows propagate throughout the en-                                                                   further reﬂected in the more practical aspects of applica-
+tire model but we only update the gradient values of a few                                                                        tion. Compared with full ﬁne-tuning, prompt-tuning has a
+parameters θ = {τ A, {P l}Ll=1} for visual prompt learning,      shorter training period, at the same time, this paradigm can
+where τ A denotes the patch embedding functions of aux-                                                       be deployed to various downstream tracking scenarios with-
+iliary inputs.  Therefore, the default version of our ViPT                                                             out having to store a huge number of foundation parameters
+contains only 0.84M trainable parameters. Despite this, we                                                                  repeatedly. These advantages further enables the founda-
+ﬁnd that ViPT defeats the full ﬁne-tuning paradigm with                                                                   tion tracker to be quickly transferred to diverse downstream
+two branches for various modalities. Thus, the optimization                                                               tracking tasks.
+process can be formulated as                                                              Differences with other prompt-learning methods.
+                     1                             The proposed ViPT focuses on  effectively introducing
+       θtuned = arg min X L φ(HL), Bgt   ,    (9)     prompt-learning mechanisms to multi-modal tracking.  In                       θ  |D|
+                                                                  contrast to the existing prompt-learning methods in CV or
+where D symbolizes the downstream multi-modal data. By    NLP domains which focus on adaptation between upstream
+tuning only a few parameters for prompt learning, the model      to downstream tasks, ViPT also explores adaptation be-
+can achieve convergence within a brief period, and effec-     tween single-modal and multi-modal tasks. A similar work
+tively leverage the abundant knowledge in the pre-trained      to ours is ProTrack [48]. Unfortunately, ProTrack merely
+foundation model, thereby narrowing the gap between the     introduces the concept of prompt to multi-modal tracking.
+
+
+
+                                                       9520
+
+======================== PDF 第 6 页 ========================
+         CA3DMS  SiamM Ds  Siam LTD  LTDSEd  DAL  CLGS D LTMU B  ATCAIS DDiMP  DeT  OSTrack  SPT   ProTrack  ViPT
+                 [31]        [18]         [17]        [18]     [37]     [17]       [17]       [17]      [17]     [47]     [49]     [60]     [48]    (ours)
+  F-score(↑)    0.223       0.336       0.376      0.405    0.429    0.453     0.460     0.476     0.485   0.532    0.529    0.538    0.578    0.594
+    Re(↑)      0.228       0.264       0.342      0.382    0.369    0.369     0.417     0.455     0.469   0.506    0.522    0.549    0.573    0.596
+    Pr(↑)       0.218       0.463       0.418      0.430    0.512    0.584     0.512     0.500     0.503   0.560    0.536    0.527    0.583    0.592
+
+                                    Table 1. Overall performance on DepthTrack test set [47].
+
+
+           ATOM  DiMP  ATCAIS  DReﬁne  keep trackSTARK RGBDDMTracker  DeT  OSTrack  SBT RGBD  SPT   ProTrack  ViPT
+                      [7]      [3]      [17]      [19]       [16]        [19]         [16]       [47]     [49]         [16]       [60]     [48]    (ours)
+    EAO(↑)      0.505   0.543    0.559     0.592      0.606      0.647       0.658     0.657    0.676       0.708     0.651    0.651    0.721
+  Accuracy(↑)    0.698   0.703    0.761     0.775      0.753      0.803       0.758     0.760    0.803       0.809     0.798    0.801    0.815
+  Robustness(↑)   0.688   0.731    0.739     0.760      0.797      0.798       0.851     0.845    0.833       0.864     0.851    0.802    0.871
+
+                                     Table 2. Overall performance on VOT-RGBD2022 [16].
+
+
+Speciﬁcally, it conducts a linear summing of multi-modal     ﬁxed parameters are initialized with the pre-trained foun-
+inputs and uses only RGB-based model parameters with-     dation model [49] in RGB-based tracking, and the trainable
+out tuning on the downstream data. In contrast, ViPT fully     prompt learning parameters are initialized with xavier uni-
+explores the associations between different modalities at     form initialization scheme [11].
+different semantic levels, learns the complementarities be-
+tween modalities in the form of prompt-learning, therefore     4.3. Main Properties and Analysis
+achieving superior performance.                                                       DepthTrack. DepthTrack [47] is a large-scale long-term
+                                          RGB-D tracking benchmark, which contains 150 training
+4. Experiments                                      and 50 testing videos with 15 per-frame attributes.  It uses
+                                                                precision (Pr) and recall (Re) to measure the accuracy and
+4.1. Downstream tasks
+                                                              robustness of target localization.  F-score, calculated by
+  ViPT achieves the uniﬁcation of multiple downstream    F = Re+P2ReP rr, is the primary measure. Though our ViPT
+multi-modal tracking tasks. In this work, three challenging       is a short-term algorithm, Table 1 shows ViPT surpasses
+tasks are chosen to validate the effectiveness and general-       all previous SOTA trackers and obtains the highest F-score
+ization of the proposed method.  (i) For RGB-D tracking,     of 59.4%, gaining a signiﬁcant improvement of 6.5% com-
+we evaluate our tracker on Depthtrack [47] and VOT22-     pared with our foundation model [49].
+RGBD [16]. (ii) For RGB-T tracking, we provide the com-      VOT-RGBD2022. VOT-RGBD2022 [16] is an up-to-
+parison results on RGBT234 [23] and LasHeR [25]. (iii) For     date benchmark that contains 127 short-term RGB-D se-
+RGB-E tracking, we report the experimental results on the     quences for exploiting the role of depth in RGB-D track-
+largest VisEvent [43]. We perform prompt-tuning on these      ing.  It applies an anchor-based short-term evaluation pro-
+downstream tasks without speciﬁc modulation, and all the      tocol introduced in  [17] that needs trackers to multi-start
+experimental settings are kept to the same.                  from different initialization points. The expected average
+                                                             overlap (EAO) is the overall performance measure. As re-
+4.2. Experimental Settings                                ported in Table 2, our ViPT is superior to previous compet-
+                                                                           itive methods, getting an EAO of 0.721. ViPT outperforms  When ﬁne-tuning our ViPT on downstream tasks, we
+                                                                the foundation model by 4.5% EAO while another prompt-choose train sets of Depthtrack [47] for RGB-D tracking,
+LasHeR [25] for RGB-T tracking, and VisEvent [43] for
+RGB-E tracking. Some recent works (e.g., DeT [47] and
+mfDiMP [53]) employ other algorithms to generate more
+sample pairs for downstream tasks, thus alleviating the
+problem of insufﬁcient data in downstream tasks. While
+in our work, to demonstrate the effectiveness of prompt-
+tuning, we only use the most basic multi-modal training set
+mentioned above. ViPT is trained on 2 NVIDA Tesla A100
+GPUs with a global batch size of 64. The model ﬁne-tuning
+takes 60 epochs that each epoch contains 6 × 104 sample
+pairs. The AdamW optimizer [32] with a weight decay of
+10−4 is adopted. The initial learning rate is set to 4 × 10−5
+and decreased by the factor of 10 after 48 epochs.  The           Figure 4. Overall performance on LasHeR test set [25].
+
+
+
+                                                       9521
+
+======================== PDF 第 7 页 ========================
+         mfDiMP  SGT   DAFNet   OSTrack   FANet  MaCNet  CAT  JMMAC  CMPP  APFNet   ProTrack   ViPT
+                [53]      [26]      [10]        [49]       [62]       [50]      [24]      [55]       [42]      [44]        [48]     (ours)
+  MPR(↑)     0.646    0.720    0.796      0.729     0.787     0.790    0.804    0.790     0.823     0.827      0.795     0.835
+  MSR(↑)     0.428    0.472    0.544      0.549     0.553     0.554    0.561    0.573     0.575     0.579      0.599     0.617
+
+                                     Table 3. Overall performance on RGBT234 dataset [23].
+
+based tracker ProTrack [48], only has an improvement of                        …        …
+                                                                                                                                                                                                                                                                                                                                             𝐸𝐸𝑙𝑙+1          Encoder Layer 𝐸𝐸𝑙𝑙+1 …0.4% relative to their baseline STARK RGBD [46].           …        …                Encoder Layer
+  RGBT234.  RGBT234 [23]  is a large-scale RGB-T              Encoder Layer 𝐸𝐸𝑙𝑙+1        Encoder Layer 𝐸𝐸𝑙𝑙+1                                                                                                         𝑃𝑃𝑙𝑙
+tracking benchmark, which contains 234 videos with visi-                                                                                                                                                                Encoder Layer   𝐸𝐸𝑙𝑙           Encoder Layer  𝐸𝐸𝑙𝑙
+ble and thermal infrared pairs. MSR and MPR are adopted              Encoder Layer   𝐸𝐸𝑙𝑙         Encoder Layer  𝐸𝐸𝑙𝑙     …        …                                           …        …
+for performance evaluation. Here we compare our proposed
+                                                                                                                                                                                                                                         𝑃𝑃1                             𝑃𝑃1
+ViPT with recent RGB-T trackers. As shown in Table 3, our
+ViPT reaches the top MSR and MPR of 61.7% and 83.5%,         (a) Prompt-shallow   (b) Prompt-deep     (c) ViPT-shallow        (d) ViPT-deep
+respectively, which beats the well-designed RGB-T trackers          Figure 6. Variants of vanilla prompt-structure and ViPT.
+and outperforms ProTrack [48] by 1.8% on MSR.
+  LasHeR. LasHeR [25] is a large-scale high-diversity      track [47], LasHeR [25], and VisEvent [43].
+benchmark for short-term RGB-T tracking. We evaluate the      Power of Multiple Modalities. To investigate the ben-
+trackers on 245 testing video sequences in terms of preci-     eﬁts gained from multi-modal ﬂows, we evaluate the per-
+sion plot and success plot. The results are reported in Fig-     formance with single-modal inputs (RGB-based foundation
+ure 4.  Surprisingly, ViPT surpasses previous SOTA algo-      tracker) and multi-modal inputs.  For multi-modal cases,
+rithms by a large margin, which exceeds the second place by    we further compare the effectiveness between FFT and
+10.5% and 11.3% on success and precision, respectively. It     our ViPT. Speciﬁcally, FFT is the full ﬁne-tuning tracker
+can be inferred that our prompt-tuning paradigm effectively     which is extended from the foundation model by adding an
+utilizes the thermal information and makes ViPT adapt well     auxiliary-modal branch, and the branch design and modali-
+to complex tracking scenarios.                                        ties interaction are inspired by [47]. As shown in Table 4,
+   VisEvent.  VisEvent [43] is the largest visible-event      after combining the auxiliary-modal inputs, FFT shows re-
+benchmark dataset collected from real-world for single ob-     markable improvement over the foundation model, espe-
+ject tracking at present and we perform comparisons on its      cially on LasHeR (10.5%↑).  It is encouraging to note that
+320 testing videos. Note we just use event images trans-    ViPT still beats FFT on performance while having two or-
+formed from raw event data rather than event ﬂow. Figure 5     ders of magnitude fewer trainable parameters.
+shows ViPT achieves a gain of 5.8% on success and 6.3%
+on precision over the runner-up OSTrack [49] and outper-                                         Depthtrack [47]      LasHeR [25]      VisEvent [43]
+                                                                                     Method      Params†
+forms other visible-event SOTA trackers.                                                                    F-score(↑) Re(↑) Pr(↑)    SR(↑)   PR(↑)   SR(↑)   PR(↑)
+                                                                                                 Foudation            -           52.9     52.2  53.6     41.2     51.5     53.4     69.5
+
+                                                                              FFT    178.6M (100%) 55.6 (2.7↑)  55.4  55.7 51.7 (10.5↑)  64.8  58.7 (5.3↑)  75.2
+
+                                                                                    ViPT     0.84M (0.9%)  59.4(6.5↑)  59.6  59.2  52.5(11.3↑)  65.1  59.2 (5.8↑)  75.8
+
+                                                                                        Prompt-shaw  0.59M (0.6%)     52.0     51.5  52.5     47.2     58.7     53.7     70.2
+
+                                                                                           Prompt-deep  3.29M (3.4%)     54.9     54.7  55.1     50.7     63.1     54.8     71.4
+
+                                                                                         ViPT-shaw  0.61M (0.7%)     56.4     56.7  56.2     47.9     59.6     57.8     74.9
+
+                                                                  Table 4. Ablation studies on multiple downstream benchmarks.
+                                                             Params† denotes the number of trainable parameters, and its pro-
+                                                                      portion of the overall model parameters is noted in parentheses.
+                                                                     Results are reported in percentage (%).
+
+
+                                                            Variants Comparison.  We further explore different
+                                                                  variant versions of our ViPT. As shown in Figure 6 (c) &
+    Figure 5. Overall performance on VisEvent test set [43].          (d) , we provide two variants of ViPT, ViPT-shallow (ViPT-
+                                                   shaw in Table 4) and ViPT-deep (ViPT in Table 4). More-
+                                                                  over, to verify the validity of our MCP module, we intro-
+4.4. Exploration Studies
+                                                       duce prompt tokens into the foundation model with VPT-
+  We  further explore  the  characteristics of our ViPT      style [14] (Figure 6 (a) & (b)).  Note that for receiving
+on multiple downstream tasks of multiple representative     auxiliary-modal inputs, we replace the input prompts with
+benchmarks. We present the experimental results on Depth-      the embeddings of auxiliary modality. And we choose to
+
+
+
+                                                       9522
+
+======================== PDF 第 8 页 ========================
+    RGB + Depth                                                                        ters can not bring better results. The reason may be that a
+ Tem
+                                                            small number of trainable parameters is more conducive for
+                                                    model learning in downstream tasks with limited train data.
+                                                        Conducting them together may gain some beneﬁts (e.g., on    RGB + Thermal
+ Tem                                                   LasHeR), but it will be more costly compared with ViPT.
+
+                                                                                                 Depthtrack [47]       LasHeR [25]
+                                                             Model  ET  UFP
+                                                                                                 F-score(↑)  Re(↑)   Pr(↑)  SR(↑)  PR(↑)
+    RGB + Event                                                             ViPT                  59.4      59.6    59.2    52.5    65.1 Tem
+                                         x                    59.3      59.3    59.2    49.7    61.6
+                                         y                    55.4      55.3    55.6    51.3    64.5
+                                         z                    58.3      58.6    58.0    53.9    67.0
+         (a)         (b)          (c)         (d)          (e)          (f)
+                                                                  Table 5. Ablation studies on training volume and tunable param-
+Figure 7.  Visualization of response and t-SNE [40] maps.  (a)
+                                                                                 eters. ET: expending the training data. UFP: unfreeze all the pa-
+RGB ﬂows. The yellow and green bounding boxes denote Foun-
+                                                                   rameters tunably. Results are reported in percentage (%).
+dation tracker and ViPT, respectively. (b) Auxiliary-modal ﬂows.
+(c) Score maps of foundation model. (d) Score maps of ViPT. (e)
+                                                                 Visualization.  To explore how the learned modality-t-SNE maps of the foundation model. (f) t-SNE maps of ViPT.
+                                                      complementary prompts work in ViPT, we visualize several
+                                                                 representative response maps and the corresponding t-SNE
+introduce the prompt parameters as a summation instead of
+                                                 maps in Figure 7. As can be seen, with auxiliary-modal
+the concatenation to align RGB and other auxiliary modali-
+                                                           prompts, ViPT has more unambiguous and discriminative
+ties. The trainable parameters and performance comparison
+                                                            responses when facing some complex scenarios, such as il-
+are reported in Table 4. We can see that ViPT achieves fa-
+                                                            lumination variation and background cluster. t-SNE maps
+vorable precision-efﬁciency trade-offs.
+                                                                also verify that learned prompts help the foundation tracker
+  Number Analysis of Prompt Block.  ViPT achieves
+                                                                 distinguish the objects from the background due to the more
+multi-modal tracking by inserting MCP blocks into dif-
+                                                              separable distribution boundaries. As a result, it leads to
+ferent semantic layers of the foundation model. Here we
+                                                   more accurate and robust object localization overall.
+experimentally investigate the effect of providing different
+numbers of prompters to the foundation model.  Speciﬁ-     5. Conclusion
+cally, we set different placement intervals for the inserted
+blocks, and we insert MCP per 1, 2, 4, 6, and 12 layers        In this work, we present ViPT, a new parameter-efﬁcient
+of the foundation encoder. Note that the ﬁrst and the last      vision tuning framework by introducing prompt-learning
+case are the variants of our ViPT-deep and ViPT-shallow.     ideology to multi-modal tracking. The core idea of ViPT
+As shown in Figure 8, we observed that as the number of       is to maximally exploit the pre-trained foundation model
+inserted MCP blocks increases, there is a corresponding in-     which is trained at scale, and excavate the relevance of foun-
+crease in performance on all benchmarks.                      dation and downstream tracking, and the complementarity
+                                                              of multiple modalities. Extensive experiments on multiple
+       Depthtrack         0.9 53     LasHeR             0.9 59.5      VisEvent            0.9 59.5        F-score (%)                   SR (%)                        SR (%)             downstream tasks demonstrate the effectiveness and gen-
+            Trainable (M)                        Trainable (M)                         Trainable (M)                                                                                          59.0                         eralization of ViPT. We expect this work can attract more
+ 58.5                                        0.8 51                                        0.8                                             0.8       attention to prompt learning for multi-modal tracking.
+                                                                                          58.5
+ 57.5                                             0.7 49                                        0.7                                             0.7      Limitations.  Despite achieving a uniﬁed architecture for
+                                                                                          58.0                     multi-modal tracking tasks, ViPT mainly focuses on vi- 56.5
+      1      2      3      6      12  0.6 47  1      2      3      6      12  0.6 57.5  1      2      3      6      12  0.6      sual prompting. However, some vision-language tasks are
+         number                 number                 number            emerging. ViPT may have the potential to be extended to
+Figure 8. Inﬂuence of the number of MCP blocks. The number of
+                                                   more tracking tasks like vision-language tracking. More-
+trainable parameters is shown in each subﬁgure for reference.
+                                                                  over, our method still needs to train separately for the dif-
+   Training Volume and Tunable Parameters. We note      ferent multi-modal tasks. In the future, we are interested in
+that DeT [47] and mfDiMP [53] expand the training data by      joint training a general model for multiple modalities.
+generating more RGB-D and RGB-T image pairs. Hence,
+we further expand the training data to see its impact. In the     Acknowledgements. This work was supported in part by
+implementation, we use the same data generation method      the National Key R&D Program of China under Grant No.
+as them.  Moreover, we unfreeze the overall parameters    2018AAA0102001, the National Natural Science Founda-
+of ViPT to see the impact of number of trainable parame-      tion of China under Grant Nos. 62293542, U1903215, and
+ters. The results are reported in Table 5. We can see that      the Fundamental Research Funds for the Central Universi-
+only expending the train set or unfreezing the rest parame-       ties under Grant No. DUT22ZD210.
+
+
+
+                                                       9523
+
+======================== PDF 第 9 页 ========================
+References                                                                     et al. The tenth visual object tracking vot2022 challenge re-
+                                                                                         sults. In ECCVW, pages 431–460. Springer, 2023. 6
+ [1] Hyojin Bahng, Ali Jahanian, Swami Sankaranarayanan, and
+                                                                     [17] Matej Kristan, Aleˇs Leonardis,  Jiˇr´ı Matas, Michael Fels-
+      Phillip Isola. Exploring visual prompts for adapting large-
+                                                                             berg, Roman Pﬂugfelder, Joni-Kristian K¨am¨ar¨ainen, Martin
+      scale models.   arXiv preprint arXiv:2203.17274, 1(3):4,                                                                           Danelljan, Luka ˇCehovin Zajc, Alan Lukeˇziˇc, Ondrej Dr-
+     2022. 2
+                                                                           bohlav, et al. The eighth visual object tracking vot2020 chal-
+ [2] Luca Bertinetto, Jack Valmadre, Jo˜ao F Henriques, Andrea                                                                        lenge results.  In ECCVW, pages 547–601. Springer, 2020.
+     Vedaldi, and Philip H S Torr.  Fully-convolutional siamese                                                              6
+     networks for object tracking. In ECCVW, 2016. 1, 2
+                                                                     [18] Matej Kristan,  Jiri Matas, Ales Leonardis, Michael Fels-
+ [3] Goutam Bhat, Martin Danelljan, Luc Van Gool, and Radu                                                                             berg, Roman Pﬂugfelder, Joni-Kristian Kamarainen, Luka
+     Timofte. Learning discriminative model prediction for track-           ˇCehovin Zajc, Ondrej Drbohlav, Alan Lukezic, Amanda
+      ing. In ICCV, 2019. 1, 2, 6                                                                       Berg, et al. The seventh visual object tracking vot2019 chal-
+ [4] Shoufa Chen, Chongjian Ge, Zhan Tong, Jiangliu Wang,           lenge results. In ICCVW, pages 0–0, 2019. 6
+     Yibing Song, Jue Wang, and Ping Luo.   Adaptformer:                                                                     [19] Matej Kristan, Jiˇr´ı Matas, Aleˇs Leonardis, Michael Felsberg,
+     Adapting vision transformers for scalable visual recognition.                                                      Roman Pﬂugfelder, Joni-Kristian K¨am¨ar¨ainen, Hyung Jin
+     NeurIPS, 2022. 3                                                                 Chang, Martin Danelljan, Luka Cehovin, Alan Lukeˇziˇc, et al.
+ [5] Xin Chen, Bin Yan, Jiawen Zhu, Dong Wang, Xiaoyun Yang,         The ninth visual object tracking vot2021 challenge results. In
+     and Huchuan Lu. Transformer tracking. In CVPR, 2021. 1,        ICCVW, pages 2711–2738, 2021. 6
+    2                                                                     [20] Brian Lester, Rami Al-Rfou, and Noah Constant. The power
+ [6] Ciar´an ´O Conaire, Noel E O’Connor, and Alan Smeaton.           of scale for parameter-efﬁcient prompt tuning.  EMNLP,
+     Thermo-visual feature fusion for object tracking using mul-           2021. 3
+      tiple spatiogram trackers. Machine Vision and Applications,      [21] Bo Li, Wei Wu, Qiang Wang, Fangyi Zhang, Junliang Xing,
+     19(5):483–494, 2008. 2                                        and Junjie Yan. SiamRPN++: Evolution of siamese visual
+ [7] Martin Danelljan, Goutam Bhat, Fahad Shahbaz Khan, and            tracking with very deep networks. In CVPR, 2019. 1
+     Michael Felsberg.  ATOM: Accurate tracking by overlap      [22] Bo Li, Junjie Yan, Wei Wu, Zheng Zhu, and Xiaolin Hu.
+     maximization. In CVPR, 2019. 1, 6                             High performance visual tracking with siamese region pro-
+ [8] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov,           posal network. In CVPR, 2018. 1, 2
+     Dirk Weissenborn,  Xiaohua  Zhai, Thomas  Unterthiner,      [23] Chenglong Li, Xinyan Liang, Yijuan Lu, Nan Zhao, and Jin
+     Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-           Tang. RGB-T object tracking: Benchmark and baseline. Pat-
+     vain Gelly, Jakob Uszkoreit, and Neil Houlsby. An image is            tern Recognition, 96:106977, 2019. 6, 7
+     worth 16x16 words: Transformers for image recognition at                                                                     [24] Chenglong Li, Lei Liu, Andong Lu, Qing Ji, and Jin Tang.
+      scale. ICLR, 2021. 4                                                                     Challenge-aware RGBT tracking. In ECCV, pages 222–237.
+ [9] Heng Fan, Liting Lin, Fan Yang, Peng Chu, Ge Deng, Sijia            Springer, 2020. 7
+     Yu, Hexin Bai, Yong Xu, Chunyuan Liao, and Haibin Ling.                                                                     [25] Chenglong Li, Wanlin Xue, Yaqing Jia, Zhichen Qu, Bin
+    LaSOT: A high-quality benchmark for large-scale single ob-                                                                   Luo, Jin Tang, and Dengdi Sun. Lasher: A large-scale high-
+      ject tracking. In CVPR, 2019. 1, 2                                                                                 diversity benchmark for RGBT tracking. IEEE Transactions
+[10] Yuan Gao, Chenglong Li, Yabin Zhu, Jin Tang, Tao He, and         on Image Processing, 31:392–404, 2021. 1, 6, 7, 8
+     Futian Wang. Deep adaptive fusion network for high perfor-                                                                     [26] Chenglong Li, Nan Zhao, Yijuan Lu, Chengli Zhu, and
+    mance RGBT tracking. In ICCVW, pages 0–0, 2019. 7                                                                                Jin Tang. Weighted sparse representation regularized graph
+[11] Xavier Glorot and Yoshua Bengio. Understanding the dif-            learning for RGB-T object tracking.  In ACMMM, pages
+     ﬁculty of training deep feedforward neural networks.  In          1856–1864, 2017. 7
+     ICAIS, 2010. 6                                                                     [27] Tsung-Yi Lin, Michael Maire, Serge J. Belongie, Lubomir D.
+[12] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.           Bourdev, Ross B. Girshick, James Hays, Pietro Perona, Deva
+    Deep residual learning for image recognition.  In CVPR,         Ramanan, Piotr Doll´ar, and C. Lawrence Zitnick. Microsoft
+     2016. 2                                          COCO: Common objects in context. In ECCV, 2014. 1, 3
+[13] Lianghua Huang, Xin Zhao, and Kaiqi Huang. Got-10k: A      [28] Hongjie Liu, Diederik Paul Moeys, Gautham Das, Daniel
+      large high-diversity benchmark for generic object tracking in            Neil, Shih-Chii Liu, and Tobi Delbr¨uck. Combined frame-
+     the wild. TPAMI, 2019. 1, 2                                    and event-based detection and tracking.  In ISCAS, pages
+[14] Menglin Jia, Luming Tang, Bor-Chun Chen, Claire Cardie,          2511–2514. IEEE, 2016. 2
+     Serge Belongie, Bharath Hariharan, and Ser-Nam Lim. Vi-      [29] Lingbo Liu, Bruce XB Yu, Jianlong Chang, Qi Tian, and
+      sual prompt tuning. In ECCV, 2022. 2, 3, 7                      Chang-Wen Chen. Prompt-matched semantic segmentation.
+[15] Shibo Jie and Zhi-Hong Deng.   Convolutional bypasses           arXiv preprint arXiv:2208.10159, 2022. 4
+     are  better vision transformer  adapters.   arXiv preprint      [30] Pengfei Liu, Weizhe Yuan, Jinlan Fu, Zhengbao Jiang, Hi-
+     arXiv:2207.07039, 2022. 3                                            roaki Hayashi, and Graham Neubig. Pre-train, prompt, and
+[16] Matej Kristan, Aleˇs Leonardis, Jiˇr´ı Matas, Michael Felsberg,            predict: A systematic survey of prompting methods in nat-
+    Roman Pﬂugfelder, Joni-Kristian K¨am¨ar¨ainen, Hyung Jin            ural language processing. arXiv preprint arXiv:2107.13586,
+     Chang, Martin Danelljan, Luka ˇCehovin Zajc, Alan Lukeˇziˇc,           2021. 3
+
+
+
+                                                       9524
+
+======================== PDF 第 10 页 ========================
+[31] Ye Liu, Xiao-Yuan Jing, Jianhui Nie, Hao Gao, Jun Liu, and          and Thomas Huang.  Youtube-vos: Sequence-to-sequence
+     Guo-Ping Jiang.  Context-aware three-dimensional mean-           video object segmentation. In ECCV, pages 585–601, 2018.
+      shift with occlusion handling for robust object tracking         1
+      in RGB-D videos.   IEEE Transactions on Multimedia,      [46] Bin Yan, Houwen Peng, Jianlong Fu, Dong Wang, and
+     21(3):664–677, 2018. 2, 6                                   Huchuan Lu. Learning spatio-temporal transformer for vi-
+[32] Ilya Loshchilov and Frank Hutter. Decoupled weight decay            sual tracking. In ICCV, 2021. 7
+      regularization. In ICLR, 2018. 6                                 [47] Song Yan, Jinyu Yang, Jani K¨apyl¨a, Feng Zheng,  Aleˇs
+[33] Chengwei Luo, Bin Sun, Ke Yang, Taoran Lu, and Wei-           Leonardis, and Joni-Kristian K¨am¨ar¨ainen. Depthtrack: Un-
+    Chang Yeh. Thermal infrared and visible sequences fusion            veiling the power of RGBD tracking. In ICCV, pages 10725–
+     tracking based on a hybrid tracking framework with adaptive          10733, 2021. 1, 2, 6, 7, 8
+     weighting scheme. Infrared Physics & Technology, 99:265–      [48] Jinyu Yang, Zhe Li, Feng Zheng, Ales Leonardis, and
+     276, 2019. 2                                                     Jingkuan Song.  Prompting for multi-modal tracking.  In
+[34] S Mahdi H Miangoleh, Sebastian Dille, Long Mai, Sylvain       ACMMM, pages 3492–3500, 2022. 3, 5, 6, 7
+      Paris, and Yagiz Aksoy. Boosting monocular depth estima-      [49] Botao Ye, Hong Chang, Bingpeng Ma, Shiguang Shan, and
+      tion models to high-resolution via content-adaptive multi-            Xilin Chen. Joint feature learning and relation modeling for
+      resolution merging. In CVPR, pages 9685–9694, 2021. 3               tracking: A one-stream framework.  In ECCV, pages 341–
+                                                                       357. Springer, 2022. 4, 5, 6, 7[35] Franziska  Mueller,  Dushyant Mehta,  Oleksandr Sotny-
+     chenko, Srinath Sridhar, Dan Casas, and Christian Theobalt.      [50] Hui Zhang, Lei Zhang, Li Zhuo, and Jing Zhang.  Object
+     Real-time hand tracking under occlusion from an egocentric            tracking in RGB-T videos using modal-aware attention net-
+    RGB-D sensor. In ICCV, pages 1154–1163, 2017. 2               work and competitive learning.  Sensors, 20(2):393, 2020.
+                                                              7[36] Matthias Muller, Adel Bibi, Silvio Giancola, Salman Al-
+                                                                     [51] Jiqing Zhang, Bo Dong, Haiwei Zhang, Jianchuan Ding, Fe-      subaihi, and Bernard Ghanem. TrackingNet: A large-scale
+                                                                                        lix Heide, Baocai Yin, and Xin Yang.  Spiking transform-      dataset and benchmark for object tracking in the wild.  In
+                                                                                ers for event-based single object tracking. In CVPR, pages    ECCV, 2018. 1, 2
+                                                                 8801–8810, 2022. 1
+[37] Yanlin Qian, Song Yan, Alan Lukeˇziˇc, Matej Kristan, Joni-
+                                                                     [52] Jiqing Zhang, Xin Yang, Yingkai Fu, Xiaopeng Wei, Bao-      Kristian K¨am¨ar¨ainen, and  Jiˇr´ı Matas.  Dal: A deep depth-
+                                                                                cai Yin, and Bo Dong.  Object tracking by jointly exploit-     aware long-term tracker. In ICPR, pages 7825–7832. IEEE,
+                                                                         ing frame and event domain. In ICCV, pages 13043–13052,     2021. 6
+                                                                     2021. 1, 2
+[38] Alec Radford, Jong Wook Kim,  Chris Hallacy, Aditya
+                                                                     [53] Lichao Zhang, Martin Danelljan, Abel Gonzalez-Garcia,
+    Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
+                                                                            Joost van de Weijer, and Fahad Shahbaz Khan. Multi-modal
+    Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learn-
+                                                                           fusion for end-to-end RGB-T tracking. In ICCVW, pages 0–
+     ing transferable visual models from natural language super-
+                                                                                   0, 2019. 2, 6, 7, 8
+      vision. In ICML, pages 8748–8763. PMLR, 2021. 2
+                                                                     [54] Pengyu Zhang, Dong Wang, Huchuan Lu, and Xiaoyun
+[39] Olga Russakovsky, Jia Deng, Hao Su, Jonathan Krause, San-
+                                                                   Yang. Learning adaptive attribute-driven representation for
+     jeev Satheesh, Sean Ma, Zhiheng Huang, Andrej Karpathy,
+                                                                             real-time RGB-T tracking. IJCV, 129(9):2714–2729, 2021.
+     Aditya Khosla, and Michael Bernstein.  ImageNet Large
+                                                              2
+      scale visual recognition challenge. IJCV, 2015. 1, 2
+                                                                     [55] Pengyu Zhang,  Jie Zhao,  Chunjuan Bo, Dong Wang,
+[40] Laurens Van der Maaten and Geoffrey Hinton. Visualizing                                                            Huchuan Lu, and Xiaoyun Yang.   Jointly modeling mo-
+     data using t-SNE.  Journal of machine learning research,                                                                                tion and appearance cues for robust RGB-T tracking. IEEE
+      9(11), 2008. 8                                                                        Transactions on Image Processing, 30:3335–3347, 2021. 2,
+[41] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszko-                                                              7
+       reit, Llion Jones, Aidan N Gomez, Lukasz Kaiser, and Illia                                                                     [56] Pengyu Zhang, Jie Zhao, Dong Wang, Huchuan Lu, and
+     Polosukhin. Attention is all you need. In NIPS, 2017. 2, 4                                                                Xiang Ruan.  Visible-thermal uav tracking: A large-scale
+[42] Chaoqun Wang, Chunyan Xu, Zhen Cui, Ling Zhou, Tong          benchmark and new baseline. In CVPR, pages 8886–8895,
+     Zhang, Xiaoya Zhang, and Jian Yang. Cross-modal pattern-           2022. 1
+     propagation for RGB-T tracking.  In CVPR, pages 7064–      [57] Tianlu Zhang, Xueru Liu, Qiang Zhang, and Jungong Han.
+     7073, 2020. 7                                                  Siamcda:  Complementarity-and distractor-aware RGB-T
+[43] Xiao Wang, Jianing Li, Lin Zhu, Zhipeng Zhang, Zhe Chen,            tracking based on siamese network.  TCSVT, 32(3):1403–
+    Xin Li, Yaowei Wang, Yonghong Tian, and Feng Wu. Visev-           1417, 2021. 1
+      ent: Reliable object tracking via collaboration of frame and      [58] Xingchen  Zhang,  Ping  Ye, Dan  Qiao,  Junhao  Zhao,
+     event ﬂows. arXiv preprint arXiv:2108.05015, 2021. 1, 2, 6,         Shengyun Peng, and Gang Xiao.  Object fusion tracking
+    7                                                              based on visible and infrared images using fully convolu-
+[44] Yun Xiao, Mengmeng Yang, Chenglong Li, Lei Liu, and Jin            tional siamese networks.  In FUSION, pages 1–8. IEEE,
+     Tang. Attribute-based progressive fusion network for RGBT           2019. 2
+      tracking. In AAAI, 2022. 1, 7                                    [59] Zangwei Zheng, Xiangyu Yue, Kai Wang, and Yang You.
+[45] Ning Xu,  Linjie  Yang,  Yuchen  Fan,  Jianchao  Yang,          Prompt vision transformer for domain generalization. arXiv
+     Dingcheng Yue, Yuchen Liang, Brian Price, Scott Cohen,            preprint arXiv:2208.08914, 2022. 2
+
+
+
+                                                       9525
+
+======================== PDF 第 11 页 ========================
+[60] Xue-Feng Zhu, Tianyang Xu, Zhangyong Tang, Zucheng
+    Wu, Haodong Liu, Xiao Yang, Xiao-Jun Wu, and Josef Kit-
+       tler. RGBD1K: A large-scale dataset and benchmark for
+    RGB-D object tracking. AAAI, 2023. 1, 2, 6
+[61] Yabin Zhu, Chenglong Li, Bin Luo, Jin Tang, and Xiao
+    Wang.  Dense feature aggregation and pruning for RGBT
+      tracking. In ACMMM, pages 465–472, 2019. 1, 2
+[62] Yabin Zhu, Chenglong Li, Jin Tang, and Bin Luo. Quality-
+     aware feature aggregation network for robust RGBT track-
+      ing. IEEE Transactions on Intelligent Vehicles, 6(1):121–
+     130, 2020. 7
+
+
+
+
+
+                                                       9526

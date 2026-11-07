@@ -1,0 +1,813 @@
+KH-A044 | Graph Structure of Neural Networks
+来源：https://arxiv.org/abs/2007.06559
+本地PDF：专题文献/何恺明/KH-A044_Graph_Structure_of_Neural_Networks_ICML2020.pdf
+SHA-256：e5717371d8b7817af0148f6a87d4e010a1f5c34506f49202e8ffa1fb846b1fbe
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                     Graph Structure of Neural Networks
+
+
+
+                                 Jiaxuan You 1 Jure Leskovec 1 Kaiming He 2 Saining Xie 2
+
+                         Abstract                                  all the way to the output neurons (McClelland et al., 1986).
+              Neural networks are often represented as graphs        While it has been widely observed that performance of neu-
+               of connections between neurons. However, de-          ral networks depends on their architecture (LeCun et al.,
+                 spite their wide use, there is currently little un-        1998; Krizhevsky et al., 2012; Simonyan & Zisserman,
+               derstanding of the relationship between the graph         2015; Szegedy et al., 2015; He et al., 2016), there is currently2020                 structure of the neural network and its predictive            little systematic understanding on the relation between a
+               performance. Here we systematically investigate         neural network’s accuracy and its underlying graph struc-
+           how does the graph structure of neural networks           ture. This is especially important for the neural architectureAug          affect their predictive performance. To this end,         search, which today exhaustively searches over all possible
+           we develop a novel graph-based representation of         connectivity patterns (Ying et al., 2019). From this per-
+27         neural networks called relational graph, where          spective, several open questions arise: Is there a systematic
+                layers of neural network computation correspond          link between the network structure and its predictive perfor-
+                to rounds of message exchange along the graph       mance? What are structural signatures of well-performing
+                 structure. Using this representation we show that:         neural networks? How do such structural signatures gener-
+                 (1) a sweet spot of relational graphs leads to neural          alize across tasks and datasets? Is there an efﬁcient way to
+              networks with signiﬁcantly improved predictive        check whether a given neural network is promising or not?[cs.LG]         performance; (2) neural networks performance is
+                                                                         Establishing such a relation is both scientiﬁcally and practi-               approximately a smooth function of the clustering
+                                                                            cally important because it would have direct consequences                coefﬁcient and average path length of its relational
+                                                             on designing more efﬁcient and more accurate architectures.               graph; (3) our ﬁndings are consistent across many
+                                                                                                It would also inform the design of new hardware architec-                 different tasks and datasets; (4) the sweet spot can
+                                                                              tures that execute neural networks. Understanding the graph              be identiﬁed efﬁciently; (5) top-performing neural
+                                                                              structures that underlie neural networks would also advance              networks have graph structure surprisingly similar
+                                                                         the science of deep learning.                to those of real biological neural networks. Our
+            work opens new directions for the design of neu-        However, establishing the relation between network archi-
+                  ral architectures and the understanding on neural          tecture and its accuracy is nontrivial, because it is unclear
+              networks in general.                          how to map a neural network to a graph (and vice versa).
+                                                           The natural choice would be to use computational graph rep-
+                                                                            resentation but it has many limitations: (1) lack of generality:
+                                                                  Computational graphs are constrained by the allowed graph
+          1. Introduction                                                                               properties, e.g., these graphs have to be directed and acyclicarXiv:2007.06559v2         Deep neural networks consist of neurons organized into lay-   (DAGs), bipartite at the layer level, and single-in-single-out
+            ers and connections between them. Architecture of a neural     at the network level (Xie et al., 2019). This limits the use of
+          network can be captured by its “computational graph” where    the rich tools developed for general graphs. (2) Disconnec-
+          neurons are represented as nodes and directed edges link     tion with biology/neuroscience: Biological neural networks
+          neurons in different layers. Such graphical representation    have a much richer and less templatized structure (Fornito
+          demonstrates how the network passes and transforms the     et al., 2013). There are information exchanges, rather than
+          information from its input neurons, through hidden layers     just single-directional ﬂows, in the brain networks (Stringer
+                                                                                    et al., 2018). Such biological or neurological models cannot
+              1Department of Computer Science,  Stanford University    be simply represented by directed acyclic graphs.
+          2Facebook AI Research. Correspondence to: Jiaxuan You <ji-
+           axuan@cs.stanford.edu>, Saining Xie <s9xie@fb.com>.         Here we systematically study the relationship between the
+                                   th                                   graph structure of a neural network and its predictive per-           Proceedings of the 37   International Conference on Machine                                                                  formance. We develop a new way of representing a neural
+           Learning, Online, PMLR 119, 2020. Copyright 2020 by the au-
+                                                               network as a graph, which we call relational graph. Our              thor(s).
+
+======================== PDF 第 2 页 ========================
+                                  Graph Structure of Neural Networks
+
+a                   Relational Graph Representation         c       Exploring Relational Graphs             d  Neural Net Performance
+     5-layer MLP
+                                                                                                                                   WS-flex graph
+
+                                                                                                                    Translate to
+                           Neural                                Networks                                                           Relational                                                         Graphs
+                                 1 layer                                                   1 round                                                                              of message                                                                      exchange                                                       5-layer MLP
+                                                                                                      WS-flex graph
+                       1    2    3    4
+                                                  1        2
+           ⟺
+
+                                                  4        3                                                     Complete graph
+                       1    2    3    4
+                                                                                                                    Translate to
+b                                                                                                       ResNet-34
+     1   2   3   4                         1   2   3   4
+                           1       2                               1       2
+      ⟺          ⟺
+
+                           4       3                               4       3
+     1   2   3   4                         1   2   3   4
+
+Figure 1: Overview of our approach. (a) A layer of a neural network can be viewed as a relational graph where we connect
+nodes that exchange messages. (b) More examples of neural network layers and relational graphs. (c) We explore the design
+space of relational graphs according to their graph measures, including average path length and clustering coefﬁcient, where
+the complete graph corresponds to a fully-connected layer. (d) We translate these relational graphs to neural networks and
+study how their predictive performance depends on the graph measures of their corresponding relational graphs.
+
+
+key insight is to focus on message exchange, rather than        works with signiﬁcantly improved performance under
+just on directed data ﬂow. As a simple example, for a ﬁxed-         controlled computational budgets (Section 5.1).
+width fully-connected layer, we can represent one input      • Neural network’s performance is approximately achannel and one output channel together as a single node,        smooth function of the clustering coefﬁcient and aver-
+and an edge in the relational graph represents the message        age path length of its relational graph. (Section 5.2).
+exchange between the two nodes (Figure 1(a)). Under this       Our ﬁndings are consistent across many architec-                                                     •formulation, using appropriate message exchange deﬁnition,         tures (MLPs, CNNs, ResNets, EfﬁcientNet) and tasks
+we show that the relational graph can represent many types        (CIFAR-10, ImageNet) (Section 5.3).
+of neural network layers (a fully-connected layer, a convo-       The sweet spot can be identiﬁed efﬁciently. Identifying
+lutional layer, etc.), while getting rid of many constraints of      • a sweet spot only requires a few samples of relational
+computational graphs (such as directed, acyclic, bipartite,        graphs and a few epochs of training (Section 5.4).
+single-in-single-out). One neural network layer corresponds
+to one round of message exchange over a relational graph,     • Well-performing neural networks have graph structure                                                                   surprisingly similar to those of real biological neural
+and to obtain deep networks, we perform message exchange                                                            networks (Section 5.5).
+over the same graph for several rounds. Our new representa-
+tion enables us to build neural networks that are richer and   Our results have implications for designing neural network
+more diverse and analyze them using well-established tools     architectures, advancing the science of deep learning and
+of network science (Barab´asi & Psfai, 2016).                improving our understanding of neural networks in general1.
+We then design a graph generator named WS-ﬂex that al-
+lows us to systematically explore the design space of neural    2. Neural Networks as Relational Graphs
+networks (i.e., relation graphs). Based on the insights from                                                To explore the graph structure of neural networks, we ﬁrst
+neuroscience, we characterize neural networks by the clus-                                                              introduce the concept of our relational graph representation
+tering coefﬁcient and average path length of their relational                                                    and its instantiations. We demonstrate how our representa-
+graphs (Figure 1(c)). Furthermore, our framework is ﬂexible                                                                  tion can capture diverse neural network architectures under
+and general, as we can translate relational graphs into di-                                                        a uniﬁed framework. Using the language of graph in the
+verse neural architectures, including Multilayer Perceptrons                                                              context of deep learning helps bring the two worlds together
+(MLPs), Convolutional Neural Networks (CNNs), ResNets,                                                     and establish a foundation for our study.
+etc. with controlled computational budgets (Figure 1(d)).
+                                                                    2.1. Message Exchange over GraphsUsing standard image classiﬁcation datasets CIFAR-10 and
+ImageNet, we conduct a systematic study on how the ar-  We start by revisiting the deﬁnition of a neural network
+chitecture of neural networks affects their predictive perfor-   from the graph perspective. We deﬁne a graph G =
+mance. We make several important empirical observations:
+                                                          1Code for experiments and analyses are available at https:
+  • A “sweet spot” of relational graphs lead to neural net-   //github.com/facebookresearch/graph2nn
+
+======================== PDF 第 3 页 ========================
+                                  Graph Structure of Neural Networks
+
+                                Fixed-width MLP    Variable-width MLP  ResNet-34           ResNet-34-sep       ResNet-50
+                                      Scalar:                Vector: multiple        Tensor: multiple      Tensor: multiple      Tensor: multiple
+  Node feature xi                              1 dimension of data    dimensions of data      channels of data       channels of data       channels of data
+                                                       (Non-square)                                     depth-wise  Message function               Scalar multiplication                         Conv         3×3             3×3                        fi(·)                               matrix multiplication   3×3                and    Conv       and    Conv                                                                             1×1             1×1
+   Aggregation function AGG(·)  σ(P(·))            σ(P(·))             σ(P(·))            σ(P(·))            σ(P(·))
+                                                                     34 rounds with       34 rounds with       50 rounds with
+  Number of rounds R          1 round per layer     1 round per layer                                                                                       residual connections   residual connections   residual connections
+
+Table 1: Diverse neural architectures expressed in the language of relational graphs. These architectures are usually
+implemented as complete relational graphs, while we systematically explore more graph structures for these architectures.
+
+
+
+
+ 4-node         Relational Graph                                4-layer 65-dim MLP         different instantiations in Table 1, and provide a concrete    %"("")
+                      Node                                      feature:                                                                                              65-dim                                               MLP layer 1        65-dim                                                     example of instantiating a 4-layer 65-dim MLP in Figure 2.             %"("%)                                            "",%,'                                ∈ℝ"#, "& ∈ℝ")       ""                    "%                                                                            1                                                                                        1
+ ())(⋅)                  Message: %! "$ = '!$"$      MLP layer 2
+                            Aggregation: ()) ⋅= +∑⋅                      2           2
+                         Rounds: - = 4             MLP layer 3         3           3       2.2. Fixed-width MLPs as Relational Graphs           %"("&)
+       "&           "'            Translate           MLP layer 4         4           4
+                                  A Multilayer Perceptron (MLP) consists of layers of com-
+                                                             putation units (neurons), where each neuron performs a
+Figure 2: Example of translating a 4-node relational    weighted sum over scalar inputs and outputs, followed by
+graph to a 4-layer 65-dim MLP. We highlight the mes-   some non-linearity. Suppose the r-th layer of an MLP takes
+sage exchange for node x1. Using different deﬁnitions of    x(r) as input and x(r+1) as output, then a neuron computes:
+                          X               and R (those                         deﬁned                                        in Table                                                     1), relationalxi,    fi(·),        AGG(·)                                                                          x(r+1)i   = σ(                                                                                        w(r)ij x(r)j  )              (2)graphs       can          be translated                          to diverse                                  neural                                            architectures.
+                                                                                                                 j
+(V, E) by  its node set V =  {v1, ..., vn} and edge set    where w(r)ij  is the trainable weight, x(r)j   is the j-th dimension
+E ⊆{(vi, vj)|vi, vj ∈V}. We assume each node v has    of the input x(r), i.e., x(r) = (x(r)1  , ..., x(r)n  ), x(r+1)i      is the i-a node feature scalar/vector xv.                                                                   th dimension of the output x(r+1), and σ is the non-linearity.
+We call graph G a relational graph, when it is associated                                                         Let us consider the special case where the input and output
+with message exchanges between neurons. Speciﬁcally, a                                                            of all the layers x(r), 1          have the same featuremessage exchange is deﬁned by a message function, whose              ≤r ≤R                                                           dimensions. In this scenario, a fully-connected, ﬁxed-width
+input is a node’s feature and output is a message, and an                                    MLP layer can be expressed with a complete relational
+aggregation function, whose input is a set of messages and                                                         graph, where each node xi connects to all the other nodesoutput is the updated node feature. At each round of mes-                                                                                                  . . . ,        i.e., neighborhood set N(v) =    for eachsage exchange, each node sends messages to its neighbors,    {x1,    xn},                      V                                                   node v. Additionally, a fully-connected ﬁxed-width MLP
+and aggregates incoming messages from its neighbors. Each                                                               layer has a special message exchange deﬁnition, where the
+message is transformed at each edge through a message                                                   message function is fi(xj) = wijxi, and the aggregation
+function f(·), then they are aggregated at each node via    function is       =an aggregation function        Suppose we conduct R            AGG({xi})   σ(P{xi}).                      AGG(·).rounds of message exchange, then the r-th round of message   The above discussion reveals that a ﬁxed-width MLP can
+exchange for a node v can be described as                  be viewed as a complete relational graph with a special
+                                                     message exchange function. Therefore, a ﬁxed-width MLP
+                            v                                                                           is a special case under a much more general model family,       x(r+1)v   = AGG(r)({f                                  (r) (x(r)u  ), ∀u ∈N(v)})    (1)
+                                                     where the message function, aggregation function, and most
+where u, v are nodes in G, N(v) = {u|v ∨(u, v) ∈E}    importantly, the relation graph structure can vary.is the neighborhood of node v where we assume all nodes
+have self-edges, x(r)v   is the input node feature and x(r+1)v      is    This insight allows us to generalize ﬁxed-width MLPs from
+the output node feature for node v. Note that this message    using complete relational graph to any general relational
+exchange can be deﬁned over any graph G; for simplicity,    graph G. Based on the general deﬁnition of message ex-
+we only consider undirected graphs in this paper.            change in Equation 1, we have:
+                          X
+Equation 1 provides a general deﬁnition for message ex-                  x(r+1)i   = σ(      w(r)ij x(r)j  )            (3)
+change. In the remainder of this section, we discuss how
+                                                                                      j∈N(i)this general message exchange deﬁnition can be instanti-
+ated as different neural architectures. We summarize the    where i, j are nodes in G and N(i) is deﬁned by G.
+
+======================== PDF 第 4 页 ========================
+                                  Graph Structure of Neural Networks
+
+2.3. General Neural Networks as Relational Graphs      Modern neural architectures as relational graphs.  Fi-
+                                                                    nally, we generalize relational graphs to represent modern
+The graph viewpoint in Equation 3 lays the foundation of                                                            neural architectures with more sophisticated designs. For
+representing ﬁxed-width MLPs as relational graphs. In this                                                       example, to represent a ResNet (He et al., 2016), we keep
+section, we discuss how we can further generalize relational                                                             the residual connections between layers unchanged. To
+graphs to general neural networks.                                                             represent neural networks with bottleneck transform (He
+Variable-width MLPs as relational graphs. An important     et al., 2016), a relational graph alternatively applies mes-
+design consideration for general neural networks is that layer    sage exchange with 3×3 and 1×1 convolution; similarly,width often varies through out the network. For example,    in the efﬁcient computing setup, the widely used separable
+in CNNs, a common practice is to double the layer width    convolution (Howard et al., 2017; Chollet, 2017) can be
+(number of feature channels) after spatial down-sampling.   viewed as alternatively applying message exchange with
+To represent neural networks with variable layer width, we   3×3 depth-wise convolution and 1×1 convolution.
+generalize node features from scalar x(r)i   to vector x(r)i      Overall, relational graphs provide a general representation
+which consists of some dimensions of the input x(r) for the                                                                for neural networks. With proper deﬁnitions of node fea-
+MLP , i.e., x(r) = CONCAT(x(r)1  , ..., x(r)n  ), and generalize     tures and message exchange, relational graphs can represent
+message function fi(·) from scalar multiplication to matrix    diverse neural architectures, as is summarized in Table 1.multiplication:
+        X
+             x(r+1)i   = σ(     W(r)ij x(r)j  )            (4)    3. Exploring Relational Graphs
+                          j∈N(i)                                                            In this section, we describe in detail how we design and
+where W(r)ij  is the weight matrix. Additionally, we allow    explore the space of relational graphs deﬁned in Section 2,
+that: (1) the same node in different layers, x(r)i  and x(r+1)i       ,    in order to study the relationship between the graph struc-
+                                                                ture of neural networks and their predictive performance.can have different dimensions; (2) Within a layer, different
+                                                     Three main components are needed to make progress: (1)nodes in the graph, x(r)i  and x(r)j   , can have different dimen-                                                      graph measures that characterize graph structural properties,sions. This generalized deﬁnition leads to a ﬂexible graph
+                                                                 (2) graph generators that can generate diverse graphs, andrepresentation of neural networks, as we can reuse the same
+                                                                (3) a way to control the computational budget, so that therelational graph across different layers with arbitrary width.
+                                                               differences in performance of different neural networks areSuppose we use an n-node relational graph to represent
+                                                     due to their diverse relational graph structures.
+an m-dim layer, then m mod n nodes have ⌊m/n⌋+ 1 di-
+mensions each, remaining n −(m mod n) nodes will have     3.1. Selection of Graph Measures
+⌊m/n⌋dimensions each. For example, if we use a 4-node
+relational graph to represent a 2-layer neural network. If the    Given the complex nature of graph structure, graph mea-
+ﬁrst layer has width of 5 while the second layer has width of    sures are often used to characterize graphs. In this paper,
+9, then the 4 nodes have dimensions {2, 1, 1, 1} in the ﬁrst   we focus on one global graph measure, average path length,
+layer and {3, 2, 2, 2} in the second layer.                  and one local graph measure, clustering coefﬁcient. No-
+                                                                    tably, these two measures are widely used in network sci-Note that under this deﬁnition, the maximum number of
+                                                      ence (Watts & Strogatz, 1998) and neuroscience (Sporns,nodes of a relational graph is bounded by the width of the
+                                                         2003; Bassett & Bullmore, 2006). Speciﬁcally, average pathnarrowest layer in the corresponding neural network (since
+                                                             length measures the average shortest path distance betweenthe feature dimension for each node must be at least 1).
+                                                    any pair of nodes; clustering coefﬁcient measures the pro-
+CNNs as relational graphs.  We further make  rela-    portion of edges between the nodes within a given node’s
+tional graphs applicable to CNNs where the input be-    neighborhood, divided by the number of edges that could
+comes an image tensor X(r). We generalize the deﬁni-    possibly exist between them, averaged over all the nodes.
+tion of node features from vector x(r)i   to tensor X(r)i   that    There are other graph measures that can be used for analysis,
+consists of some channels of the input image X(r) =    which are included in the Appendix.
+CONCAT(X(r)1  , ..., X(r)n  ). We then generalize the message
+exchange deﬁnition with convolutional operator. Speciﬁ-    3.2. Design of Graph Generators
+cally,      X
+                                                                      selected                                                                     graph                                                                             measures,                                                                  we                                                                               aim                                                                                                           to generate                                                                                                                 diverse                                                    j  )          (5)    Given          X(r+1)i   = σ(     W(r)ij ∗X(r)                                                          graphs                                                                            that can                                                                         cover                                                                             a large span                                                                                               of                                                                                         graph                                                                                                  measures,                                                                                                             using
+                        j∈N(i)                                                        a graph generator. However, such a goal requires careful
+where ∗is the convolutional operator and W(r)ij  is the convo-    generator designs: classic graph generators can only gen-lutional ﬁlter. Under this deﬁnition, the widely used dense                                                                 erate a limited class of graphs, while recent learning-based
+convolutions are again represented as complete graphs.
+
+======================== PDF 第 5 页 ========================
+                                  Graph Structure of Neural Networks
+
+graph generators are designed to imitate given exemplar
+graphs (Kipf & Welling, 2017; Li et al., 2018; You et al.,
+2018a;b; 2019a).
+Limitations of existing graph generators. To illustrate
+the limitation of existing graph generators, we investigate
+the following classic graph generators: (1) Erd˝os-R´enyi
+(ER) model that can sample graphs with given node and                                                         Figure 3: Graphs generated by different graph gener-
+edge number uniformly at random (Erd˝os & R´enyi, 1960);                                                               ators. The proposed graph generator WS-ﬂex can cover
+(2) Watts-Strogatz (WS) model that can generate graphs                                                        a much larger region of graph design space. WS (Watts-
+with small-world properties (Watts & Strogatz, 1998); (3)                                                                 Strogatz), BA (Barab´asi-Albert), ER (Erd˝os-R´enyi).
+Barab´asi-Albert (BA) model that can generate scale-free
+graphs (Albert & Barab´asi, 2002); (4) Harary model that can
+generate graphs with maximum connectivity (Harary, 1962);
+                                                          complexity in each experiment. As described in Section 2.3,(5) regular ring lattice graphs (ring graphs); (6) complete
+                                                        a relational graph structure can be instantiated as a neuralgraphs. For all types of graph generators, we control the
+                                                       network with variable width, by partitioning dimensions ornumber of nodes to be 64, enumerate all possible discrete
+                                                         channels into disjoint set of node features. Therefore, weparameters and grid search over all continuous parameters
+                                                      can conveniently adjust the width of a neural network toof the graph generator. We generate 30 random graphs with
+                                                   match the reference complexity (within 0.5% of baselinedifferent random seeds under each parameter setting. In
+                                             FLOPS) without changing the relational graph structures.total, we generate 486,000 WS graphs, 53,000 ER graphs,
+                                       We provide more details in the Appendix.8,000 BA graphs, 1,800 Harary graphs, 54 ring graphs and
+1 complete graph (more details provided in the Appendix).
+In Figure 3, we can observe that graphs generated by those    4. Experimental Setup
+classic graph generators have a limited span in the space of
+                                                        Considering the large number of candidate graphs (3942average path length and clustering coefﬁcient.
+                                                                 in total) that we want to explore, we ﬁrst investigate graph
+WS-ﬂex graph generator. Here we propose the WS-ﬂex    structure of MLPs on the CIFAR-10 dataset (Krizhevsky,
+graph generator that can generate graphs with a wide cov-   2009) which has 50K training images and 10K validation
+erage of graph measures; notably, WS-ﬂex graphs almost    images. We then further study the larger and more complex
+encompass all the graphs generated by classic random gen-    task of ImageNet classiﬁcation (Russakovsky et al., 2015),
+erators mentioned above, as is shown in Figure 3. WS-   which consists of 1K image classes, 1.28M training images
+ﬂex generator generalizes WS model by relaxing the con-   and 50K validation images.
+straint that all the nodes have the same degree before random
+rewiring. Speciﬁcally, WS-ﬂex generator is parametrized by                                                                    4.1. Base Architectures
+node n, average degree k and rewiring probability p. The
+number of edges is determined as e =            Specif-    For CIFAR-10 experiments, We use a 5-layer MLP with 512                               ⌊n ∗k/2⌋.ically, WS-ﬂex generator ﬁrst creates a ring graph where    hidden units as the baseline architecture. The input of the
+each node connects to ⌊e/n⌋neighboring nodes; then the   MLP is a 3072-d ﬂattened vector of the (32×32×3) image,generator randomly picks e mod n nodes and connects each     the output is a 10-d prediction. Each MLP layer has a ReLU
+node to one closest neighboring node; ﬁnally, all the edges    non-linearity and a BatchNorm layer (Ioffe & Szegedy,
+are randomly rewired with probability p. We use WS-ﬂex    2015). We train the model for 200 epochs with batch size
+generator to smoothly sample within the space of clustering    128, using cosine learning rate schedule (Loshchilov & Hut-
+coefﬁcient and average path length, then sub-sample 3942     ter, 2016) with an initial learning rate of 0.1 (annealed to
+graphs for our experiments, as is shown in Figure 1(c).         0, no restarting). We train all MLP models with 5 different
+                                                  random seeds and report the averaged results.
+3.3. Controlling Computational Budget                   For ImageNet experiments, we use three ResNet-family ar-
+To compare the neural networks translated by these diverse     chitectures, including (1) ResNet-34, which only consists
+graphs, it is important to ensure that all networks have ap-    of basic blocks of 3×3 convolutions (He et al., 2016); (2)
+proximately the same complexity, so that the differences in    ResNet-34-sep, a variant where we replace all 3×3 dense
+performance are due to their relational graph structures. We    convolutions in ResNet-34 with 3×3 separable convolu-use FLOPS (# of multiply-adds) as the metric. We ﬁrst com-    tions (Chollet, 2017); (3) ResNet-50, which consists of
+pute the FLOPS of our baseline network instantiations (i.e.    bottleneck blocks (He et al., 2016) of 1×1, 3×3, 1×1 con-complete relational graph), and use them as the reference    volutions. Additionally, we use EfﬁcientNet-B0 architec-
+                                                                ture (Tan & Le, 2019) that achieves good performance in
+
+======================== PDF 第 6 页 ========================
+                                  Graph Structure of Neural Networks
+
+a  5-layer MLP on CIFAR-10          b  Measures vs Performance   c  ResNet-34 on ImageNet         d  Measures vs Performance     e  Correlation across neural architectures
+
+
+         Best graph:                                                            Best graph:
+
+
+
+
+
+                                           Complete graph Top-1 Error:                                              Complete graph Top-1 Error:
+                                              33.34 ± 0.36                                                                25.73 ± 0.07
+                                              Best graph Top-1 Error:                                                      Best graph Top-1 Error:
+                                              32.05 ± 0.14                                                                24.57 ± 0.10
+
+ f Summary of all the experiments
+     5-layer MLP on CIFAR-10        8-layer CNN on ImageNet       ResNet-34 on ImageNet      ResNet-34-sep on ImageNet     ResNet-50 on ImageNet     EfficientNet-B0 on ImageNet
+
+       Complete graph:                   Complete graph:                   Complete graph:                   Complete graph:                   Complete graph:                   Complete graph:
+        33.34 ± 0.36                        48.27 ± 0.14                        25.73 ± 0.07                        28.39 ± 0.05                        23.09 ± 0.05                        25.59 ± 0.05
+       Best graph:                         Best graph:                         Best graph:                         Best graph:                         Best graph:                        Best graph:
+        32.05 ± 0.14                        46.73 ± 0.16                        24.57 ± 0.10                        27.17 ± 0.18                        22.42 ± 0.09                        25.07 ± 0.17
+
+
+
+
+
+Figure 4: Key results. The computational budgets of all the experiments are rigorously controlled. Each visualized result is
+averaged over at least 3 random seeds. A complete graph with C = 1 and L = 1 (lower right corner) is regarded as the
+baseline. (a)(c) Graph measures vs. neural network performance. The best graphs signiﬁcantly outperform the baseline
+complete graphs. (b)(d) Single graph measure vs. neural network performance. Relational graphs that fall within the
+given range are shown as grey points. The overall smooth function is indicated by the blue regression line. (e) Consistency
+across architectures. Correlations of the performance of the same set of 52 relational graphs when translated to different
+neural architectures are shown. (f) Summary of all the experiments. Best relational graphs (the red crosses) consistently
+outperform the baseline complete graphs across different settings. Moreover, we highlight the “sweet spots” (red rectangular
+regions), in which relational graphs are not statistically worse than the best relational graphs (bins with red crosses). Bin
+values of 5-layer MLP on CIFAR-10 are average over all the relational graphs whose C and L fall into the given bin.
+
+the small computation regime. Finally, we use a simple 8-    4.2. Exploration with Relational Graphs
+layer CNN with 3×3 convolutions. The model has 3 stages    For all the architectures, we instantiate each sampled rela-with [64, 128, 256] hidden units.  Stride-2 convolutions
+                                                                 tional graph as a neural network, using the correspondingare used for down-sampling. The stem and head layers are
+                                                           deﬁnitions outlined in Table 1. Speciﬁcally, we replace allthe same as a ResNet. We train all the ImageNet models
+                                                             the dense layers (linear layers,     and     convolutionfor 100 epochs using cosine learning rate schedule with                        3×3   1×1                                                                layers) with their relational graph counterparts. We leaveinitial learning rate of 0.1. Batch size is 256 for ResNet-
+                                                               the input and output layer unchanged and keep all the otherfamily models and 512 for EfﬁcientNet-B0. We train all
+                                                            designs (such as down-sampling, skip-connections, etc.) in-ImageNet models with 3 random seeds and report the av-
+                                                                            tact. We then match the reference computational complexityeraged performance. All the baseline architectures have a
+                                                                 for all the models, as discussed in Section 3.3.complete relational graph structure. The reference computa-
+tional complexity is 2.89e6 FLOPS for MLP, 3.66e9 FLOPS    For CIFAR-10 MLP experiments, we study 3942 sampled
+for ResNet-34, 0.55e9 FLOPS for ResNet-34-sep, 4.09e9     relational graphs of 64 nodes as described in Section 3.2.
+FLOPS for ResNet-50, 0.39e9 FLOPS for EffcientNet-B0,    For ImageNet experiments, due to high computational cost,
+and 0.17e9 FLOPS for 8-layer CNN. Training an MLP   we sub-sample 52 graphs uniformly from the 3942 graphs.
+model roughly takes 5 minutes on a NVIDIA Tesla V100    Since EfﬁcientNet-B0 is a small model with a layer that
+GPU, and training a ResNet model on ImageNet roughly    has only 16 channels, we can not reuse the 64-node graphs
+takes a day on 8 Tesla V100 GPUs with data parallelism.   sampled for other setups. We re-sample 48 relational graphs
+We provide more details in Appendix.                       with 16 nodes following the same procedure in Section 3.
+
+======================== PDF 第 7 页 ========================
+                                  Graph Structure of Neural Networks
+
+5. Results
+
+In this section, we summarize the results of our experiments
+and discuss our key ﬁndings. We collect top-1 errors for
+all the sampled relational graphs on different tasks and ar-                              correlation = 0.90                                       correlation = 0.93
+chitectures, and also record the graph measures (average
+path length L and clustering coefﬁcient C) for each sam-              52 graphs            3942 graphs              3 epochs             100 epochs
+pled graph. We present these results as heat maps of graph
+measures vs. predictive performance (Figure 4(a)(c)(f)).
+
+5.1. A Sweet Spot for Top Neural Networks
+
+Overall, the heat maps of graph measures vs. predictive per-                       5-layer MLP on CIFAR-10                       ResNet-34 on ImageNet
+formance (Figure 4(f)) show that there exist graph structures                                                           Figure 5: Quickly identifying a sweet spot. Left: The cor-
+that can outperform the complete graph (the pixel on bottom                                                                    relation between sweet spots identiﬁed using fewer samples
+right) baselines. The best performing relational graph can                                                             of relational graphs and using all 3942 graphs. Right: The
+outperform the complete graph baseline by 1.4% top-1 error                                                                correlation between sweet spots identiﬁed at the intermedi-
+on CIFAR-10, and 0.5% to 1.2% for models on ImageNet.                                                                 ate training epochs and the ﬁnal epoch (100 epochs).
+Notably, we discover that top-performing graphs tend to
+cluster into a sweet spot in the space deﬁned by C and L
+(red rectangles in Figure 4(f)). We follow these steps to    Qualitative consistency. We visually observe in Figure
+identify a sweet spot: (1) we downsample and aggregate the     4(f) that the sweet spots are roughly consistent across dif-
+3942 graphs in Figure 4(a) into a coarse resolution of 52     ferent architectures. Speciﬁcally, if we take the union of the
+bins, where each bin records the performance of graphs that    sweet spots across architectures, we have C ∈[0.43, 0.50],
+fall into the bin; (2) we identify the bin with best average   L ∈[1.82, 2.28] which is the consistent sweet spot acrossperformance (red cross in Figure 4(f)); (3) we conduct one-    architectures. Moreover, the U-shape trends between graph
+tailed t-test over each bin against the best-performing bin,    measures and corresponding neural network performance,
+and record the bins that are not signiﬁcantly worse than   shown in Figure 4(b)(d), are also visually consistent.
+the best-performing bin (p-value 0.05 as threshold). The                                                         Quantitative consistency. To further quantify this consis-
+minimum area rectangle that covers these bins is visualized                                                          tency across tasks and architectures, we select the 52 bins
+as a sweet spot. For 5-layer MLP on CIFAR-10, the sweet                                                                  in the heat map in Figure 4(f), where the bin value indicates
+spot is C ∈[0.10, 0.50], L ∈[1.82, 2.75].                     the average performance of relational graphs whose graph
+                                                      measures fall into the bin range. We plot the correlation of
+5.2. Neural Network Performance as a Smooth                                                             the 52 bin values across different pairs of tasks, shown in
+    Function over Graph Measures                                                          Figure 4(e). We observe that the performance of relational
+In Figure 4(f), we observe that neural network’s predictive    graphs with certain graph measures correlates across dif-
+performance is approximately a smooth function of the clus-    ferent tasks and architectures. For example, even though
+tering coefﬁcient and average path length of its relational    a ResNet-34 has much higher complexity than a 5-layer
+graph. Keeping one graph measure ﬁxed in a small range   MLP, and ImageNet is a much more challenging dataset
+(C         0.6], L       2.5]), we visualize network perfor-    than CIFAR-10, a ﬁxed set relational graphs would perform   ∈[0.4,               ∈[2,mances        against the                   other measure (shown in Figure 4(b)(d)).    similarly in both settings, indicated by a Pearson correlation
+We use second degree polynomial regression to visualize the    of 0.658 (p-value < 10−8).
+overall trend. We observe that both clustering coefﬁcient
+and average path length are indicative of neural network     5.4. Quickly Identifying a Sweet Spot
+performance, demonstrating a smooth U-shape correlation.                                                          Training thousands of relational graphs until convergence
+                                                       might be computationally prohibitive. Therefore, we quanti-
+5.3. Consistency across Architectures                                                                     tatively show that a sweet spot can be identiﬁed with much
+Given that relational graph deﬁnes a shared design space     less computational cost, e.g., by sampling fewer graphs and
+across various neural architectures, we observe that rela-    training for fewer epochs.
+tional graphs with certain graph measures may consistently   How many graphs are needed? Using the 5-layer MLP
+perform well regardless of how they are instantiated.                                                  on CIFAR-10 as an example, we consider the heat map
+                                                         over 52 bins in Figure 4(f) which is computed using 3942
+                                                        graph samples. We investigate if a similar heat map can be
+
+======================== PDF 第 8 页 ========================
+                                  Graph Structure of Neural Networks
+
+  Graph                    Path (L)   Clustering (C)  CIFAR-10 Error (%)     Neuroscience. The best-performing relational graph that
+  Complete graph                1.00          1.00            33.34 ± 0.36      we discover surprisingly resembles biological neural net-
+   Cat cortex                      1.81          0.55            33.01 ± 0.22        works, as is shown in Table 2 and Figure 6. The similarities
+  Macaque visual cortex          1.73          0.53            32.78 ± 0.21        are in two-fold: (1) the graph measures (L and C) of top
+  Macaque whole cortex         2.38          0.46            32.77 ± 0.14         artiﬁcial neural networks are highly similar to biological
+   Consistent sweet spot                                1.82-2.28      0.43-0.50         32.50   0.33   across neural architectures                       ±            neural networks; (2) with the relational graph representation,
+   Best 5-layer MLP              2.48          0.45            32.05 ± 0.14      we can translate biological neural networks to 5-layer MLPs,
+                                                     and found that these networks also outperform the baselineTable 2: Top artiﬁcial neural networks can be similar to
+                                                      complete graphs. While our ﬁndings are preliminary, ourbiological neural networks (Bassett & Bullmore, 2006).
+                                                        approach opens up new possibilities for interdisciplinary re-
+                                                            search in network science, neuroscience and deep learning.
+     Biological neural network:                  Artificial neural network:
+      Macaque whole cortex                    Best 5-layer MLP
+                                                        6. Related Work
+                                                    Neural network connectivity. The design of neural net-
+                                                 work connectivity patterns has been focused on compu-
+                                                                tational graphs at different granularity: the macro struc-
+                                                                    tures, i.e. connectivity across layers (LeCun et al., 1998;
+Figure 6: Visualizations of graph structure of biological                                                      Krizhevsky et al., 2012; Simonyan & Zisserman, 2015;
+(left) and artiﬁcial (right) neural networks.                                                    Szegedy et al., 2015; He et al., 2016; Huang et al., 2017;
+                                                  Tan & Le, 2019), and the micro structures, i.e. connec-
+                                                                        tivity within a layer (LeCun et al., 1998; Xie et al., 2017;
+produced with much fewer graph samples. Speciﬁcally, we   Zhang et al., 2018; Howard et al., 2017; Dao et al., 2019;
+sub-sample the graphs in each bin while making sure each    Alizadeh et al., 2019). Our current exploration focuses on
+bin has at least one graph. We then compute the correlation    the latter, but the same methodology can be extended to
+between the 52 bin values computed using all 3942 graphs    the macro space. Deep Expander Networks (Prabhu et al.,
+and using sub-sampled fewer graphs, as is shown in Figure    2018) adopt expander graphs to generate bipartite structures.
+5 (left). We can see that bin values computed using only   RandWire (Xie et al., 2019) generates macro structures
+52 samples have a high 0.90 Pearson correlation with the    using existing graph generators. However, the statistical
+bin values computed using full 3942 graph samples. This     relationships between graph structure measures and net-
+ﬁnding suggests that, in practice, much fewer graphs are   work predictive performances were not explored in those
+needed to conduct a similar analysis.                        works. Another related work is Cross-channel Communica-
+                                                                 tion Networks (Yang et al., 2019) which aims to encourage
+How many training epochs are needed? Using ResNet-                                                               the neuron communication through message passing, where
+34 on ImageNet as an example, we compute the correlation                                                         only a complete graph structure is considered.
+between the validation top-1 error of partially trained models
+and the validation top-1 error of models trained for full    Neural architecture search. Efforts on learning the con-
+100 epochs, over the 52 sampled relational graphs, as is     nectivity patterns at micro (Ahmed & Torresani, 2018;
+visualized in Figure 5 (right). Surprisingly, models trained   Wortsman et al., 2019; Yang et al., 2018), or macro (Zoph
+after 3 epochs already have a high correlation (0.93), which  & Le, 2017; Zoph et al., 2018) level mostly focus on im-
+means that good relational graphs perform well even at    proving learning/search algorithms (Liu et al., 2018; Pham
+the early training epochs. This ﬁnding is also important     et al., 2018; Real et al., 2019; Liu et al., 2019). NAS-Bench-
+as it indicates that the computation cost to determine if a   101 (Ying et al., 2019) deﬁnes a graph search space by
+relational graph is promising can be greatly reduced.         enumerating DAGs with constrained sizes (≤7 nodes, cf.                                                     64-node graphs in our work). Our work points to a new
+                                                                path: instead of exhaustively searching over all the possible5.5. Network Science and Neuroscience Connections
+                                                             connectivity patterns, certain graph generators and graph
+Network science. The average path length that we measure    measures could deﬁne a smooth space where the search cost
+characterizes how well information is exchanged across the    could be signiﬁcantly reduced.
+network (Latora & Marchiori, 2001), which aligns with
+our deﬁnition of relational graph that consists of rounds of                                                        7. Discussionsmessage exchange. Therefore, the U-shape correlation in
+Figure 4(b)(d) might indicate a trade-off between message    Hierarchical graph structure of neural networks. As the
+exchange efﬁciency (Sengupta et al., 2013) and capability     ﬁrst step in this direction, our work focuses on graph struc-
+of learning distributed representations (Hinton, 1984).
+
+======================== PDF 第 9 页 ========================
+                                  Graph Structure of Neural Networks
+
+tures at the layer level. Neural networks are intrinsically    the procedure described in Section 2.2; (2) to get undirected
+hierarchical graphs (from connectivity of neurons to that    edges, the weights are summed by their transposes; (3) we
+of layers, blocks, and networks) which constitute a more    compute the Frobenius norm of the weights as the edge
+complex design space than what is considered in this paper.    value; (4) we get a sparse graph structure by binarizing edge
+Extensive exploration in that space will be computationally    values with a certain threshold.
+prohibitive, but we expect our methodology and ﬁndings to                                       We show the extracted graphs under different thresholds ingeneralize.                                                           Figure 7. As expected, the extracted graphs at initialization
+Efﬁcient implementation. Our current implementation    follow the patterns of E-R graphs (Figure 3(left)), since
+uses standard CUDA kernels thus relies on weight masking,    weight matrices are randomly i.i.d. initialized. Interestingly,
+which leads to worse wall-clock time performance compared     after training to convergence, the extracted graphs are no
+with baseline complete graphs. However, the practical adop-    longer E-R random graphs and move towards the sweet spot
+tion of our discoveries is not far-fetched. Complementary    region we found in Section 5. Note that there is still a gap
+to our work, there are ongoing efforts such as block-sparse    between these learned graphs and the best-performing graph
+kernels (Gray et al., 2017) and fast sparse ConvNets (Elsen    imposed as a structural prior, which might explain why a
+et al., 2019) which could close the gap between theoretical    fully-connected MLP has inferior performance.
+FLOPS and real-world gains. Our work might also inform                                                              In our experiments, we also ﬁnd that there are a few specialthe design of new hardware architectures, e.g., biologically-                                                           cases where learning the graph structure can be superiorinspired ones with spike patterns (Pei et al., 2019).                                                                                   (i.e., when the task is simple and the network capacity is
+Prior vs. Learning. We currently utilize the relational    abundant). We provide more discussions in the Appendix.
+graph representation as a structural prior, i.e., we hard-wire    Overall, these results further demonstrate that studying the
+the graph structure on neural networks throughout training.    graph structure of a neural network is crucial for understand-
+It has been shown that deep ReLU neural networks can    ing its predictive performance.
+automatically learn sparse representations (Glorot et al.,
+                                                 Uniﬁed view of Graph Neural Networks (GNNs) and2011). A further question arises: without imposing graph
+                                                        general neural architectures. The way we deﬁne neuralpriors, does any graph structure emerge from training a                                                       networks as a message exchange function over graphs is(fully-connected) neural network?                                                                 partly inspired by GNNs (Kipf & Welling, 2017; Hamilton
+                  5-layer 512-dim MLP on CIFAR-10                     et al., 2017; Veliˇckovi´c et al., 2018). Under the relational
+                                                        graph representation, we point out that GNNs are a special
+                                                                 class of general neural architectures where: (1) graph struc-
+                                                                ture is regarded as the input instead of part of the neural
+                                                                   architecture; consequently, (2) message functions are shared
+                                                            across all the edges to respect the invariance properties of
+                                                             the input graph. Concretely, recall how we deﬁne general
+                                                             neural networks as relational graphs:
+
+
+
+
+                                                                                            v                                                                                                            (r) (x(r)u  ), ∀u ∈N(v)})    (6)                                                                x(r+1)v   = AGG(r)({f
+Figure 7: Prior vs. Learning. Results for 5-layer MLPs on
+CIFAR-10. We highlight the best-performing graph when                      (r)
+                                                      For a GNN, fv   is shared across all the edges (u, v), andused as a structural prior. Additionally, we train a fully-
+                                              N(v) is provided by the input graph dataset, while a generalconnected MLP, and visualize the learned weights as a re-
+                                                             neural architecture does not have such constraints.lational graph (different points are graphs under different
+thresholds). The learned graph structure moves towards the    Therefore, our work offers a uniﬁed view of GNNs and gen-
+“sweet spot” after training but does not close the gap.          eral neural architecture design, which we hope can bridge
+                                                              the two communities and inspire new innovations. On one
+As a preliminary exploration, we “reverse-engineer” a    hand, successful techniques in general neural architectures
+trained neural network and study the emerged relational    can be naturally introduced to the design of GNNs, such
+graph structure. Speciﬁcally, we train a fully-connected    as separable convolution (Howard et al., 2017), group nor-
+5-layer MLP on CIFAR-10 (the same setup as in previous    malization (Wu & He, 2018) and Squeeze-and-Excitation
+experiments). We then try to infer the underlying relational    block (Hu et al., 2018); on the other hand, novel GNN ar-
+graph structure of the network via the following steps: (1) to    chitectures (You et al., 2019b; Chen et al., 2019) beyond
+get nodes in a relational graph, we stack the weights from all    the commonly used paradigm (i.e., Equation 6) may inspire
+the hidden layers and group them into 64 nodes, following    more advanced neural architecture designs.
+
+======================== PDF 第 10 页 ========================
+                                  Graph Structure of Neural Networks
+
+8. Conclusion                                               Fornito, A., Zalesky, A., and Breakspear, M. Graph analysis
+                                                                 of the human connectome: promise, progress, and pitfalls.
+In sum, we propose a new perspective of using relational                                                        Neuroimage, 80:426–444, 2013.
+graph representation for analyzing and understanding neural
+networks. Our work suggests a new transition from study-    Glorot, X., Bordes, A., and Bengio, Y. Deep sparse rectiﬁer
+ing conventional computation architecture to studying graph       neural networks. In AISTATS, pp. 315–323, 2011.
+structure of neural networks. We show that well-established
+                                                         Gray, S., Radford, A., and Kingma, D. P. Gpu kernels forgraph techniques and methodologies offered in other sci-
+                                                              block-sparse weights. arXiv preprint arXiv:1711.09224,ence disciplines (network science, neuroscience, etc.) could
+                                                           2017.contribute to understanding and designing deep neural net-
+works. We believe this could be a fruitful avenue of future                                                       Hamilton, W., Ying, Z., and Leskovec, J. Inductive repre-
+research that tackles more complex situations.                                                                  sentation learning on large graphs. In NeurIPS, 2017.
+Acknowledgments                                      Harary, F. The maximum connectivity of a graph. Proceed-                                                              ings of the National Academy of Sciences of the United
+This work is done during Jiaxuan You’s internship at Face-       States of America, 48(7):1142, 1962.
+book AI Research. Jure Leskovec is a Chan Zuckerberg
+                                                     He, K., Zhang, X., Ren, S., and Sun, J. Deep residualBiohub investigator. The authors thank Alexander Kirillov,
+                                                                learning for image recognition. In CVPR, 2016.Ross Girshick, Jonathan Gomes Selman, Pan Li for their
+helpful discussions.                                                           Hinton, G. E. Distributed representations. 1984.
+
+                                                     Howard, A. G., Zhu, M., Chen, B., Kalenichenko, D., Wang,References                                                            W., Weyand, T., Andreetto, M., and Adam, H. Mobilenets:
+Ahmed, K. and Torresani, L. Maskconnect: Connectivity       Efﬁcient convolutional neural networks for mobile vision
+   learning by gradient descent. In ECCV, 2018.                  applications. arXiv preprint arXiv:1704.04861, 2017.
+
+Albert, R. and Barab´asi, A.-L.  Statistical mechanics of    Hu, J., Shen, L., and Sun, G. Squeeze-and-excitation net-
+  complex networks. Reviews of modern physics, 74(1):47,      works. In CVPR, 2018.
+  2002.                                                   Huang, G., Liu, Z., van der Maaten, L., and Weinberger,
+                                                     K. Q. Densely connected convolutional networks.  InAlizadeh, K., Farhadi, A., and Rastegari, M. Butterﬂy trans-
+                                                CVPR, 2017.  form: An efﬁcient fft based neural architecture design.
+  arXiv preprint arXiv:1906.02256, 2019.                       Ioffe, S. and Szegedy, C. Batch normalization: Accelerating
+                                                         deep network training by reducing internal covariate shift.
+Barab´asi, A.-L. and Psfai, M. Network science. Cambridge                                                           arXiv preprint arXiv:1502.03167, 2015.
+  University Press, Cambridge, 2016.
+                                                             Kipf, T. N. and Welling, M. Semi-supervised classiﬁcation
+Bassett, D. S. and Bullmore, E. Small-world brain networks.      with graph convolutional networks. In ICLR, 2017.
+  The neuroscientist, 12(6):512–523, 2006.
+                                                         Krizhevsky, A. Learning multiple layers of features from
+Chen, Z., Villar, S., Chen, L., and Bruna, J. On the equiv-       tiny images. Technical report, 2009.
+  alence between graph isomorphism testing and function
+                                                         Krizhevsky, A., Sutskever, I., and Hinton, G. E. Imagenet  approximation with gnns. In NeurIPS, 2019.
+                                                                classiﬁcation with deep convolutional neural networks.
+                                                               In NeurIPS, 2012.Chollet, F. Xception: Deep learning with depthwise separa-
+   ble convolutions. In CVPR, pp. 1251–1258, 2017.                                                             Latora, V. and Marchiori, M. Efﬁcient behavior of small-
+                                                        world networks. Physical review letters, 87(19):198701,
+Dao, T., Gu, A., Eichhorn, M., Rudra, A., and R´e, C. Learn-                                                           2001.
+  ing fast algorithms for linear transforms using butterﬂy
+   factorizations. In ICML, 2019.                         LeCun, Y., Bottou, L., Bengio, Y., and Haffner, P. Gradient-
+                                                           based learning applied to document recognition. Proceed-
+Elsen, E., Dukhan, M., Gale, T., and Simonyan, K. Fast       ings of the IEEE, 86(11):2278–2324, 1998.
+   sparse convnets. arXiv preprint arXiv:1911.09723, 2019.
+                                                                  Li, Y., Vinyals, O., Dyer, C., Pascanu, R., and Battaglia, P.
+Erd˝os, P. and R´enyi, A. On the evolution of random graphs.      Learning deep generative models of graphs. In ICML,
+  Publ. Math. Inst. Hung. Acad. Sci, 5(1):17–60, 1960.         2018.
+
+======================== PDF 第 11 页 ========================
+                                  Graph Structure of Neural Networks
+
+Liu, C., Zoph, B., Neumann, M., Shlens, J., Hua, W., Li,    Tan, M. and Le, Q. V. Efﬁcientnet: Rethinking model scal-
+   L.-J., Fei-Fei, L., Yuille, A., Huang, J., and Murphy, K.      ing for convolutional neural networks. In ICML, 2019.
+  Progressive neural architecture search. In ECCV, 2018.
+                                                                           Veliˇckovi´c, P., Cucurull, G., Casanova, A., Romero, A., Lio,
+Liu, H., Simonyan, K., and Yang, Y. DARTS: Differentiable         P., and Bengio, Y. Graph attention networks. In ICLR,
+   architecture search. In ICLR, 2019.                         2018.
+                                                           Watts, D. J. and Strogatz, S. H.  Collective dynamics ofLoshchilov,  I. and Hutter,  F.   Sgdr:  Stochastic gra-
+                                                            small-worldnetworks. Nature, 393(6684):440, 1998.  dient descent with warm  restarts.   arXiv preprint
+  arXiv:1608.03983, 2016.                                                     Wortsman, M., Farhadi, A., and Rastegari, M. Discovering
+                                                               neural wirings. In NeurIPS, 2019.McClelland, J. L., Rumelhart, D. E., Group, P. R., et al.
+   Parallel distributed processing. Explorations in the Mi-   Wu, Y. and He, K. Group normalization. In ECCV, 2018.
+  crostructure of Cognition, 2:216–271, 1986.
+                                                           Xie, S., Girshick, R., Doll´ar, P., Tu, Z., and He, K. Aggre-
+Pei, J., Deng, L., Song, S., Zhao, M., Zhang, Y., Wu, S.,      gated residual transformations for deep neural networks.
+  Wang, G., Zou, Z., Wu, Z., He, W., et al. Towards artiﬁcial       In CVPR, 2017.
+  general intelligence with hybrid tianjic chip architecture.
+                                                           Xie, S., Kirillov, A., Girshick, R., and He, K. Exploring  Nature, 572(7767):106–111, 2019.
+                                                      randomly wired neural networks for image recognition.
+Pham, H., Guan, M. Y., Zoph, B., Le, Q. V., and Dean, J.      In ICCV, 2019.
+  Efﬁcient neural architecture search via parameter sharing.                                                     Yang, J., Ren, Z., Gan, C., Zhu, H., and Parikh, D. Cross-
+  In ICML, 2018.                                                           channel communication networks. In NeurIPS, 2019.
+Prabhu, A., Varma, G., and Namboodiri, A. Deep expander                                                     Yang, Y., Zhong, Z., Shen, T., and Lin, Z. Convolutional
+  networks: Efﬁcient deep networks from graph theory. In                                                                neural networks with alternately updated clique. In CVPR,
+  ECCV, 2018.                                                          2018.
+Real, E., Aggarwal, A., Huang, Y., and Le, Q. V. Regular-    Ying, C., Klein, A., Real, E., Christiansen, E., Murphy, K.,
+  ized evolution for image classiﬁer architecture search. In      and Hutter, F. Nas-bench-101: Towards reproducible neu-
+  AAAI, 2019.                                                           ral architecture search. arXiv preprint arXiv:1902.09635,
+                                                          2019.
+Russakovsky, O., Deng, J., Su, H., Krause, J., Satheesh, S.,
+  Ma, S., Huang, Z., Karpathy, A., Khosla, A., Bernstein,    You, J., Liu, B., Ying, Z., Pande, V., and Leskovec, J. Graph
+  M., Berg, A. C., and Fei-Fei, L. ImageNet Large Scale       convolutional policy network for goal-directed molecular
+  Visual Recognition Challenge. IJCV, 2015.                 graph generation. In NeurIPS, 2018a.
+
+Sengupta, B., Stemmler, M. B., and Friston, K. J.  Infor-   You, J., Ying, R., Ren, X., Hamilton, W., and Leskovec,
+  mation and efﬁciency in the nervous systema synthesis.        J. GraphRNN: Generating realistic graphs with deep
+  PLoS computational biology, 9(7), 2013.                      auto-regressive models. In ICML, 2018b.
+
+                                                      You, J., Wu, H., Barrett, C., Ramanujan, R., and Leskovec,Simonyan, K. and Zisserman, A. Very deep convolutional
+                                                                                    J. G2SAT: Learning to generate sat formulas. In NeurIPS,  networks for large-scale image recognition.  In ICLR,
+                                                           2019a.  2015.
+                                                     You, J., Ying, R., and Leskovec, J. Position-aware graphSporns, O. Graph theory methods for the analysis of neural
+                                                               neural networks. ICML, 2019b.  connectivity patterns.  In Neuroscience databases, pp.
+  171–185. Springer, 2003.                              Zhang, X., Zhou, X., Lin, M., and Sun, J.  ShufﬂeNet:
+                                           An extremely efﬁcient convolutional neural network for
+Stringer, C., Pachitariu, M., Steinmetz, N., Reddy, C. B.,                                                         mobile devices. In CVPR, 2018.
+  Carandini, M., and Harris, K. D. Spontaneous behaviors
+  drive multidimensional, brain-wide population activity.   Zoph, B. and Le, Q. V. Neural architecture search with
+  BioRxiv, pp. 306019, 2018.                                 reinforcement learning. In ICML, 2017.
+
+Szegedy, C., Liu, W.,  Jia, Y., Sermanet,  P., Reed, S.,    Zoph, B., Vasudevan, V., Shlens, J., and Le, Q. V. Learning
+  Anguelov, D., Erhan, D., Vanhoucke, V., and Rabinovich,       transferable architectures for scalable image recognition.
+  A. Going deeper with convolutions. In CVPR, 2015.          In CVPR, 2018.
+
+======================== PDF 第 12 页 ========================
+                                 Appendix for
+                     “Graph Structure of Neural Networks”
+
+
+
+                                 Jiaxuan You 1 Jure Leskovec 1 Kaiming He 2 Saining Xie 2
+
+          1. Details for Generating Relational Graphs       In total, we generate 1760 Harary graphs.
+         Here we provide more details for how we generate graphs in    Ring graphs. Ring graphs are characterized by: (1) number
+          Section 3.2. For all generators, we ﬁx the number of nodes    of nodes n, (2) node degree k (integer). We search over:2020   n = 64, and constrain the graph sparsity within [0.125, 1.0].
+                                                              • degree k ∈np.arange(8,62)
+          Watts-Strogatz (WS) graphs. WS graphs are character-                                                                       In total, we generate 54 ring graphs.
+           ized by: (1) number of nodes n, (2) initial node degree kAug          (must be an integer), (3) edge rewiring probability (random-   WS-ﬂex graphs. We describe the detailed procedures of
+27    ness) p. We search over:                             WS-ﬂexgetting 3942graphsWS-ﬂexare characterizedgraphs that weby:used(1) numberin the experiments.of nodes n,
+           • degree k ∈np.arange(8,62)                         (2) average node degree k (real number), (3) edge rewiring
+           • randomness p ∈np.linspace(0,1,300)**2       probability (randomness) p. We search over:
+           • 30 random seeds
+          Since graph measures are more sensitive when p is small,     • degree k ∈np.linspace(8,62,300)
+        we increase the sample density of small p value by squaring      • randomness p ∈np.linspace(0,1,300)**2                                                                30 random seeds[cs.LG]     p. In total, we generate 54   300   30 = 486, 000 WS      •                     ×   ×
+           graphs.                                                       In total, we generate 300×300×30 = 2, 700, 000 WS-ﬂex                                                                      graphs. Generating these WS-ﬂex graphs (and computing
+           Erd˝os-R´enyi (ER) graphs. ER graphs are characterized                                                                                their average path length and clustering coefﬁcient) only
+          by: (1) number of nodes n, (2) number of edges m. We                                                                         takes about 1 hour on a 80 CPU core machine.
+          search over:
+                                                                   Next, we sub-sample 3942 graphs from these 2.7M candi-
+           • edge number m ∈np.arange(64 × 4, 64 × 63/2)    date graphs. We create 2-d bins over the graph structure
+           • 30 random seeds                                      measures: (1) for average path length, we create 15  9 bins                                                                ×
+           In total, we generate 1760 × 30 = 52, 800 ER graphs.       whose bin edges are given by np.linspace(1, 4.5, 15 ×
+                                                            9 + 1); (2) for clustering coefﬁcient, we create 15 × 9 bins          Barab´asi-Albert (BA) graphs. ER graphs are character-
+                                                         whose bin edges are given by np.linspace(0, 1, 15 ×           ized by: (1) number of nodes n, (2) number of existing                                                            9 + 1). We sub-sample 1 graph, whose graph structure
+          nodes m that a new node connects to. We search over:                                                                 measures fall within a given 2-d bin, for each of the 2-d bins.
+           • m ∈np.arange(4,30)                            After gathering bins that have graphs, we get 3942 graphsarXiv:2007.06559v2        300 random seeds                                         in total.           •
+           In total, we generate 26 × 300 = 7, 800 ER graphs.          For ImageNet experiments, we further sub-sample 52 graphs                                                            from these 3942 graphs. Speciﬁcally, we collect graphs in
+        Harary graphs.  Harary graphs are determined by:  (1)                                                                        the bins whose bin ID (i mod 9) = 5, so that the sub-
+         number of nodes n, (2) number of edges m. We search                                                             sampled graphs are roughly uniformly distributed in the
+           over:                                                                 graph measure space.
+           • edge number m ∈np.arange(64*4,64*63/2)
+              1Department of Computer Science,  Stanford University    2. Details for Matching the Reference FLOPS
+          2Facebook AI Research. Correspondence to: Jiaxuan You <ji-                                                            Here we provide more details on matching the reference           axuan@cs.stanford.edu>, Saining Xie <s9xie@fb.com>.
+                                                 FLOPS for a given model. As described in Section 3.3,
+           Proceedings of the 37 th International Conference on Machine   we vary the layer width of a neural network to match the
+           Learning, Online, PMLR 119, 2020. Copyright 2020 by the au-    reference FLOPS.
+              thor(s).
+
+======================== PDF 第 13 页 ========================
+                                  Graph Structure of Neural Networks
+
+                                                 5-layer 512-dim MLP on CIFAR-10, 3942 graphs
+
+
+
+
+
+Figure 1: More graph measures vs. neural network performance. Global (left 3) and local (right 3) graph measures
+versus 5-layer 512-dim MLP performance on CIFAR-10.
+
+
+
+
+
+Figure 2: Ablation study: varying width/depth of neural networks. Pearson correlation between MLPs with different
+width/depth over the same set of 52 relational graphs. 5-layer 512-d MLP is the default architecture.
+
+
+Speciﬁcally, to match the reference FLOPS, if all the layers    consider the following additional local and global graph
+have the same width, we incrementally vary the layer width    measures.
+by 1 for all the layers, then pick the layer width that has the
+                                                     Local graph measures. (1) Average degree: node degreefewest FLOPS above the reference FLOPS. In the scenarios                                                          averaged over all the nodes. (2) Local efﬁciency: a measurewhere layer width varies in different stages, we ﬁne-tune                                                              of how well information is exchanged by a node’s neighborsthe network width in each of the stages via an iterative                                               when the node is removed, averaged over all the nodes.mechanism: (1) we incrementally vary the layer width of
+the narrowest stage by 1, while maintaining the ratio of    Global graph measures. (1) Algebraic Connectivity: the
+layer width across all the stages, then ﬁx the layer width for    second smallest eigenvalue of graph Laplacian.  Graph
+that stage; (2) we repeat (1) for the narrowest stage in the    Laplacian is deﬁned as A −D, where A is the adjacencyremaining stages. Using this technique, we can control the    matrix and D is the degree matrix. (2) Global efﬁciency: a
+complexity of a model within 0.5% of the baseline FLOPS.   measure of how well information is exchanged across the
+                                                    whole network.
+3. Details for Wall Clock Running Time       We plot the performance of 5-layer MLPs on CIFAR-10
+                                                                 dataset versus one of the graph structure measures, over the
+Training a baseline MLP (translated by a complete graph)                                                  3942 relational graphs that we experimented with. We use
+on CIFAR-10 roughly takes 5 minutes on a NVIDIA V100                                                                locally weighted linear regression to visualize the overall
+GPU, while training all baseline ResNets and EfﬁcientNets                                                                   trend. From Figure 1, we can see that more graph measures
+approximately take a day on 8 NVIDIA V100 GPU. Due                                                               exhibit the interesting U-shape correlation with respect to
+to the lack of mature support of sparse CUDA kernels, we                                                             neural network predictive performance.
+implement relational graphs via applying sparse masks over
+dense weight matrices. The most sparse graph that we
+experiment with (sparsity = 0.125) is around 2x slower (in    5. Ablation Study
+wall clock time) than the corresponding baseline graph.
+                                                                    5.1. Varying Width/Depth of Neural Networks
+4. Analysis with More Graph Measures           Here we investigate the effect of network width/depth on the
+                                                       performance of neural networks translated by the same set
+In the paper, we focus on 2 classic graph measures: clus-    of relational graphs. Speciﬁcally, we study 5-layer MLPs
+tering coefﬁcient and average path length. Here we include    with [256, 512, 1024] dimension hidden layers, and 512-dim
+the analysis using more graph measures. Speciﬁcally, we   MLP with [3, 5, 7] layers. We can see that the performance
+
+======================== PDF 第 14 页 ========================
+                                  Graph Structure of Neural Networks
+
+
+         5-layer MLP on CIFAR-10, 52 nodes         5-layer MLP on CIFAR-10, 64 nodes          5-layer MLP on CIFAR-10, 71 nodes
+
+              Complete graph:                                   Complete graph:                                   Complete graph:
+               33.34 ± 0.36                                         33.34 ± 0.36                                          33.34 ± 0.36
+               Best graph:                                          Best graph:                                          Best graph:
+               32.08 ± 0.42                                         32.07 ± 0.24                                          32.09 ± 0.32
+
+
+
+
+
+Figure 3: Ablation study: varying number of nodes in relational graphs. We average results from 482 relational graphs
+for 52-node graphs, 449 graphs for 64-node graphs, and 422 graphs for 71-node graphs.
+
+of relational graphs with certain structural measures highly    6. Discussion of Failure Cases
+correlates across networks with different width.
+                                                     There are some special cases for convolutional neural net-
+The behavior is different when varying the network depth:   works on CIFAR-10, where the consistent sweet spot pattern
+while increasing the depth of MLP to 7 layers maintains a   (C ∈[0.43, 0.50],                                                 L ∈[1.82, 2.28]) breaks and the besthigh correlation with 5-layer MLP, decreasing the depth of     results are obtained with approximately fully-connected
+MLP to 3 layers completely reverse the correlation1. One    graphs. We visualize and discuss this phenomenon in Fig-
+possible explanation is that while sparse relational graphs    ure 4. We start from analyzing the results of 8-layer 64-dim
+may represent a more efﬁcient neuron connectivity pattern,  CNN on ImageNet, where consistent sweep spot region
+more rounds of message exchange are necessary for these    emerges (Figure 4(a)). We then hold the model ﬁxed, and
+neurons to fully communicate. Understanding how many    switch the dataset to CIFAR-10. On CIFAR-10, we ﬁnd that
+rounds of message exchange are required by a given rela-    the complete graph performs better than most sparse graphs
+tional graph to reach optimal performance is an interesting    (Figure 4(b)).
+direction left for future work.
+                                                        Without a theoretical discussion on network overparameteri-
+                                                               zation (?) and intrinsic task difﬁculty (?), we provide some5.2. Varying Number of Nodes in Relational Graphs                                                           empirical intuitions for those cases. As we have shown in
+In Section 2.3, we show that an m-dim neural network layer    main paper Figure 7, fully-connected neural networks can
+can be ﬂexibly represented by an n-node relational graph,    automatically learn graph structures during training. We
+as long as n ≤m. Here we show that varying the number of    hypothesize that the structural prior matters less when thenodes in a relational graph has little effect on our ﬁndings.     task is simple, relative to the representation capacity and efﬁ-
+                                                            ciency of the neural network and the learned graph structure
+In Figure 3, we show the results of 5-layer MLP on CIFAR-                                                                            is sufﬁcient in those settings.
+10, where we consider using 52-node (number of nodes of
+the cat cortex graph) and 71-node (number of nodes of the   To verify this hypothesis, we reduce the model capacity by
+macaque whole cortex graph) relational graphs in addition    reducing the width of CNN from 64 to 16 dimensions (Fig-
+to 64-node graphs used in the main paper. To cover the    ure 4(c)), and train it again on CIFAR-10. In this setting, we
+space of clustering C and path length L, we generate 482   show that sparse graph structure signiﬁcantly outperforms
+graphs for 52-node graphs, 449 graphs for 64-node graphs,    the complete graph again. We provide more examples that
+and 422 graphs for 71-node graphs. To save computational    compares two scenarios in Figure 5. Note that with Im-
+cost, we use fewer graphs than the 3942 graphs in the main    ageNet, sparse relational graphs consistently yield better
+paper. From the results, we can see the performance of the    performance in the sweet spot regions, even when the model
+best graph is almost identical across these varied number    capacity is increased.
+of nodes, which justiﬁes our claimed ﬂexibility of selecting
+the number of nodes in a relational graph.
+
+   1Recall that when translating a relational graph, we leave the
+input and output layer unchanged; therefore, a 3-layer MLP only
+has 1 round of message passing over a given relational graph.
+
+======================== PDF 第 15 页 ========================
+                                  Graph Structure of Neural Networks
+
+
+
+
+
+ a 8-layer 64-dim CNN on ImageNet           b 8-layer 64-dim CNN on CIFAR-10          c 8-layer 16-dim CNN on CIFAR-10
+
+
+
+
+                                      Switch to                                   Narrow to
+                                 CIFAR-10                                  16-dim
+
+
+
+
+Figure 4: (a) We recap the results of 8-layer 64-dim CNN on ImageNet. (b) We apply the same architecture to CIFAR-10.
+Results from 449 relational graphs are averaged to 52 bins, using the technique in Section 5.2. We ﬁnd that the complete
+graph performs better than most sparse graphs in this setting. (c) We hypothesize that since CIFAR-10 is an intrinsically
+much easier task than ImageNet, the graph structural priors might not matter when the representation capacity is abundant.
+To verify the hypothesis,we reduce the model capacity by reducing the width of CNN from 64 to 16 dimensions. Due to
+the narrowed dimensions, we explore relational graphs with 16 nodes instead of 64. Results of 326 relational graphs are
+averaged to 48 bins. In this setting, sparse graph structure signiﬁcantly outperforms the complete graph again.
+
+
+
+
+
+                   5-layer MLP on CIFAR-10               8-layer CNN on ImageNet            ResNet on ImageNet
+
+
+
+
+
+                   11-layer MLP on CIFAR-10             8-layer CNN on CIFAR-10             ResNet on CIFAR-10
+
+
+
+
+
+Figure 5: There are some special cases where the consistent sweet spots disappear, when training CNN models on CIFAR-10
+(bottom row). For a simple task, we hypothesize that the graph structural priors might not matter when the representation
+capacity is abundant. However, for challenging tasks like ImageNet, sweet spots are consistent and sparse relational graphs
+always produce better results than the fully-connected/complete graph counterpart. (For 11-layer MLP on CIFAR-10, no
+sweet spot can be identiﬁed.)

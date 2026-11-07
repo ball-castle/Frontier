@@ -1,0 +1,506 @@
+KH-A009 | Optimized Product Quantization for Approximate Nearest Neighbor Search
+来源：https://openaccess.thecvf.com/content_cvpr_2013/html/Ge_Optimized_Product_Quantization_2013_CVPR_paper.html
+本地PDF：专题文献/何恺明/KH-A009_Optimized_Product_Quantization_for_Approximate_Nearest_Neighbor_Search_CVPR2013.pdf
+SHA-256：f117890bc03758d6e5bec677264889a14a7c3843386fcd921b8cdd85ad37ac02
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+  Optimized Product Quantization for Approximate Nearest Neighbor Search
+
+
+        Tiezheng Ge1∗          Kaiming He2            Qifa Ke3             Jian Sun2
+    1University of Science and Technology of China   2Microsoft Research Asia   3Microsoft Research Silicon Valley
+
+
+                 Abstract                         and the distance between two data points is approximated
+                                                    by the distance between their codewords. PQ achieves a
+   Product quantization is an effective vector quantization      large effective codebook size with the Cartesian product of
+approach to compactly encode high-dimensional vectors     a set of small sub-codebooks. It has been shown to be more
+for fast approximate nearest neighbor (ANN) search. The     accurate than various hashing-based methods (c.f. [10, 3]),
+essence of product quantization is to decompose the orig-      largely due to its lower quantization distortions and more
+inal high-dimensional space into the Cartesian product of      precise distance computation using a set of small lookup ta-
+a ﬁnite number of low-dimensional subspaces that are then      bles. Moreover, PQ is computationally efﬁcient and thus at-
+quantized separately. Optimal space decomposition is im-      tractive for large-scale applications—the Cartesian product
+portant for the performance of ANN search, but still re-     enables pre-computed distances between codewords to be s-
+mains unaddressed.  In this paper, we optimize produc-     tored in tables with feasible sizes, and query is merely done
+t quantization by minimizing quantization distortions w.r.t.    by table lookups using codeword indices. It takes about 20
+the space decomposition and the quantization codebooks.     milliseconds to query against one million data points for the
+We present two novel methods for optimization: a non-      nearest neighbor by exhaustive search.
+parametric method that alternatively solves two smaller
+                                                     To keep the size of the distance lookup table feasible,
+sub-problems, and a parametric method that is guaranteed
+                                         PQ decomposes the original vector space into the Cartesian
+to achieve the optimal solution if the input data follows
+                                                           product of a ﬁnite number of low-dimensional subspaces.
+some Gaussian distribution. We show by experiments that
+                                                                                    It has been noticed [10] that the prior knowledge about the
+our optimized approach substantially improves the accura-
+                                                                  structures of the input data is of particular importance, and
+cy of product quantization for ANN search.
+                                                               the accuracy of ANN search would become substantially
+                                                      worse if ignoring such knowledge. The method in [11] op-
+                                                               timizes a Householder transform under an intuition that the
+1. Introduction                                                              data components should have balanced variances.  It is al-
+  Approximate nearest neighbor (ANN) search is of great     so observed that a random rotation achieves similar perfor-
+importance for many computer vision problems, such as re-    mance [11]. But the optimality in terms of quantization er-
+trieval [17], classiﬁcation [2], and recognition [18].  Re-      ror is unclear. Thus, optimal space decomposition for PQ
+cent years have witnessed the increasing interest  (e.g.,     remains largely an unaddressed problem.
+[18, 20, 3, 10, 6]) in encoding high dimensional data in-                                                                 In this paper, we formulate product quantization as an
+to distance-preserving compact codes.  With merely tens                                                             optimization problem that minimizes the quantization dis-
+of bits per data item, compact encoding not only saves the                                                                    tortions by searching for optimal codebooks and space de-
+cost of data storage and transmission, but more important-                                                            composition. Such an optimization problem is challenging
+ly, it enables efﬁcient nearest neighbor search on large-scale                                                      due to large number of free parameters. We proposed t-
+datasets, taking only a fraction of a second for each nearest                                           wo solutions.  In the ﬁrst solution, we split the problem
+neighbor query [18, 10]                                                                  into two sub-problems, each having a simple solver. The
+  Hashing [1, 18, 20, 19, 6, 8] has been a popular approach                                                          space decomposition and the codebooks are then alterna-
+to compact encoding, where the similarity between two da-                                                                     tively optimized, by solving for the space decomposition
+ta points is approximated by the Hamming distance of their                                                          while ﬁxing the codewords, and vice versa. Such a solution
+hashed codes. Recently, product quantization (PQ) [10] was                                                                              is non-parametric in that it does not assume any priori in-
+applied to compact encoding, where a data point is vector-                                                           formation about the data distribution. Our second solution
+quantized to its nearest codeword in a predeﬁned codebook,                                                                              is a parametric one in that it assumes the data follows Gaus-
+   ∗This work is done when Tiezheng Ge is an intern at Microsoft Re-      sian distribution. Under such assumption, we show that the
+search Asia.                                                 lower bound of the quantization distortion has an analytical
+
+
+                                                 1
+
+======================== PDF 第 2 页 ========================
+formulation, which can be effectively optimized by a sim-        Formally, denote any x ∈RD as the concatenation of
+ple Eigenvalue Allocation method. Experiments show that  M subvectors: x = [x1, ...xm, ...xM]. For simplicity it is
+our two solutions outperform the original PQ [10] and other     assumed [10] that the subvectors have common number of
+alternatives like transform coding [3] and iterative quantiza-     dimensions D/M. The Cartesian product C = C1×...×CM
+tion [6], even when the prior knowledge about the structure       is the set in which a codeword c ∈C is formed by concate-
+of the input data is used by PQ [10].                           nating the M sub-codewords: c = [c1, ...cm, ...cM], with
+   Concurrent with our work, a very similar idea is inde-     each cm ∈Cm. We point out that the objective function for
+pendently developed by Norouzi and Fleet [14].             PQ, though not explicitly deﬁned in [10], is essentially:
+
+                                                           min     ∥x −c(i(x))∥2,            (2)2. Quantization Distortion                                                     C1,...,CM
+                                                                           x
+   In this section, we show that a variety of distance approx-                       s.t.  c ∈C = C1 × ... × CM.
+imation methods, including k-means [13], product quan-
+                                                                                    It is easy to show that x’s nearest codeword c in C  istization [10], and orthogonal hashing [19, 6], can be for-
+                                                               the concatenation of the M nearest sub-codewords c =mulated within the framework of vector quantization [7]
+                                                                    [c1, ...cm, ...cM] where cm is the nearest sub-codeword ofwhere quantization distortion is used as the objective func-
+                                                               the subvector xm. So Eqn. (2) can be split into M separatetion. Quantization distortion is tightly related to the empiri-
+                                                          subproblems, each of which can be solved by k-means in itscal ANN performance, and thus can be used to measure the
+                                                           corresponding subspace. This is the PQ algorithm.“optimality” of a quantization algorithm for ANN search.
+                                                    The beneﬁt of PQ is that it can easily generate a code-
+2.1. Vector Quantization                             book C with a large number of codewords.  If each sub-
+                                                     codebook has k sub-codewords, then their Cartesian prod-   Vector quantization (VQ) [7] maps a vector x ∈RD to
+a codeword c in a codebook C = {c(i)} with i in a ﬁnite     uct C has kM codewords. This is not possible for classical k-
+                                                   means when kM is large. PQ also enables fast distance com-
+index set. The mapping, termed as a quantizer, is denoted
+                                                                 putation: the distances between any two sub-codewords in aby: x →c(i(x)). In information theory, the function i(·) is
+                                                         subspace are precomputed and stored in a k-by-k lookup ta-called an encoder, and function c(·) is called a decoder [7].
+  The quantization distortion E is deﬁned as:                    ble, and the distance between two codewords in C is simply
+                                                                the sum of the distances compute from the M subspaces.
+                 1
+        E =     ∥x −c(i(x))∥2,             (1)      Iterative Quantization [6]              n
+                     x                                                  If any codeword c must be taken from “the vertexes of
+where ∥· ∥denotes the l2-norm, n is the total number of da-     a rotating hyper-cube,” minimizing the distortion leads to a
+                                                          hashing method called Iterative Quantization (ITQ) [6].ta samples, and the summation is over all the points in the
+                                                    The D-dimensional vectors in {−a, a}D are the ver-given sample set. Given a codebook C, a quantizer that min-
+imizes the distortion E must satisfy the ﬁrst Lloyd’s condi-      tices of an axis-aligned D-dimensional hyper-cube. Sup-
+tion [7]: the encoder i(x) should map any x to its nearest     pose the data has been zero-centered. The objective func-
+                                                                   tion in ITQ [6] is essentially:codeword in the codebook C. The distance between two
+vectors can be approximated by the distances between their                min   ∥x −c(i(x))∥2,               (3)
+codewords, which can be precomputed ofﬂine.                                  R,a  x
+                                                                                s.t.  c ∈C = {c | Rc ∈{−a, a}D},  RTR = I,2.2. Codebook Generation
+                                                     where R is an orthogonal matrix and I is an identity matrix.  We show that a variety of methods minimize the distor-
+                                                    The beneﬁt of using a rotating hyper-cube as the code-tion w.r.t. to the codebook using different constraints.
+                                                    book is that the squared Euclidean distance between any
+K-means                                                    two codewords is equivalent to the Hamming distance be-
+    If there is no constraint on the codebook, minimizing the                                                      tween their indices. So ITQ is in the category of binary
+distortion in Eqn.(1) leads to the classical k-means cluster-                                                          hashing methods [1, 20, 19]. Eqn.(3) also indicates that any
+ing algorithm [13]. With the encoder i(·) ﬁxed, the code-                                                           orthogonal hashing method is equivalent to a vector quan-
+word c of a given x is the center of the cluster that x belongs                                                                               tizer. The length a in (3) does not impact the resulting hash-
+to—this is the second Lloyd’s condition [7].                                                             ing functions as noticed in [6], but it matters when we com-
+Product Quantization [10]                                  pare the distortion with other quantization methods.
+    If any codeword c must be taken from the Cartesian
+                                                               2.3. Distortion as the Objective Function
+product of a ﬁnite number of sub-codebooks, minimizing
+the distortion in Eqn.(1) leads to the product quantization       The above methods all optimize the same form of quan-
+method [10].                                                       tization distortion, but subject to different constraints. This
+
+======================== PDF 第 3 页 ========================
+                    9/,:                                                      -/9:                 to represent the space decomposition. The D-dimensional                                                      0.1 0.2
+                                  1 SKGTY                        vector space is ﬁrst transformed by R.  The dimension-
+     1 SKGTY                                                       s of the transformed space are then divided into D/M
+                                                           chunks. The i-th chunk, consisting of the dimensions of
+                                                                       (i −1) ∗D/M + {1, 2, ..., D/M}, is then assigned to theS'6                                                                S'6
+            67                          67                      i-th subspace. Note that any reordering of the dimensions
+                                           67                67
+                   67                                               67  /:7       can be represented by an orthonormal matrix. Thus R de-
+                             /:7                                     cides the dimensions of the transformed space assigned to
+
+   0                                             0
+   0               15000             30000                                                    0.1                   0.3                   0.5     each subspace. The free parameters of product quantization
+                        *OYZUXZOUT                                              *OYZUXZOUT                thus consist of the sub-codebooks for the subspaces, and
+Figure 1: mAP vs. quantization distortion. We show result-      the matrix R. The additional free parameters of R allows
+s from ﬁve methods: k-means, ITQ, and three variants of      the vector space to rotate, thus relax the constraints on the
+PQ. The datasets are SIFT1M and GIST1M from [10]. All     codewords. From Fig. 1 we see that relaxing constraints
+methods are given 16 bits for codeword length. The data     leads to lower distortions. We optimize product quantiza-
+consist of the largest 16 principal components (this is to en-      tion over these free parameters:
+able measuring the ITQ distortion).
+                                                           min     ∥x −c(i(x))∥2,           (4)
+                                                                                       R,C1,...,CM
+implies that distortion is an objective function that can be                          x
+                                                                              s.t.  c ∈C = {c | Rc ∈C1 × ... × CM, RTR = I}evaluated across different quantization methods. We empir-
+ically observe that the distortion is tightly correlated to the                                        We call the above problem Optimized Product Quantization
+ANN search accuracy of different methods.                                                     (OPQ). The effective codebook C is jointly determined by
+  To show this, we investigate nearest neighbor search for   R and sub-codebooks {Cm}Mm=1.
+100 nearest neighbors on two large datasets. We adop-                                                             Notice that assigning x to its nearest codeword c is e-
+t the common strategy of linear search using compact                                                               quivalent to assigning Rx to the nearest Rc. To apply the
+codes [10, 6]: the return results are ordered by their approxi-                                                     codebook in Eqn.(4) for encoding, we only need to pre-
+mate distances to the query. Here both the query and the da-                                                            process the data by Rx, and the remaining step is the same
+ta are quantized, and their distance is approximated by their                                                              as that in PQ.
+codeword distances (for ITQ this is equivalent to ranking by                                                           Optimizing the problem in Eqn.(4) was considered “not
+Hamming distance). We compute the mean Average Preci-                                                                tractable” [11], because of the large number of degrees
+sion (mAP) over ten thousand and one thousand queries on                                                              of freedom. Previous methods pre-processed the data us-
+the ﬁrst and second data set, respectively. The mAP using                                                             ing simple heuristics like randomly ordering the dimensions
+different methods and their distortions are shown in Fig. 1.                                                              [10] or randomly rotating the space [11]. The matrix R has
+We compare ﬁve methods: k-means, ITQ, and three variants                                                            not been considered in any optimization. In the following
+of PQ (decomposed into M = 2, 4, or 8 subspaces, denoted                                             we propose a non-parametric iterative solution and a simple
+as PQM). For all methods the codeword length is ﬁxed to be                                                            parametric solution to the problem of Eqn.(4).
+B = 16 bits, which essentially gives K = 216 codewords
+(though PQ and ITQ need not explicitly store them). We can     3.1. A Non-Parametric Solution
+see that mAP (from different methods) has a strong corre-
+                                                    Our non-parametric solution does not assume any data
+lation with the quantization distortion. We observe similar                                                                    distribution 1. We split the problem in Eqn.(4) into two sim-
+behaviors under various ANN metrics, like precision/recall                                                                   pler sub-problems that are optimized in an alternative way.
+at the ﬁrst N samples, with various number of ground-truth
+nearest neighbors.                                       Step (i): Fix R, optimize the sub-codebooks {Cm}Mm=1.
+  Based on the above observations, we use distortion as an        Recall that assigning x to the nearest c is equivalent to
+objective function to evaluate the optimality of a quantiza-     assigning Rx to the nearest Rc. Denote ˆx = Rx and ˆc =
+tion method.                                         Rc. Since R is orthonormal, we have ∥x−c∥2 = ∥ˆx−ˆc∥2.
+                                                     With R ﬁxed, Eqn.(4) then becomes:
+3. Optimized Product Quantization
+                                                           min       ∥ˆx −ˆc(i(ˆx))∥2,             (5)
+                                                                                            C1,...,Cm
+   Product  quantization  involves decomposing  the D-                                                   ˆx
+dimensional vector space into M subspaces, and comput-                          s.t.   ˆc ∈C1 × ... × CM.
+ing a sub-codebook for each subspace. M is determined by
+                                                          1We follow the terminology in statistics that a “non-parametric” model
+the budget constraint of memory space (to ensure a feasi-
+                                                                                                  is the one that does not rely on any assumption about the data distribu-
+ble lookup table size) and computational costs, and is pre-        tion, while “parametric” model explicitly assumes certain parameterized
+determined in practice. We use an orthonormal matrix R       distribution such as Gaussian distribution.
+
+======================== PDF 第 4 页 ========================
+Eqn.(5) is the same problem as PQ in Eqn.(2). We can sep-     Algorithm 1 Non-Parametric OPQ
+arately run k-means in each subspace to compute the sub-                                                         Input: training samples {x}, number of subspaces M,
+codebooks.                                                      number of sub-codewords k in each sub-codebook.
+Step (ii): Fix the sub-codebooks {Cm}Mm=1, optimize R.     Output: the matrix R, sub-codebooks {Cm}Mm=1, M sub-
+                                                      {im}Mm=1 for each x.   Since ∥x−c∥2 = ∥Rx−ˆc∥2, the sub-problem becomes:          indices
+                                                                                      1: Initialize R, {Cm}Mm=1, and {im}Mm=1.
+            min   ∥Rx −ˆc(i(ˆx))∥2,              (6)         2: repeat
+            R
+                  x                                                        3:    Step(i): project the data: ˆx = Rx.
+                         s.t. RTR = I.                                     4:    for m = 1 to M do
+                                                                                      5:      for j = 1 to k: update ˆcm(j) by the sample mean
+For each ˆx, the codeword ˆc(i(ˆx)) is ﬁxed in the subproblem              of {ˆxm | im(ˆxm) = j}.
+and can be derived from the sub-codebooks computed in         6:      for ∀ˆxm: update im(ˆxm) by the sub-index of the
+Step (i). To ﬁnd ˆc(i(ˆx)), we simply concatenate the M             sub-codeword ˆcm that is nearest to ˆxm.
+sub-codewords of the sub-vectors in ˆx. We denote ˆc(i(ˆx))         7:   end for
+as y. Given n training samples, we denote X and Y as two         8:    Step(ii): solve R by Eqn.(7).
+D-by-n matrices whose columns are the samples x and y         9: until max iteration number reached
+respectively. Note Y  is ﬁxed in this subproblem. Then we
+
+                                                                                                                                                                       4can rewrite (6) as:                                                                                             x 10
+                                                                                                                                  4.3
+               min              ∥RX −Y ∥2F,                  (7)               R
+                                                                                                                                  4.1
+                         s.t. RTR = I,
+where ∥· ∥F is the Frobenius norm. This is the Orthogonal                                  3.9                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           *OYZUXZOUT
+Procrustes problem [16, 6] and there is a closed-form solu-
+tion: ﬁrst apply Singular Value Decomposition to XY T =                                  3.7
+USV T, and then let R = V U T.  In [6] this solution was                                  3.5
+used to optimized the ITQ problem in Eqn.(3).                                              0     100   /ZKXGZO\K200  T[SHKX300    400    500
+                                                           Figure 2:  Convergence of Algorithm 1 in the SIFT1M
+  Our algorithm alteratively optimizes Step (i) and (ii).
+                                                                  dataset[10]. Here we use M = 4 and k = 256 (32 bits).
+Note that in Step (i) we need to run k-means, which by itself
+is an iterative algorithm. However, we notice that after Step
+(ii) the updated matrix R would not change the cluster mem-      ric solution has both practical and theoretical merits. First,
+bership of the previous k-means clustering results, thus we        it is a simpler method and is globally optimal if the data
+only need to reﬁne the previous k-means results instead of     follows Gaussian distribution. Second, it provides a way to
+restarting k-means. With this strategy, we empirically ﬁnd      initialize the non-parametric method. Third, it provides new
+that even if we only run one k-means iteration in each Step      theoretical explanations for two commonly used criteria in
+(i), our entire algorithm still converges to a good solution.    some other quantization methods.
+A pseudo-code is in Algorithm 1.                                                                3.2.1  Distortion Bound of Quantization
+  Note that if we ignore line 3 and line 8 in Algorithm 1, it
+is equivalent to PQ (for PQ one might usually put line 2 in   We assume each dimension of x ∈RD is subject to an in-
+the inner loop). Thus its complexity is comparable to PQ,     dependent Gaussian distribution with zero mean. From rate
+except that in each iteration our algorithm updates R and      distortion theory [5] we know that the codeword length b
+transforms the data by R. Fig. 2 shows the convergence of     from any quantizer achieving a distortion of E must satisfy:
+our algorithm. In practice we ﬁnd 100 iterations are good                   D
+                                                                            1    Dσ2denough for the purpose of ANN search.                                  b(E) ≥                                                                                           log2 E   ,              (8)                                                                            2   Like many other alternative-optimizationalgorithms, our                          d=1
+algorithm is locally optimal and the ﬁnal solution depends
+                                                     where σ2d is the variance at each dimension. In this equationon the initialization. In the next subsection we propose a
+                                             we have assumed σ2d is sufﬁciently large (a more generalparametric solution that can be used to initialize our alter-
+                                                     form is in [5]). Equivalently, the distortion E satisﬁes:native optimization procedure.
+
+                                                                                                                        1
+                                              E ≥k−2D D|Σ| D ,                  (9)3.2. A Parametric Solution
+  We further propose another solution assuming the data     where k = 2b and we assume all codewords have identical
+follows a parametric Gaussian distribution. This paramet-     code length. The matrix Σ is the covariance of x, and |Σ|
+
+======================== PDF 第 5 页 ========================
+is the determinant. Here we have relaxed the independence      3.2.4  Eigenvalue Allocation
+assumption and allowed x to follow a Gaussian distribu-                                        We ﬁrst show that the objective function in Eqn.(12) has a
+tion N(0, Σ). Eqn.(9) is the distortion lower bound for any                                                              constant lower bound. Using the inequality of arithmetic
+quantizer with k codewords. The following table shows the                                                    and geometric means (AM-GM inequality) [4], the objec-
+values of this bound and the empirical distortion of k-means                                                                       tive in Eqn.(12) satisﬁes:
+(105 samples, k = 256, σ2d randomly generated in [0.5, 1]):          M          M
+                                                                        |ˆΣmm| MD ≥M     |ˆΣmm| D1 .        (13)         D           32    64    128
+                                                      m=1           m=1
+             distortion bound     16.2   38.8   86.7
+           empirical distortion   17.1   39.9   88.5             The equality holds if and only if the term |ˆΣmm| has the
+                                                  same value for all m. Further, Fischer’s inequality [9] gives:    It is reasonable to consider this bound as an approxima-
+tion to the k-means distortion. The small gap (∼5%) may              M
+be due to two reasons: k-means can only achieve a local-                           |ˆΣmm| ≥|ˆΣ|.               (14)
+ly optimal solution, and the ﬁxed code-length for all code-                  m=1
+words may not achieve optimal bit rate2.                   The equality holds if the off-diagonal sub-matrices in ˆΣ e-
+                                                            qual to zero. Note that |ˆΣ| ≡|Σ| is a constant given the3.2.2  Distortion Bound of Product Quantization
+                                                              data distribution. Combining (13) and (14), we obtain the
+Now we study the distortion bound of product quantization                                                              constant lower bound for the objective in (12):
+when x ∼N(0, Σ). Suppose x has been decomposed into            M
+a concatenation of M equal-dimensional sub-vectors. Ac-                                                                           |ˆΣmm| MD ≥M|Σ| D1 .            (15)
+cordingly, we can decompose Σ into M × M sub-matrices:                                                         m=1
+
+        ⎛          ⎞               The minimum is achieved if the following two criteria are
+                  Σ11     · · ·  Σ1M                                                          both satisﬁed:        ⎜          ⎟
+                                                    (10)           (i) Independence.  If we align the data by PCA, the e-       Σ = ⎝                 ...      ...                           ...  ⎠.
+             ΣM1    · · ·  ΣMM                        quality in Fischer’s inequality (14) is achieved. This implies
+                                            we make the dimensions independent to each other.
+Here the diagonal sub-matrices Σmm are the covariance of           (ii) Balanced Subspaces’ Variance.  The equality in
+the m-th subspace.  Notice that the marginal distribution   AM-GM (13) is achieved if |ˆΣmm| has the same value for
+of xm subjects to MD -dimensional Gaussian N(0, Σmm).       all subspaces. Suppose the data has been aligned by PCA.
+From (9), the distortion bound of PQ is:                   Then |ˆΣmm| equals to the product of the eigenvalues of
+                 M                    Σmm. By re-ordering the principal components, we can             D        M
+                  D       |Σmm| D ,         (11)     balance the product of eigenvalues for each subspace, thus          EPQ = k−2M           M
+                      m=1                             the values |ˆΣmm| for all subspaces. As a result, both equal-
+                                                                              ities in AM-GM (13) and Fischer’s (14) are satisﬁed, so the3.2.3  Minimizing Distortion Bound of PQ
+                                                                objective function is minimized.
+Remember that space decomposition can be parameterized                                                        Based on the above analysis, we propose a simple
+by an orthonormal matrix R. When applying R to data, the                                                        Eigenvalue Allocation method to optimize Eqn.(12). This
+variable ˆx = Rx is subject to N(0, ˆΣ) with ˆΣ = RΣRT.                                                    method is a greedy solution for the balanced partition prob-
+We propose to minimize the distortion bound w.r.t. R to op-                                                           lem. We ﬁrst align the data using PCA and sort the eigen-
+timize the space decomposition in product quantization:                                                             values σ2 in the descending order σ21 ≥... ≥σ2D. Note
+             M                                        that we do not reduce dimensions. We prepare M empty
+              min    |ˆΣmm| MD ,               (12)     buckets, one for each of the M subspaces. We sequentially              R
+                 m=1                                 pick out the largest eigenvalue and allocate it to the bucket
+                         s.t. RTR = I,                        having the minimum product of the eigenvalues in it (un-
+                                                                     less the bucket is full, i.e., with D/M eigenvalues in it).
+where ˆΣmm is the diagonal sub-matrix of ˆΣ. The constant    The principal directions corresponding to the eigenvalues
+scale in Eqn.(11) has been ignored in this objective func-      in each bucket form the subspace. In fact, the principal di-
+tion. Due to the orthonormal constraint, this problem is in-      rections are re-ordered to form the columns of R.
+herently non-convex. Fortunately, the special form of our        In real data sets, we ﬁnd this greedy algorithm is suf-
+objective function can be minimized by a simple algorithm,     ﬁciently good for minimizing the objective function. To
+as we show next.                                     show this fact, we compute the covariance matrix Σ from
+   2In information theory, it is possible to reduce the average bit rate by      the SIFT/GIST datasets [10]. The following table shows the
+varying the bit-length of codewords, known as entropy encoding [5].           theoretical minimum of the objective function (right hand
+
+======================== PDF 第 6 页 ========================
+side in (15)) and the objective function value (left hand side                           1          9_TZNKZOI   HOZY 9*)
+                                                                                     OPQNP
+in (15)) obtained by our Eigenvalue Allocation algorithm.                        OPQP
+Here we use M = 8 and k = 256. We can see the above                                0.8   PQRO
+greedy algorithm achieves the theoretical minimum:                                    PQRR
+                                                                                    TC
+                                                                                                                              0.6    ITQ
+              theoretical minimum   Eigenvalue Allocation                                                                                                                                                                                                                                                                                                                          8KIGRR
+    SIFT      2.9286 × 103         2.9287 × 103                                              0.4
+    GIST      1.9870 × 10−3        1.9870 × 10−3
+
+                                                                                                                              0.2
+   Interestingly, existing encoding methods have adopted,
+either heuristically or in objective functions different from                           0
+ours, the criteria of “independence” or “balance” mentioned                            0               25004             5000
+above. “Independence” was used in [20, 19, 3] in the for-     Figure 3: Comparison on Gaussian synthetic data using
+m of PCA projection. “Balance” was used in [11, 20, 3]:     Symmetric Distance Computation and 32-bit codes.
+the method in [11] rotates the data to “balance” variance
+for each component but lost “independence”; the methods                                                           ranking for orthogonal hashing methods like ITQ [6].  If
+in [20, 3] adaptively allocate the codeword bits to the princi-                                                          only the data are quantized, the method is termed as Asym-
+pal components. Our derivation provides theoretical expla-                                                             metric Distance Computation (ADC) [10]. ADC is more
+nations for the two criteria: they can be considered as a way                                                              accurate than SDC but has the same complexity. We have
+of minimizing the quantization distortion under a Gaussian                                                                   tested both cases. The exhaustive search is fast using lookup
+distribution assumption.                                                                      tables: e.g., for 64 bits indices it takes 20 ms per 1 million
+  Summary of the parametric solution. Our parametric     distance computation. Experiments are on a PC with an In-
+solution ﬁrst computes the covariance matrix Σ of the data       tel Core2 2.13GHz CPU and 8G RAM. We do not combine
+and uses Eigenvalue Allocation to generate the orthonormal     with any non-exhaustive method like inverted ﬁles [17] as
+matrix R, which determines the space decomposition. The      this is not the focus of our paper. We study the following
+data are then transformed by R. The original PQ algorithm     methods:
+is then performed on these transformed data.                 • OPQP: our parametric solution.
+                                                     • OPQNP: our non-parametric solution initialized by para-
+4. Experiments                                                              metric solution.
+  We evaluate our method for ANN search using three     • PQRO: randomly order dimensions as suggested in [10].
+public datasets. The ﬁrst two datasets are from SIFT1M     • PQRR: data is aligned using PCA and then randomly ro-
+and GIST1M [10]. The SIFT1M consists of 1 million 128-d       tated, as suggested in [11].
+SIFT features [12] and 10k queries. The GIST1M set con-     • TC (Transform Coding  [3]):  a  scalar quantization
+sists of 1 million 960-d GIST features [15] and 1k queries.     method that quantizes each principal component with an
+The third dataset MNIST3 consists of 70k images of hand-      adaptive number of bits.
+written digits, each as a 784-d vector concatenating all pix-                                                     • ITQ [6]: one of the state-of-the-art hashing methods, a
+els. We randomly sample 1k as the queries and use the re-                                                                  special vector quantization method.
+maining as the data base. We further generate a synthet-
+                                                          Notice that in these settings we have assumed there is noic dataset subject to a 128-d independent Gaussian distri-
+                                                                  prior knowledge available. Later we will study the case withbution, where the eigenvalues of the covariance matrix are
+given by σ2d = e−0.1d (d=1,...,128), a long-tail curve ﬁt to      prior knowledge.
+                                                        Given the code-length B,  all the PQ-based methodsthe eigenvalues of the above real datasets. This synthetic set
+                                                    (OPQNP, OPQP, PQRO, PQRR) assign 8 bits to each sub-has 1 million data points and 10k queries.
+                                                          space (k = 256). The subspace number M is B/8.  We consider K=100 Euclidean nearest neighbors as the
+                                          We have published the Matlab code of our solutions4.true neighbors. We ﬁnd that for lookup-based methods, K
+is not inﬂuential for the comparisons among the methods.      Performance on the synthetic dataset
+  We follow a common exhaustive search strategy (e.g.,         Fig. 3 shows the performance on the synthetic data sub-
+[10, 6]). The data are ranked in the order of their approxi-      ject to a 128-d independent Gaussian distribution, evaluated
+mate distances to the query. If both the query and data are to     through recall vs. N, i.e., the proportion of the true nearest
+be quantized, the method is termed as Symmetric Distance     neighbors ranked in the ﬁrst N positions. We can see that
+Computation (SDC) [10]. SDC is equivalent to Hamming    OPQNP and OPQP perform almost the same. OPQP achieves
+
+  3http://yann.lecun.com/exdb/mnist/                    4research.microsoft.com/en-us/um/people/kahe/
+
+======================== PDF 第 7 页 ========================
+                                      G  9/,:   HOZY 9*)                                                                        H    9/,: 9*)                                                                                                                                           I    9/,: '*)                            1                                                                                                                                               0.8                                                                                        0.8
+                                                       OPQNP                           OPQNP
+                                                    OPQP                          OPQP
+                                 0.8
+                                                                                        0.6   PQRO                                        0.6   PQRO
+                                                              PQRR                                PQRR
+                                 0.6                                  TC                             TC
+                                                                              8KIGRR                      OPQNP        S'60.4   ITQ                                                   S'60.4
+                                 0.4                   OPQP
+                                           PQRO
+                                 0.2                       PQRR          0.2                                                    0.2
+                                        TC
+                                             ITQ
+                            0                                           0                                           0
+                             0               1000            2000      16          32          64        128       16          32          64        128
+                               4                                                   HOZY                                                   HOZY
+Figure 4: Comparisons on SIFT1M. (a): recall at the N top ranked samples, using SDC and 64-bit codes. (b): mean Average
+Precision vs. code-length, using SDC. (c): mean Average Precision vs. code-length, using ADC.
+
+
+                                      G  -/,:   HOZY 9*)                                                                        H   -/9: 9*)                                                                                                                                           I   -/9: '*)
+                            1                                                                                        0.4                                                                                                                                               0.4
+                        OPQNP                           OPQNP                           OPQNP
+                      OPQP                          OPQP                          OPQP
+                                 0.8   PQRO                                                                                        0.3   PQRO                                        0.3   PQRO
+                           PQRR                               PQRR                                PQRR
+                                 0.6   TC                             TC                             TC
+                                                                                        0.2   ITQ                                                   S'60.2                                                                              8KIGRR     ITQ                                                  S'6
+                                 0.4
+
+
+                                                                                        0.1                                                    0.1
+                                 0.2
+
+
+
+                            0                                           0                                           0
+                             0               1000            2000      16          32          64        128       16          32          64        128
+                               4                                                    HOZY                                                   HOZY
+                                        Figure 5: Comparisons on GIST1M.
+
+theoretic minimum of 6.314 × 10−3 in Eqn.(15). This im-     This is because these two sets exhibit more than one cluster:
+plies that, under a Gaussian distribution, our parametric so-      the SIFT1M set has two distinct clusters (this can be visual-
+lution is optimal. On the contrary, PQRO and PQRR perform     ized by the ﬁrst two principal components), and MNIST can
+substantially worse. This means that the subspace decom-     be expected to have 10 clusters due to the 10 digits. In these
+position is important for PQ even under a simple Gaussian     cases the non-parametric solution is able to further reduce
+distribution.  Besides, we ﬁnd PQRO performs better than      the distortion. Such an improvement on MNIST is signiﬁ-
+PQRR. This is because in this distribution PQRO automati-      cant. In GIST1M our two methods are comparable, possibly
+cally satisﬁes the independent criterion (see 3.2.4).             as this set is mostly subject to a Gaussian distribution.
+                                          We notice that TC performs clearly better than PQRO andPerformance without prior knowledge
+                                               PQRR in the GIST1M set. This scalar quantization method  Next we evaluate the performance if the prior knowledge
+                                                             attempts to balance the bits assigned to the eigenvalues. So
+is not available. In Fig. 4, 5, and 6 we compare the results of
+                                                                                              it better satisﬁes the two criteria in Sec. 3.2.4. But TC is
+SIFT1M, GIST1M, and MNIST. We show the recall in the
+ﬁrst N positions with 64 bits using SDC (Fig. 4, 5, 6 (a)),      inferior to our methods in all datasets. This is because our
+                                                    method quantizes multi-dimensional subspaces instead of
+and the mAP (mean Average Precision) vs. code-length us-
+                                                        each scalar dimension. And unlike TC that assigns a vari-
+ing SDC and ADC, respectively (Fig. 4, 5, 6 (b)(c)).
+                                                              able number of bits to each eigenvalue, our method assigns
+  We ﬁnd that both of our solutions substantially outper-
+                                                               the eigenvalues to each subspace.  Since bit numbers are
+form the existing methods. The superiority of our methods
+                                                                   discrete but eigenvalues are continuous, it is easier for our
+does not depends on the choice of SDC or ADC. Typical-                                                    method to achieve balance.
+ly, in all cases even our simple parametric method OPQP
+has shown prominent improvement over PQRO and PQRR.    Performance with prior knowledge
+This indicates that PQ-based methods strongly depend on           It has been noticed [10] that PQ works much better if uti-
+the space decomposition. We also notice the performance      lizing the prior knowledge that SIFT and GIST are concate-
+of PQRR is disappointing.  Although this method tries to     nated histograms. Typically, the so-called “natural” order is
+balance the variance using a random rotation, the indepen-      that each subspace consists of neighboring histograms. The
+dence between subspaces is lost by such a random rotation.      “structural” order (when M = 8) is that each subspace con-
+  Our non-parametric solution further improves the result-       sists of the same bin of all histograms (each histogram has
+s from the parametric one in the SIFT1M and MNIST sets.     8 bins).  It is observed [10] that the natural order perform-
+
+======================== PDF 第 8 页 ========================
+                                     G 34/9:   HOZY 9*)                       H   34/9: 9*)                                I  34/9: '*)
+                            1                                           1                                           1
+                                                           OPQNP                             OPQNP
+                                                        OPQP                            OPQP
+                                 0.8                                                    0.8   PQRO                                         0.8   PQRO
+                                                                  PQRR                                  PQRR
+                                                          TC                                            0.6   TC                                 0.6                                                    0.6
+                                                                               8KIGRR                      OPQNP         S'6     ITQ                                                   S'6
+                                 0.4                   OPQP          0.4                                                    0.4
+                                            PQRO
+                                 0.2                       PQRR           0.2                                                    0.2
+                                        TC
+                                             ITQ
+                            0                                           0                                           0
+                             0     100    200    300    400   500       16          32          64        128       16          32          64        128
+                               4                                                    HOZY                                                   HOZY
+                                         Figure 6: Comparisons on MNIST.
+
+
+
+              G  9/,:   HOZY 9*)                     H  -/9:   HOZY 9*)
+   1                                         1                                    pages 459–468. IEEE, 2006.
+                                                                            [2] O. Boiman, E. Shechtman, and M. Irani.  In defense of
+  0.8                                                 0.8                                       nearest-neighbor based image classiﬁcation. In CVPR, 2008.
+                                                                            [3]  J. Brandt.  Transform coding for fast approximate nearest
+  0.6                                                 0.6                                     neighbor search in high dimensions. In CVPR, 2010.
+ 8KIGRR                                                                                                                              8KIGRR                                        [4] A. Cauchy.  Cours d’analyse de l’ ´Ecole Royale Polytech-
+  0.4                                                 0.4                                        nique. Imprimerie royale, 1821.
+                                                                            [5] T. Cover and J. Thomas.  Elements of information theory,  0.2                OPQNP            0.2                OPQNP
+                         OPQNP+pri                              OPQNP+pri               chapter 13, page 348. John Wiley & Sons, Inc., 1991.
+                           PQpri                                    PQpri               [6] Y. Gong and S. Lazebnik.  Iterative quantization: A pro-
+   0                                         0
+    0               1000                                     2000     0               1000                                                                               2000           crustean approach to learning binary codes. In CVPR, 2011.               4                                          4
+                                                                            [7] R. Gray. Vector quantization. ASSP Magazine, IEEE, 1984.Figure 7: Comparisons with prior knowledge using 64 bits
+                                                                            [8] K. He, F. Wen, and J. Sun. K-means Hashing: an Afﬁnity-and SDC. (a): SIFT1M. (b): GIST1M.
+                                                                         Preserving Quantization Method for Learning Binary Com-
+                                                                           pact Codes. In CVPR, 2013.
+s better for SIFT features, and the structural order is better                                                                            [9] R. A. Horn and C. R. Johnson. Matrix Analysis, chapter 7,
+for GIST features. We denote PQ with priori knowledge as          page 478. Cambridge University Press, 1990.
+PQpri (use the recommended orders). Note such priors may      [10] H. Jegou, M. Douze, and C. Schmid. Product quantization
+limit the choices of M and are not always applicable for all            for nearest neighbor search. TPAMI, 33, 2011.
+possible code-length.                                               [11] H. Jegou, M. Douze, C. Schmid, and P. Perez. Aggregating
+   In Fig. 7 we compare PQpri with our prior-free non-            local descriptors into a compact image representation.  In
+parametric method OPQNP.  We also evaluate our non-         CVPR, pages 3304–3311, 2010.
+parametric method using the prior orders as initialization,      [12] D. G. Lowe. Distinctive image features from scale-invariant
+denoted as OPQNP+pri. Our prior-free method outperforms           keypoints. IJCV, 60:91–110, 2004.
+the prior-based PQ. In SIFT1M our prior-dependent method      [13]  J. B. MacQueen. Some methods for classiﬁcation and analy-
+improves further due to a better initialization. In GIST1M             sis of multivariate observations. In Proceedings of 5th Berke-
+                                                                                  ley Symposium on Mathematical Statistics and Probability,our prior-dependent method is slightly inferior than our
+                                                                     pages 281–297. University of California Press, 1967.
+prior-free method: this also implies that GIST1M largely
+                                                                     [14] M. Norouzi and D. Fleet.  Cartesian k-means.  In CVPR,
+follows a Gaussian distribution.
+                                                                      2013.
+5. Conclusion                                                   [15] A. Oliva and A. Torralba. Modeling the shape of the scene:
+                                                                      a holistic representation of the spatial envelope. IJCV, 2001.
+  We have proposed to optimize space decomposition in      [16]  P. Sch¨onemann. A generalized solution of the orthogonal
+product quantization. Since space decomposition has been            procrustes problem. Psychometrika, 31(1):1–10, 1966.
+shown to have great impact on the search accuracy in our      [17]  J. Sivic and A. Zisserman.  Video google: a text retrieval
+experiments and in existing study [10], we believe our re-          approach to object matching in videos. In ICCV, 2003.
+sult has made product quantization a more practical and ef-      [18] A. B. Torralba, R. Fergus, and Y. Weiss. Small codes and
+fective solution to general ANN problems.                               large image databases for recognition. In CVPR, 2008.
+                                                                     [19]  J. Wang, S. Kumar, and S.-F. Chang. Semi-supervised hash-
+References                                                           ing for scalable image retrieval. In CVPR, 2010.
+                                                                     [20] Y. Weiss, A. Torralba, and R. Fergus. Spectral hashing. In
+ [1] A. Andoni and P. Indyk. Near-optimal hashing algorithms for          NIPS, pages 1753–1760, 2008.
+     approximate nearest neighbor in high dimensions. In FOCS,

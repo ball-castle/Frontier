@@ -1,0 +1,537 @@
+WUT-A023 | SSAT: A Symmetric Semantic-Aware Transformer Network for Makeup Transfer and Removal
+来源：https://ojs.aaai.org/index.php/AAAI/article/view/20131
+本地PDF：专题文献/武汉理工AI_CCF-A/WUT-A023_SSAT_arXiv2021.pdf
+SHA-256：f140c37ce39db3ea776ab7dbf52650ed388af029999e60f555c85f57ea85d0da
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+      SSAT: A Symmetric Semantic-Aware Transformer Network for Makeup Transfer
+                                 and Removal
+
+                         Zhaoyang Sun,1 Yaxiong Chen, 1 2 Shengwu Xiong 1 3 *
+                       1 School of Computer Science and Artiﬁcial Intelligence, Wuhan University of Technology, Wuhan, 430070
+                                   2 Wuhan University of Technology Chongqing Research Institute, Chongqing, 401122
+                           3 Sanya Science and Education Innovation Park of Wuhan University of Technology, Sanya, 572000
+                          zhaoyangsun0304@outlook.com, chenyaxiong@whut.edu.cn, xiongsw@whut.edu.cn
+
+
+                               Abstract
+
+           Makeup transfer is not only to extract the makeup style of the2021       reference image, but also to render the makeup style to the
+             semantic corresponding position of the target image. How-
+                ever, most existing methods focus on the former and ignore
+               the latter, resulting in a failure to achieve desired results. ToDec              solve the above problems, we propose a uniﬁed Symmetric
+7      Semantic-Aware Transformer (SSAT) network, which incor-
+              porates semantic correspondence learning to realize makeup
+               transfer and removal simultaneously. In SSAT, a novel Sym-
+              metric Semantic Corresponding Feature Transfer (SSCFT)
+            module and a weakly supervised semantic loss are proposed
+               to model and facilitate the establishment of accurate seman-
+                  tic correspondence. In the generation process, the extracted
+           makeup features are spatially distorted by SSCFT to achieve[cs.CV]
+             semantic alignment with the target image, then the distorted
+           makeup features are combined with unmodiﬁed makeup irrel-
+              evant features to produce the ﬁnal result. Experiments show
+                that our method obtains more visually accurate makeup trans-         Figure 1: The diagram of our motivation and PSGAN com-
+                fer results, and user study in comparison with other state-of-         parison. The spatial mapping of the same color points be-
+                the-art makeup transfer methods reﬂects the superiority of our        tween the target image and the reference image is the seman-
+             method. Besides, we verify the robustness of the proposed           tic correspondence expected to be established in this paper.
+            method in the difference of expression and pose, object oc-
+              clusion scenes, and extend it to video makeup transfer. Code
+               will be available at SSAT.
+                                                                          signiﬁcant progress in extracting makeup style and generat-
+                                                                         ing realistic makeup results.
+                        Introduction                                                                   However, little attention has been paid to semantic corre-
+        Makeup transfer aims to transfer the makeup style of any ref-      spondence, which plays an important role in makeup trans-
+          erence image to the target image while preserving the iden-        fer. Consider the actual makeup process following the tuto-
+             tity of the target person. With the booming development of        rial: 1) choose cosmetics of the same color (extract makeup
+           the cosmetics market, makeup transfer is widely demanded        style); 2) apply this cosmetics to the semantic correspond-arXiv:2112.03631v1           in many popular beautifying applications and has been re-      ing position of the face (semantic correspondence), see Fig-
+          ceived extensive attention in the computer vision and graph-      ure 1. Ignoring the semantic correspondence would result
+             ics. In the early years, traditional approaches (Guo and Sim       in the makeup style being transferred to the wrong position,
+         2009; Tong et al. 2007; Li, Zhou, and Lin 2015) mostly used      such as lipstick leaking lips. At the same time, inaccurate se-
+         image gradient editing or physical-based modiﬁcation to re-      mantic correspondence will lead to the averaging of makeup
+           alize makeup transfer. Recently, combining generative ad-       colors (Jiang et al. 2020), so that the resulting makeup style
+           versarial network (Goodfellow et al. 2014) and disentangled        is visually different from the reference makeup. In addition,
+           representation (Lee et al. 2018; Huang et al. 2018), many       the robustness of expression and pose and the robustness of
+        makeup transfer approaches (Li et al. 2018; Chang et al.       object occlusion are greatly reduced.
+         2018; Chen et al. 2019; Gu et al. 2019; Huang et al. 2020;                                                              The motivation of this paper is to establish accurate se-
+        Deng et al. 2021; Nguyen, Tran, and Hoai 2021) have made                                                                    mantic correspondence between the target and the reference
+              *Corresponding Author                                              facial images to improve the quality of makeup transfer.
+           Copyright © 2022, Association for the Advancement of Artiﬁcial      Note that the dense semantic correspondence of the makeup
+            Intelligence (www.aaai.org). All rights reserved.                      regions is established, not the sparse semantic correspon-
+
+======================== PDF 第 2 页 ========================
+                                                               both qualitatively and quantitatively.
+                                                                             • A novel SSCFT module and a semantic loss are proposed
+                                                                        to establishing accurate semantic correspondence, which
+                                                                    signiﬁcantly improves the quality of makeup transfer.
+                                                                             • Combined with face parsing, our method is more ﬂexible
+                                                          and could realize partial makeup transfer. Meanwhile, we
+                                                                       verify the robustness of the proposed method in the dif-
+                                                                   ference of expression and pose, object occlusion (glasses
+                                                                   or hair) scenes and extend it to video makeup transfer.
+
+                                                               Related work
+                                         Makeup Transfer
+                                                                In recent years, makeup transfer has been extensively stud-
+                                                                        ied. BeautyGAN (Li et  al. 2018) addressed the makeup
+                                                                      transfer and removal task by incorporating both global do-
+                                                     main adaptation loss and local instance-level makeup loss
+                                                                     in an dual input/output GAN. PairedCycleGAN (Chang
+                                                                          et al. 2018) extended the CycleGAN (Zhu et al. 2017) to
+                                                         asymmetric networks to enable transferring speciﬁc makeup
+                                                                           style. LADN (Gu et al. 2019) and CPM (Nguyen, Tran, and
+Figure 2: Our SSAT makeup transfer results. The diversity of      Hoai 2021) focused on the complex/dramatic makeup styles
+makeup style, the difference of facial expression and pose,        transfer. Introducing facial feature points, PSGAN (Jiang
+object occlusion (glasses or hair) are considered in the se-        et al. 2020; Liu et al. 2021) proposed a pose and expression
+lected images. The semantic correspondence is in the lower       robust spatial-aware GAN for makeup transfer. Recently,
+right corner of the generated result, and the value of each    SOGAN (Lyu et al. 2021) explored the shadow and occlu-
+spatial position of it is obtained by the different weighted       sion robust and (Wan et al. 2021) realized makeup transfer
+sum of the reference image.                                from the perspective of face attribute editing. Inspired by
+                                                  StyleGAN (Karras, Laine, and Aila 2018), SCGAN (Deng
+                                                                          et al. 2021) proposed a style-based controllable GAN model.
+dence shown in the Figure1. For this purpose, a Symmet-      Unlike the above methods, the core idea of this paper is to
+ric Semantic Corresponding Feature Transfer (SSCFT) mod-       establish accurate semantic correspondence to improve the
+ule is proposed to models the spatial position mapping be-       quality of makeup transfer.
+tween different images. Next there is no effective supervi-
+                                                 Semantic Correspondencesion for semantic correspondence, so the face parsing is in-
+troduced and a weakly supervised semantic loss is proposed.       In recent years, CNN-based features (Simonyan and Zisser-
+The experiments show that the semantic correspondence es-     man 2015; Krizhevsky, Sutskever, and Hinton 2017) have
+tablished by our method is adaptive, which ignores the se-      been proved to be a powerful tool to express high-level se-
+mantic correspondence of makeup irrelevant regions (hair,      mantics. Recently, (Liao et al. 2017; Zhang et al. 2020) pro-
+background, glasses, inside eyes, inside mouth) and focuses      posed a technique for visual attribute transfer across im-
+on the makeup regions, see Figure 2.                           ages using semantic correspondence. The exemplar-based
+  To sum up, we propose a Symmetric Semantic-Aware       colorization methods (He et al. 2018; Lee et al. 2020) cal-
+Transformer network (SSAT) whose framework and pro-       culated the semantic correspondence between the target im-
+cess are shown in Figure 3. Compared with PSGAN (Jiang      age and the exemplar image, then transferred the color with
+et al. 2020), there are several obvious differences: 1) The       the closest semantic similarity to the target image. Inspired
+proposed method introduces the face parsing, instead of the     by the recent exemplar-based image colorization (He et al.
+feature points which sometimes has large error in side face.      2018; Lee et al. 2020), our work is expected to transfer the
+2) Learnable network features instead of hand-designed fea-     makeup style with the closest semantic similarity to the tar-
+tures to establish semantic correspondence. 3) Using the       get image.
+symmetry of semantic correspondence, our method gener-
+ates makeup transfer and removal results simultaneously,             Our approach: SSAT
+while PSGAN can only realize makeup transfer. The main     Formulation
+contributions of this paper are summarized as follows:
+                                                   Our goal is to transfer the makeup style from an arbitrary
+ • We propose a novel Symmetric Semantic-Aware Trans-     makeup reference image to a non-makeup target image.
+   former (SSAT) network for makeup transfer and removal.      Here, X ⊂RH×W ×3 refers to non-makeup image domain,
+   Experiments verify the effectiveness of the transferring     Y ⊂RH×W ×3 refers to makeup image domain. Given
+   strategy in the real-world environment and generated re-      a target image xt ∈X and a reference image yr ∈Y ,
+    sults are of higher quality than state-of-the-art methods       the goal of makeup transfer is learning a mapping function:
+
+======================== PDF 第 3 页 ========================
+Figure 3: The proposed Symmetric Semantic-Aware Transformer (SSAT) network. The process goes through the following
+steps: 1) Content encoder Ec and makeup encoder Em decompose target image xt and reference image yr respectively, xct =
+Ec(xt), xmt = Em(xt), ycr = Ec(yr), ymr = Em(yr). Meanwhile, face parsing st, sr is introduced and semantic features
+are extracted by using semantic encoders Es: xst = Es(st), ysr = Es(sr). 2) The Feature Fusion (FF) module fuses content
+features and semantic features to obtain richer features for semantic correspondence, xft = FF(xct, xst), yfr = FF(ycr, ysr). 3)
+The Symmetric Semantic Corresponding Feature Transfer (SSCFT) module distorts makeup features spatially according to the
+semantic correspondence established by xft and yfr , and outputs ˆymr  , ˆxmt = SSCFT(xft , yfr , xmt  , ymr ). 4) Distorted makeup
+features ˆymr  of the reference image are embedded in the content features xct of the target image to generate makeup transfer
+result ˆyt = Dec(xct, ˆymr ). Similarly, the makeup removal result ˆxr = Dec(ycr, ˆxmt ).
+
+
+Φ : xt, yr →ˆyt, where ˆyt ∈Y has the makeup style with     makeup irrelevant features. Here, this problem is referred
+yr while preserving the identity of xt. For makeup removal,       to as content-style separation (Huang et al. 2018; Lee et al.
+it is assumed that the non-makeup image is a special case of      2018). So a content encoder Ec and a makeup encoder Em
+the makeup image (Sun et al. 2020), which uniﬁes makeup       are designed to extract content features and makeup features
+transfer and makeup removal. Therefore, the goal of makeup       respectively:
+removal is learning a mapping function: Φ  : yr, xt →ˆxr,
+                                                                       xct = Ec(xt), xmt = Em(xt)             (1)where ˆxr ∈X has the makeup style with xt while preserv-
+ing the identity of yr. In this paper, the only difference be-                    ycr = Ec(yr), ymr = Em(yr)             (2)
+tween makeup transfer and removal is whether the reference
+image is a non-makeup image or a makeup image.              Experiments have found that it is difﬁcult to establish ac-
+                                                                 curate semantic correspondences only with content features.
+SSAT                                                         Therefore, face parsing (Yu et al. 2018) is introduced and
+                                                            semantic features are extracted by using semantic encoders
+The  overall framework  of Symmetric Semantic-Aware      Es:
+Transformer network (SSAT) is shown in Figure 3, which                    xst = Es(st), ysr = Es(sr)              (3)
+consists of three encoders, a FF module, a SSCFT module
+                                                       where st ∈RH×W ×L and sr ∈RH×W ×L refer to binaryand a decoder Dec. Next, the function of each module will
+                                                                face parsing of the target image and the reference image,be introduced in detail.
+                                                                      respectively. L is the number of different semantic regions,
+Encoders  The one main problem of makeup  transfer      which is set 18 in our experiments. Next, content features
+stems from the difﬁculty of extracting the makeup latent      and semantic features will cooperate to establish semantic
+features, which are required to be disentangled from other      correspondence.
+
+======================== PDF 第 4 页 ========================
+Figure 4: The illustration of feature fusion (FF) module.
+FF fuses content features and semantic features to obtain
+richer features for semantic correspondence. ⊙refers to the
+                                                             Figure 5: The illustration of symmetric semantic corre-channel-wise concatenation operator.
+                                                          sponding feature transfer (SSCFT) module. Wa, Wb refer to
+                                                                 the linear transformation matrix into xft and yfr , respectively.
+FF  In the FF module, content features and semantic fea-      ⊗refers to the matrix multiplication operator. T refers to the
+tures are fused to obtain richer features for feature match-      matrix transpose operator. After this module, the output dis-
+ing, see Figure 4. Take the target image as an example, af-       torted makeup features ˆxmt  , ˆymr  are semantic aligned with
+ter obtaining content features and semantic features, they      ycr, xct in semantic.
+are connected along the channel dimensions and fed into
+the FF module. FF consists of N convolutional layers and
+outputs N high-level features (f 1, f 2, · · · , f N). Besides,      2018), where ˆxi = xi −mean(xi), ˆyj = xy −mean(yj).
+the low-level features extracted by Ec and Es are also      Given ˆxi and ˆyj, SSCFT computes a semantic correlation
+combined. Ec and Es consist of M  convolutional lay-      matrix A ∈Rhw×hw, whose element ai,j is computed by
+ers, producing M low-level features (C1, C2, · · · , CM) and       the scaled dot product:
+(S1, S2, · · · , SM), where CM = xct, SM = xst. Each layer
+of content features is selected, but the last layer of semantic                                          ˆxTi  · ˆyj
+features is selected. Now, we downsample each of Cm and                                 ai,j =                              (5)                                                                                                    ∥ˆxi∥∥ˆyj∥
+upsample each of f n to match the spatial size SM, forming
+the ﬁnal fusion features xft :                                     After that, we distort the reference makeup features ymr
+                                                            towards xct according to the correlation matrix A. The
+          xft = [φ(C1); φ(C2); · · · ; CM; SM;                weighted sum of ˆymr   is calculated  to approximate the
+                                                           (4)                                                   makeup sampling from ymr  :              ϕ(f 1); ϕ(f 2); · · · ; ϕ(f N)]
+where φ denotes a spatially downsampling function of an              ˆymr (i) = X softmaxj(a(i, j) · σ) · ymr (j)     (6)
+input Cm of different size to the size of CM or SM. Simi-                               j
+larly, ϕ denotes a spatially upsampling function. ”;” denotes
+the channel-wise concatenation operator. In this manner, the      where σ controls the sharpness of the softmax and we set its
+
+                                                                                                                                      routput fusion feature xft combines the low-level and high-       default value as 100. Now the distorted makeup features ˆym
+                                                                of reference image are aligned with the content features xctlevel features, while ensuring the accuracy of semantic cor-
+                                                                of target image in semantic. In the same way, we obtain therespondence. With the same operation, we obtain the fusion
+                                                                                                                             t  , which aligns with the contentfeatures yfr of the reference image.                                 distorted makeup features ˆxm
+                                                                   features ycr. Note that this step makes our method robust to
+SSCFT  The SSCFT module is inspired by colorization       expression, pose, object occlusion and produce more accu-
+(He et al. 2018) and combines the symmetry of semantic       rate makeup transfer results.
+correspondence. In makeup transfer task, the semantic cor-
+respondence is a one-to-one mapping relationship. That is,     Dec   Finally, we employ the spatially-adaptive denormal-
+point A corresponds to point B. In turn, point B also corre-       ization (SPADE) block (Park et al. 2019) to project the dis-
+sponds to point A. And the symmetry of this semantic rela-       torted makeup styles ˆymr  , ˆxmt  to content features xct, ycr for
+tionship can be applied cleverly to the anti-task of makeup     makeup transfer and removal.
+transfer, makeup removal. See Figure 5 for the framework
+of the proposed SSCFT module.                                                                                   ˆyt = Dec(xct, ˆymr )                  (7)
+   Firstly, we reshape xft  into ˆxft = [x1, x2, · · · , xhw] ∈                                                                                                               ˆxr = Dec(ycr, ˆxmt )                  (8)Rd×hw, where xi ∈Rd indicates feature variables of the
+ith location of ˆxft . Then we obtain channel-wise centralized      where ˆyt is the makeup transfer result and ˆxr is the makeup
+features ˆxi and ˆyj to make the learning more stable (He et al.      removal result.
+
+======================== PDF 第 5 页 ========================
+  Figure 6: The process of generating pseudo-paired data.
+
+                                                                     Figure 7: Ablation study of SSCFT module.
+Objective
+In total, there are four loss functions used for network SSAT       identical to xt and yr. We use L1 loss to encourage such
+end-to-end training. The overall loss is as follows:                reconstruction consistency:
+        Loverall =λsemLsem + λmakeupLmakeup+
+                                                           (9)              Lrec =∥xt −xselft   ∥1 + ∥yr −yselfr  ∥1+
+                 λrecLrec + λadvLadv                                                                               (12)
+                                                                         ∥xt −xcyclet   ∥1 + ∥yr −ycycler   ∥1
+Semantic Loss A weakly supervise semantic loss is pro-
+posed to establish semantic correspondence. The idea is that      Adversarial loss  Two discriminators DX and DY are in-
+semantic correspondence should only exist between seman-      troduced for the non-makeup domain and makeup domain,
+tic regions of the same class:                               which try to discriminate between real samples and gener-
+                                                                ated images and help the generator synthesize realistic out-
+          Lsem = ∥st −ˆsr∥1 + ∥sr −ˆst∥1         (10)       puts. The least square loss (Mao et al. 2017) is used for
+where st ∈RH×W ×L and sr ∈RH×W ×L refer to binary      steady training:
+face parsing, which only have the values 0 and 1. L is the        Ladv =Ext[(DX(xt))2] + Eˆxr[(1 −DX(ˆxr))2]+
+number of semantic classes, ˆsr(i) = Pj softmaxj(a(i, j)·                                                            (13)                                                            Eyr[(DY (yr))2] + Eˆyt[(1 −DY (ˆyt))2]
+σ) · sr(j), ˆst(i) = Pj softmaxj(a(i, j) · σ) · st(j), and
+∥· ∥1 refers to L1 loss. For dense semantic correspondence,                   Experiment
+the Lsem is only a crude region constraint, but experiments
+                                                     Dataset and Implementation Detailsshow that it plays an important role.
+                                                          For the dataset, we randomly selected 300 non-makeup im-
+Makeup Loss  Inspired by (Chang et al. 2018), we gener-      ages as target images and 300 makeup images as reference
+ate pseudo pairs of data ¯xr and ¯yt according to face feature      images from the Makeup Transfer dataset (Li et al. 2018).
+points to train the network, see Figure 12. The process is      Using the proposed generation method, a total of 180,000
+described in detail in the supplementary materials. Here, we       pairs of pseudo-paired data are generated for makeup trans-
+introduce the SPL loss (Sarfraz et al. 2019) instead of the L1       fer and removal. During the training, all trainable parame-
+loss to guide the makeup transfer and removal:                      ters are initialized normally, and the Adam optimizer with
+                                                       β1 = 0.5, β2 = 0.999 is employed for training. We set   Lmakeup = SPL(ˆyt, xt, ¯yt) + SPL(ˆxr, yr, ¯xr)    (11)
+                                                    λsem = 1, λmakeup = 1, λrec = 1, λadv = 1 for balan-
+Take the makeup transfer as an example, SPL constrains the      ceing the different loss functions. The SSAT is implemented
+gradient consistency between ˆyt and xt to ensure the identity     by MindSpore 1. And the model is trained for 300,000 iter-
+of the target image, and restricts the color consistency be-       ations on one single Nvidia 2080Ti GPU. The learning rate
+tween ˆyt and ¯yt to guide the makeup transfer. Note that Lsem        is ﬁxed as 0.0002 during the ﬁrst 150,000 iterations and lin-
+constrains the corresponding region and does not penalize       early decays to 0 over the next 150,000 iterations. The batch-
+one-to-many mappings of the same class. While Lmakeup       size is set 1. See the supplementary materials for the speciﬁc
+guides makeup transfer, it implicitly constrains the one-to-      network structure parameters.
+one mapping in the makeup regions.
+                                                    Ablation Studies
+Reconstruction loss  We feed the xct and xmt  into Dec to
+generate xselft     , and ycr and ymr  into Dec to generate yselfr     ,      Effects of SSCFT  The motivation of this paper is to es-                                                                      tablish semantic correspondence to improve the quality of
+which should be identical to xt and yr. Here, we introduce
+                                                   makeup transfer. In order to verify our idea, we remove the
+Cycle loss (Zhu et al. 2017) to ensure that the image does not
+                                             SSCFT module to analyze the effects of the role of seman-
+lose information during the decoupling process of makeup
+                                                                                tic correspondence in makeup transfer. In this case, we di-
+features and content features. So we feed the makeup re-
+                                                                      rectly skip the SSCFT module and input the features into
+moval result ˆxr and makeup transfer  ˆyt result into SSAT
+again to obtain the xcyclet    and ycycler      , which should also be          1Mindspore. https://www.mindspore.cn/
+
+======================== PDF 第 6 页 ========================
+                                                         Methods    Rank 1  Rank 2  Rank 3  Rank 4
+                                                  BeautyGAN   3.0%    3.9%   34.5%   58.6%
+                                            PSGAN    11.3%   73.2%   11.3%   4.1%
+                                          SCGAN     3.6%   15.3%   48.0%   33.2%
+                                                  SSAT     82.1%   7.6%    6.2%    4.1%
+
+                                                                               Table 1: User Study.
+
+
+                                                                         sults explain why our method has a better makeup transfer
+                                                                       effect and why our method is robust to expression, pose and
+                                                                 object occlusion.
+            Figure 8: Ablation study of Lsem.                  Quantitative Comparison  How quantitative evaluation
+                                                   makeup transfer is still a ﬁeld that needs to explore. Here,
+                                              we conduct user study to compare different methods quanti-
+the decoder. The comparison results are shown in the Fig-        tatively. We randomly generate 30 results of makeup transfer
+ure 7. Without SSCFT, the resulting makeup style is signif-      using four methods respectively. 45 volunteers are asked to
+icantly lighter than the reference makeup. With the addition      rank the results based on the realism and the similarity of
+of SSCFT, the result is more similar visually to the reference     makeup styles. To be fair, the results in each selection are
+makeup , especially eye shadow and blush.                        also randomly arranged. As shown in the Table 3, our SSAT
+                                                            outperforms other methods by a large margin. Our methodEffects of Lsem  The lack of effective supervision hinders
+                                                               achieves the highest selection rate of 82.1% in Rank 1.the establishment of semantic correspondence. To solve this
+problem, we introduce face parsing and propose a weakly
+                                                          Partial Makeup Transfersupervised semantic loss Lsem. In order to verify their ef-
+fect, we remove Lsem and the face parsing, use the remain-       Partial makeup transfer refers to transfer partial makeup
+ing loss to train the network. The comparison of semantic       of the reference image. The distorted makeup features ex-
+and makeup transfer results is shown in the Figure 8. Com-       tracted by our method is accurately distributed according to
+pared without Lsem, the semantic result using Lsem is more       the spatial semantic position of the target image, making it
+accurate and the boundary between makeup area and non-       possible to integrate the partial makeup from different refer-
+makeup area is also clearer. For the makeup transfer result,      ence images, as shown in the Figure 10.
+the blush is mapped to the wrong semantic position, spread-
+ing over the entire face in the result without using Lsem.                         ˆypartt  = Dec(xct, X(ˆymir   · Maski))       (14)
+                                                                                                                                         i
+Comparisons to Baselines
+                                                       where i ∈{Lip, Eye, Face} in our experiment, ˆymir  meansTo verify the superiority of our makeup transfer strategy, we                                                                 the distorted makeup features extracted are from different
+choose three state-of-the-art makeup transfer approaches,
+                                                                reference images, Maski represents a binary mask related
+BeautyGAN (Li et al. 2018), PSGAN (Jiang et al. 2020),                                                                     to the makeup area.
+SCGAN (Deng et al. 2021), as our comparison benchmark.
+We skip some baselines such as LADN (Gu et al. 2019) and
+                                                 Video Makeup Transfer
+CPM (Nguyen, Tran, and Hoai 2021), because they focus on
+the complex/dramatic makeup styles transfer.                  Video makeup transfer is a very challenging task, which has
+                                                            high requirements for the quality of generated images and
+Qualitative Comparison  Here, three scenes that often ap-                                                                 the accuracy of semantic correspondence. We download a
+pear in real life are selected for comparison, frontal face,                                                            video from the Internet and decompose it frame by frame,
+different expressions and poses, and object occlusion. The                                                              then apply the SSAT method, and ﬁnally integrate the result-
+qualitative comparison has been shown in Figure 9. Beau-                                                               ing images into a video. We chose PSGAN as the compari-
+tyGAN produces a  realistic  result, but  fails to transfer                                                          son baseline, because other methods don’t consider semantic
+eye shadow and blush. Although PSGAN designs semantic                                                             correspondence. See Figure 11, the results produced by PS-
+correspondence modules, its accuracy is limited by hand-                                     GAN are visually different from the reference makeup and
+designed features. The imprecise semantic correspondence                                                            cause ﬂickering and discontinuity. In contrast, Our SSAT
+results in a lighter eye and blush makeup style, which is vi-                                                               achieves smooth and accurate video makeup transfer results.
+sually different from the reference makeup. Similar to Beau-
+tyGAN, the transfer of eye makeup and blush fails in SC-
+                                                              ConclusionGAN. Meanwhile, the results of SCGAN are too smooth,
+and slightly change makeup irrelevant information, such as       Different from other methods, we focus on semantic cor-
+the glasses in the sixth row. On the contrary, the makeup      respondence learning, propose the SSCFT module and a
+style of our results is highly similar to the reference makeup,      semantic  loss, then integrate them into one Symmetric
+whether it is lipstick, eye shadow, blush. The semantic re-      Semantic-Aware Transformer network (SSAT) for makeup
+
+======================== PDF 第 7 页 ========================
+Figure 9: Comparison with state-of-the-art methods. The ﬁrst two rows: frontal face, the middle two rows: different expressions
+and poses, the last two rows: object occlusion (glasses or hair).
+
+
+
+
+
+Figure 10: The partial makeup transfer results. The last col-
+umn is the partial makeup transfer results, which receive per-
+sonal identity from the ﬁrst column, the lips style from the             Figure 11: The video makeup transfer results.
+second column, the eyes style from the third column and the
+face style from the fourth column.
+
+
+
+transfer and removal. The experiment veriﬁed that seman-       difference of expression and pose, object occlusion and can
+tic correspondence signiﬁcantly improved the quality of      achieve partial makeup transfer. Moreover, we extend SSAT
+makeup transfer visually as expected. The comparison with       to the ﬁeld of video makeup transfer, generating smooth
+other methods demonstrates that our method achieves state-      and stable results. However, the computational complexity
+of-the-art makeup transfer results. In addition, beneﬁts from       of proposed SSCFT is quadratic to image size, the focus of
+precise semantic correspondence, our method is robust to the      our later work is to solve this problem.
+
+======================== PDF 第 8 页 ========================
+            Acknowledgments                       Lee, H.-Y.; Tseng, H.-Y.; Huang, J.-B.; Singh, M. K.; and
+                                                          Yang, M.-H. 2018. Diverse Image-to-Image Translation via
+This  work  was  in  part  supported  by NSFC  (Grant
+                                                             Disentangled Representations. In European Conference on
+No. 62176194) and  the Major  project  of  IoV,  Tech-
+                                                     Computer Vision, 36–52.
+nological Innovation Projects in Hubei Province (Grant
+No. 2020AAA001, 2019AAA024) and Sanya Science and      Lee, J.; Kim, E.; Lee, Y.; Kim, D.; Chang, J.; and Choo, J.
+Education Innovation Park of Wuhan University of Technol-      2020.  Reference-Based Sketch Image Colorization Using
+ogy (Grant No. 2020KF0054), the National Natural Science      Augmented-Self Reference and Dense Semantic Correspon-
+Foundation of China under Grant 62101393 and the Open      dence. In Computer Vision and Pattern Recognition, 5800–
+Project of Wuhan University of Technology Chongqing Re-      5809.
+search Institute(ZL2021–6).                                         Li, C.; Zhou, K.; and Lin, S. 2015.  Simulating makeup
+                                                            through physics-based manipulation of intrinsic image lay-
+                References                                  ers.  In Computer Vision and Pattern Recognition, 4621–
+                                                           4629.
+Chang, H.; Lu, J.; Yu, F.; and Finkelstein, A. 2018. Paired-
+CycleGAN: Asymmetric Style Transfer for Applying and       Li, T.; Qian, R.; Dong, C.; Liu, S.; Yan, Q.; Zhu, W.; and Lin,
+Removing Makeup. In Computer Vision and Pattern Recog-      L. 2018. BeautyGAN: Instance-level Facial Makeup Trans-
+nition, 40–48.                                                         fer with Deep Generative Adversarial Network.  In ACM
+                                                            Multimedia, 645–653.Chen, H.-J.; Hui, K.-M.; Wang, S.-Y.; Tsao, L.-W.; Shuai,
+H.-H.; and Cheng, W.-H. 2019. BeautyGlow: On-Demand       Liao, J.; Yao, Y.; Yuan, L.; Hua, G.; and Kang, S. B. 2017.
+Makeup Transfer Framework With Reversible Generative      Visual attribute transfer through deep image analogy.  In
+Network. In Computer Vision and Pattern Recognition.      ACM Transactions on Graphics, volume 36.
+Deng, H.; Han, C.; Cai, H.; Han, G.; and He, S. 2021.       Liu, S.; Jiang, W.; Gao, C.; He, R.; Feng, J.; Li, B.; and
+Spatially-Invariant Style-Codes Controlled Makeup Trans-      Yan, S. 2021. PSGAN++: Robust Detail-Preserving Makeup
+fer.  In Computer Vision and Pattern Recognition, 6549–      Transfer and Removal. In ArXiv, abs/2105.12324.
+6557.                                                           Lyu, Y.; Dong, J.; Peng, B.; Wang, W.; and Tan, T. 2021. SO-
+Goodfellow,  I.; Pouget-Abadie,  J.; Mirza, M.; Xu,  B.;    GAN: 3D-Aware Shadow and Occlusion Robust GAN for
+Warde-Farley, D.; Ozair, S.; Courville, A.; and Bengio, Y.     Makeup Transfer. In ArXiv, abs/2104.10567.
+2014.  Generative Adversarial Networks.  In Advances in                                                   Mao, X.; Li, Q.; Xie, H.; Lau, R. Y. K.; Wang, Z.; and Smol-
+Neural Information Processing Systems, 2672–2680.                                                                             ley, S. P. 2017. Least Squares Generative Adversarial Net-
+Gu, Q.; Wang, G.; Chiu, M. T.; Tai, Y.-W.; and Tang, C.-K.      works.  In International Conference on Computer Vision,
+2019. LADN: Local Adversarial Disentangling Network for      2813–2821.
+Facial Makeup and De-Makeup.  In International Confer-                                                       Nguyen, T.; Tran, A. T.; and Hoai, M. 2021. Lipstick Ain’t
+ence on Computer Vision, 10481–10490.                                                       Enough: Beyond Color Matching for In-the-Wild Makeup
+Guo, D.; and Sim, T. 2009. Digital face makeup by example.       Transfer.   In Computer Vision and Pattern Recognition,
+In Computer Vision and Pattern Recognition, 73–79.            13305–13314.
+He, M.; Chen, D.; Liao, J.; Sander, P. V.; and Yuan, L. 2018.       Park, T.; Liu, M.-Y.; Wang, T.-C.; and Zhu, J.-Y. 2019. Se-
+Deep Exemplar-based Colorization.  In International Con-      mantic Image Synthesis with Spatially-Adaptive Normaliza-
+ference on Computer Graphics and Interactive Techniques.        tion.  In Computer Vision and Pattern Recognition, 2337–
+                                                           2346.Huang, X.; Liu, M.-Y.; Belongie, S.; and Kautz, J. 2018.
+Multimodal Unsupervised Image-to-Image Translation.  In       Sarfraz, M. S.; Seibold, C.; Khalid, H.; and Stiefelhagen, R.
+European Conference on Computer Vision, 179–196.            2019. Content and Colour Distillation for Learning Image
+                                                                 Translations with the Spatial Proﬁle Loss.  In British Ma-Huang, Z.; Zheng, Z.; Yan, C.; Xie, H.; Sun, Y.; Wang, J.;
+                                                              chine Vision Conference, 287.and Zhang, J. 2020.  Real-World Automatic Makeup via
+Identity Preservation Makeup Net.  In International Joint      Simonyan, K.; and Zisserman, A. 2015. Very Deep Convo-
+Conference on Artiﬁcial Intelligence.                               lutional Networks for Large-Scale Image Recognition.  In
+                                                                  International Conference on Learning Representations.Jiang, W.; Liu, S.; Gao, C.; Cao, J.; He, R.; Feng, J.; and
+Yan, S. 2020. PSGAN: Pose and Expression Robust Spatial-      Sun, Z.; Liu, F.; Liu, R. W.; Xiong, S.; and Liu, W. 2020.
+Aware GAN for Customizable Makeup Transfer.  In Com-      Local Facial Makeup Transfer via Disentangled Representa-
+puter Vision and Pattern Recognition, 5194–5202.                  tion. In Asian Conference on Computer Vision.
+Karras, T.; Laine, S.; and Aila, T. 2018. A Style-Based Gen-      Tong, W.-S.; Tang, C.-K.; Brown, M. S.; and Xu, Y.-Q. 2007.
+erator Architecture for Generative Adversarial Networks. In      Example-Based Cosmetic Transfer.  In Paciﬁc Conference
+Computer Vision and Pattern Recognition, 4401–4410.         on Computer Graphics and Applications, 211–218.
+
+Krizhevsky, A.; Sutskever, I.; and Hinton, G. E. 2017. Im-     Wan, Z.; Chen, H.; Zhang, J.; Jiang, W.; Yao, C.; and Luo, J.
+ageNet classiﬁcation with deep convolutional neural net-      2021. Facial Attribute Transformers for Precise and Robust
+works. Communications of The ACM, 60: 84–90.             Makeup Transfer. In ArXiv, abs/2104.02894.
+
+======================== PDF 第 9 页 ========================
+Yu, C.; Wang, J.; Peng, C.; Gao, C.; Yu, G.; and Sang, N.
+2018. BiSeNet: Bilateral Segmentation Network for Real-
+Time Semantic Segmentation. In European Conference on
+Computer Vision, 334–349.
+Zhang,  P.; Zhang,  B.; Chen, D.; Yuan,  L.; and Wen,
+F. 2020.   Cross-Domain Correspondence Learning  for
+Exemplar-Based Image Translation. In Computer Vision and
+Pattern Recognition, 5143–5153.
+Zhu, J.-Y.; Park, T.; Isola, P.; and Efros, A. A. 2017. Un-
+paired Image-to-Image Translation Using Cycle-Consistent
+Adversarial Networks. In International Conference on Com-
+puter Vision.
+
+======================== PDF 第 10 页 ========================
+         Supplementary Materials
+                                                                 Layer          Ec and Em
+Generation of pseudo-paired data
+                                                                                   Conv(I:3,O:64,K:7,P:3,S:1),
+                                                        L1        Instance Normalization,
+                                                                           Leaky ReLU:0.2
+                                                                                 Conv(I:64,O:128,K:3,P:1,S:2),
+                                                        L2        Instance Normalization,
+                                                                           Leaky ReLU:0.2
+                                                                                Conv(I:128,O:256,K:3,P:1,S:2),
+                                                        L3        Instance Normalization,
+                                                                           Leaky ReLU:0.2
+
+                                                             Table 2: The network architecture of Encoder Ec and Em.
+
+
+ Figure 12: The process of generating pseudo-paired data.
+                                                                  Layer            Es
+  Pseudo-paired data is used in the Lmakeup, and the gen-                         Conv(I:18,O:32,K:7,P:3,S:1),
+eration process is shown in Figure 12. Firstly, Face ++ API             L1        Instance Normalization,
+interface 2 is used to obtain the feature points of the input                          Leaky ReLU:0.2
+face image. Then, piecewise-afﬁne transformation distorts                         Conv(I:32,O:64,K:3,P:1,S:2),
+the reference image into the target image according to the             L2        Instance Normalization,
+position of feature points. In this step, the inside of the eyes                          Leaky ReLU:0.2
+and the mouth remain unchanged, because these two areas                        Conv(I:64,O:128,K:3,P:1,S:2),
+need to be preserved during makeup transfer. Finally, his-             L3        Instance Normalization,
+togram matching are applied to change the appearance of                          Leaky ReLU:0.2
+the ears and neck according to face parsing. Note that the
+warping results ¯yr sometimes possess artifacts, which can           Table 3: The network architecture of Encoder Es.
+be ﬁxed by SSAT in the generated results. For the dataset,
+we randomly selected 300 non-makeup images as target
+images and 300 makeup images as reference images from              Layer          FF
+the Makeup Transfer dataset. Using the proposed genera-
+                                                                                Conv(I:384,O:512,K:3,P:1,S:2),
+tion method, a total of 180,000 pairs of pseudo-paired data
+                                                        L1        Instance Normalization,are generated for makeup transfer and removal. During the
+                                                                           Leaky ReLU:0.2
+training, images are resized to 286×286, randomly cropped
+                                                                                Conv(I:512,O:512,K:3,P:1,S:1),to 256 × 256, horizontally ﬂipped with probability of 0.5,
+                                                        L2        Instance Normalization,and randomly rotated from -30 degrees to +30 degrees for
+                                                                           Leaky ReLU:0.2data augmentation.
+                                                                         Connect [L1, L2, L3 of Ec,
+Network Structure                                        L3           L3 of Es,
+                                                                                   L1, L2 of FF]
+For the network structure, the encoders consist of stacked
+convolution blocks, which contain convolution, Instance                                                                 Table 4: The network architecture of FF module.
+normalization, and ReLU activation layers. In the decoder,
+the SPADE is applyed to embed the makeup features into the
+content features, with each SPADE followed by a residual
+block. For the discriminator, the network structure follows                Layer          Dec
+the multi-scale discriminator architecture. The speciﬁc net-                              Upsample:2,
+work structure parameters will be given in detail in the table              L1           SPADE,
+below. I, O, K, P, and S denote the number of input channels,                                 Resnet
+the number of output channels, a kernel size, a padding size,                              Upsample:2,
+and a stride size, respectively. The network architecture of              L2           SPADE,
+Encoder Ec and Em has been shown in table 2. The network                                 Resnet
+architecture of Encoder Es has been shown in table 3 The                           SPADE,
+                                                         L3network architecture of FF module has been shown in table                                 Resnet
+4 The network architecture of Encoder Dec has been shown                          Conv(I:64,O:3,K:7,P:3,S:1),
+                                                         L4in table 5                                                                                   tanh
+
+                                                                 Table 5: The network architecture of Encoder Dec.
+   2https://www.faceplusplus.com.cn/dense-facial-landmarks/
+
+======================== PDF 第 11 页 ========================
+Makeup Style Interpolation
+Adjusting the shade of makeup style is an essential func-
+tion of existing makeup applications. Due to the separation
+of makeup features, our method could generate continuous
+makeup transfer results by interpolating makeup features,
+see Figure 17 . The formula is described as follows:
+
+          ˆyadjustt   = Dec(xct, (ˆym1r    · α1 + ˆym2r    · α2))    (15)
+where α1 + α2 = 1. The closer α1 is to 1, the closer the
+resulting makeup style is to ˆym1r   . The closer α2 is to 1, the
+closer the resulting makeup style is to ˆym2r   .
+
+More Results
+We present more results in additional material. The re-
+sult of the makeup removal is shown in Figure 13. More
+video makeup transfer results are shown in Figure 14. More
+makeup transfer results is shown in Figure 15. More quali-
+tative comparisons are shown in Figure 16. More results of
+makeup style interpolation are shown in Figure 17.
+
+
+
+
+
+Figure 13: Our makeup removal results. The ﬁrst column
+is three makeup target images, the ﬁrst row is three non-
+makeup reference images, the makeup removal results are
+displayed in the lower right corner.
+
+
+
+
+
+                                                             Figure 14: The video makeup transfer results. We also pro-
+                                                              vide the full video results in the supplementary materials.
+
+======================== PDF 第 12 页 ========================
+Figure 15: Our makeup transfer results. The ﬁrst column is ﬁve target images, the ﬁrst row is eight reference images, the
+semantic correspondence results and the makeup transfer results are displayed in the lower right corner. In the semantic corre-
+spondence results, the value of each spatial position of it is obtained by the different weighted sum of the reference image.
+
+======================== PDF 第 13 页 ========================
+Figure 16: Comparison with state-of-the-art methods. The ﬁrst three rows: frontal face, the middle three rows: different ex-
+pressions and poses, the last three rows: object occlusion (glasses or hair). From left to right, Target, Reference, BeautyGAN,
+PSGAN, SCGAN, Semantic, Ours. The value of each spatial position of semantic is obtained by the different weighted sum
+of the reference image according to semantic correspondence. In all cases, SSAT produces more accurate transfer results,
+especially for eye shadow and blush.
+
+======================== PDF 第 14 页 ========================
+Figure 17: Results of makeup style interpolation. The ﬁrst four rows have one reference image, and the last four rows have two.
+The makeup styles of the interpolated images continuously transfer from reference 1 to reference 2.

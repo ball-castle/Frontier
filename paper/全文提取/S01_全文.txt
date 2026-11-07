@@ -1,0 +1,1386 @@
+S01 | Stable Geometry with Divergent Task Evidence for Efficient Long-Horizon Agent Compression
+来源：https://arxiv.org/abs/2609.27332
+本地PDF：补充对照论文/S01_GEM_2609.27332.pdf
+SHA-256：924f4af1cdef2e56fc5a7e60f968001b7d55349b69d3d3316c68b366d94a4492
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+      TSINGSHU RESEARCH
+
+         STABLE GEOMETRY / LONG-HORIZON AGENTS
+
+
+     Stable Geometry with Divergent Task Evidence for
+     Efficient Long-Horizon Agent Compression
+
+         Mingxuan Wang1  Fei Luo1  Bo Wang1  Guorun Yao1  Yinglong Guo1
+         Chao Ning1  Hongyue Chen1  Yanbiao Ma2,*  Jungong Han3,*
+          1TierFlow Team
+          2Gaoling School of Artificial Intelligence, Renmin University of China
+          3Tsinghua University2026
+          *Corresponding authors.  ybma1998@ruc.edu.cn
+Sep
+23    ABSTRACT
+        Long horizon agents accumulate growing interaction histories that increase context and inference costs. We
+           find that geometric redundancy alone is an insufficient criterion for safe compression. Although agent histories
+           exhibit strong low dimensional structure, similar global geometry can preserve very different amounts of
+           task evidence. At identical retained block counts, evidence aware selection raises next action Top 3 retention[cs.AI]     from 0.31 to 0.69, while centroid similarity remains 0.98. Controlled replacement further shows that action
+           related information can be substantially altered while global geometric measures remain nearly unchanged.
+          Motivated by this gap between geometry and evidence, we introduce Geometry Guided Evidence Preserving
+       Memory (GEM), a training free compressor that protects task and execution evidence before using geometric
+           residuals to complete coverage. GEM reduces mean combined token usage from 2.69M to 2.11M per task, a
+        21.4% reduction, while maintaining comparable task reward. Our results show that efficient agent history
+         compression should optimize for preserved task evidence rather than geometric coverage alone.
+
+
+      1 Introduction
+
+        Language-model agents continuously accumulate task instructions, plans, tool calls, environment
+         observations, errors, and intermediate artifacts throughout long-horizon execution1,2,3,4. As thearXiv:2609.27332v1      trajectory grows, repeatedly forwarding the full interaction history increases context and inference
+           costs5,6,3.  Existing systems therefore summarize, edit, retrieve, or selectively retain historical
+           information7,8,9,10. However, compression is not only a question of how much history can be
+        removed. A more fundamental question is which historical records can be discarded without
+        removing information that remains necessary for subsequent execution. This question is particularly
+           difficult when redundant-looking records encode different stages of task execution across prolonged
+         sequences of interaction.
+
+     A natural approach is to preserve the dominant geometry of the history representation. Prior studies
+       show that contextual representations often exhibit anisotropy and concentration along dominant
+           directions11,12,13. If most historical variation lies in a low-dimensional subspace, a small subset of
+          interaction blocks may appear sufficient to cover the trajectory. Yet geometric redundancy does not
+        imply execution redundancy. A plan to modify a file, the command that performs the modification,
+
+
+
+           STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                     1
+
+======================== PDF 第 2 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+and a later partial read may occupy similar semantic directions while establishing different facts
+about the task state. A historical block may therefore contribute little new geometric variation while
+still carrying information required for the next action. We refer to this mismatch as the gap between
+geometry and evidence.
+
+This distinction makes history compression inherently evidence sensitive. Recent agent-memory
+studies likewise emphasize that task state, execution dependencies, and persistent evidence can
+remain important across long interaction horizons14,15,16,4. Removing a geometrically redundant
+block is harmless only when its execution role has also become redundant. In contrast, removing a
+low-novelty record that contains a goal constraint, state transition, unresolved error, or source-bearing
+observation may eliminate information that later actions still depend on. Global representational
+coverage alone is therefore insufficient for deciding which blocks are safe to remove. Compression
+should first identify evidence that remains consequential for execution and only then use geometric
+redundancy to decide which remaining records can be omitted. This suggests that compression
+should jointly account for representational coverage and the execution role of retained records.
+
+Motivated by these observations, we introduce Geometry-Guided Evidence-Preserving Memory
+(GEM), a training-free external compressor for long agent histories. GEM first protects task and
+execution evidence, including recent context, goal-related observations, execution-state records,
+fresh errors, and source-bearing information. It then completes the retained set using geometric
+residuals so that uncovered representation directions are preserved without allowing low geometric
+novelty to override protected evidence. Retained interaction blocks remain unchanged and are
+reconstructed in chronological order before being forwarded to the acting model through its standard
+request interface. The main contributions are as follows:
+
+ • Geometry and evidence gap in agent histories. We distinguish global representational coverage
+  from execution-relevant evidence retention and show that similar geometric coverage can corre-
+  spond to substantially different preservation of next-action information. Controlled replacement
+   further isolates low-energy evidence whose removal changes action-related information while
+  leaving global geometry nearly unchanged.
+
+ • Evidence-first geometric compression. We introduce a two-stage selection principle that
+   protects consequential task and execution evidence before applying geometric residual completion.
+  This prevents geometric redundancy from being treated as sufficient evidence that a historical
+   interaction is safely removable during long-horizon execution.
+
+ • Execution-aware online history management. We operate on complete interaction blocks,
+  preserve call-result structure, and maintain original message content and chronological order.
+  Online forwarding constraints limit each compression update while allowing newly activated
+  evidence to remain available during subsequent execution.
+
+
+2 Related Work
+
+2.1 Context Management for Long Horizon Agents
+
+Methods for controlling growing agent histories differ in what they remove and how they decide
+to remove it. ReSum periodically summarizes interaction history, ACON improves compression
+guidelines using failure feedback, and PACE adjusts historical detail according to predicted relevance
+to the next action3,17. SelfCompact and Self-GC give agents context management operations, while
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                     2
+
+======================== PDF 第 3 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+Sculptor supports summarizing, hiding, restoring, and searching historical information9,18,10. Other
+recent approaches learn what to retain, decouple context management from the acting model, or
+expose agentic context-management mechanisms19,20,21. GEM instead selects complete original
+interaction blocks. It neither produces a replacement summary nor requires the acting agent to learn
+new memory operations.
+
+2.2 Memory and Execution Evidence
+
+Memory systems preserve information beyond the active context22,23,24. MEM1 jointly learns rea-
+soning and memory consolidation, SAM combines compact memory cues with access to raw history,
+and AdaCoM learns an external context manager for a frozen agent15,4. MAGE organizes history
+around execution dependencies and errors, and Proactive Memory Agent emphasizes that infor-
+mation present in a transcript may still fail to influence later behavior14,16. These studies motivate
+explicit treatment of task state. Our focus is more specific: when original records share semantic
+content, their execution roles may still differ. GEM protects such evidence before completing
+coverage of the remaining history.
+
+2.3 Task-Aware Context Selection
+
+Prompt compression methods such as LLMLingua-2 learn which tokens to retain, while SWE-
+Pruner and SWE-Pruner Pro study selective retention of tool context7,8. Dynamic token pruning and
+long-context evaluation further study which parts of a long context remain useful under fixed model
+interfaces25,26,27. Retrieval systems likewise explore hierarchical or adaptive evidence selection28,29,30.
+Work on context interference further shows that retaining relevant evidence is not sufficient when
+surrounding information impairs its use. We study selection at the level of complete interaction
+blocks and distinguish coverage of history representations from information related to the next
+action. The selector is training-free and uses only the current task and available history without
+modifying the acting model.
+
+3 Geometry and Task Information in Agent Histories
+
+We analyze history representations to distinguish redundancy from information needed for continued
+execution. The recorded next action is used only for offline measurement and is never available to
+the deployed compressor.
+
+3.1 History Representation
+
+A removable interaction block contains an assistant tool-call message and all of its corresponding
+tool results. Calls and results are retained or removed together. The system and task prefix is kept
+separately, and messages that cannot be safely assigned to complete blocks are not deleted.
+
+Prior analyses of representation spaces characterize anisotropy, dominant directions, and rank-
+based concentration in contextual and sentence embeddings across modern neural representation
+models11,12,13.
+
+Let Ht = {o1, . . . , on} denote the available complete blocks. A frozen encoder maps each block
+to a unit vector xi ∈Rd. With X = [x1, . . . , xn]⊤and mean representation ¯x, we study centered
+variation through the following centered matrix decomposition
+
+                Xc = X −1¯x⊤= UΣV ⊤,   Σ = diag(σ1, . . . , σr).                    (1)
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                     3
+
+======================== PDF 第 4 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+The singular values are ordered from largest to smallest. Writing pj = σ2j/ Pk σ2k, we summarize
+concentration by using two complementary spectral statistics
+
+              reff(Xc) = exp − X pj log pj  ,     rρ(Xc) = minnk : X pj ≥ρo.           (2)
+                                               j                                    j≤k
+
+We also report ¯rρ = rρ/n. The spectral analysis sets ρ to 0.90. Low effective dimension indicates
+concentration of variation, not that every block outside a dominant representation can be safely
+removed during subsequent downstream execution steps.
+
+3.2 Coverage and Action-Related Retention
+
+Let S ⊆[n] index a retained subset, ¯xS be its mean, and QS contain an orthonormal basis for its
+span. Overall geometric coverage is measured by
+                                       ¯x⊤S ¯x               1  n                 C(S) =                  ,    E(S) = X ∥Q⊤S xi∥22.                     (3)
+                                 ∥¯xS∥2∥¯x∥2           n                                                                 i=1
+
+Centroid similarity C(S) measures preservation of the mean direction. Captured energy E(S)
+measures average projection onto the retained span. Unlike the centered spectral analysis, E(S)
+uses the original normalized block vectors, matching the online selector.
+
+For the unit representation a of the recorded next action, we separately measure
+
+                                      Pa(S)                 |S ∩N3(a)|
+           Pa(S) = ∥Q⊤S a∥22,    Ra(S) = Pa([n]),     T3(S; a) =     3        .           (4)
+
+Here N3(a) contains the three history blocks most similar to a. Projection measures retention of the
+action direction; Top-3 retention measures retention of the corresponding original blocks. Neither is
+a task success rate. Ratios are evaluated only when their denominators are defined.
+
+3.3 Information Outside the Dominant Subspace
+
+Let Vhigh = [v1, . . . , vrρ] and Vlow = [vrρ+1, . . . , vr]. The latter directions account for at most a
+fraction 1 −ρ of centered history variation. Their share of the action projection is
+
+                                     ∥Vlowa∥2⊤    2
+                                 mlow(a) =               .                                     (5)
+                                      ∥V ⊤a∥22
+A large value indicates that action-related information extends beyond the leading history directions.
+It does not identify a removable block by itself. For the controlled replacement analysis, we
+additionally measure the low-energy fraction of each centered block and its alignment with the
+action in this subspace. Appendix C.3 gives the complete definitions.
+
+
+4 Evidence Beyond the Dominant Subspace
+
+We test whether agent histories contain non-random representational redundancy, whether matching
+global geometry is sufficient to retain task evidence, and whether action-related information can be
+selectively removed from low-energy directions.
+
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                     4
+
+======================== PDF 第 5 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+
+                                 Real history             Feature-shift matched null           Gaussian matched null
+   A  Hidden-state reff   B  Hidden-state ̄r90   C   Embedding reff   D   Embedding ̄r90
+                                   1.0
+   150
+                                                        80
+ reff                                          ̄r90 0.8                                     reff                                        ̄r90 0.8
+   100                                                 60
+                                   0.6
+                                                                                                 0.6                                                        40
+    50   Centered                                                                                            Centered 0.4                                                                                Centered                                                                                        Centered
+                                                        20
+                                                                                                 0.4
+     0
+          Real    F-shift Gaussian        Real    F-shift Gaussian        Real    F-shift Gaussian        Real    F-shift Gaussian
+Figure 1: Structured redundancy in agent histories. Real histories are compared with feature-shift
+and Gaussian controls. The two representation spaces show the same concentration pattern.
+
+4.1  Histories Exhibit Structured Redundancy
+
+The first analysis contains 171 trajectories and 4,701 complete blocks. Each block is encoded
+independently using mean layer-32 representations from a frozen Qwen3.5-9B encoder, producing
+4,096-dimensional vectors. A second analysis uses the 1,024-dimensional Qwen3-Embedding-8B
+representations used by the online selector on 32 trajectories and 1,162 block representations. These
+are isolated block encodings or external selector embeddings, not hidden states of the acting model
+under its full history.
+
+For each trajectory, we compare the real representation matrix with two matched controls. Indepen-
+dent circular feature shifts preserve every feature’s marginal values but disrupt alignment across
+blocks; a Gaussian control matches matrix shape. Figure 1 gives the visual comparison, while the
+exact centered effective-rank and r90/n medians are moved to Appendix C, Table C.1. Median effec-
+tive ranks are 8.39, 16.99, and 19.96 for real, feature-shift, and Gaussian isolated blocks, and 14.04,
+23.54, and 30.07 in selector space. All 171 isolated-block comparisons and all 32 selector-space
+comparisons place the real history below its feature-shift control in effective rank. Across the four
+primary feature-shift comparisons, the reported Holm-adjusted values satisfy p ≤1.86 × 10−9.
+
+The result establishes representational concentration, not safe removability. Indeed, the uncentered
+greedy-coverage analysis uses a median of six isolated blocks and ten selector blocks, corresponding
+to median retained fractions of 0.30 and 0.35, respectively. Those counts describe geometric
+coverage only; they do not imply that the omitted blocks are task-irrelevant.
+
+4.2 Coverage Does Not Determine Evidence Retention
+
+We next compare geometry-only and evidence-constrained selection at identical retained block
+counts. The dense replay contains 650 checkpoints from 32 trajectories, starting after 16 complete
+blocks. Individual trajectories contribute between 2 and 73 checkpoints (median 15.5), with 130,
+108, 161, and 251 checkpoints from Code, Office, Security, and Web, respectively. The independent
+statistical units remain the 32 trajectories. At the same retained budget, evidence-constrained
+selection preserves substantially more task information, particularly next-action Top-3 retention,
+while global geometry remains nearly unchanged.
+
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                     5
+
+======================== PDF 第 6 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+                                                                      0.5
+ΔC            Code                                                    Code
+    0.005      Office                                                   ΔT3 0.4      Office
+               Sec                                                         Sec
+    0.000
+            Web                                                  0.3    Web
+   −0.005change                                                                      0.2   −0.010                                                                                                                                       change
+                                                                      0.1
+   −0.015                                                                                                                                     Top-3 0.0Centroid −0.020
+         0.0       0.2       0.4       0.6       0.8       1.0        0.0       0.2       0.4       0.6       0.8       1.0
+Figure 2: Matched-budget geometry and task information. The trajectory-level visualization con-
+trasts evidence-constrained and geometry-only selection at the same retained block count.
+
+Table 1 reports the pooled same-budget   Table 1: Matched-budget retention at 650 checkpoints.
+means. At the same retained count, next-
+action Top-3 retention rises from 0.31  Metric             Geometry    Evidence     ∆
+to 0.69, while centroid similarity is un-  Action projection          0.91          0.94       ↑0.03
+                                              Next-action Top-3         0.31          0.69       ↑0.38changed at two-decimal precision. Ac-
+                                                Final projection           0.90          0.94       ↑0.04
+tion, final-state, and goal projections
+                                         Goal projection            0.91          0.94       ↑0.03
+show the same pattern:  evidence re-
+                                             Centroid similarity         0.98          0.98      −
+tention improves without a comparably
+large shift in the global centroid measure. The metric definitions and pooled-checkpoint aggregation
+are detailed in Appendix C.2.
+
+The dense numbers are descriptive pooled checkpoint means, with trajectories remaining the
+independent statistical units throughout the analysis. The small mean centroid change alone does
+not establish statistical equivalence.
+
+4.3 Low-Energy Evidence and Controlled Replacement
+
+Figure 3 shows that next-action information is      0.8     Code      Security
+not confined to the leading directions. The plot-               Office    Web                                                                                                        mass 0.6
+ted bands are descriptive rank bands, not equal-
+energy intervals; the formal intervention instead      0.4
+uses directions after the 90% centered-energy cut-                                                                    0.2                                                                                                                                                                                                                                                                                              Next-actionoff. A block can therefore be weakly represented
+by the dominant variation of the trajectory while      0.0 Leading                Middle             Low-energy
+still carrying evidence relevant to the next action.                                               Figure 3: Next-action information across ordered
+This observation motivates a controlled single-  spectral bands.
+block replacement. The targeted condition re-
+moves a retained block whose low-energy component is strongly aligned with the recorded next
+action. The matched condition removes a low-alignment block while matching representation
+similarity, recency, and serialized length.
+
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                     6
+
+======================== PDF 第 7 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+  (a) History Encoding                     Agent History              (c) Residual Geometric Completion             (d) Safe Forwarding and Online Update
+          prefix                                                                                                                                                  ...
+       Block 1                             Frozen                                                                    Pickmax-residualblock
+                       Frozen
+       Block 2                         Block               Block Encoder                                                          Protected set    Geometric set
+                      Encoder
+       Block... 3                      ...                                      Evidence                      Current span      Candidate                              ...
+        Block n                        Constrained Selection             Other blockers     Selected                              ContextReconstruction
+  (b) Evidence-Constrained Selection                                             Residual score :                                                  ...
+                                           Residual                                                                     Forwadcontext
+      Temporal evidence              Geometric Completion            Compute residuals                                        ...                                set                                                                            ϭϤ(τ)
+      State evidence                                                                                        Pick max-residual block
+                              Compressed Context
+        Failure evidence
+                                                                                 Update basis                                 Protected    (from b)        Block Embedding                                                                                                 Protected       Goal evidence                                     Agent LLM               Stopping criteria :    ≥̐    ≤Κ               Geometric   (from c)       Dropped                                                                                            E(ƽ)      |ƽ|
+
+Figure 4: Overview of GEM. (a) A frozen encoder represents complete interaction blocks. (b)
+Evidence constraints form the protected set Pt. (c) Residual geometric completion adds blocks
+whose directions are not covered by the current selected span. (d) Retained original blocks are
+reconstructed in chronological order and forwarded to the unchanged agent. The online forwarding
+constraints are described in Section 5.3.
+                                                           Table 2: Targeted block replace-
+Table 2 shows the same dissociation in intervention form. Tar- ment effects.
+geted replacement reduces action projection by 0.03 and next-
+action Top-3 retention by 0.33, whereas centroid similarity  Metric           ∆
+changes by only +0.00 and captured energy by +0.00. The  Task information
+intervention quantities and matching definition are given in Ap-  Action projection           −0.03
+pendix C.3 for full reproducibility.                                   Next-action Top-3          −0.33
+                                                                    Global geometry
+The targeted replacement therefore removes substantially more                                                                        Centroid similarity          +0.00
+action-related information without a comparable change in the  Captured energy            +0.00
+global geometric measures. This is a representation-level inter-
+vention rather than a rerun of the acting agent, so it supports the
+distinction between geometry and evidence without by itself establishing a causal task-reward effect.
+
+Execution-aware protection distinguishes plans, state-changing operations, and subsequent obser-
+vations, even when they refer to the same artifact. Appendix B.2 details the rules that identify and
+preserve these different execution roles.
+
+
+5 GEM: Geometry-Guided Evidence-Preserving Memory
+
+GEM is a training-free external compressor for complete interaction histories. It separates records
+that should be protected from records selected for additional geometric coverage. The encoder is
+frozen, and the acting model is accessed through its ordinary request interface. No agent hidden
+states, parameter updates, or generated summaries are required.
+
+Figure 4 summarizes the procedure. The protected set seeds geometric completion; the two stages
+are not independent selectors. Embeddings guide selection, while the original message records
+supply the forwarded context. This separation keeps the selection mechanism lightweight while
+preserving the original interaction semantics seen by the acting model.
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                     7
+
+======================== PDF 第 8 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+5.1 Evidence-Constrained Selection
+
+We distinguish the protected set Pt, the selected core Bt, and the final forwarded set St. The core
+contains the evidence and additional directions identified by the selector. The forwarded set may be
+larger because the online deletion guard retains additional original blocks. This distinction separates
+the semantic selection objective from the request-level constraints that determine what is ultimately
+forwarded to the acting model.
+
+For nominal core capacity K, let Kt = max{K, |Pt|} so that required evidence is not dropped when
+its count exceeds the nominal capacity. The ideal core-selection problem is
+
+             B⋆t = arg min |B|   s.t.  Pt ⊆B,  E(B) ≥τ,   |B| ≤Kt.                (6)
+                           B⊆[n]
+
+We use a greedy procedure rather than solve this problem exactly.  It need not find the smallest
+core, and the coverage target can remain unmet when capacity or candidate directions are exhausted.
+Importantly, K is not a hard bound on the number of blocks forwarded to the agent.
+
+5.2 Protecting Task and Execution Evidence
+
+The protected set combines recent interactions, goal-related observations, execution-state evidence,
+fresh errors, and source records14,15,16,4. These groups are combined and deduplicated before
+geometric completion. Recent blocks retain the immediate working context. Goal selection keeps
+the eligible block most similar to the current task. State selection uses the current state query, file
+paths, and supported operation patterns to identify relevant records of possible changes to task
+artifacts. Together, these signals prioritize records whose execution role may remain important even
+when their semantic content is highly redundant.
+
+A plan, a write, and a read of the same file can differ in execution value even when they add little
+geometric novelty. We therefore inspect explicit editing calls and supported Bash and Python write
+patterns, rather than relying only on tool names. State candidates are organized by target path. Error
+evidence is protected within a fixed age window, and source protection retains recent records from
+distinct sources when source-like observations form a sufficient fraction of the history.
+
+These rules use only the available history and current goal. A detected write is evidence of a possible
+mutation, not an independent verification that it succeeded. Likewise, the expiration of an error
+record does not establish that the error was resolved. The rules provide inexpensive protection cues,
+not a complete symbolic model of the environment. Their recorded limits are listed in Appendix B.
+
+5.3 Geometric Completion and Online Updates
+
+Starting from B = Pt, we construct an orthonormal basis QB with modified Gram-Schmidt
+orthogonalization. For each eligible unselected block, we compute its residual and select the largest:
+
+                      ri(B) = 1 −∥Q⊤Bxi∥22,    i⋆= arg max ri(B).                       (7)
+                                                                              i/∈B
+We add i⋆, update the basis, and continue until coverage, capacity, or candidate exhaustion terminates
+selection. The residual therefore measures information not yet represented by the current geometric
+span, rather than relevance to the task itself. Writing Gt = Bt \ Pt for the blocks added by geometric
+completion gives Bt = Pt ∪Gt. A protected record cannot be removed merely because it has a small
+residual. The default coverage target is τ = 0.90, and the nominal core capacity is K = 16.
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                     8
+
+======================== PDF 第 9 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+The online implementation limits how much of a request can be removed in one rewrite. If L(S) is
+the serialized length of the complete request containing blocks S, the forwarded set satisfies
+
+                      Bt ⊆St ⊆[n],     L(St) ≥(1 −δ)L([n]).                         (8)
+
+We set δ = 0.05. Starting from the full safe request, the implementation attempts to remove eligible
+blocks outside the core, prioritizing larger redundant blocks while respecting this guard. Complete
+blocks are indivisible, so an event may remove nothing. All retained messages remain unchanged
+and in chronological order.
+
+Requests with fewer than 16 complete blocks are left unchanged. Global selection occurs at the first
+eligible request, after a session or goal change, or after 256 newly added blocks. Between these
+events, the implementation keeps the previously forwarded set and appends new blocks and newly
+activated evidence. This incremental policy avoids repeatedly reconstructing the retained history
+when no global reselection is required. Storing the actual forwarded set prevents a later update
+from mistakenly removing blocks retained by the deletion guard. The per-request character limit is
+distinct from cumulative token savings over a task. Appendix A gives the corresponding geometric
+derivations and forwarding properties.
+
+6 Experiments
+
+6.1 Experimental Setup
+
+Table 3: WorkBuddyBench Full260 results. S denotes mean reward ×100, and T denotes combined
+tokens per task (M). Higher S and lower T are better.
+
+
+                  Code             Office           Security        Web            Overall
+Method
+              S ↑    T ↓    S ↑    T ↓    S ↑    T ↓    S ↑    T ↓    S ↑    T ↓
+Base agent        76.99     1.37     81.84     1.20     47.76     5.98     72.14     2.43     69.87     2.69
+GEM            75.25     1.35     84.06     1.15     49.56     3.95     72.14     2.09     70.18     2.11
+
+WorkBuddyBench Full26031 contains 260 tasks across Code, Office, Security, and Web. The main
+online evaluation uses DeepSeek-V4-Flash32 at temperature zero, while GEM uses frozen 1,024-
+dimensional Qwen3-Embedding-8B representations. Task quality is reported as Score= 100×mean
+reward, and combined tokens include model input, model output, and embedding tokens. Full260
+is the primary end-to-end evaluation, while the fixed-40 panel serves as a separate reference for
+common compression controls. The same-ID GEM slice from the Full260 carrier is marked
+separately in Table 4. Appendix E.3 describes the reference-panel protocol.
+
+6.2 Full260 End-to-End Results
+
+Across all 260 tasks, mean combined usage decreases from 2.69M to 2.11M per task, a reduction of
+approximately 21.4%. Mean score changes from 69.87 to 70.18 (reward ×100). The average hides
+important domain variation. Security shows the largest token decrease, 5.98M to 3.95M per task,
+while its mean reward changes from 0.48 to 0.50. Office also increases in mean reward while using
+fewer tokens, and Web keeps the same rounded reward while reducing tokens. Code is the clearest
+boundary case: tokens change only slightly (1.37M to 1.35M) and mean reward decreases by about
+0.02. This pattern is consistent with code tasks being more sensitive to intermediate execution and
+file-state evidence, but the domain means alone do not identify the causal mechanism.
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                     9
+
+======================== PDF 第 10 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+Table 4: Fixed-40 context-management reference. S is mean reward ×100 and T is combined tokens
+per task (M). Each domain contains ten tasks.
+
+                        Code            Office          Security       Web          Overall
+Method
+                    S ↑    T ↓    S ↑    T ↓    S ↑    T ↓    S ↑    T ↓    S ↑    T ↓
+Base agent                72.93    1.44    81.64    1.04    44.58    3.97    71.00    1.10    67.54    1.89
+Window (K = 5)          66.81    3.12    67.43    3.98    32.32    2.13    59.00    2.58    56.39    2.95
+Window (K = 10)         74.37    1.76    73.05    1.82    40.07    0.82    61.00    3.55    62.12    1.99
+Window (K = 20)         79.31    1.42    85.11    2.23    40.28    1.13    70.00    3.30    68.67    2.02
+Periodic summary (n = 3)  65.44    1.91    67.66    2.14    26.32    0.99    82.66    3.82    60.52    2.21
+Periodic summary (n = 5)  83.60    1.76    75.74    2.55    40.03    1.29    81.32    3.88    70.17    2.37
+PACE 17                   70.38    0.94    55.75    1.01    43.53    0.57    64.02    1.89    58.42    1.10
+LLMLingua-2 7            64.64    1.63    73.31    3.41    40.10    3.49    70.00    1.09    62.01    2.41
+SelfCompact 9             76.83    1.57    79.62    0.85    36.19    3.14    71.00    0.71    65.91    1.57
+ACON-Core 3              71.79    1.48    68.55    2.15    47.94    1.51    65.00    0.47    63.32    1.40
+Self-GC 18                 63.45    1.17    71.67    1.18    43.70    3.44    71.00    0.84    62.46    1.66
+LRE 19                    62.62    2.26    63.44    3.47    27.14    2.85    68.00    0.59    55.30    2.29
+CoMem 20                 56.43    0.55    59.86    0.75    2.50    1.00    58.00    0.76    44.20    0.77
+SAM 4                    67.62    1.41    81.63    1.09    47.23    1.91    67.00    0.97    65.87    1.35
+SWE-Pruner 8              63.45    2.17    72.60    1.43    40.87    1.82    65.00    0.58    60.48    1.50
+Sculptor 10                 51.19    1.03    81.62    0.99    35.24    2.45    69.00    0.71    59.26    1.29
+ACM 21                   38.69    2.54    55.93    1.53    6.19    5.20    34.00    0.19    33.70    2.36
+GEM†                   76.67    1.74    78.51    1.32    55.31    3.88    82.00    2.08    73.12    2.26
+
+The token decomposition in Appendix E.2 shows that the net reduction comes primarily from a
+lower cached-input volume. GEM also introduces embedding usage and increases uncached input,
+so its savings are not free; the cached-input reduction must exceed these added costs.
+
+6.3 Fixed-40 Context-Management Reference Panel
+
+Table 4 reports reward and token use for the fixed-40 reference panel in each domain. The panel
+is useful for understanding how tradeoffs between reward and token use vary across Code, Office,
+Security, and Web, but it is not used as a matched GEM comparison because the available GEM
+same-ID slice belongs to the Full260 carrier snapshot. The fixed-40 evaluation protocol is described
+in Appendix E.3.
+
+The reference panel illustrates why compression should not be summarized by a single token ratio.
+For example, periodic summarization at n = 5 has a relatively high mean score in this panel but uses
+more tokens than the uncompressed base, whereas CoMem uses substantially fewer tokens with a
+much lower mean score. The domain columns show that these operating points vary substantially
+across task families.
+
+6.4 Online Ablation and Compression Strength
+
+The online ablation uses 20 formal-valid tasks, five from each domain. Random completion retains
+the same evidence rules and candidate pool but replaces largest-residual completion with random
+selection. Geometry-only removes the evidence-protection bundle while retaining residual selection
+and the online bookkeeping required for valid requests.
+
+On this batch, the full method scores 60.39 versus 60.75 for the base agent (a 0.36-point difference)
+while using about 35.30% fewer combined tokens overall. The domain columns make the tradeoff
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    10
+
+======================== PDF 第 11 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+Table 5: Online 20-task ablation by domain. S is mean reward ×100 and T is combined tokens per
+task (M). Each domain contains five tasks.
+
+
+                    Code             Office           Security        Web           Overall
+Variant
+                S ↑    T ↓    S ↑    T ↓    S ↑    T ↓    S ↑    T ↓    S ↑    T ↓
+Base agent           59.79    2.33    74.28    3.02    62.95    10.70    46.00    4.73    60.75    5.19
+GEM               70.79    2.52    69.32    3.18    53.45    4.33    48.00    3.41    60.39    3.36
+Random completion  47.40    2.72    60.86    5.20    56.69    6.69    47.30    3.23    53.06    4.46
+Geometry only       60.93    2.40    59.62    1.25    48.92    8.14    50.64    4.71    55.03    4.12
+
+                                                             0.70
+   0.8    Geometry-only                                                     Top-3 recallrecall       Evidence-constrained                                  0.65    Retention ratio
+   0.7
+                                                             0.60
+   0.6Top-3                                                           0.55
+   0.5                                                                                                                          Ratio 0.50
+   0.4
+                                                             0.45
+   0.3
+                                                             0.40
+   0.2Next-action                                                           0.35
+       8  9  10 11 12 13 14 15 16 17 18 19 20              0.85    0.87    0.89    0.91    0.93    0.95
+                Exact retained budget K                                Energy target τ
+Figure 5: Compression strength. (a) Next-action Top-3 retention at exact retained budgets K. (b)
+Top-3 retention and retained-history ratio as the coverage threshold τ increases. The exact-K sweep
+uses 28 trajectories and 525 common checkpoints; the coverage sweep uses 32 trajectories and 59
+checkpoints.
+
+explicit: on the five Code tasks GEM raises reward while slightly increasing tokens, whereas on
+the five Security tasks it sharply reduces tokens but loses reward. Relative to random completion
+and geometry-only selection, the full method has the highest overall reward and the lowest overall
+token use in this batch. The ablation therefore supports the combined selector without implying a
+universally monotone relationship between reward and compression.
+
+Evidence-constrained selection has higher Top-3 retention than geometry-only selection at every
+tested exact budget K ∈[8, 20]. Increasing τ from 0.85 to 0.95 raises the retained fraction from
+0.38 to 0.53 and Top-3 retention from 0.58 to 0.65. The default τ = 0.90 is therefore an operating
+point on an observed tradeoff between retention and evidence, not a claim of a universally optimal
+threshold. The complete sweep values are listed in Appendix D.3.
+
+
+7 Conclusion
+
+Agent histories can be highly redundant in representation space while still containing low-energy
+records that matter for continued execution. This paper separates those two notions of importance.
+Same-budget selection and controlled replacement show that preserving dominant geometry does
+not guarantee preservation of next-action evidence. GEM converts this observation into a simple
+external compressor: protect task and execution evidence first, then use geometric residuals to
+complete coverage.  It preserves original messages and leaves the acting model unchanged. On
+WorkBuddyBench Full260, the reported operating point reduces mean combined tokens from 2.69M
+to 2.11M per task while maintaining a similar aggregate reward, with clear domain-dependent
+tradeoffs. The broader lesson is that repeated content can still be consequential evidence; effective
+history compression should model that distinction explicitly.
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    11
+
+======================== PDF 第 12 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+Reproducibility Statement
+
+We provide the methodological definitions, selection algorithm, implementation settings, evaluation
+protocols, ablation configurations, and additional analyses required to reproduce the reported results
+in the main text and appendix. The acting model and representation encoder remain frozen under the
+default setting, and all reported comparisons follow the evaluation and token-accounting procedures
+described in the manuscript.
+
+AI Use Statement
+
+Generative AI tools assisted with code development, analysis scripts, figure and table preparation,
+and manuscript editing under author supervision. All experimental results and scientific claims were
+reviewed and verified by the authors, who take responsibility for the final manuscript.
+
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    12
+
+======================== PDF 第 13 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+References
+
+ 1. Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik Narasimhan, and Yuan Cao.
+    React: Synergizing reasoning and acting in language models. arXiv preprint arXiv:2210.03629,
+    2022.
+ 2. Xiao Liu, Hao Yu, Hanchen Zhang, Yifan Xu, Xuanyu Lei, Hanyu Lai, Yu Gu, Hangliang Ding,
+   Kaiwen Men, Kejuan Yang, et al. Agentbench: Evaluating llms as agents. In International
+    Conference on Learning Representations, volume 2024, pages 52989–53046, 2024.
+ 3. Minki Kang, Wei-Ning Chen, Dongge Han, Huseyin A Inan, Lukas Wutschitz, Yanzhi Chen,
+    Robert Sim, and Saravan Rajmohan. Acon: Optimizing context compression for long-horizon
+    llm agents. arXiv preprint arXiv:2510.00615, 2025.
+ 4. Yuyang Hu, Hongjin Qian, Shuting Wang, Jiongnan Liu, Ziliang Zhao, Jiejun Tan, Zheng Liu,
+    and Zhicheng Dou. Sam: State-adaptive memory for long-horizon reasoning agent. arXiv
+    preprint arXiv:2605.24468, 2026.
+ 5. Huiqiang Jiang, Qianhui Wu, Chin-Yew Lin, Yuqing Yang, and Lili Qiu. Llmlingua: Compress-
+    ing prompts for accelerated inference of large language models. In Proceedings of the 2023
+    conference on empirical methods in natural language processing, pages 13358–13376, 2023.
+ 6. Huiqiang Jiang, Qianhui Wu, Xufang Luo, Dongsheng Li, Chin-Yew Lin, Yuqing Yang, and
+     Lili Qiu. Longllmlingua: Accelerating and enhancing llms in long context scenarios via prompt
+    compression. In Proceedings of the 62nd Annual Meeting of the Association for Computational
+    Linguistics (Volume 1: Long Papers), pages 1658–1677, 2024.
+ 7. Zhuoshi Pan, Qianhui Wu, Huiqiang Jiang, Menglin Xia, Xufang Luo, Jue Zhang, Qingwei Lin,
+    Victor Rühle, Yuqing Yang, Chin-Yew Lin, et al. Llmlingua-2: Data distillation for efficient and
+     faithful task-agnostic prompt compression. In Findings of the Association for Computational
+    Linguistics: ACL 2024, pages 963–981, 2024.
+ 8. Yuhang Wang, Yuling Shi, Mo Yang, Rongrui Zhang, Shilin He, Heng Lian, Yuting Chen, Siyu
+    Ye, Kai Cai, and Xiaodong Gu. Swe-pruner: Self-adaptive context pruning for coding agents.
+    arXiv preprint arXiv:2601.16746, 2026.
+ 9. Tianjian Li, Jingyu Zhang, William Jurayj, Xi Wang, Chuanyang Jin, Mehrdad Farajtabar,
+    Eric Nalisnick, and Daniel Khashabi. Self-compacting language model agents. arXiv preprint
+    arXiv:2606.23525, 2026.
+10. Mo Li, LH Xu, Qitai Tan, Long Ma, Hongyong Song, Ting Cao, and Yunxin Liu. Sculptor:
+   Empowering llms with cognitive agency via active context management.  In International
+    Conference on Learning Representations, volume 2026, pages 153411–153440, 2026.
+11. Kawin Ethayarajh. How contextual are contextualized word representations? comparing the
+    geometry of bert, elmo, and gpt-2 embeddings. In Proceedings of the 2019 conference on
+    empirical methods in natural language processing and the 9th international joint conference on
+    natural language processing (EMNLP-IJCNLP), pages 55–65, 2019.
+12. Jiaqi Mu, Suma Bhat, and Pramod Viswanath. All-but-the-top: Simple and effective postpro-
+    cessing for word representations. arXiv preprint arXiv:1702.01417, 2017.
+13. Tianyu Gao, Xingcheng Yao, and Danqi Chen. Simcse: Simple contrastive learning of sentence
+    embeddings. In Proceedings of the 2021 conference on empirical methods in natural language
+    processing, pages 6894–6910, 2021.
+
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    13
+
+======================== PDF 第 14 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+14. Yaoqi Chen, Haibin Lai, Yuru Feng, Chuyu Han, Qianxi Zhang, Baotong Lu, Menghao Li,
+    Xinjiang Wang, Zhirui Wang, Shusen Xu, et al. Beyond semantic organization: Memory as
+    execution state management for long-horizon agents. arXiv preprint arXiv:2606.06090, 2026.
+15. Zijian Zhou, Ao Qu, Zhaoxuan Wu, Sunghwan Kim, Alok Prakash, Daniela Rus, Bryan
+    Kian Hsiang Low, and Paul Liang. Mem1: Learning to synergize memory and reasoning for
+     efficient long-horizon agents. In International Conference on Learning Representations, volume
+    2026, pages 58413–58438, 2026.
+16. Yifan Wu, Lizhu Zhang, Yuhang Zhou, Mingyi Wang, Bo Peng, Serena Li, Xiangjun Fan, and
+    Zhuokai Zhao. Remember when it matters: Proactive memory agent for long-horizon agents.
+    arXiv preprint arXiv:2607.08716, 2026.
+17. Lei Wei, Xiao Peng, Guannan Zhang, Chenhao Jiang, Hongyu Li, Lanbo Lin, Yuanwu Xu,
+    Jiayao Liu, Kesu Wang, Bin Wang, et al. Pace: Predictive adaptive context extraction for
+    long-horizon llm agents. In Proceedings of the 64th Annual Meeting of the Association for
+    Computational Linguistics (Volume 1: Long Papers), pages 27184–27199, 2026.
+18. Xubin Hao, Hongjin Meng, Xin Yin, Jiawei Zhu, and Chenpeng Cao. Self-gc: Self-governing
+    context for long-horizon llm agents. arXiv preprint arXiv:2607.00692, 2026.
+19. Nusrat Jahan Lia and Aritra Mazumder. Learning what not to forget: Long-horizon agent
+   memory from a few kilobytes of learning. arXiv e-prints, pages arXiv–2606, 2026.
+20. Yuwei Zhang, Chengyu Dong, Shuowei Jin, Changlong Yu, Hejie Cui, Hongye Jin, Xinyang
+    Zhang, Hamed Bonab, Colin Lockard, Jianshu Chen, et al. Comem: Context management with
+    a decoupled long-context model. arXiv preprint arXiv:2605.30842, 2026.
+21. Xiaochuan Li, Ryan Ming, Meng Chu, Shuai Shao, Rong Jin, and Chenyan Xiong. Acm:
+    Agentic context management for long horizon tasks. arXiv preprint arXiv:2607.23809, 2026.
+22. Charles Packer, Sarah Wooders, Kevin Lin, Vivian Fang, Shishir G Patil, Ion Stoica,
+    and Joseph E Gonzalez.  Memgpt: Towards llms as operating systems.  arXiv preprint
+    arXiv:2310.08560, 2023.
+23. Joon Sung Park, Joseph O’Brien, Carrie Jun Cai, Meredith Ringel Morris, Percy Liang, and
+    Michael S Bernstein. Generative agents: Interactive simulacra of human behavior. In Proceed-
+    ings of the 36th annual acm symposium on user interface software and technology, pages 1–22,
+    2023.
+24. Noah Shinn, Federico Cassano, Ashwin Gopinath, Karthik Narasimhan, and Shunyu Yao.
+    Reflexion: Language agents with verbal reinforcement learning. Advances in neural information
+    processing systems, 36:8634–8652, 2023.
+25. Qichen Fu, Minsik Cho, Thomas Merth, Sachin Mehta, Mohammad Rastegari, and Mahyar
+     Najibi. Lazyllm: Dynamic token pruning for efficient long context llm inference. arXiv preprint
+    arXiv:2407.14057, 2024.
+26. Cheng-Ping Hsieh, Simeng Sun, Samuel Kriman, Shantanu Acharya, Dima Rekesh, Fei Jia,
+   Yang Zhang, and Boris Ginsburg. Ruler: What’s the real context size of your long-context
+    language models? arXiv preprint arXiv:2404.06654, 2024.
+27. Xinrong Zhang, Yingfa Chen, Shengding Hu, Zihang Xu, Junhao Chen, Moo Hao, Xu Han,
+   Zhen Thai, Shuo Wang, Zhiyuan Liu, et al. ∞bench: Extending long context evaluation beyond
+   100k tokens. In Proceedings of the 62nd Annual Meeting of the Association for Computational
+    Linguistics (Volume 1: Long Papers), pages 15262–15277, 2024.
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    14
+
+======================== PDF 第 15 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+28. Parth Sarthi, Salman Abdullah, Aditi Tuli, Shubh Khanna, Anna Goldie, and Christopher
+    Manning. Raptor: Recursive abstractive processing for tree-organized retrieval. In International
+    Conference on Learning Representations, volume 2024, pages 32628–32649, 2024.
+29. Soyeong Jeong, Jinheon Baek, Sukmin Cho, Sung Ju Hwang, and Jong C Park. Adaptive-rag:
+    Learning to adapt retrieval-augmented large language models through question complexity.
+    In Proceedings of the 2024 conference of the north american chapter of the association for
+    computational linguistics: Human language technologies (volume 1: Long papers), pages
+    7036–7050, 2024.
+30. Akari Asai, Zeqiu Wu, Yizhong Wang, Avi Sil, and Hannaneh Hajishirzi. Self-rag: Learning to
+     retrieve, generate, and critique through self-reflection. In International conference on learning
+    representations, volume 2024, pages 9112–9141, 2024.
+31. Tencent WorkBuddy Bench Team, Siqi Cai, Shaopeng Chen, Xiang Fei, Yong Mao, Zihan Xu,
+    Zhiheng Lyu, Zhijian Shao, Yuchen Shi, Shuwen Zhang, et al. Tencent workbuddy bench: A
+    multi-domain coding-agent benchmark with contamination-resistant task construction. arXiv
+    preprint arXiv:2607.20911, 2026.
+32. Anyi Xu, Bangcai Lin, Bing Xue, Bingxuan Wang, Bingzheng Xu, Bochao Wu, Bowei Zhang,
+    Chaofan Lin, Chen Dong, Chenchen Ling, et al.  Deepseek-v4: Towards highly efficient
+    million-token context intelligence. arXiv preprint arXiv:2606.19348, 2026.
+33. Fangyuan Xu, Weijia Shi, and Eunsol Choi. Recomp: Improving retrieval-augmented lms with
+    context compression and selective augmentation. In International Conference on Learning
+    Representations, volume 2024, pages 43478–43502, 2024.
+34. Jesse Mu, Xiang Li, and Noah Goodman. Learning to compress prompts with gist tokens.
+    Advances in Neural Information Processing Systems, 36:19327–19352, 2023.
+35. Tao Ge, Jing Hu, Lei Wang, Xun Wang, Si-Qing Chen, and Furu Wei. In-context autoencoder
+     for context compression in a large language model. arXiv preprint arXiv:2307.06945, 2023.
+36. Nelson F Liu, Kevin Lin, John Hewitt, Ashwin Paranjape, Michele Bevilacqua, Fabio Petroni,
+    and Percy Liang. Lost in the middle: How language models use long contexts. Transactions of
+    the association for computational linguistics, 12:157–173, 2024.
+37. Yushi Bai, Xin Lv, Jiajie Zhang, Hongchang Lyu, Jiankai Tang, Zhidian Huang, Zhengxiao
+    Du, Xiao Liu, Aohan Zeng, Lei Hou, et al. Longbench: A bilingual, multitask benchmark for
+    long context understanding. In Proceedings of the 62nd annual meeting of the association for
+    computational linguistics (volume 1: Long papers), pages 3119–3137, 2024.
+38. Yushi Bai, Shangqing Tu, Jiajie Zhang, Hao Peng, Xiaozhi Wang, Xin Lv, Shulin Cao, Jiazheng
+   Xu, Lei Hou, Yuxiao Dong, et al. Longbench v2: Towards deeper understanding and reason-
+    ing on realistic long-context multitasks. In Proceedings of the 63rd Annual Meeting of the
+    Association for Computational Linguistics (Volume 1: Long Papers), pages 3639–3664, 2025.
+39. Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu,
+    Joseph Gonzalez, Hao Zhang, and Ion Stoica. Efficient memory management for large language
+    model serving with pagedattention. In Proceedings of the 29th symposium on operating systems
+     principles, pages 611–626, 2023.
+
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    15
+
+======================== PDF 第 16 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+A Mathematical Derivations and Properties
+
+We derive the geometric and structural properties used by GEM. Throughout this section, the
+available history is fixed, the block vectors xi ∈Rd have unit norm, and QB contains an orthonormal
+basis for the span of the selected vectors. The statements concern these representation-space
+quantities and the selection and forwarding operations.
+
+A.1 Residual Selection and Reconstruction Error
+
+Write X = [x1, . . . , xn]⊤and PB = QBQ⊤B, with P∅= 0. The selected block identities and the
+numerical basis are maintained separately: a protected block remains selected even if its vector is
+already in the span of the other selected vectors. For any block, the orthogonal decomposition is
+
+                          xi = PBxi + ei(B),     ei(B) = (I −PB)xi.                   (A.1)
+
+Proposition A.1 (Residual score and geometric coverage). For normalized block vectors,
+
+                        ri(B) = ∥ei(B)∥22 = 1 −∥Q⊤Bxi∥22,                            (A.2)
+                        ∥XQB∥2F                   E(B) =                         = 1 −∥X(I −PB)∥2                                                             F .                     (A.3)
+                            n             n
+Consequently, 0 ≤ri(B) ≤1, 0 ≤E(B) ≤1, and a core satisfying E(B) ≥τ has mean squared
+embedding reconstruction error at most 1 −τ.
+
+Proof. Because PB is a symmetric idempotent projector, PBxi is orthogonal to (I −PB)xi. Thus
+∥xi∥22 = ∥PBxi∥22 + ∥ei(B)∥22. Orthonormality gives ∥PBxi∥22 = ∥Q⊤Bxi∥22. Using ∥xi∥22 = 1 proves
+the first identity. Summing it over all n blocks gives the second identity and the stated bounds. □
+
+Equation A.2 explains the completion rule: the largest-residual candidate contributes a direction that
+is poorly represented by the current selected span. Equation A.3 gives the coverage target its direct
+reconstruction interpretation. These quantities are evaluated on the original normalized vectors,
+matching the online selector; the centered spectral analysis is defined separately in Appendix C.
+
+A.2 Coverage Gain and Incremental Basis Updates
+
+For an eligible candidate j with rj(B) > 0, modified Gram Schmidt constructs the new unit direction
+
+                             xj −QB(Q⊤Bxj)
+                        q =                          ,     QB∪{j} = [QB, q].                    (A.4)
+              prj(B)
+
+Proposition A.2 (Monotone coverage completion). For the update in Eq. A.4,
+
+                                      PB∪{j} = PB + qq⊤,                            (A.5)
+                                                     n
+                                            1
+                  E(B ∪{j}) −E(B) = X (q⊤xi)2,                        (A.6)
+                                    n
+                                                          i=1
+                                 ri(B ∪{j}) = ri(B) −(q⊤xi)2.                      (A.7)
+
+In particular, the coverage gain is at least rj(B)/n > 0. More generally, B ⊆S implies E(S) ≥
+E(B).
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    16
+
+======================== PDF 第 17 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+Proof.  The normalized residual q is orthogonal to every column of QB. The projector onto the
+expanded span is therefore PB + qq⊤. Substituting this expression into the definition of E gives
+Eq. A.6, and subtracting the new projected component gives Eq. A.7. All terms in the coverage
+gain are nonnegative, and the i = j term equals rj(B). For nested sets B ⊆S, extend QB by an
+orthonormal basis of the additional directions in span(S) and apply the same argument to each
+added direction.                                         □
+
+For m added independent directions q1, . . . , qm, the increments sum to
+
+                                   m
+                                           1
+                     E(Bm) = E(B0) + X ∥Xqk∥22.                         (A.8)
+                                    n
+                                                   k=1
+
+Thus geometric completion progressively covers additional directions after the evidence set has
+been protected. The residual-update identity also allows candidate scores to be updated without
+rebuilding all previous projections at each iteration.
+
+A.3 Evidence Preservation and Forwarding Invariants
+
+The selector begins with B0 = Pt and uses the expanded capacity Kt = max{K, |Pt|}. It only adds
+indices during completion. The forwarding stage starts from the full valid request and considers
+removing indices outside the completed core Bt.
+
+Proposition A.3 (Protected and structurally valid forwarding). For an accepted global rewrite,
+
+                    Pt ⊆Bt ⊆St ⊆[n],     L(St) ≥(1 −δ)L([n]).                  (A.9)
+
+Every retained removable block contains its complete assistant call and result group, and the
+retained messages preserve their original chronological order. Between global reselections, under
+stable block identities, the append rule satisfies
+
+                         St+1 = St ∪Nt+1 ∪At+1,     St ⊆St+1,                    (A.10)
+
+where Nt+1 and At+1 are newly available blocks and newly activated evidence, respectively.
+
+Proof.  The core is initialized to Pt and is modified only by insertion, so Pt ⊆Bt. Forwarding
+starts from [n] and deletes only members of its complement to Bt, proving Bt ⊆St. Initially the
+length constraint holds; accepting each proposed deletion only when it continues to hold proves
+the bound by induction. Parsing constructs complete call and result blocks, selection changes only
+whole-block membership, and reconstruction sorts retained messages by their original indices. This
+preserves call and result groups and chronological order. Finally, the ordinary update is a set union
+with the saved actual forwarded set, proving Eq. A.10.                      □
+
+Keeping the actual forwarded set is important: it preserves not only the core but also the additional
+original blocks retained by the request-length guard. Protected block membership is therefore
+independent of whether a protected embedding introduces a new basis direction.
+
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    17
+
+======================== PDF 第 18 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+B Algorithm and Implementation Details
+
+B.1 Complete Blocks and Selection Representations
+
+A removable interaction block contains an assistant message with one or more tool calls and all
+corresponding tool-result messages, matched by call ID. The parser checks identifier uniqueness and
+complete matching between calls and results. The system/task prefix and non-removable messages
+are preserved independently. When parsing or reconstructed-request validation fails, the original
+request is returned.
+
+The selection representation concatenates assistant reasoning, assistant text, tool names and ar-
+guments, and tool observations under the markers ASSISTANT_REASONING, ASSISTANT_TEXT,
+ACTION, and OBSERVATION. This encoder input is limited to 12,000 characters, retaining its begin-
+ning and end for overlength blocks. Only the selection representation is shortened; forwarded blocks
+use the complete, unchanged original message objects. The frozen encoder is Qwen3-Embedding-8B
+with 1,024 output dimensions.
+This block-level interface differs from compressed retrieved text33 and learned compact represen-
+tations such as gist tokens and in-context autoencoding34,35. In GEM, embeddings guide which
+original blocks to retain; the acting model continues to receive ordinary messages.
+
+B.2 Evidence Protection and Shared Settings
+
+The protected set is a deduplicated union
+
+                     Pt = Precentt    ∪Pgoalt   ∪Pstatet    ∪Perrort    ∪Psourcet       .                   (B.1)
+
+Recent protection retains four complete blocks of immediate working context. Goal protection
+retains the eligible block most similar to the current task. State protection retains up to three relevant
+records using the state query, artifact paths, explicit editing calls, and supported Bash/Python
+write patterns. Error protection retains up to two recent error records within eight blocks. Source
+protection is activated when source-like blocks constitute at least half of the history and keeps recent
+evidence from distinct sources.
+
+These rules distinguish the execution roles of records rather than treating semantic similarity
+as interchangeability. State-related and persistent memory provide the relevant context for this
+distinction14,15,16,4. The numerical protection limits in Table B.1 are the shared GEM settings. A
+detected write is treated as evidence of a possible state change; preserving it does not assert that the
+operation succeeded.
+
+B.3 Global Selection and Incremental Forwarding
+
+Every request is inspected. Requests with fewer than 16 complete blocks remain unchanged. Global
+selection is triggered at the first eligible request, after a session reset/rewrite or goal change, or
+after 256 newly accumulated blocks.  It initializes the core with protected evidence and adds
+largest-residual candidates until coverage, capacity, or candidate exhaustion terminates selection.
+
+The final forwarded set starts from the full safe request. Only blocks outside the selected core
+are considered for deletion, with larger redundant blocks considered first. Each accepted deletion
+must preserve at least 95% of the original request’s serialized character count. Ordinary append
+events keep the saved actual forwarded set, append new blocks and activated evidence, and preserve
+chronological order. Algorithm 1 combines these steps.
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    18
+
+======================== PDF 第 19 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+
+
+
+
+            Table B.1: Shared implementation settings across Code, Office, Security,
+           and Web.
+
+
+               Setting                                  Value
+
+           Minimum complete blocks                 16
+              Coverage target τ / nominal core capacity K   0.90 / 16
+              Recent / Goal / State / Error limits           4 / 1 / 3 / 2
+               Error eligibility horizon                   8 blocks
+
+              Source protection activation                   Source-like fraction ≥0.50
+                 Initial-block protection                    0
+                                                 semantic_evidence /
+              Candidate / fill policy                    max_residual
+           Maximum request-character reduction δ       0.05
+              Global reselection interval                 256 new blocks
+
+                Selection-representation length               12,000 characters
+             Embedding dimension / batch size            1,024 / 16
+              Recorded budget_k                      8
+             Random-completion seed                  42
+            Model temperature / context window           0.0 / 1,000,000 tokens
+
+             The core capacity expands to include all required evidence. The recorded budget_k is
+               not the final forwarded-block count: the protected set, core capacity, and request-length
+              guard jointly determine the forwarded set.
+
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    19
+
+======================== PDF 第 20 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+Algorithm 1 GEM at an intercepted agent request
+  1: Input: request, goal, saved forwarded state, τ, K, δ
+  2: Parse complete blocks and preserve the non-removable prefix
+  3:  if the tool protocol is invalid or fewer than 16 complete blocks are available then
+  4:   return the original request
+  5: end if
+  6: Construct and deduplicate the protected set Pt
+  7:  if global reselection is triggered then
+  8:   Encode blocks; set B ←Pt and Kt ←max{K, |Pt|}
+  9:   Construct an orthonormal basis QB of the selected representations
+ 10:   while |B| < Kt, E(B) < τ, and an independent eligible candidate exists do
+ 11:      Select j ←arg maxi/∈B(1 −∥Q⊤Bxi∥22) over eligible candidates
+ 12:    Add j to B and update the basis and residuals
+ 13:   end while
+ 14:    Initialize S ←[n]; save the original request length L0
+ 15:    for eligible blocks i /∈B in the deletion-priority order do
+ 16:        if L(S \ {i}) ≥(1 −δ)L0 then
+ 17:      S ←S \ {i}
+ 18:     end if
+ 19:   end for
+ 20: else
+ 21:   Keep the saved forwarded set and append new blocks and activated evidence
+ 22:   Let S be the resulting index set in the current history
+ 23: end if
+ 24: Reconstruct complete original messages in chronological order
+ 25:  if the reconstructed request fails structural validation then
+ 26:   return the original request
+ 27: end if
+ 28: Save the actual forwarded set and session/goal bookkeeping
+ 29: return the reconstructed request
+
+
+With n encoded blocks, dimension d, and final basis rank b, incremental projection updates in
+Eq. A.7 can be implemented in O(ndb) arithmetic and O(nd + db + n) working storage, excluding
+the original messages and encoder. These are operation-count bounds for incremental updates;
+encoding and request serialization are accounted for separately.
+
+
+C Additional Geometry and Evidence Analysis
+
+C.1 Representations, Centering, and Matched Controls
+
+The isolated-block analysis uses 171 trajectories and 4,701 complete blocks, encoded independently
+with frozen Qwen3.5-9B mean layer-32 representations of dimension 4,096. The selector-space
+analysis uses 32 trajectories and 1,162 block representations of dimension 1,024. These are the two
+representation populations used in Section 4.1.
+
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    20
+
+======================== PDF 第 21 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+For Xc = X −1¯x⊤= UΣV ⊤with positive centered energy, define
+
+        σ2j                  !           1  (         )
+  pj =           ,       reff = exp − X pj log pj    ,        ¯r90 =  min  k : X pj ≥0.90    .  (C.1)
+   Pk σ2k                               j                 n          j≤k
+
+The centered analysis isolates variation around the mean direction, complementing studies of
+representation anisotropy and dominant embedding directions11,12,13.
+
+The feature-shift control independently circularly shifts each feature along the block axis, preserving
+its marginal values while disrupting cross-feature alignment. The Gaussian control matches the
+trajectory matrix dimensions. Both comparisons are performed within trajectories before aggregation.
+Table C.1 gives the aggregate dimensionality statistics corresponding to the main-text comparison.
+
+              Table C.1: Structured low-dimensionality of agent histories. Values are
+               trajectory medians for centered representations; r90/n is the fraction
+              of available blocks required to explain 90% of centered energy.
+
+
+               Representation   Metric         Real   Feature-shift   Gaussian
+
+                  Isolated blocks    Effective rank    8.39          16.99       19.96
+                  Isolated blocks    r90/n            0.47            0.78        0.88
+
+                 Selector space     Effective rank   14.04          23.54       30.07
+                 Selector space    r90/n            0.48            0.78        0.85
+
+Real histories have lower effective rank than their feature-shift controls in all 171 isolated-block
+comparisons and all 32 selector-space comparisons. The consistent pattern across the two spaces
+supports structured geometric redundancy as a basis for the completion stage.
+
+C.2 Matched-Budget Evidence Retention
+
+The matched-budget analysis holds the retained block count fixed at each checkpoint. Both selectors
+are measured on the same available history and recorded next action. The online compressor has
+access only to the current goal and available history; the recorded next action is used for offline
+evaluation.
+
+For action representation a, the quantities in Eq. 4 distinguish projected action-direction energy from
+retention of actual neighboring history records. The action projection is ∥Q⊤S a∥22, and Top-3 retention
+is the fraction of the three history blocks most similar to a that remain in S. The 650-checkpoint
+comparison in Table 1 shows higher action-related retention with evidence constraints at the same
+retained count, while the reported centroid similarity remains 0.98.
+
+Let fjc denote a checkpoint metric for checkpoint c of trajectory j, and let mj be that trajectory’s
+checkpoint count. The pooled statistic is
+                         P32j=1 Pmjc=1 fjc        32                                 ¯fpooled =                        ,  X mj = 650.                    (C.2)
+                           P32j=1 mj          j=1
+
+This specifies the weighting used for pooled checkpoint means; trajectories remain the independent
+experimental units. No individual task outcomes are needed to interpret this representation-level
+comparison.
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    21
+
+======================== PDF 第 22 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+C.3 Low-Energy Subspace and Controlled Replacement
+
+Let Vlow contain the centered-history singular vectors after the 90% energy cutoff, and write
+˜xi = xi −¯x. The block’s low-energy fraction and its alignment with the action are
+                             ∥Vlow˜xi∥2⊤     2
+                             Li =                ,                                          (C.3)
+                             ∥V ⊤˜xi∥22
+                           Ai = cos VlowVlow˜xi,⊤    VlowVlowa⊤     .                          (C.4)
+
+These quantities are evaluated when their denominators and cosine norms are nonzero. The targeted
+condition removes a retained block with high Ai; the matched condition removes a low-alignment
+block while matching representation similarity, recency, and serialized length. The two conditions
+retain the same number of blocks. These definitions specify the intervention reported in Table 2.
+The spectral visualization groups ordered directions into rank bands, whereas the intervention uses
+the cumulative-energy cutoff above. Keeping these definitions separate connects the visualization to
+the formal replacement analysis without treating rank fractions as energy fractions.
+
+D Ablation and Hyperparameter Analysis
+
+D.1  Selectors at the Same Retained Count
+
+Table D.1 compares selection strategies at the same retained count on 32 trajectories and 59
+checkpoints. This comparison isolates which records are selected from how many records are
+retained. The evidence-first selector achieves the highest reported final projection and next-action
+Top-3 retention while retaining high geometric coverage.
+
+                Table D.1: Same-retained-count offline selector comparison on 32
+                  trajectories and 59 checkpoints.
+
+
+                   Selector         Action   Final   Goal   Top-3   Centroid
+
+                Recent-K           0.96    0.88    0.82     0.76        0.97
+              Random-K          0.92    0.92    0.95     0.45        0.99
+                  Cosine Top-K       0.86    0.91    0.97     0.53        0.96
+                  Novelty Top-K      0.93    0.93    0.96     0.33        0.99
+           GEM               0.95    0.95    0.96     0.78        0.99
+
+
+D.2 Contribution of Evidence Protection
+
+Table D.2 reports the component ablation at each variant’s natural retained fraction. Relative to
+geometry-only selection, the complete protection bundle retains more action-related information.
+Removing State or Error protection reduces Top-3 retention, supporting their role within the
+combined evidence set. The natural-budget comparison complements the fixed-count comparison
+above; their retained fractions and checkpoint protocols are reported separately.
+For the online ablation in Table 5, Random completion retains the protected set and candidate
+pool and fills remaining slots by seeded sampling to match the greedy reference count. Geometry
+only removes the semantic protection groups while retaining the candidate policy, residual rule,
+and request-validity bookkeeping. These definitions separate the roles of evidence protection and
+geometric completion without duplicating the online outcome table.
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    22
+
+======================== PDF 第 23 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+             Table D.2: Offline component ablation at each variant’s natural retained
+               fraction (32 trajectories, 59 checkpoints).
+
+
+               Variant                  Retention   Action   Top-3   Centroid
+
+                  Full constraints                 0.46      0.95     0.62        0.99
+              Geometry only                  0.39      0.91     0.25        0.98
+               Recent + Goal only              0.45      0.95     0.57        0.98
+               Without State                   0.45      0.95     0.53        0.98
+               Without Error                   0.45      0.95     0.56        0.98
+                 All candidates                  0.44      0.95     0.59        0.99
+            Maximum basis K = 12         0.44      0.95     0.61        0.98
+            Maximum basis K = 20         0.47      0.95     0.63        0.99
+
+               Because retention differs across variants, this table does not isolate selection quality
+                   at identical budgets. The same-K comparison above provides the corresponding
+                 budget-controlled view.
+
+D.3 Budget and Coverage Sensitivity
+
+The exact-K sweep uses 28 trajectories and 525 checkpoints common to all budgets. Table D.3
+gives the complete tested range K = 8, . . . , 20, including all four selectors. Evidence-constrained
+selection exceeds geometry-only Top-3 retention throughout this range.
+
+The coverage sweep uses 32 trajectories and 59 checkpoints. Table D.4 shows the retained frac-
+tion, next-action Top-3 retention, and action projection for every tested threshold. Increasing τ
+progressively adds geometric coverage and retains additional task evidence. The τ = 0.90 row is
+the operating point highlighted in the main text.
+
+These sweeps provide the tabulated values corresponding to Figure 5. They evaluate representation-
+level evidence retention under controlled compression settings.
+
+
+E Evaluation Protocol and Efficiency Analysis
+
+E.1 Task Units and Aggregate Metrics
+
+The online evaluation uses WorkBuddyBench31 with DeepSeek-V4-Flash32 at temperature zero. A
+complete task is the unit for reward and token aggregation. For a domain d with Nd tasks, define
+
+                            100                     1
+                      Scored = X Ri,     Tokensd = X Ti.                   (E.1)
+                        Nd                  Nd
+                                            i∈d                             i∈d
+
+Overall Full260 means weight domains by task count. The fixed-40 panel contains ten tasks per
+domain, and the 20-task online ablation contains five per domain. All three use the same domain
+order: Code, Office, Security, and Web.
+
+The trajectory-level geometric analyses evaluate a different question from end-to-end reward.
+Long-context understanding is likewise studied through context-use analyses and dedicated bench-
+marks36,37,38; here the primary online outcome is the reward of a completed agent task.
+
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    23
+
+======================== PDF 第 24 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+               Table D.3: Exact retained-count sweep. Values are next-action Top-
+             3 retention on 28 trajectories and 525 checkpoints common to all
+           K.
+
+                    Geometry      Evidence
+         K          only    constrained    Recent-K    Recent+Goal
+
+                8           0.18            0.56          0.50             0.51
+                9           0.21            0.56          0.53             0.52
+                10          0.24            0.57          0.55             0.53
+                11          0.27            0.59          0.54             0.54
+                12          0.31            0.60          0.56             0.56
+                13          0.33            0.62          0.58             0.57
+                14          0.36            0.62          0.60             0.59
+                15          0.42            0.64          0.63             0.61
+                16          0.46            0.67          0.66             0.63
+                17          0.50            0.68          0.68             0.66
+                18          0.54            0.71          0.69             0.67
+                19          0.59            0.74          0.71             0.72
+                20          0.66            0.78          0.74             0.74
+
+                  Table D.4: Coverage-threshold sweep on 32 trajectories and
+                59 checkpoints.
+
+
+                       τ     Retained fraction   Top-3   Action projection
+
+                      0.85                 0.38     0.58                 0.94
+                      0.86                 0.39     0.58                 0.94
+                      0.87                 0.41     0.58                 0.95
+                      0.88                 0.43     0.61                 0.95
+                      0.89                 0.44     0.62                 0.95
+                      0.90                 0.48     0.64                 0.96
+                      0.91                 0.48     0.64                 0.96
+                      0.92                 0.49     0.64                 0.96
+                      0.93                 0.50     0.64                 0.96
+                      0.94                 0.51     0.64                 0.96
+                      0.95                 0.53     0.65                 0.97
+
+
+E.2 Token Accounting and Full260 Efficiency
+For each counted call c in task i, let Iic and Oic denote model input and output tokens, and let Tienc
+be embedding usage. Combined tokens are
+
+                                   Ti = X (Iic + Oic) + Tienc .                              (E.2)
+                                                       c
+When usage is partitioned, Iic = Iuncachedic   + Icachedic    and Oic = Onormalic  + Oreasoningic          . The component
+counts are not added to the input/output totals a second time. Model tokens are the four model
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    24
+
+======================== PDF 第 25 页 ========================
+TSINGSHU RESEARCH                                                                                                      Stable Geometry
+
+components; combined tokens additionally include the selector’s embedding usage.
+
+                        Table E.1: Full260 token composition, mean per
+                            task. K and M denote thousands and millions of
+                          tokens. Values use the same reporting precision
+                         as the main text.
+
+
+                       Token category     Base agent   GEM
+
+                        Uncached input        48.70K    201.48K
+                        Cached input          2.60M     1.82M
+                        Normal output         12.40K     15.68K
+                          Reasoning output       25.38K     22.81K
+
+                       Model total            2.69M     2.06M
+                        Embedding                 0     46.97K
+
+                      Combined            2.69M     2.11M
+
+Table E.1 explains the net reduction in Table 3: combined usage decreases from 2.69M to 2.11M per
+task after accounting for embedding cost. The reduced cached-input volume more than offsets the
+additional embedding and uncached-input volume. All categories are retained so that the total is
+interpretable.
+Token accounting is distinct from the physical memory management studied in LLM serving39. The
+combined-token measure here includes both cached and uncached input and is used consistently for
+the efficiency comparison; it is not presented as a direct wall-clock measurement.
+
+E.3 Reference Panel and Online Ablation Protocol
+
+The current fixed-40 method comparison is reported in Table 4; the current 20-task online ablation
+is reported in Table 5. This appendix specifies their aggregation and method definitions rather than
+reproducing task-level records or expanding the tables into individual task outcomes.
+
+The fixed-40 panel and the Full260 evaluation retain the comparison scope stated in the main text.
+The same-ID GEM slice and the reference methods are not treated as a newly executed paired
+comparison. The online ablation uses the same protected-set definitions, candidate policy, and
+valid-request structure, with only the completion or protection component changed as described in
+Appendix D.
+
+
+
+
+
+STABLE GEOMETRY / LONG-HORIZON AGENTS                                                                    25

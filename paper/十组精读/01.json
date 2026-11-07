@@ -1,0 +1,147 @@
+[
+  {
+    "id": "W01",
+    "title": "Neural Dynamics Self-Attention for Spiking Transformers",
+    "year": 2026,
+    "status": "ICLR 2026 conference paper；本地16页arXiv:2603.19290v1，2026-03-09",
+    "source_url": "https://proceedings.iclr.cc/paper_files/paper/2026/hash/5fc6b31407972f3226464a9178e93da7-Abstract-Conference.html",
+    "local_pdf": "C:/Users/CAI BIN/Desktop/1/paper/W01_LRF-Dyn_ICLR2026.pdf",
+    "screenshot_check": "已用view_image核对截图1上方卡片：中文标题“ICLR 2026 | Attention矩阵都不...”截断，缩略图显示摘要末段、Introduction及ICLR标记；与本地首页的charge–fire–reset、消除显式attention矩阵表述相合。截图自身不能读出完整题名，结合PDF首页与ICLR官方论文页确定身份；下方Radial不是同一篇。",
+    "contribution": "把局部空洞卷积与多树突脉冲动力学接入Spiking Transformer，在保留视觉精度收益的同时减少attention中间状态存储。",
+    "problem": "SSA去softmax后缺少足够局部偏置，且即便利用结合律Q(K^TV)，仍需d×d中间状态。作者关注视觉SNN推理的精度/存储折衷，不是给LLM softmax attention提供精确等价替换。",
+    "mechanism": "分两步。LRF-SSA保留Q(K^TV)全局聚合，在V上加入两条3×3 depthwise卷积分支，dilation=3和5，强化邻域。LRF-Dyn进一步用多树突状态递推X_n=A⊙X_(n-1)+ΓToken_n及局部状态混合代替显式Q/K/V attention；A和Γ由树突时间常数、相邻树突耦合和读出权重参数化，树突数k=8。时不变更新可转成卷积核，用FFT并行训练，最后SN执行发放/复位。其相似性是结构近似，非任意输入下与SSA逐值相等。",
+    "formulas_and_conditions": [
+      "p5 Eq8：y_n=q_n Σ_j k_j^T v_j + Σ_{δ∈{3,5}} DWConv_δ(V)_n；局部卷积是加性分支。",
+      "p6 Eq12、p7 Eq15：X_n=A⊙X_(n−1)+ΓToken_n，H=F^{-1}(F(K)∗F(X))，局部混合后SN；沿token位置递推不能被混同于脉冲仿真时间t。",
+      "理论采用q_i^Tk_j≈a−βΔ、归一化非负权重和凸混合；若λ∈[0,1]且μ_r≤μ_SSA，则μ_mix=(1−λ)μ_SSA+λμ_r≤μ_SSA。该条件性恒等式不能独立证明所有softmax attention局部。",
+      "我们的数学检查：p16 Eq19的H(mix)≤h(λ)+(1−λ)H(P)+λH(R)不能仅由H(R)≤H(P)推出Eq20。需补充能保证混合分布熵不升的结构条件，例如证明混合分布majorizes原分布；仅H(R)≤H(P)不够，现有推导不足，不否定表格中的经验结果。"
+    ],
+    "evidence": [
+      {
+        "claim": "ImageNet-1K，Spikformer-8-512基线73.38%，LRF-SSA74.62%，LRF-Dyn74.51%；LRF-Dyn增加1.13个百分点，参数29.68M→29.71M，表中attention存储O(d²)→O(kd)。",
+        "page_or_table": "PDF p8 Table 1"
+      },
+      {
+        "claim": "ADE20K，SDT-V3小模型mIoU33.6→36.3（LRF-Dyn），大模型41.3→43.1；均T=4。不得把这写成普遍ANN精度胜出。",
+        "page_or_table": "PDF p8 Table 2"
+      },
+      {
+        "claim": "作者报告Spikformer-8-512准确率+1.13个百分点同时推理内存减少49.4%；这是图5对应设置，不是通用节省比例。",
+        "page_or_table": "PDF p9 Figure 5(b)及正文"
+      },
+      {
+        "claim": "CIFAR-100消融，LRF-Dyn无LRF为77.78，Ω≤5为78.57；LRF-SSA对应77.86→78.64，支持局部分支本身贡献。",
+        "page_or_table": "PDF p9 Table 3"
+      }
+    ],
+    "compute": "公开基准ImageNet-1K、ADE20K、CIFAR-100；ImageNet模型约5.24M–66.53M，ADE20K脉冲步数4。全文未确认GPU型号/卡数、GPU-hours、完整训练超参和直接测量能耗。论文及官方会议页未定位到作者代码链接；定向查找只找到论文/他人笔记，代码可得性记未确认，不据此断言不存在。",
+    "limits": [
+      "与Spikformer/QKFormer相比是真正新增局部先验与多树突状态实现；不是首创线性attention或SSM，也没有给任意QK内容依赖保持的保证。",
+      "理论的相似度随距离线性下降是假设；附录非负线性分布条件0≤β≤α/(N−1)影响渐近比较，不能照搬为所有SSA的定理。",
+      "我们的数学检查指出p16 Eq19→Eq20的推导不足；这是本次检查，不是作者自述。没有据此宣称整篇方法无效。",
+      "O(kd)应解读为相关attention状态口径，不能外推为训练峰值显存、完整模型总存储或已经实测芯片功耗。",
+      "本文未验证LLM语言建模、长视频生成或长期事件保真；局部视觉提升不自动说明长程记忆充分。"
+    ],
+    "transfer_hypothesis": "推断：在我方ESN/资源条件研究中，给固定状态递推添加受控局部通路，可能在匹配状态字节、精度、接口容量后减少局部信息编码负担。应把它作为可检验结构因素，不将已冻结动力学项目换名重启。向LLM/视频迁移时可测试局部交互+小状态，但经典SSM/S4/Mamba、局部卷积与线性attention已构成直接碰撞。",
+    "pilot": "建议而未执行：固定同一视觉编码器与token顺序，比较固定ESN、固定ESN+LRF、学习递推+LRF、等参数纯卷积；扫描状态预算和任务距离，匹配训练样本、总状态、接口、精度与参数；先用一个小型分类/延迟事件诊断，3 seeds，记录准确率、峰值显存、实际延迟。局部任务改善而远距依赖退化应如实报告；只有超越等预算强基线并解释何时有效，才考虑扩展。",
+    "priority": "B：机制与消融值得精读；作为ESN对照中高优先，独立新主线中低优先。4–8高端GPU足以规划小模型复现，但论文未报成本，不能保证完整复现时长。2–4人优先一人核实现/理论、其余做受控对照，不从头训练大模型。",
+    "read_audit": "fitz已提取全文；逐页读主文p1–9与理论/稳定性附录p14–16，检索全16页成本/代码信息，渲染p16核对公式。"
+  },
+  {
+    "id": "W02",
+    "title": "Radial Attention: O(n log n) Sparse Attention with Energy Decay for Long Video Generation",
+    "year": 2025,
+    "status": "NeurIPS 2025；本地25页arXiv:2506.19852v2，2025-12-06 camera-ready",
+    "source_url": "https://arxiv.org/abs/2506.19852",
+    "local_pdf": "C:/Users/CAI BIN/Desktop/1/paper/W02_Radial_Attention_NeurIPS2025.pdf",
+    "screenshot_check": "已核对截图1下方论文卡片，英文完整题名、作者机构、首图、arXiv:2506.19852v2与NeurIPS 2025页脚对应本地PDF。是2025年论文，不能用微信转发日期改记2026。",
+    "contribution": "将视频注意力的时空局部性写成可用于训练的固定分块稀疏mask，以保留softmax机制的低成本LoRA适配换取长视频加速。",
+    "problem": "长视频DiT的3D全注意力随帧数平方增长；SVG逐头在线分类空间/时间模式不方便直接用于长视频训练；直接改线性attention在少量适配下难保持原模型质量。",
+    "mechanism": "令每帧s个token、f帧、n=fs。对帧距d_t按r=floor(log2(max(d_t,1)))分环带，环带距离范围翻倍、每对帧计算密度减半；保留空间展平索引附近宽度约s/2^r的对角带。当宽度低于1，用同位置token但降低保留帧对频率。另保留首帧attention sink。实际采用128×128块稀疏；softmax仍对保留项归一化。长视频对Q/K/V/O投影做rank128 LoRA；其密度是按对数环带指数递减，约随帧距反比，不能误说成直接exp(-帧距)删边。",
+    "formulas_and_conditions": [
+      "p5–6 Eq4：r=floor(log2 max(|i−j|,1))；当2^r≤s且|k−l|+1≤s/2^r保留；否则同位置k=l且|i−j| mod ceil(2^r/s)=0可保留。首帧sink另加。",
+      "p6 Eq6：非零交互数上界为O(s²f log f)=O(sn log(n/s))；只有固定分辨率/每帧token数s并增长f时才称O(n log n)，分辨率方向仍二次。",
+      "作者误差推导假设每个相关位置满足相对指数包络a_(j,l)≤Crel exp(−α|j−i0|−β|l−k0|)a0，α,β>0；平均衰减曲线拟合不能独立验证每行每点的包络。",
+      "我们的数学检查：p17定义w(d_t)=s/2^floor(log2 max(d_t,1))，p18却使用d_t≤s⇒w≥s/2。取s=16,d_t=8，w=2<8，定义与后续不等式冲突，故当前给出的Eq7误差界推导不足。该检查不否定算法与实验加速。",
+      "我们的复杂度检查：实际配置保留若干完整稠密DiT层及默认长度前12个全注意力去噪步，因此O(n log n)是稀疏模块的标度，不能无条件宣称完整混合系统严格具有该渐近复杂度。"
+    ],
+    "evidence": [
+      {
+        "claim": "默认117帧HunyuanVideo，单H100：dense1649s→Radial876s，1.88×；PSNR27.3、LPIPS0.114，Vision Reward0.141→0.139。是相对dense输出的保真/效率折衷，不是每个质量指标都更好。",
+        "page_or_table": "PDF p7 Table 1，p8 Implementation details"
+      },
+      {
+        "claim": "HunyuanVideo509帧：Radial稀疏率88.3%，训练21.4h对dense93.6h，推理781s对2895s，分别4.37×/3.71×；Vision Reward0.134对0.133。训练和该长视频推理均8H100，不能混用默认单卡口径。",
+        "page_or_table": "PDF p8 Table 2及实施说明"
+      },
+      {
+        "claim": "Wan2.1-14B平均attention输出MSE，Radial3.9×10^-3、SVG4.4×10^-3、STA1.5×10^-2；平均衰减曲线指数拟合R²>0.985。",
+        "page_or_table": "PDF p10 §5.3 / Figure 8"
+      },
+      {
+        "claim": "Mochi667帧Radial Vision Reward0.113高于PA0.107，但PA的Aesthetic Quality0.633与Image Quality0.650高于Radial0.618/0.638，不能称所有指标统一最优。",
+        "page_or_table": "PDF p8 Table 2"
+      }
+    ],
+    "compute": "长视频每个目标长度从OpenVid-1M筛2,000段；全部LoRA训练8×H100。Hunyuan 2×/4×分别2400/1200步、global batch1+sequence parallel，Mochi5000步、batch1，Wan2×2500步、batch8，LoRA rank128；训练前2个DiT块保持dense。Hunyuan4×表2为8×21.4=171.2 GPU-hours（由表格换算），dense8×93.6=748.8 GPU-hours；不将首页展示的约746当精确表值。作者仓库https://github.com/mit-han-lab/radial-attention确有Wan/Hunyuan推理、multi-GPU说明；2026-11-05读取README仍将Mochi支持和长视频LoRA checkpoints标为待发布，不能声称长视频全套权重齐备。",
+    "limits": [
+      "与SVG区别是一个统一静态mask及训练适配，与STA区别是远距离仍有逐级稀疏跨帧交互，与PowerAttention区别是视频空间位置相关结构；不能概括为首次O(n log n)注意力。",
+      "固定空间索引距离未显式追踪大运动；作者承认指数衰减简化了自然视频，分辨率方向仍二次。",
+      "本次数学检查的A.2不等式冲突说明原误差界当前论证不足；经验回归和已有加速不因这个检查自动失效。",
+      "质量多为Vision Reward、PSNR/LPIPS与部分VBench维度；没有直接证明复杂事件顺序、因果一致性或任意长期依赖不丢。",
+      "代码公开不等于全部复现实验资产已发布；README未勾选的长视频checkpoint与Mochi支持需单独补齐。"
+    ],
+    "transfer_hypothesis": "推断：稀疏mask按平均注意力能量分配预算，可能丢弃权重低但决定长期事件的少量远程联系。对我方视频方向，可研究等非零块数下的事件相关联系恢复是否改善任务保真；固定tokenizer/执行日程，与旧GN分块相位路线分开。对LLM不应硬套二维空间距离，需任务相关图距离与长程检索对照；对ESN可借用分层历史预算思想，但这本身已被多尺度记忆覆盖。",
+    "pilot": "建议而未执行：先用现有Wan/Hunyuan推理，40个预先选定、含远距实体复现或动作顺序的prompt×2 seeds；同噪声比较dense、Radial、STA/SVG及等块预算的远程联系恢复版本。先确认dense能够完成目标事件，盲核事件一致性，再测恢复联系是否修复；同时报Vision Reward、实际延迟、峰值显存及非零块数。第二模型复现后才做LoRA。直接碰撞包括SVG/STA/PowerAttention、NSA/MoBA及各类内容自适应视频稀疏注意力；不能仅凭“事件重要”口号申报新颖。",
+    "priority": "A：本组最高，适合作为长视频效率与任务保真基线。8H100能覆盖论文级单次LoRA适配；4卡或非H100需降规模/重测并行和显存，不能承诺同耗时。2–4人可分kernel/模型、数据与盲评、理论与对照；先做推理诊断，避免同时重训3个10–14B模型。",
+    "read_audit": "fitz已提取本地全文；重点阅读p1–10、复杂度与误差附录p16–18及长视频可视化，渲染p8、p18核对表格与数学不等式；核查作者仓库README sha611b36ebd2f5dbe1e0141d66b666e79f3c1cb851。"
+  },
+  {
+    "id": "W03",
+    "title": "Skill-Evolving Grounded Reasoning for Free-Text Promptable 3D Medical Image Segmentation",
+    "year": 2026,
+    "status": "MICCAI 2026；本地11页arXiv:2603.08215v3，2026-09-24；官方会议页面Paper3761确认",
+    "source_url": "https://papers.miccai.org/miccai-2026/0966-Paper3761.html",
+    "local_pdf": "C:/Users/CAI BIN/Desktop/1/paper/W03_SEER_MICCAI2026.pdf",
+    "screenshot_check": "已核对截图2：英文题名与arXiv:2603.08215v3/24 Sep 2026清晰对应本地PDF；中文卡片“方差暴降82%！MICCAI新范式...”是对摘要81.94%的宣传转述。题名与SEER身份确定；不将该百分比解释为每个数据集、每个backbone都下降82%。",
+    "contribution": "在冻结3D分割器前加入受视觉证据约束的指令解释器，并把成功轨迹蒸馏为可检索技能，缓解同义/拼写变化造成的掩膜漂移。",
+    "problem": "相同临床目标的缩写、同义说法和自由文本会落入不同语言嵌入区域，使已有分割器输出变化；真正目标是稳定地把临床意图转换成现有分割器可执行的规范提示，不是重新学习完整3D分割模型。",
+    "mechanism": "3D体积渲染多视角2D切片，Qwen3-VL-4B-Instruct依次生成<evidence>可见解剖证据、<rationale>消歧过程、<answer>规范分割指令；冻结VoxTell执行答案。先以SEER-Trace监督微调，再GRPO结合执行Dice、等价改写稳定性与格式/KL约束训练。每轮从高奖励轨迹蒸馏(tag,content,audit metadata)技能，按文本别名/目标/标签和视觉线索检索，去重、按经验收益修剪后回注训练/推理输入。",
+    "formulas_and_conditions": [
+      "p5 Eq3：J(θ)=E_(V,q,G)[E_(q'∈Ω(q)) Dice(S(V,aθ(V,q')),G) − λ Var_(q'∈Ω(q)) Dice(S(V,aθ(V,q')),G)]。Ω(q)必须保持临床语义等价，奖励阶段需要真实分割G；不能理解成无标签部署时自动获得Dice反馈。",
+      "p6 Eq5：B_(t+1)=Prune(Dedup(B_t ∪ Distill(Ξ+)))；p6 Eq6：Δ(s)=E[R|s被检索]−E[R|s未被检索]。后者是观测条件差，若样例难度/检索概率不同，不自动等于技能因果增益。",
+      "p4–5图像证据、推理文本和规范答案是输出格式约束；格式存在本身不保证理由真实依赖图像，需要视觉置换等干预检验。"
+    ],
+    "evidence": [
+      {
+        "claim": "PENGWIN自由文本：VoxTell Dice92.26、worst79.34、Std7.49；SEER97.39、95.47、0.98。BrainMetShare对应52.15/46.71/3.35→53.83/51.44/1.67。",
+        "page_or_table": "PDF p6 Table 1（已渲染核对）"
+      },
+      {
+        "claim": "PENGWIN消融：加原始Qwen VLM后Dice降至84.84、Std升至14.15；经grounded reasoning微调达95.92/3.84，再加SEER-Loop达97.39/0.98。这说明未经训练的提示重写并非自动有效，但仍混合了训练与grounding因素。",
+        "page_or_table": "PDF p8 Table 2"
+      },
+      {
+        "claim": "换为MedSAM3且冻结SEER前端，Dice5.75→19.97、worst3.67→3.94，但Std6.40→13.30；跨骨干均值收益存在，稳定性并非单调改善。",
+        "page_or_table": "PDF p8 Cross-backbone generalization"
+      },
+      {
+        "claim": "SEER-Trace 1,811病例、22,330实例；抽查1,120例发现7例异常（0.63%）。这是生成轨迹质量抽查，不能当真实医生自由文本上的总体泛化保证。",
+        "page_or_table": "PDF p4 §2.1"
+      }
+    ],
+    "compute": "论文p7报告NVIDIA A100，未报卡数/GPU-hours/完整GRPO采样与奖励系数；Qwen3-VL-4B视觉编码器冻结，其余参数全更新，并非论文已证实使用LoRA。训练来自BraTS/ISLES/FLARE/HVSMR等公开基准，评测BrainMetShare与PENGWIN。作者仓库https://github.com/Ztrura/SEER现有数据预处理与推理说明、v1.0/v1.1 reasoning checkpoints及评测split发布声明；checkpoint仅VLM前端，分割骨干需另接。HF权重目录本次工具未能打开，未下载确认大文件；完整训练数据/GRPO与循环训练脚本可得性未确认。正文称DeepSeek-V3.2为高容量VLM教师，但具体视觉接入/教师配置未给，不能假装复现细节已齐。",
+    "limits": [
+      "区别于VoxTell/MedSAM等直接提示分割，是规范化前端+视觉消歧+可复用技能记忆；GRPO、RAG及经验蒸馏各自均非新概念。",
+      "PENGWIN的OOD指目标不在SEER-Trace推理监督，不意味着冻结VoxTell或基础VLM从未见过骨盆解剖。",
+      "主实验仅两个数据集；主要提示由模型生成，多视角2D不能无损表达3D拓扑。缺匹配训练预算的纯文本规范化、固定/随机检索及视觉打乱消融。",
+      "摘要81.94%性能方差下降的汇总计算未在主表直接列明；本报告使用Table1原始Std，不把Std与variance互换。",
+      "SEER-Loop需有标签Dice奖励来选轨迹；技能Δ(s)不能未经配对/随机化就作因果贡献。推理文本可审计但不等于真实机制证明。",
+      "MedSAM3迁移中Std变差，说明上游提示优化不能绕过分割骨干能力上限。"
+    ],
+    "transfer_hypothesis": "推断：我方OVS/视觉QA可把等价自然语言请求先变成带视觉证据的规范目标，检验其是否减少同义改写导致的目标漂移；SINN/SRDM已有标注资产可帮助构造视觉必需性检查，但必须重新独立划分，不能用“模型答对后再改难”的集合直接当无偏测试。LLM可迁移等价指令集合上的最坏情况/稳定性目标；ESN仅适合作前端接口实验，不构成新动力学结论。",
+    "pilot": "建议而未执行：选一个冻结开放词汇视觉模型；对同一图像构造人工确认的4种等价说法和一个需视觉消歧的反例。比较原提示、强text-only规范化、同预算grounded规范化、加入静态/演化skill bank；加图像置换、无图与oracle规范标签对照，严格按图像/目标划分训练测试。记录均值、最坏分数、Std、调用token和延迟，只有视觉干预与技能随机化确认增益后才扩大。碰撞包括SEER本身、提示规范化、MedSAM-Agent、GRPO和检索式技能记忆；直接换医学为一般视觉不够。",
+    "priority": "B：稳健接口与评估设计高优先，缺医学协作者时不建议新开3D医学主线。4–8高端GPU可规划4B前端小规模微调和冻结骨干评估，但原文缺GPU总时长，GRPO多轨迹与3D执行成本需先测。2–4人最缺高质量等价提示、数据划分和视觉因果对照，不是单纯更多卡。",
+    "read_audit": "fitz逐页提取并阅读11页全文，渲染p6核对表1；读官方MICCAI条目、作者项目页和README（sha7fdc2a8d51b0c6bf5dde1a191f20ec2bdfba6c7f）；未将会议审稿分数当录用概率。"
+  }
+]

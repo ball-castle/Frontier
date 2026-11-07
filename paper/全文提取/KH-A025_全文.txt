@@ -1,0 +1,670 @@
+KH-A025 | Focal Loss for Dense Object Detection
+来源：https://arxiv.org/abs/1708.02002
+本地PDF：专题文献/何恺明/KH-A025_Focal_Loss_for_Dense_Object_Detection_ICCV2017.pdf
+SHA-256：2e6f45b97007009f32b82a3c19f35638d8da7022d8d4e4416b9078de91339f71
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                          Focal Loss for Dense Object Detection
+
+                  Tsung-Yi Lin   Priya Goyal   Ross Girshick  Kaiming He   Piotr Doll´ar
+                                     Facebook AI Research (FAIR)
+
+
+
+
+            5                                                             38
+                   CE(pt) = −log(pt)                         = 0                                                                    RetinaNet-50
+                                                                = 0.5                            G               RetinaNet-101
+            4        FL(pt) = −(1 −pt)γ log(pt)                = 1           36                                               AP   time
+                                                                = 2                                                                 [A] YOLOv2† [27]  21.6   25
+                                                                                                                                                                      [B]                                                                                                                                        SSD321                                                                                                                                                                                              [22]                                                                                                                                                                                             28.0                                                                                                                                                                            61                                                                = 5         AP 34            3                                                                                                                                                                [C]                                                                                                                                                                                             28.0                                                                                                                                                                            85                                                                                                                                  DSSD321                                                                                                                                                                                                             [9]                                                                                            F
+                                                                                                                                                                [D] R-FCN‡ [3]     29.9   852018       loss                                                               32                                               [E] SSD513 [22]     31.2  125            2                                                                                                                        COCO                E                   [F] DSSD513 [9]    33.2  156                                                                 well-classiﬁedwell-classiﬁed                                                                  [G] FPN FRCN [20] 36.2  172
+                                                        examplesexamples               30      D                               RetinaNet-50-500   32.5   73
+                                                                                                                                                             RetinaNet-101-500  34.4   90Feb      1
+                                                                                                                                                             RetinaNet-101-800  37.8  198
+                                                                                                                                                                                                 plotted  ‡Extrapolated time7                                                                    28  B   C                              †Not
+            0
+             0          0.2          0.4          0.6          0.8         1         50         100        150        200        250
+                               probability of ground truth class                                              inference time (ms)
+          Figure 1. We propose a novel loss we term the Focal Loss that      Figure 2. Speed (ms) versus accuracy (AP) on COCO test-dev.
+          adds a factor (1 −pt)γ to the standard cross entropy criterion.     Enabled by the focal loss, our simple one-stage RetinaNet detec-
+           Setting γ > 0 reduces the relative loss for well-classiﬁed examples       tor outperforms all previous one-stage and two-stage detectors, in-[cs.CV]    (pt > .5), putting more focus on hard, misclassiﬁed examples. As      cluding the best reported Faster R-CNN [28] system from [20].
+          our experiments will demonstrate, the proposed focal loss enables    We show variants of RetinaNet with ResNet-50-FPN (blue circles)
+           training highly accurate dense object detectors in the presence of     and ResNet-101-FPN (orange diamonds) at ﬁve scales (400-800
+           vast numbers of easy background examples.                              pixels).  Ignoring the low-accuracy regime (AP<25), RetinaNet
+                                                                       forms an upper envelope of all current detectors, and an improved
+                                                                                     variant (not shown) achieves 40.8 AP. Details are given in §5.
+                        Abstract
+
+          The highest accuracy object detectors to date are based     1. Introduction
+        on a two-stage approach popularized by R-CNN, where a
+          classiﬁer is applied to a sparse set of candidate object lo-        Current state-of-the-art object detectors are based on
+          cations.  In contrast, one-stage detectors that are applied     a two-stage, proposal-driven mechanism. As popularized
+         over a regular, dense sampling of possible object locations      in the R-CNN framework [11], the ﬁrst stage generates a
+        have the potential to be faster and simpler, but have trailed     sparse set of candidate object locations and the second stage
+          the accuracy of two-stage detectors thus far. In this paper,      classiﬁes each candidate location as one of the foreground
+       we investigate why this is the case. We discover that the ex-      classes or as background using a convolutional neural net-arXiv:1708.02002v2         treme foreground-background class imbalance encountered     work. Through a sequence of advances [10, 28, 20, 14], this
+         during training of dense detectors is the central cause. We     two-stage framework consistently achieves top accuracy on
+         propose to address this class imbalance by reshaping the      the challenging COCO benchmark [21].
+         standard cross entropy loss such that it down-weights the        Despite the success of two-stage detectors, a natural
+          loss assigned to well-classiﬁed examples. Our novel Focal     question to ask is: could a simple one-stage detector achieve
+        Loss focuses training on a sparse set of hard examples and      similar accuracy? One stage detectors are applied over a
+         prevents the vast number of easy negatives from overwhelm-      regular, dense sampling of object locations, scales, and as-
+         ing the detector during training. To evaluate the effective-     pect ratios.  Recent work on one-stage detectors, such as
+         ness of our loss, we design and train a simple dense detector   YOLO [26, 27] and SSD [22, 9], demonstrates promising
+       we call RetinaNet. Our results show that when trained with      results, yielding faster detectors with accuracy within 10-
+          the focal loss, RetinaNet is able to match the speed of pre-    40% relative to state-of-the-art two-stage methods.
+         vious one-stage detectors while surpassing the accuracy of        This paper pushes the envelop further: we present a one-
+           all existing state-of-the-art two-stage detectors. Code is at:     stage object detector that, for the ﬁrst time, matches the
+        https://github.com/facebookresearch/Detectron.           state-of-the-art COCO AP of more complex two-stage de-
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+tectors, such as the Feature Pyramid Network (FPN) [20]     2. Related Work
+or Mask R-CNN [14] variants of Faster R-CNN [28]. To
+                                                             Classic Object Detectors: The sliding-window paradigm,achieve this result, we identify class imbalance during train-
+                                                                   in which a classiﬁer is applied on a dense image grid, hasing as the main obstacle impeding one-stage detector from
+                                                          a long and rich history. One of the earliest successes is theachieving state-of-the-art accuracy and propose a new loss
+                                                                    classic work of LeCun et al. who applied convolutional neu-function that eliminates this barrier.
+                                                                          ral networks to handwritten digit recognition [19, 36]. Vi-
+   Class imbalance is addressed in R-CNN-like detectors      ola and Jones [37] used boosted object detectors for face
+by a two-stage cascade and sampling heuristics. The pro-      detection, leading to widespread adoption of such models.
+posal stage (e.g., Selective Search [35], EdgeBoxes [39],    The introduction of HOG [4] and integral channel features
+DeepMask [24, 25], RPN [28]) rapidly narrows down the      [5] gave rise to effective methods for pedestrian detection.
+number of candidate object locations to a small number    DPMs [8] helped extend dense detectors to more general
+(e.g., 1-2k), ﬁltering out most background samples. In the      object categories and had top results on PASCAL [7] for
+second classiﬁcation stage, sampling heuristics, such as a    many years. While the sliding-window approach was the
+ﬁxed foreground-to-background ratio (1:3), or online hard     leading detection paradigm in classic computer vision, with
+example mining (OHEM) [31], are performed to maintain a      the resurgence of deep learning [18], two-stage detectors,
+manageable balance between foreground and background.      described next, quickly came to dominate object detection.
+   In contrast, a one-stage detector must process a much                                                      Two-stage Detectors: The dominant paradigm in modern
+larger set of candidate object locations regularly sampled                                                                object detection is based on a two-stage approach. As pio-
+across an image. In practice this often amounts to enumer-                                                          neered in the Selective Search work [35], the ﬁrst stage gen-
+ating ∼100k locations that densely cover spatial positions,                                                                   erates a sparse set of candidate proposals that should con-
+scales, and aspect ratios. While similar sampling heuris-                                                                     tain all objects while ﬁltering out the majority of negative
+tics may also be applied, they are inefﬁcient as the training                                                                   locations, and the second stage classiﬁes the proposals into
+procedure is still dominated by easily classiﬁed background                                                           foreground classes / background. R-CNN [11] upgraded the
+examples. This inefﬁciency is a classic problem in object                                                            second-stage classiﬁer to a convolutional network yielding
+detection that is typically addressed via techniques such as                                                                  large gains in accuracy and ushering in the modern era of
+bootstrapping [33, 29] or hard example mining [37, 8, 31].                                                                object detection. R-CNN was improved over the years, both
+   In this paper, we propose a new loss function that acts      in terms of speed [15, 10] and by using learned object pro-
+as a more effective alternative to previous approaches for     posals [6, 24, 28]. Region Proposal Networks (RPN) inte-
+dealing with class imbalance. The loss function is a dy-     grated proposal generation with the second-stage classiﬁer
+namically scaled cross entropy loss, where the scaling factor      into a single convolution network, forming the Faster R-
+decays to zero as conﬁdence in the correct class increases,   CNN framework [28]. Numerous extensions to this frame-
+see Figure 1.  Intuitively, this scaling factor can automati-    work have been proposed, e.g. [20, 31, 32, 16, 14].
+cally down-weight the contribution of easy examples during                                                       One-stage Detectors: OverFeat [30] was one of the ﬁrst
+training and rapidly focus the model on hard examples. Ex-                                                   modern one-stage object detector based on deep networks.
+periments show that our proposed Focal Loss enables us to                                                More recently SSD [22, 9] and YOLO [26, 27] have re-
+train a high-accuracy, one-stage detector that signiﬁcantly                                                  newed interest in one-stage methods. These detectors have
+outperforms the alternatives of training with the sampling                                                       been tuned for speed but their accuracy trails that of two-
+heuristics or hard example mining, the previous state-of-                                                               stage methods. SSD has a 10-20% lower AP, while YOLO
+the-art techniques for training one-stage detectors. Finally,                                                             focuses on an even more extreme speed/accuracy trade-off.
+we note that the exact form of the focal loss is not crucial,                                                      See Figure 2. Recent work showed that two-stage detectors
+and we show other instantiations can achieve similar results.                                                        can be made fast simply by reducing input image resolution
+  To demonstrate the effectiveness of the proposed focal     and the number of proposals, but one-stage methods trailed
+loss, we design a simple one-stage object detector called      in accuracy even with a larger compute budget [17]. In con-
+RetinaNet, named for its dense sampling of object locations       trast, the aim of this work is to understand if one-stage de-
+in an input image. Its design features an efﬁcient in-network      tectors can match or surpass the accuracy of two-stage de-
+feature pyramid and use of anchor boxes. It draws on a va-      tectors while running at similar or faster speeds.
+riety of recent ideas from [22, 6, 28, 20]. RetinaNet is efﬁ-       The design of our RetinaNet detector shares many simi-
+cient and accurate; our best model, based on a ResNet-101-       larities with previous dense detectors, in particular the con-
+FPN backbone, achieves a COCO test-dev AP of 39.1     cept of ‘anchors’ introduced by RPN [28] and use of fea-
+while running at 5 fps, surpassing the previously best pub-      tures pyramids as in SSD [22] and FPN [20]. We empha-
+lished single-model results from both one and two-stage de-      size that our simple detector achieves top results not based
+tectors, see Figure 2.                                   on innovations in network design but due to our novel loss.
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+Class Imbalance: Both classic one-stage object detection     3.1. Balanced Cross Entropy
+methods, like boosted detectors [37, 5] and DPMs [8], and
+                                      A common method for addressing class imbalance is to
+more recent methods, like SSD [22], face a large class
+                                                              introduce a weighting factor α ∈[0, 1] for class 1 and 1−α
+imbalance during training. These detectors evaluate 104-
+                                                                   for class −1. In practice α may be set by inverse class fre-
+105 candidate locations per image but only a few loca-
+                                                      quency or treated as a hyperparameter to set by cross valida-
+tions contain objects. This imbalance causes two problems:
+                                                                        tion. For notational convenience, we deﬁne αt analogously
+(1) training is inefﬁcient as most locations are easy nega-
+                                                                   to how we deﬁned pt. We write the α-balanced CE loss as:
+tives that contribute no useful learning signal; (2) en masse,
+the easy negatives can overwhelm training and lead to de-                     CE(pt) = −αt log(pt).                (3)
+generate models. A common solution is to perform some
+form of hard negative mining [33, 37, 8, 31, 22] that sam-     This loss is a simple extension to CE that we consider as an
+ples hard examples during training or more complex sam-     experimental baseline for our proposed focal loss.
+pling/reweighing schemes [2]. In contrast, we show that our                                                               3.2. Focal Loss Deﬁnition
+proposed focal loss naturally handles the class imbalance
+faced by a one-stage detector and allows us to efﬁciently      As our experiments will show, the large class imbalance
+train on all examples without sampling and without easy     encountered during training of dense detectors overwhelms
+negatives overwhelming the loss and computed gradients.       the cross entropy loss. Easily classiﬁed negatives comprise
+                                                                the majority of the loss and dominate the gradient. WhileRobust Estimation: There has been much interest in de-
+                                         α balances the importance of positive/negative examples, itsigning robust loss functions (e.g., Huber loss [13]) that re-
+                                                         does not differentiate between easy/hard examples. Instead,duce the contribution of outliers by down-weighting the loss
+                                             we propose to reshape the loss function to down-weightof examples with large errors (hard examples). In contrast,
+                                                          easy examples and thus focus training on hard negatives.rather than addressing outliers, our focal loss is designed
+                                                  More formally, we propose to add a modulating factorto address class imbalance by down-weighting inliers (easy
+                                                               (1 −pt)γ to the cross entropy loss, with tunable focusingexamples) such that their contribution to the total loss is
+                                                          parameter γ ≥0. We deﬁne the focal loss as:small even if their number is large. In other words, the focal
+loss performs the opposite role of a robust loss:  it focuses                                                                       FL(pt) = −(1 −pt)γ log(pt).            (4)
+training on a sparse set of hard examples.
+                                                    The focal loss is visualized for several values of γ ∈
+3. Focal Loss                                                       [0, 5] in Figure 1. We note two properties of the focal loss.
+                                                                   (1) When an example is misclassiﬁed and pt is small, the
+  The Focal Loss is designed to address the one-stage ob-
+                                                         modulating factor is near 1 and the loss is unaffected. As
+ject detection scenario in which there is an extreme im-
+                                                                          pt →1, the factor goes to 0 and the loss for well-classiﬁed
+balance between foreground and background classes during
+                                                       examples is down-weighted. (2) The focusing parameter γ
+training (e.g., 1:1000). We introduce the focal loss starting
+                                                        smoothly adjusts the rate at which easy examples are down-
+from the cross entropy (CE) loss for binary classiﬁcation1:
+                                                            weighted. When γ = 0, FL is equivalent to CE, and as γ is
+           (−log(p)         if y = 1                 increased the effect of the modulating factor is likewise in-
+        CE(p, y) =                                     (1)                                                             creased (we found γ = 2 to work best in our experiments).                  −log(1 −p)  otherwise.
+                                                                            Intuitively, the modulating factor reduces the loss contri-
+In the above y ∈{±1} speciﬁes the ground-truth class and     bution from easy examples and extends the range in which
+p ∈[0, 1] is the model’s estimated probability for the class     an example receives low loss. For instance, with γ = 2, an
+with label y = 1. For notational convenience, we deﬁne pt:     example classiﬁed with pt = 0.9 would have 100× lower
+                                                                   loss compared with CE and with pt ≈0.968 it would have           (                   p         if y = 1
+                   pt =                                    (2)    1000× lower loss.  This in turn increases the importance
+                   1 −p  otherwise,                      of correcting misclassiﬁed examples (whose loss is scaled
+                                               down by at most 4× for pt ≤.5 and γ = 2).and rewrite CE(p, y) = CE(pt) = −log(pt).
+                                                                 In practice we use an α-balanced variant of the focal loss:  The CE loss can be seen as the blue (top) curve in Fig-
+ure 1. One notable property of this loss, which can be easily                                                                      FL(pt) = −αt(1 −pt)γ log(pt).           (5)
+seen in its plot, is that even examples that are easily clas-
+siﬁed (pt ≫.5) incur a loss with non-trivial magnitude.   We adopt this form in our experiments as it yields slightly
+When summed over a large number of easy examples, these     improved accuracy over the non-α-balanced form. Finally,
+small loss values can overwhelm the rare class.            we note that the implementation of the loss layer combines
+   1Extending the focal loss to the multi-class case is straightforward and      the sigmoid operation for computing p with the loss com-
+works well; for simplicity we focus on the binary loss in this work.            putation, resulting in greater numerical stability.
+
+
+                                                 3
+
+======================== PDF 第 4 页 ========================
+  While in our main experimental results we use the focal     Feature Pyramid Network Backbone: We adopt the Fea-
+loss deﬁnition above, its precise form is not crucial. In the      ture Pyramid Network (FPN) from [20] as the backbone
+appendix we consider other instantiations of the focal loss     network for RetinaNet.  In brief, FPN augments a stan-
+and demonstrate that these can be equally effective.            dard convolutional network with a top-down pathway and
+                                                                         lateral connections so the network efﬁciently constructs a
+3.3. Class Imbalance and Model Initialization             rich, multi-scale feature pyramid from a single resolution
+                                                               input image, see Figure 3(a)-(b). Each level of the pyramid   Binary classiﬁcation models are by default initialized to
+                                                        can be used for detecting objects at a different scale. FPNhave equal probability of outputting either y = −1 or 1.
+                                                        improves multi-scale predictions from fully convolutionalUnder such an initialization, in the presence of class imbal-
+                                                         networks (FCN) [23], as shown by its gains for RPN [28]ance, the loss due to the frequent class can dominate total
+                                                      and DeepMask-style proposals [24], as well at two-stageloss and cause instability in early training. To counter this,
+                                                                 detectors such as Fast R-CNN [10] or Mask R-CNN [14].we introduce the concept of a ‘prior’ for the value of p es-
+                                                            Following [20], we build FPN on top of the ResNet ar-timated by the model for the rare class (foreground) at the
+                                                                  chitecture [16]. We construct a pyramid with levels P3start of training. We denote the prior by π and set it so that
+                                                          through P7, where l indicates pyramid level (Pl has reso-the model’s estimated p for examples of the rare class is low,
+                                                                   lution 2l lower than the input). As in [20] all pyramid levelse.g. 0.01. We note that this is a change in model initializa-
+                                                        have C = 256 channels. Details of the pyramid generallytion (see §4.1) and not of the loss function. We found this
+                                                            follow [20] with a few modest differences.2 While manyto improve training stability for both the cross entropy and
+                                                            design choices are not crucial, we emphasize the use of thefocal loss in the case of heavy class imbalance.
+                                          FPN backbone is; preliminary experiments using features
+3.4. Class Imbalance and Two-stage Detectors         from only the ﬁnal ResNet layer yielded low AP.
+
+   Two-stage detectors are often trained with the cross en-     Anchors: We use translation-invariant anchor boxes simi-
+tropy loss without use of α-balancing or our proposed loss.      lar to those in the RPN variant in [20]. The anchors have
+Instead, they address class imbalance through two mech-     areas of 322 to 5122 on pyramid levels P3 to P7, respec-
+anisms: (1) a two-stage cascade and (2) biased minibatch       tively. As in [20], at each pyramid level we use anchors at
+sampling.  The ﬁrst cascade stage is an object proposal      three aspect ratios {1:2, 1:1, 2:1}. For denser scale cover-
+mechanism [35, 24, 28] that reduces the nearly inﬁnite set     age than in [20], at each level we add anchors of sizes {20,
+of possible object locations down to one or two thousand.      21/3, 22/3} of the original set of 3 aspect ratio anchors. This
+Importantly, the selected proposals are not random, but are     improve AP in our setting. In total there are A = 9 anchors
+likely to correspond to true object locations, which removes     per level and across levels they cover the scale range 32 -
+the vast majority of easy negatives. When training the sec-     813 pixels with respect to the network’s input image.
+ond stage, biased sampling is typically used to construct       Each anchor is assigned a length K one-hot vector of
+minibatches that contain, for instance, a 1:3 ratio of posi-      classiﬁcation targets, where K  is the number of object
+tive to negative examples. This ratio is like an implicit α-      classes, and a 4-vector of box regression targets. We use
+balancing factor that is implemented via sampling. Our pro-      the assignment rule from RPN [28] but modiﬁed for multi-
+posed focal loss is designed to address these mechanisms in      class detection and with adjusted thresholds. Speciﬁcally,
+a one-stage detection system directly via the loss function.      anchors are assigned to ground-truth object boxes using an
+                                                                intersection-over-union (IoU) threshold of 0.5; and to back-
+4. RetinaNet Detector                                ground if their IoU is in [0, 0.4). As each anchor is assigned
+                                                                   to at most one object box, we set the corresponding entry
+   RetinaNet is a single, uniﬁed network composed of a      in its length K label vector to 1 and all other entries to 0.
+backbone network and two task-speciﬁc subnetworks. The       If an anchor is unassigned, which may happen with overlap
+backbone is responsible for computing a convolutional fea-      in [0.4, 0.5), it is ignored during training. Box regression
+ture map over an entire input image and is an off-the-self      targets are computed as the offset between each anchor and
+convolutional network. The ﬁrst subnet performs convo-       its assigned object box, or omitted if there is no assignment.
+lutional object classiﬁcation on the backbone’s output; the
+                                                                           2RetinaNet uses feature pyramid levels P3 to P7, where P3 to P5 aresecond subnet performs convolutional bounding box regres-
+                                                                  computed from the output of the corresponding ResNet residual stage (C3
+sion. The two subnetworks feature a simple design that we      through C5) using top-down and lateral connections just as in [20], P6 is
+propose speciﬁcally for one-stage, dense detection, see Fig-       obtained via a 3×3 stride-2 conv on C5, and P7 is computed by apply-
+ure 3. While there are many possible choices for the details       ing ReLU followed by a 3×3 stride-2 conv on P6. This differs slightly
+                                                                   from [20]: (1) we don’t use the high-resolution pyramid level P2 for com-of these components, most design parameters are not partic-
+                                                                                 putational reasons, (2) P6 is computed by strided convolution instead of
+ularly sensitive to exact values as shown in the experiments.      downsampling, and (3) we include P7 to improve large object detection.
+We describe each component of RetinaNet next.                  These minor modiﬁcations improve speed while maintaining accuracy.
+
+
+                                                 4
+
+======================== PDF 第 5 页 ========================
+                                                                                             class+box
+                                                                                            subnets                  class
+                                                                                                              subnet
+                                                                                    W×H        W×H        W×H
+                                                                                             class+box                      ×256   ×4     ×256          ×KA                                                       +                                                                                            subnets
+
+
+                                                                                             class+box
+                                                       +                        subnets
+                                                                                    W×H        W×H        W×H
+                                                                                                       box      ×256   ×4     ×256          ×4A
+                                                                                                              subnet
+
+
+             (a) ResNet                                (b) feature pyramid net                                        (c) class subnet (top)      (d) box subnet (bottom)
+
+Figure 3. The one-stage RetinaNet network architecture uses a Feature Pyramid Network (FPN) [20] backbone on top of a feedforward
+ResNet architecture [16] (a) to generate a rich, multi-scale convolutional feature pyramid (b). To this backbone RetinaNet attaches two
+subnetworks, one for classifying anchor boxes (c) and one for regressing from anchor boxes to ground-truth object boxes (d). The network
+design is intentionally simple, which enables this work to focus on a novel focal loss function that eliminates the accuracy gap between our
+one-stage detector and state-of-the-art two-stage detectors like Faster R-CNN with FPN [20] while running at faster speeds.
+
+
+Classiﬁcation Subnet: The classiﬁcation subnet predicts      regression subnet, see Figure 3. As such, inference involves
+the probability of object presence at each spatial position     simply forwarding an image through the network. To im-
+for each of the A anchors and K object classes. This subnet     prove speed, we only decode box predictions from at most
+is a small FCN attached to each FPN level; parameters of     1k top-scoring predictions per FPN level, after threshold-
+this subnet are shared across all pyramid levels. Its design     ing detector conﬁdence at 0.05. The top predictions from
+is simple.  Taking an input feature map with C channels       all levels are merged and non-maximum suppression with a
+from a given pyramid level, the subnet applies four 3×3     threshold of 0.5 is applied to yield the ﬁnal detections.
+conv layers, each with C ﬁlters and each followed by ReLU
+                                                        Focal Loss: We use the focal loss introduced in this work
+activations, followed by a 3×3 conv layer with KA ﬁlters.
+                                                              as the loss on the output of the classiﬁcation subnet. As we
+Finally sigmoid activations are attached to output the KA
+                                                                   will show in §5, we ﬁnd that γ = 2 works well in practice
+binary predictions per spatial location, see Figure 3 (c). We
+                                                      and the RetinaNet is relatively robust to γ ∈[0.5, 5]. We
+use C = 256 and A = 9 in most experiments.
+                                                       emphasize that when training RetinaNet, the focal loss is
+   In contrast to RPN [28], our object classiﬁcation subnet
+                                                              applied to all ∼100k anchors in each sampled image. This
+is deeper, uses only 3×3 convs, and does not share param-
+                                                              stands in contrast to common practice of using heuristic
+eters with the box regression subnet (described next). We
+                                                         sampling (RPN) or hard example mining (OHEM, SSD) to
+found these higher-level design decisions to be more im-
+                                                                    select a small set of anchors (e.g., 256) for each minibatch.
+portant than speciﬁc values of hyperparameters.
+                                                  The total focal loss of an image is computed as the sum
+Box Regression Subnet: In parallel with the object classi-     of the focal loss over all ∼100k anchors, normalized by the
+ﬁcation subnet, we attach another small FCN to each pyra-    number of anchors assigned to a ground-truth box. We per-
+mid level for the purpose of regressing the offset from each     form the normalization by the number of assigned anchors,
+anchor box to a nearby ground-truth object, if one exists.     not total anchors, since the vast majority of anchors are easy
+The design of the box regression subnet is identical to the     negatives and receive negligible loss values under the focal
+classiﬁcation subnet except that it terminates in 4A linear      loss. Finally we note that α, the weight assigned to the rare
+outputs per spatial location, see Figure 3 (d).  For each      class, also has a stable range, but it interacts with γ mak-
+of the A anchors per spatial location, these 4 outputs pre-     ing it necessary to select the two together (see Tables 1a
+dict the relative offset between the anchor and the ground-     and 1b). In general α should be decreased slightly as γ is
+truth box (we use the standard box parameterization from R-     increased (for γ = 2, α = 0.25 works best).
+CNN [11]). We note that unlike most recent work, we use a                                                                   Initialization: We experiment with ResNet-50-FPN and
+class-agnostic bounding box regressor which uses fewer pa-                                                    ResNet-101-FPN backbones [20]. The base ResNet-50 and
+rameters and we found to be equally effective. The object                                                      ResNet-101 models are pre-trained on ImageNet1k; we use
+classiﬁcation subnet and the box regression subnet, though                                                                the models released by [16]. New layers added for FPN are
+sharing a common structure, use separate parameters.                                                                       initialized as in [20]. All new conv layers except the ﬁnal
+                                                      one in the RetinaNet subnets are initialized with bias b = 0
+4.1. Inference and Training
+                                                      and a Gaussian weight ﬁll with σ = 0.01. For the ﬁnal conv
+Inference: RetinaNet forms a single FCN comprised of a      layer of the classiﬁcation subnet, we set the bias initializa-
+ResNet-FPN backbone, a classiﬁcation subnet, and a box      tion to b = −log((1 −π)/π), where π speciﬁes that at
+
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+         α    AP    AP50   AP75         γ  α   AP    AP50   AP75           #sc  #ar   AP    AP50   AP75
+             .10     0.0      0.0      0.0           0   .75    31.1     49.4     33.0           1    1    30.3     49.0     31.8
+             .25    10.8     16.0     11.7            0.1  .75    31.4     49.9     33.1           2    1    31.9     50.0     34.0
+             .50    30.2     46.7     32.8            0.2  .75    31.9     50.7     33.4           3    1    31.8     49.4     33.7
+             .75    31.1     49.4     33.0            0.5  .50    32.9     51.7     35.2           1    3    32.4     52.3     33.9
+             .90    30.8     49.7     32.3            1.0  .25    33.7     52.0     36.2           2    3    34.2     53.1     36.5
+             .99    28.7     47.4     29.9            2.0  .25    34.0     52.5     36.5           3    3    34.0     52.5     36.5
+            .999    25.1     41.7     26.1            5.0  .25    32.2     49.6     34.8           4    3    33.8     52.1     36.2
+
+             (a) Varying α for CE loss (γ = 0)          (b) Varying γ for FL (w. optimal α)           (c) Varying anchor scales and aspects
+
+                        batch  nms
+           method     size    thr   AP    AP50   AP75      depth  scale  AP   AP50  AP75  APS  APM  APL   time
+        OHEM    128     .7     31.1     47.2     33.2       50   400    30.5    47.8    32.7    11.2    33.8    46.1   64
+        OHEM    256     .7     31.8     48.8     33.9       50   500    32.5    50.9    34.8    13.9    35.8    46.7   72
+        OHEM    512     .7     30.6     47.0     32.6       50   600    34.3    53.2    36.9    16.2    37.4    47.4   98
+        OHEM    128     .5     32.8     50.3     35.1       50   700    35.1    54.2    37.7    18.0    39.3    46.4   121
+        OHEM    256     .5     31.0     47.4     33.0       50   800    35.7    55.0    38.5    18.9    38.9    46.3   153
+        OHEM    512     .5     27.6     42.0     29.2       101   400    31.9    49.5    34.1    11.6    35.8    48.5   81
+       OHEM 1:3   128     .5     31.1     47.2     33.2       101   500    34.4    53.1    36.8    14.7    38.5    49.1   90
+       OHEM 1:3   256     .5     28.3     42.4     30.3       101   600    36.0    55.2    38.7    17.4    39.6    49.7   122
+       OHEM 1:3   512     .5     24.0     35.5     25.8       101   700    37.1    56.6    39.8    19.1    40.6    49.4   154
+          FL        n/a    n/a    36.0     54.9     38.7       101   800    37.8    57.5    40.8    20.2    41.1    49.2   198
+             (d) FL vs. OHEM baselines (with ResNet-101-FPN)              (e) Accuracy/speed trade-off RetinaNet (on test-dev)
+
+Table 1. Ablation experiments for RetinaNet and Focal Loss (FL). All models are trained on trainval35k and tested on minival
+unless noted. If not speciﬁed, default values are: γ = 2; anchors for 3 scales and 3 aspect ratios; ResNet-50-FPN backbone; and a 600
+pixel train and test image scale. (a) RetinaNet with α-balanced CE achieves at most 31.1 AP. (b) In contrast, using FL with the same exact
+network gives a 2.9 AP gain and is fairly robust to exact γ/α settings. (c) Using 2-3 scale and 3 aspect ratio anchors yields good results
+after which point performance saturates. (d) FL outperforms the best variants of online hard example mining (OHEM) [31, 22] by over 3
+points AP. (e) Accuracy/Speed trade-off of RetinaNet on test-dev for various network depths and image scales (see also Figure 2).
+
+
+the start of training every anchor should be labeled as fore-    train and a random 35k subset of images from the 40k im-
+ground with conﬁdence of ∼π. We use π = .01 in all ex-     age val split). We report lesion and sensitivity studies by
+periments, although results are robust to the exact value. As     evaluating on the minival split (the remaining 5k images
+explained in §3.3, this initialization prevents the large num-     from val). For our main results, we report COCO AP on
+ber of background anchors from generating a large, desta-      the test-dev split, which has no public labels and requires
+bilizing loss value in the ﬁrst iteration of training.              use of the evaluation server.
+
+Optimization: RetinaNet is trained with stochastic gradi-                                                               5.1. Training Dense Detection
+ent descent (SGD). We use synchronized SGD over 8 GPUs
+with a total of 16 images per minibatch (2 images per GPU).     We run numerous experiments to analyze the behavior
+Unless otherwise speciﬁed, all models are trained for 90k it-     of the loss function for dense detection along with various
+erations with an initial learning rate of 0.01, which is then     optimization strategies. For all experiments we use depth
+divided by 10 at 60k and again at 80k iterations. We use     50 or 101 ResNets [16] with a Feature Pyramid Network
+horizontal image ﬂipping as the only form of data augmen-     (FPN) [20] constructed on top. For all ablation studies we
+tation unless otherwise noted. Weight decay of 0.0001 and     use an image scale of 600 pixels for training and testing.
+momentum of 0.9 are used. The training loss is the sum
+                                                 Network Initialization: Our ﬁrst attempt to train Reti-
+the focal loss and the standard smooth L1 loss used for box
+                                                      naNet uses standard cross entropy (CE) loss without anyregression [10]. Training time ranges between 10 and 35
+                                                         modiﬁcations to the initialization or learning strategy. Thishours for the models in Table 1e.
+                                                                            fails quickly, with the network diverging during training.
+                                                       However, simply initializing the last layer of our model such5. Experiments
+                                                                     that the prior probability of detecting an object is π = .01
+  We present experimental results on the bounding box      (see §4.1) enables effective learning.  Training RetinaNet
+detection track of the challenging COCO benchmark [21].     with ResNet-50 and this initialization already yields a re-
+For training, we follow common practice [1, 20] and use     spectable AP of 30.2 on COCO. Results are insensitive to
+the COCO trainval35k split (union of 80k images from      the exact value of π so we use π = .01 for all experiments.
+
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+         loss  1       = 0                                                                                              loss  1       = 0
+        0.8       = 0.5                                                         0.8       = 0.5
+                 = 1                                                             = 1
+        0.6       = 2                                                           0.6       = 2                      normalized                                                                                                                                                                                                                                                                                                       normalized
+        0.4                                                                     0.4
+
+        0.2                                                                     0.2                      cumulative  0                                                                                                                                                                                                                                                                                         cumulative  0
+         0           .2          .4          .6          .8        1             0           .2          .4          .6          .8        1
+                       fraction of foreground examples                                        fraction of background examples
+Figure 4. Cumulative distribution functions of the normalized loss for positive and negative samples for different values of γ for a converged
+model. The effect of changing γ on the distribution of the loss for positive examples is minor. For negatives, however, increasing γ heavily
+concentrates the loss on hard examples, focusing nearly all attention away from easy negatives.
+
+
+Balanced Cross Entropy: Our next attempt to improve      positive loss, as γ increases more of the loss gets concen-
+learning involved using the α-balanced CE loss described      trated in the top 20% of examples, but the effect is minor.
+in §3.1. Results for various α are shown in Table 1a. Set-       The effect of γ on negative samples is dramatically dif-
+ting α = .75 gives a gain of 0.9 points AP.                        ferent. For γ = 0, the positive and negative CDFs are quite
+                                                                      similar. However, as γ increases, substantially more weightFocal Loss: Results using our proposed focal loss are
+                                                    becomes concentrated on the hard negative examples.  Inshown in Table 1b. The focal loss introduces one new hy-
+                                                                           fact, with γ = 2 (our default setting), the vast majority ofperparameter, the focusing parameter γ, that controls the
+                                                                the loss comes from a small fraction of samples. As can bestrength of the modulating term. When γ = 0, our loss is
+                                                                seen, FL can effectively discount the effect of easy nega-equivalent to the CE loss. As γ increases, the shape of the
+                                                                          tives, focusing all attention on the hard negative examples.loss changes so that “easy” examples with low loss get fur-
+ther discounted, see Figure 1. FL shows large gains over     Online Hard Example Mining (OHEM): [31] proposed
+CE as γ is increased. With γ = 2, FL yields a 2.9 AP im-      to improve training of two-stage detectors by construct-
+provement over the α-balanced CE loss.                       ing minibatches using high-loss examples. Speciﬁcally, in
+   For the experiments in Table 1b, for a fair comparison   OHEM each example is scored by its loss, non-maximum
+we ﬁnd the best α for each γ. We observe that lower α’s     suppression (nms) is then applied, and a minibatch is con-
+are selected for higher γ’s (as easy negatives are down-      structed with the highest-loss examples. The nms threshold
+weighted, less emphasis needs to be placed on the posi-     and batch size are tunable parameters. Like the focal loss,
+tives). Overall, however, the beneﬁt of changing γ is much   OHEM puts more emphasis on misclassiﬁed examples, but
+larger, and indeed the best α’s ranged in just [.25,.75] (we     unlike FL, OHEM completely discards easy examples. We
+tested α ∈[.01, .999]). We use γ = 2.0 with α = .25 for all      also implement a variant of OHEM used in SSD [22]: after
+experiments but α = .5 works nearly as well (.4 AP lower).     applying nms to all examples, the minibatch is constructed
+                                                                   to enforce a 1:3 ratio between positives and negatives toAnalysis of the Focal Loss: To understand the focal loss
+                                                            help ensure each minibatch has enough positives.better, we analyze the empirical distribution of the loss of a
+                                          We test both OHEM variants in our setting of one-stageconverged model. For this, we take take our default ResNet-
+                                                                detection which has large class imbalance. Results for the101 600-pixel model trained with γ = 2 (which has 36.0
+                                                                   original OHEM strategy and the ‘OHEM 1:3’ strategy forAP). We apply this model to a large number of random im-
+                                                                 selected batch sizes and nms thresholds are shown in Ta-ages and sample the predicted probability for ∼107 negative
+                                                                ble 1d. These results use ResNet-101, our baseline trainedwindows and ∼105 positive windows. Next, separately for
+                                                          with FL achieves 36.0 AP for this setting. In contrast, thepositives and negatives, we compute FL for these samples,
+                                                                best setting for OHEM (no 1:3 ratio, batch size 128, nms ofand normalize the loss such that it sums to one. Given the
+                                                                        .5) achieves 32.8 AP. This is a gap of 3.2 AP, showing FLnormalized loss, we can sort the loss from lowest to highest
+                                                                              is more effective than OHEM for training dense detectors.and plot its cumulative distribution function (CDF) for both
+                                        We note that we tried other parameter setting and variantspositive and negative samples and for different settings for
+                                                                   for OHEM but did not achieve better results.γ (even though model was trained with γ = 2).
+   Cumulative distribution functions for positive and nega-    Hinge Loss: Finally, in early experiments, we attempted
+tive samples are shown in Figure 4. If we observe the pos-      to train with the hinge loss [13] on pt, which sets loss to 0
+itive samples, we see that the CDF looks fairly similar for     above a certain value of pt. However, this was unstable and
+different values of γ. For example, approximately 20% of    we did not manage to obtain meaningful results.  Results
+the hardest positive samples account for roughly half of the     exploring alternate loss functions are in the appendix.
+
+
+                                                 7
+
+======================== PDF 第 8 页 ========================
+                                                   backbone        AP    AP50   AP75   APS  APM   APL
+                 Two-stage methods
+                   Faster R-CNN+++ [16]             ResNet-101-C4         34.9     55.7     37.4     15.6     38.7     50.9
+                   Faster R-CNN w FPN [20]         ResNet-101-FPN        36.2     59.1     39.0     18.2     39.0     48.2
+                   Faster R-CNN by G-RMI [17]   Inception-ResNet-v2 [34]    34.7     55.5     36.7     13.5     38.1     52.0
+                   Faster R-CNN w TDM [32]    Inception-ResNet-v2-TDM    36.8     57.7     39.2     16.2     39.8     52.1
+                 One-stage methods
+             YOLOv2 [27]                    DarkNet-19 [27]        21.6     44.0     19.2      5.0     22.4     35.5
+              SSD513 [22, 9]                  ResNet-101-SSD        31.2     50.4     33.3     10.2     34.5     49.8
+             DSSD513 [9]                  ResNet-101-DSSD       33.2     53.3     35.2     13.0     35.4     51.1
+                RetinaNet (ours)                 ResNet-101-FPN        39.1     59.1     42.3     21.8     42.7     50.2
+                RetinaNet (ours)               ResNeXt-101-FPN       40.8     61.1     44.1     24.1     44.2     51.2
+
+Table 2. Object detection single-model results (bounding box AP), vs. state-of-the-art on COCO test-dev. We show results for our
+RetinaNet-101-800 model, trained with scale jitter and for 1.5× longer than the same model from Table 1e. Our model achieves top results,
+outperforming both one-stage and two-stage models. For a detailed breakdown of speed versus accuracy see Table 1e and Figure 2.
+
+5.2. Model Architecture Design                       image compared to 172 ms (both measured on an Nvidia
+                                         M40 GPU). Using larger scales allows RetinaNet to sur-
+Anchor Density: One of the most important design fac-
+                                                            pass the accuracy of all two-stage approaches, while still
+tors in a one-stage detection system is how densely it covers
+                                                          being faster. For faster runtimes, there is only one operating
+the space of possible image boxes. Two-stage detectors can
+                                                               point (500 pixel input) at which using ResNet-50-FPN im-
+classify boxes at any position, scale, and aspect ratio using
+                                                           proves over ResNet-101-FPN. Addressing the high frame
+a region pooling operation [10]. In contrast, as one-stage
+                                                                     rate regime will likely require special network design, as in
+detectors use a ﬁxed sampling grid, a popular approach for
+                                                                    [27], and is beyond the scope of this work. We note that
+achieving high coverage of boxes in these approaches is to
+                                                                       after publication, faster and more accurate results can now
+use multiple ‘anchors’ [28] at each spatial position to cover
+                                                       be obtained by a variant of Faster R-CNN from [12].
+boxes of various scales and aspect ratios.
+  We sweep over the number of scale and aspect ratio an-     5.3. Comparison to State of the Art
+chors used at each spatial position and each pyramid level in                                          We evaluate RetinaNet on the challenging COCO dataset
+FPN. We consider cases from a single square anchor at each                                                      and compare test-dev results to recent state-of-the-art
+location to 12 anchors per location spanning 4 sub-octave                                                      methods including both one-stage and two-stage models.
+scales (2k/4, for k ≤3) and 3 aspect ratios [0.5, 1, 2]. Re-                                                              Results are presented in Table 2 for our RetinaNet-101-800
+sults using ResNet-50 are shown in Table 1c. A surprisingly                                                    model trained using scale jitter and for 1.5× longer than the
+good AP (30.3) is achieved using just one square anchor.                                                      models in Table 1e (giving a 1.3 AP gain). Compared to ex-
+However, the AP can be improved by nearly 4 points (to                                                                      isting one-stage methods, our approach achieves a healthy
+34.0) when using 3 scales and 3 aspect ratios per location.                                                              5.9 point AP gap (39.1 vs. 33.2) with the closest competitor,
+We used this setting for all other experiments in this work.                                         DSSD [9], while also being faster, see Figure 2. Compared
+   Finally, we note that increasing beyond 6-9 anchors did                                                                   to recent two-stage methods, RetinaNet achieves a 2.3 point
+not shown further gains. Thus while two-stage systems can                                                      gap above the top-performing Faster R-CNN model based
+classify arbitrary boxes in an image, the saturation of per-                                                    on Inception-ResNet-v2-TDM [32]. Plugging in ResNeXt-
+formance w.r.t. density implies the higher potential density                                                    32x8d-101-FPN [38] as the RetinaNet backbone further im-
+of two-stage systems may not offer an advantage.                                                           proves results another 1.7 AP, surpassing 40 AP on COCO.
+
+Speed versus Accuracy: Larger backbone networks yield                                                          6. Conclusion
+higher accuracy, but also slower inference speeds. Likewise
+for input image scale (deﬁned by the shorter image side).        In this work, we identify class imbalance as the pri-
+We show the impact of these two factors in Table 1e.  In    mary obstacle preventing one-stage object detectors from
+Figure 2 we plot the speed/accuracy trade-off curve for Reti-     surpassing top-performing, two-stage methods. To address
+naNet and compare it to recent methods using public num-       this, we propose the focal loss which applies a modulat-
+bers on COCO test-dev. The plot reveals that RetinaNet,     ing term to the cross entropy loss in order to focus learn-
+enabled by our focal loss, forms an upper envelope over     ing on hard negative examples. Our approach is simple and
+all existing methods, discounting the low-accuracy regime.     highly effective. We demonstrate its efﬁcacy by designing
+RetinaNet with ResNet-101-FPN and a 600 pixel image     a fully convolutional one-stage detector and report exten-
+scale (which we denote by RetinaNet-101-600 for simplic-      sive experimental analysis showing that it achieves state-
+ity) matches the accuracy of the recently published ResNet-      of-the-art accuracy and speed. Source code is available at
+101-FPN Faster R-CNN [20], while running in 122 ms per     https://github.com/facebookresearch/Detectron [12].
+
+
+                                                 8
+
+======================== PDF 第 9 页 ========================
+   5                                                                0
+                                         CE                                                     CE
+                                                FL =2                   -0.2                                          FL =2   4                                                      FL*  =2, =1                                                               FL*  =2, =1
+                                                      FL*  =4, =0                                                               FL*  =4, =0
+                                                                                    -0.4
+   3
+
+                                                                                    -0.6loss   2                                                                                                                                                                                                                                                 gradient
+                                                                                    -0.8
+
+   1
+                                                                                    -1
+
+   0                                                                                -1.2
+    -5                         0                         5            -10             -5           0           5           10
+                                      xt                                                                               xt
+Figure 5. Focal loss variants compared to the cross entropy as a      Figure 6. Derivates of the loss functions from Figure 5 w.r.t. x.
+function of xt = yx. Both the original FL and alternate variant
+FL∗reduce the relative loss for well-classiﬁed examples (xt > 0).        5
+                                                                                                      AP > 33.5
+                                                                                                      AP < 33.5
+               loss   γ   β   AP    AP50   AP75                     4
+          CE   –    –    31.1     49.4     33.0
+           FL   2.0   –    34.0     52.5     36.5                     3
+           FL∗   2.0  1.0    33.8     52.7     36.3                                     loss
+           FL∗   4.0  0.0    33.9     51.8     36.4                     2
+Table 3. Results of FL and FL∗versus CE for select settings.
+                                                                 1
+
+Appendix A: Focal Loss*                                  0
+                                                                                   -5                         0                         5
+  The exact form of the focal loss is not crucial. We now                                             xt
+show an alternate instantiation of the focal loss that has sim-      Figure 7. Effectiveness of FL∗with various settings γ and β. The
+ilar properties and yields comparable results. The following      plots are color coded such that effective settings are shown in blue.
+also gives more insights into properties of the focal loss.
+  We begin by considering both cross entropy (CE) and the
+focal loss (FL) in a slightly different form than in the main     We found that various γ and β settings gave good results.
+text. Speciﬁcally, we deﬁne a quantity xt as follows:            In Figure 7 we show results for RetinaNet-50-600 with FL∗
+                                                                   for a wide set of parameters. The loss plots are color coded
+                          xt = yx,                       (6)     such that effective settings (models converged and with AP
+                                                           over 33.5) are shown in blue. We used α = .25 in all ex-
+where y ∈{±1} speciﬁes the ground-truth class as before.
+                                                           periments for simplicity. As can be seen, losses that reduce
+We can then write pt = σ(xt) (this is compatible with the
+                                                          weights of well-classiﬁed examples (xt > 0) are effective.
+deﬁnition of pt in Equation 2). An example is correctly clas-
+                                                  More generally, we expect any loss function with similar
+siﬁed when xt > 0, in which case pt > .5.                                                                 properties as FL or FL∗to be equally effective.
+  We can now deﬁne an alternate form of the focal loss in
+terms of xt. We deﬁne p∗t and FL∗as follows:                                          Appendix B: Derivatives
+                  p∗t = σ(γxt + β),                  (7)                                                           For reference, derivates for CE, FL, and FL∗w.r.t. x are:
+            FL∗= −log(p∗t )/γ.                 (8)
+                                                         dCE
+FL∗has two parameters, γ and β, that control the steepness                 = y(pt −1)                  (9)                                                                dx
+and shift of the loss curve. We plot FL∗for two selected set-           dFL
+tings of γ and β in Figure 5 alongside CE and FL. As can be          = y(1 −pt)γ(γpt log(pt) + pt −1)     (10)                                                       dx
+seen, like FL, FL∗with the selected parameters diminishes                                                                 dFL∗
+the loss assigned to well-classiﬁed examples.                        = y(p∗t −1)               (11)                                                               dx
+  We trained RetinaNet-50-600 using identical settings as
+before but we swap out FL for FL∗with the selected param-      Plots for selected settings are shown in Figure 6. For all loss
+eters. These models achieve nearly the same AP as those      functions, the derivative tends to -1 or 0 for high-conﬁdence
+trained with FL, see Table 3. In other words, FL∗is a rea-      predictions. However, unlike CE, for effective settings of
+sonable alternative for the FL that works well in practice.       both FL and FL∗, the derivative is small as soon as xt > 0.
+
+
+                                                 9
+
+======================== PDF 第 10 页 ========================
+References                                                      [21] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ra-
+                                                                manan, P. Doll´ar, and C. L. Zitnick. Microsoft COCO: Com-
+ [1] S. Bell, C. L. Zitnick, K. Bala, and R. Girshick.  Inside-                                                    mon objects in context. In ECCV, 2014. 1, 6
+     outside net: Detecting objects in context with skip pooling
+                                                                     [22] W. Liu, D. Anguelov, D. Erhan, C. Szegedy, and S. Reed.
+     and recurrent neural networks. In CVPR, 2016. 6
+                                                           SSD: Single shot multibox detector. In ECCV, 2016. 1, 2, 3,
+ [2] S. R. Bulo, G. Neuhold, and P. Kontschieder.  Loss max-                                                                                   6, 7, 8
+     pooling for semantic image segmentation. In CVPR, 2017.
+                                                                     [23]  J. Long, E. Shelhamer, and T. Darrell. Fully convolutional
+    3
+                                                                    networks for semantic segmentation. In CVPR, 2015. 4
+ [3]  J. Dai, Y. Li, K. He, and J. Sun. R-FCN: Object detection via
+                                                                     [24]  P. O. Pinheiro, R. Collobert, and P. Dollar. Learning to seg-
+     region-based fully convolutional networks. In NIPS, 2016. 1
+                                                              ment object candidates. In NIPS, 2015. 2, 4
+ [4] N. Dalal and B. Triggs. Histograms of oriented gradients for
+                                                                     [25]  P. O. Pinheiro, T.-Y. Lin, R. Collobert, and P. Doll´ar. Learn-
+    human detection. In CVPR, 2005. 2
+                                                                         ing to reﬁne object segments. In ECCV, 2016. 2
+ [5]  P. Doll´ar, Z. Tu, P. Perona, and S. Belongie. Integral channel
+                                                                     [26]  J. Redmon, S. Divvala, R. Girshick, and A. Farhadi. You
+      features. In BMVC, 2009. 2, 3
+                                                                      only look once:  Uniﬁed, real-time object detection.   In
+ [6] D. Erhan, C. Szegedy, A. Toshev, and D. Anguelov. Scalable                                                         CVPR, 2016. 1, 2
+     object detection using deep neural networks. In CVPR, 2014.
+                                                                     [27]  J. Redmon and A. Farhadi.  YOLO9000:  Better,  faster,
+    2
+                                                                                 stronger. In CVPR, 2017. 1, 2, 8
+ [7] M. Everingham, L. Van Gool, C. K. Williams, J. Winn, and
+                                                                     [28] S. Ren, K. He, R. Girshick, and J. Sun. Faster R-CNN: To-
+     A. Zisserman. The PASCAL Visual Object Classes (VOC)
+                                                                 wards real-time object detection with region proposal net-
+     Challenge. IJCV, 2010. 2
+                                                                     works. In NIPS, 2015. 1, 2, 4, 5, 8
+ [8]  P. F. Felzenszwalb, R. B. Girshick, and D. McAllester. Cas-
+                                                                     [29] H. Rowley, S. Baluja, and T. Kanade. Human face detec-
+     cade object detection with deformable part models. In CVPR,
+                                                                                tion in visual scenes. Technical Report CMU-CS-95-158R,
+     2010. 2, 3
+                                                                     Carnegie Mellon University, 1995. 2
+ [9] C.-Y. Fu, W. Liu, A. Ranga, A. Tyagi, and A. C. Berg. DSSD:
+                                                                     [30]  P. Sermanet, D. Eigen, X. Zhang, M. Mathieu, R. Fergus,
+     Deconvolutional single shot detector.  arXiv:1701.06659,
+                                                                 and Y. LeCun. Overfeat: Integrated recognition, localization
+     2016. 1, 2, 8
+                                                                 and detection using convolutional networks. In ICLR, 2014.
+[10] R. Girshick. Fast R-CNN. In ICCV, 2015. 1, 2, 4, 6, 8                                                              2
+[11] R. Girshick, J. Donahue, T. Darrell, and J. Malik. Rich fea-                                                                     [31] A. Shrivastava, A. Gupta, and R. Girshick. Training region-
+      ture hierarchies for accurate object detection and semantic                                                                    based object detectors with online hard example mining. In
+     segmentation. In CVPR, 2014. 1, 2, 5                                                         CVPR, 2016. 2, 3, 6, 7
+[12] R.  Girshick,   I.  Radosavovic,  G.  Gkioxari,  P.  Doll´ar,                                                                     [32] A. Shrivastava, R. Sukthankar, J. Malik, and A. Gupta. Be-
+     and K. He.    Detectron.   https://github.com/                                                              yond skip connections: Top-down modulation for object de-
+    facebookresearch/detectron, 2018. 8                                                                                    tection. arXiv:1612.06851, 2016. 2, 8
+[13] T. Hastie, R. Tibshirani, and J. Friedman. The elements of                                                                     [33] K.-K. Sung and T. Poggio. Learning and Example Selection
+      statistical learning.  Springer series in statistics Springer,                                                                                for Object and Pattern Detection.  In MIT A.I. Memo No.
+      Berlin, 2008. 3, 7                                                                     1521, 1994. 2, 3
+[14] K. He, G. Gkioxari, P. Doll´ar, and R. Girshick. Mask R-                                                                     [34] C. Szegedy, S. Ioffe, V. Vanhoucke, and A. A. Alemi.
+    CNN. In ICCV, 2017. 1, 2, 4                                                                           Inception-v4, inception-resnet and the impact of residual
+[15] K. He, X. Zhang, S. Ren, and J. Sun. Spatial pyramid pooling           connections on learning.  In AAAI Conference on Artiﬁcial
+      in deep convolutional networks for visual recognition.  In            Intelligence, 2017. 8
+    ECCV. 2014. 2                                                                     [35]  J. R. Uijlings, K. E. van de Sande, T. Gevers, and A. W.
+[16] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning           Smeulders.  Selective search for object recognition. IJCV,
+      for image recognition. In CVPR, 2016. 2, 4, 5, 6, 8                   2013. 2, 4
+[17]  J. Huang, V. Rathod, C. Sun, M. Zhu, A. Korattikara,      [36] R. Vaillant, C. Monrocq, and Y. LeCun. Original approach
+     A. Fathi, I. Fischer, Z. Wojna, Y. Song, S. Guadarrama, and            for the localisation of objects in images. IEE Proc. on Vision,
+     K. Murphy. Speed/accuracy trade-offs for modern convolu-          Image, and Signal Processing, 1994. 2
+      tional object detectors. In CVPR, 2017. 2, 8                                                                     [37]  P. Viola and M. Jones. Rapid object detection using a boosted
+[18] A. Krizhevsky, I. Sutskever, and G. Hinton. ImageNet clas-           cascade of simple features. In CVPR, 2001. 2, 3
+     siﬁcation with deep convolutional neural networks. In NIPS,                                                                     [38] S. Xie, R. Girshick, P. Doll´ar, Z. Tu, and K. He. Aggregated
+     2012. 2                                                                               residual transformations for deep neural networks. In CVPR,
+[19] Y. LeCun, B. Boser,  J. S. Denker, D. Henderson, R. E.           2017. 8
+     Howard, W. Hubbard, and L. D. Jackel.  Backpropagation                                                                     [39] C. L. Zitnick and P. Doll´ar. Edge boxes: Locating object
+     applied to handwritten zip code recognition. Neural compu-                                                                         proposals from edges. In ECCV, 2014. 2
+      tation, 1989. 2
+[20] T.-Y. Lin, P. Doll´ar, R. Girshick, K. He, B. Hariharan, and
+      S. Belongie. Feature pyramid networks for object detection.
+     In CVPR, 2017. 1, 2, 4, 5, 6, 8
+
+
+                                                 10

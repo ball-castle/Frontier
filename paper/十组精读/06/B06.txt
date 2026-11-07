@@ -1,0 +1,750 @@
+
+===== PDF PAGE 1 =====
+                    Vision Transformers are Circulant Attention Learners
+
+                        Dongchen Han1*, Tianyu Li2*, Ziyi Wang1, Gao Huang1†
+
+                                      1Department of Automation, BNRist, Tsinghua University
+                                         2Institute for Interdisciplinary Information Sciences, Tsinghua University
+
+
+
+
+
+                               Abstract                                𝑁× 𝑑          𝑁× 𝑑
+                                                                                             Mat mul            DFT mul           The self-attention mechanism has been a key factor in the
+            advancement of vision Transformers. However, its quadratic                                                        ℱ2D−12025
+             complexity imposes a heavy computational burden in high-                𝝈              𝝈                     conj
+               resolution scenarios, restricting the practical application. Pre-                                                           𝑁× 𝑁          𝑁× 𝑑
+              vious methods attempt to mitigate this issue by introduc-
+                                                                                         Mat mul            DFT mul
+              ing handcrafted patterns such as locality or sparsity, which                                                   ℱ2D  ℱ2DDec
+               inevitably compromise model capacity. In this paper, we                      𝑇
+
+                                                                   𝑁× 𝑑 𝑁× 𝑑 𝑁× 𝑑25       presenttention abynovelexploitingattentionthe inherentparadigmefficienttermed patternCirculantof self-At-         𝑁×𝑸 𝑑 𝑁×𝑲 𝑑 𝑁×𝑽 𝑑   𝑸   𝑲    𝑽
+                attention. Specifically, we first identify that the self-attention                       (a) Self-Attn         (b) Circulant Attn      (c) DFT-based
+              matrix in vision Transformers often approximates the Block                 𝒪(𝑁2)           𝒪(𝑁log𝑁)         Multiplication
+              Circulant matrix with Circulant Blocks (BCCB), a kind of
+               structured matrix whose multiplication with other matrices         Figure 1: An illustration of vanilla self-attention and the pro-
+             can be performed in O(N log N) time. Leveraging this in-        posed circulant attention. The σ represents Softmax func-
+               teresting pattern, we explicitly model the attention map as          tion, ⊙is the Hadamard product, and F2D, F−12D denote[cs.CV]         its nearest BCCB matrix and propose an efficient computa-         the 2D discrete Fourier transform (DFT) and  its inver-
+               tion algorithm for fast calculation. The resulting approach                                                                                 sion, respectively. Our circulant attention largely inherits the
+               closely mirrors vanilla self-attention, differing only in its use
+                                                                  paradigm of self-attention, except for employing BCCB at-              of BCCB matrices. Since our design is inspired by the inher-
+                                                                              tention matrices. This simple modification enables our de-               ent efficient paradigm, it not only delivers O(N log N) com-
+              putation complexity, but also largely maintains the capacity         sign to be efficiently calculated through DFT-based multi-
+              of standard self-attention. Extensive experiments on diverse          plication, thereby achieving O(N log N) complexity. The
+               visual tasks demonstrate the effectiveness of our approach,         scaling factor and head-wise summation are omitted for sim-
+               establishing circulant attention as a promising alternative to           plicity. Please refer to Section 4 for details.
+                self-attention for vision Transformer architectures.
+
+         Appendix: github.com/LeapLabTHU/Circulant-Attention
+                                                                    2023; Han et al. 2023; Wang et al. 2025) address this chal-
+                                                                       lenge by introducing handcrafted patterns, such as restrict-
+                    1  Introduction                                                                         ing receptive fields or introducing sparsity. While effectively
+          Transformer models have rapidly gained prominence in the      reducing computational demands, these handcrafted designs
+            field of computer vision in recent years. The superior ca-       practically function as external constraints imposed on self-
+           pacity of self-attention enables vision Transformers to effec-       attention mechanism, which inevitably compromise long-arXiv:2512.21542v1    tively learn from large-scale data, achieving significant suc-      range modeling capability and limit scalability.
+          cess in image classification (Dosovitskiy et al. 2021), object         In this paper, we identify an interesting phenomenon that
+           detection (Carion et al. 2020), semantic segmentation (Xie       the attention maps in vision Transformers frequently ap-
+            et al. 2021), and multimodal tasks (Xia et al. 2024).             proximate a kind of special matrix: the Block Circulant ma-
+           However, integrating self-attention into vision architec-        trix with Circulant Blocks (BCCB). This kind of matrix is
+           tures also poses a challenge. The quadratic complexity      an extension of the circulant matrix in 2D scenarios, whose
+      O(N 2) of self-attention leads to prohibitively high compu-       multiplication with other matrices can be efficiently imple-
+            tational cost when applied over a global receptive field. Pre-      mented by 2D discrete Fourier transform (DFT). This indi-
+          vious works (Wang et al. 2021; Liu et al. 2021; Zhu et al.       cates that while standard self-attention operates at O(N 2)
+             *These authors contributed equally.                             computational cost, it inherently learns efficient patterns that
+              †Corresponding Author.                                    can be calculated with O(N log N) complexity. This moti-
+           Copyright © 2026, Association for the Advancement of Artificial       vates us to rethink the design of self-attention and come up
+            Intelligence (www.aaai.org). All rights reserved.                     with a compelling research question:
+
+===== PDF PAGE 2 =====
+  Can we explicitly set the attention map as a BCCB matrix        Notations                  Descriptions
+to facilitate efficient computation, while preserving the high
+                                                          F1D, F−11D 1D discrete Fourier transform (DFT) and inversion.expressiveness of vanilla self-attention?
+                                                          F2D, F−12D 2D discrete Fourier transform (DFT) and inversion.  To answer this question, we delve into the essence of
+self-attention operation, presenting a novel paradigm named               (·)              The complex conjugate.
+Circulant Attention to fully exploit the observed pattern.         σ          The Softmax operation on each row.
+Specifically, we explicitly transform attention maps into
+                                        ⊙       Hadamard product, element-wise product.BCCB matrices by vertically projecting the original self-
+                                         ⊛     The DFT-based matrix multiplication we defined.attention matrices onto the BCCB matrix subspace. We
+demonstrate that this mathematical reformulation enables          ∥· ∥               The Frobenius norm.
+efficient computation of attention scores and output features               ⟨·, ·⟩           The Frobenius inner product.
+via 2D discrete Fourier transform, thus reducing the compu-
+tation complexity from O(N 2) to O(N log N) with the fast            Table 1: Important notations used in this paper.
+Fourier transform algorithm (FFT). As illustrated in Fig. 1,
+the resulting method highly resembles vanilla self-attention,
+except that  it directly produces BCCB attention matrices       further mimics convolution by limiting attention to local
+and replaces dense matrix multiplication with DFT-based      neighborhoods of each query. Apart from these designs, an-
+operations. Building on this design, we incorporate a token       other line of research employs sparse attention paradigms.
+reweighting module to overcome the inherent limitations of    PVT (Wang et al. 2021) employs downsampling of keys and
+the BCCB structure, which further increases model capacity.      values to reduce computational complexity, and DAT (Xia
+  Extensive experiments on diverse visual recognition tasks        et al. 2022) presents an input-dependent sparse attention pat-
+are conducted to validate the effectiveness of our design, in-        tern. BiFormer (Zhu et al. 2023) uses bi-level routing at-
+cluding image classification, object detection, and seman-       tention to dynamically determine areas of interest for each
+tic segmentation. The results confirm that the proposed Cir-       query. Despite their efficiency, these handcrafted attention
+culant Attention offers high efficiency and expressiveness,       patterns inevitably compromise the expressiveness of global
+suggesting it as a promising alternative to self-attention for       self-attention. In this paper, we leverage an intrinsic efficient
+vision Transformer designs.                                        structure of self-attention to strike a favorable balance be-
+  Our main contributions and takeaways are as follows:         tween efficiency and expressiveness.
+ • We reveal that the attention maps in vision Transformers       Efficient architecture with DFT. The  discrete Fourier
+   frequently approximate the Block Circulant matrix with      transform (DFT) has long been an important tool in dig-
+   Circulant Blocks (BCCB), an extension of the circulant        ital image processing (Pitas 2000). Recent work applies
+   matrix in 2D scenarios. We provide detailed analyses and    DFT and the Fast Fourier Transform (FFT) to design effi-
+   visualizations of this phenomenon.                             cient network components (Li et al. 2021; Rao et al. 2021;
+                                                        Guibas et al. 2021; Huang et al. 2023; Kong et al. 2023). • We present a novel mechanism dubbed Circulant At-
+                                                 GFNet (Rao et al. 2021) utilizes the convolution theorem of   tention, which utilizes the observed BCCB pattern to
+                                          DFT to build global depth-wise convolution module, achiev-   achieve efficient computation with O(N log N) com-
+                                                               ing O(N log N) complexity via FFT. FNO (Li et al. 2021)    plexity. Our method serves as a plug-in attention module
+                                                                     further generalizes this approach to dense global convolu-   and can be applied to various vision Transformer models.
+                                                                          tion. AFNO (Guibas et al. 2021) and AFFNet (Huang et al.
+ • Extensive experiments across image classification, object                                                         2023) achieve equivalent dynamic depth-wise convolution
+   detection, and semantic segmentation confirm that circu-                                                            through input-dependent frequency filters. In this paper, we
+   lant attention delivers a favorable balance between effi-                                                     employ 2D DFT and the FFT algorithm to efficiently imple-
+   ciency and expressiveness, establishing it as a promising                                                     ment our circulant attention mechanism.
+   alternative to the widely employed self-attention.
+
+                                                         3  Preliminaries            2  Related Work
+                                                            This section revisits the formulation of self-attention, cir-Vision Transformer. Transformer architectures and atten-
+                                                                 culant matrix, and BCCB matrix. To facilitate reading, wetion mechanisms have seen significant advances in computer
+                                                       summarize important notations in Table 1.vision in recent years (Vaswani et al. 2017). However, the
+quadratic computation complexity of self-attention leads to
+                                                          3.1  Attention Formulationunmanageable cost when processing global feature maps.
+To address this problem, various approaches have been pro-    We  first  briefly review the  calculation of  vanilla  self-
+posed to reduce the computational overhead by introduc-       attention (Vaswani et al. 2017) in vision Transformer mod-
+ing handcrafted patterns, such as locality or sparsity. Lo-        els. Consider an image token sequence x ∈RN×C, where
+cal methods such as Swin Transformer (Liu et al. 2021) re-   N = H ×W and H, W, C are the height, width, and dimen-
+strict attention to non-overlapping windows, reducing com-       sion of the feature map, respectively. In each attention head,
+putational cost. CSwin (Dong et al. 2022) extends this idea     x is transformed into Q, K, V ∈RN×d through projection
+with cross-shaped windows for richer context. Neighbor-      matrices WQ/K/V ∈RC×d, where d is the head dimension.
+hood Attention Transformer (NAT) (Hassani et al. 2023)      Based on this, self-attention computes the attention weights
+
+===== PDF PAGE 3 =====
+and calculates the output as a weighted sum of values using
+normalized attention score:
+             √
+        A = QK⊤/  d, O = σ(A)V,            (1)
+where A ∈RN×N is the raw attention matrix and σ repre-
+sents the Softmax function.
+
+3.2  Circulant Matrix
+An N × N matrix C is a circulant matrix if and only if each
+row is a cyclic shift of the previous one. It has the form:
+          c0    c1    · · ·  cN−1 
+               cN−1   c0    · · ·  cN−2
+       C =                       (2)                                                       .                    ...                            ...     ...                          ...
+                     c1    c2    · · ·    c0
+This type of matrix can be fully determined by its first row
+c = [c0, c1, . . . , cN−1], where Ci,j = cj−i (mod N).              Figure 2: N ×N attention maps from DeiT (Touvron et al.
+                                                              2021), where N = H × W, H = W =  14. Without  The multiplication of a circulant matrix C ∈RN×N and
+a vector x ∈RN can be expressed as:                           handcrafted constraints, the self-attention module in vision
+                                                           Transformer learns near BCCB patterns. For better observa-
+           N−1       N−1                                   tion, we divide the matrix into H×H blocks of shape W×W
+     (Cx)i = X Ci,jxj = X c(j−i) mod N · xj.    (3)      using gray dashed lines. Zoom in for best view.
+              j=0          j=0
+  Let k = (j −i) mod N, which implies j = (i + k) mod
+N. We can rewrite the expression as:                        where each block Ci is a circulant matrix of size W × W.
+                N−1                                     Similar to the circulant matrix, the BCCB matrix B is fully
+           (Cx)i = X ck · x(i+k) mod N.           (4)      determined by its first row b =  [c0, c1, . . . , cHW −1]. Let
+                    k=0                                                               ˆb, ˆx ∈RH×W be the 2D reshaped versions of b, x, re-
+                                                                      spectively. As proved in the Appendix, the multiplicationThis is precisely the definition of the 1D circular cross-
+                                                      y = Bx is equivalent to the 2D circular cross-correlationcorrelation between c and x, which is the 1D depth-wise
+convolution with circular padding in deep learning (where      between ˆb and ˆx, i.e., the 2D depth-wise convolution with
+the concept of convolution does not involve flipping the ker-       circular padding in deep learning. Similar to the 1D scenario,
+nel). Therefore, the multiplication y = Cx can be achieved        this operation can be implemented by 2D DFT (Davis 1979):
+with the Cross-Correlation Theorem (Wang 2019), which
+states that the Fourier transform of a cross-correlation re-         Bx = F−12D  F2D(b) ⊙F2D(x) ≜b ⊛x,      (8)
+sult is equivalent to the element-wise product of the first sig-
+nal’s conjugated Fourier transform and the second signal’s      where F2D, F−12D denotes the 2D DFT and its inversion. The
+Fourier transform. Mathematically:                     ⊛is our defined DFT-based multiplication. For simplicity,
+                                                                 the reshaping operations between 1D RN sequences and 2D          F1D(Cx) = F1D(c) ⊙F1D(x).           (5)                                      RH×W feature maps are not demonstrated, and we define
+Thus, we have:                                                                 the inputs/outputs of F2D, F−12D to be 1D sequences.
+        Cx = F−11D  F1D(c) ⊙F1D(x)   ,          (6)
+                                                            4  Method
+where F1D, F−11D denotes the 1D discrete Fourier transform                                                          4.1  Efficient Pattern in Vision Transformer
+(DFT) and its inversion, ⊙is the element-wise (Hadamard)
+product, and (·) represents the complex conjugate. Leverag-     The self-attention mechanism calculates pairwise similari-
+ing the fast Fourier transform algorithm, we can compute        ties between each query and key at quadratic complexity
+y = Cx with a time complexity of O(N log N).           O(N 2). However, we find an interesting phenomenon that,
+                                                                     in practice, vision Transformer tends to learn attention pat-
+3.3 BCCB Matrix                                             terns that are much more structured and efficient. Specifi-
+                                                                           cally, in Fig. 2, we visualize several attention matrices ex-Block Circulant matrix with Circulant Blocks (BCCB) is
+                                                                     tracted from the DeiT (Touvron et al. 2021) model. Thesethe 2D generalization of circulant matrix (Davis 1979). A
+                                                               matrices closely resemble block circulant matrices with cir-BCCB matrix B ∈RN×N, N = H × W has a block circu-
+                                                                 culant blocks (BCCB). As discussed in Section 3, multipli-lant structure with H × H blocks:
+                                                                 cation by a BCCB matrix is equivalent to a 2D global con-
+         C0   C1    · · ·  CH−1                                                                 volution operation, which can be carried out in O(N log N)
+            CH−1  C0    · · ·  CH−2
+      B =                       (7)      time via fast Fourier transform algorithm. This suggests that                                                                                          although self-attention formally incurs quadratic complex-                     ...                               ...     ...                            ...                           ,
+               C1   C2    · · ·   C0                              ity, it implicitly inherits an efficient structure.
+
+===== PDF PAGE 4 =====
+ Attention Matrix              Attention Distributions of Consecutive Queries             be expressed as:
+
+                                                            N−1
+                                                                               ⟨A, Bk⟩                                                                                     ˜A = X                                                                             ⟨Bk, Bk⟩Bk
+                                                                        k=0
+
+                                                              N−1
+                                                                      1
+                                           = X ⟨A, Bk⟩Bk               (11)
+                                           N
+                                                                          k=0
+
+                                                              N−1
+                                                                      1                                           = X ⟨QK⊤√    , Bk⟩Bk.
+                                           N        dFigure 3: The N × N attention matrices and H × W  at-                         k=0
+tention distributions of consecutive queries, where N =        With the BCCB attention matrix ˜A, our circulant attention
+H ×W, H = W = 14. The red points correspond to the      computes the output as O = σ( ˜A)V , akin to the vanilla self-
+query tokens. When exhibiting BCCB pattern, the attention       attention mechanism (see Eq. (1)).
+distributions show convolution-like translation invariance.         Efficient computation algorithm. The proposed circulant
+                                                                     attention still incurs O(N 2) complexity when computed us-
+                                                               ing the projection formula above. Here, we demonstrate that
+  For a better understanding of this phenomenon, we pro-      our method can be equivalently calculated in O(N log N)
+vide the attention distributions of adjacent query tokens      time employing the 2D DFT.
+(marked in red) in the attention matrices of Fig. 3. A key          Specifically, since ˜A is a BCCB matrix, its entire struc-
+observation is that the attention distributions exhibit an ap-       ture is determined by the first row. We denote this row as a,
+proximate shift invariance corresponding to the movement      which can be expressed as:
+of the query positions, which is exactly the behavior of a 2D                                                               1
+global convolution implemented by a BCCB matrix. This         a =  √ [⟨QK⊤, B0⟩, · · · , ⟨QK⊤, BN−1⟩].     (12)
+further confirms that the learned attention in vision Trans-         N  d
+former exhibits strong similarity to BCCB matrix.              According to the properties of the BCCB matrix, Bk actually
+  Motivated by the above discoveries, a critical research      corresponds to a spatial shift in the 2D space. Define
+question emerges: Can we explicitly enforce a BCCB struc-           ∆h = ⌊k/W⌋, ∆w = k mod W.        (13)
+ture on the attention matrix?                                                    Then we have
+  In the next section, we answer this question with Cir-                                                                1
+culant Attention, a novel attention mechanism that em-          ak =  √ ⟨QK⊤, Bk⟩
+                                       N  dploys BCCB attention matrices. By imposing this structural
+                                                          H−1 W −1                            (14)
+prior, we aim to explicitly encode the beneficial properties                1
+of BCCB matrices, i.e., O(N log N) complexity and inher-        =  √ X X ⟨ˆQh,w, ˆKh+∆h,w+∆w⟩,
+                                       N  d                                                                    h=0 w=0ent shift invariance, into the attention mechanism, thereby
+benefiting from both efficiency and expressiveness.             where ˆQ, ˆK ∈RH×W ×d are the 2D reshaped versions of
+                                                  Q, K ∈RN×d with circular padding (to handle boundary
+4.2  Circulant Attention                                      conditions). It could be observed that ak is the circular cross-
+Our circulant attention approximates the original attention       correlation result between ˆQ and ˆK, which is exactly the
+map A ∈RN×N using its nearest Block Circulant with Cir-      convolution concept in deep learning (see Section 3). There-
+culant Blocks (BCCB) matrix ˜A. Formally, we have                fore, a can be computed efficiently using 2D DFT:
+                                                              1  h                        i                   ˜A = arg min ∥A −B∥,               (9)        a =  √  F−12D  F2D(Q) ⊙F2D(K)     · 1d×1
+                   B∈B                      N  d
+                                                                                                                     (15)
+                                                              1
+where B denotes the N × N BCCB matrix subspace and      =  √ (Q ⊛K) · 1d×1,
+                                     N  d∥· ∥represents the Frobenius norm. Therefore, ˜A is the or-
+thogonal projection of A in the BCCB matrix subspace. As      where ⊛is the DFT-based matrix multiplication we defined
+discussed in Section 3, a N ×N BCCB matrix could be fully       in Section 3.3 and Q ⊛K ∈RN×d. The 1d×1 ∈Rd×1 is an
+determined by its first row. Let Bk denotes the BCCB matrix       all-one vector, which corresponds to the implicit summation
+whose first row is a one-hot vector with 1 at the k-th posi-      over dimension d of the inner product between ˆQh,w and
+tion. It is easy to see that {B0, · · · , BN−1} forms the basis     ˆKh+∆h,w+∆w in Eq. (14).
+for BCCB matrix subspace. Furthermore, we have                                                              Since ˜A is a BCCB matrix and σ is the Softmax function
+                                                     on each row, σ(˜A) is also a BCCB matrix and σ(a) rep-         ⟨Bk, Bk⟩= N, ⟨Bk, Bj⟩= 0, k ̸= j,       (10)
+                                                                   resents its first row. As discussed in Section 3, the output
+where ⟨·, ·⟩denotes the Frobenius inner product, i.e., the sum    O = σ( ˜A)V can thus be efficiently computed with:
+of element-wise products of two matrices. Eq. (10) indicates
+                                         O = F−12D  F2D(σ(a)) ⊙F2D(V )that {B0, · · · , BN−1} is an orthogonal basis. Therefore, the                                                                                                                     (16)
+orthogonal projection ˜A in the BCCB matrix subspace can           = σ(a) ⊛V.
+
+===== PDF PAGE 5 =====
+ Method                 Reso #Params FLOPs Top-1     Method                        Reso #Params FLOPs Top-1
+ DeiT-T (Touvron et al. 2021) 2242  5.7M   1.2G  72.2      SLAB-T (Guo et al. 2024)          2242  29M    4.5G  81.8
+ CA-DeiT-T               2242  6.1M   1.2G  75.0 (+2.8)  VMamba-T (Liu et al. 2024)         2242  31M    4.9G  82.5
+ DeiT-S (Touvron et al. 2021) 2242  22.1M   4.6G  79.8      SOFT-S++ (Lu et al. 2024)          2242  27M    4.5G  82.6
+ CA-DeiT-S               2242  23.8M   4.8G  81.0 (+1.2)   PolaFormer-T (Meng et al. 2025)     2242  29M    4.5G  82.6
+ DeiT-B (Touvron et al. 2021) 2242  86.6M  17.6G 81.8      LocalVMamba-T (Huang et al. 2024) 2242  26M    5.7G  82.7
+ CA-DeiT-B               2242  93.6M  18.9G 82.3 (+0.5)  VVT-S (Sun et al. 2023)            2242  26M    5.6G  82.7
+                                                        Agent-CSwin-T (Han et al. 2024c)    2242  21M    4.3G  83.1 PVT-T (Wang et al. 2021)   2242  13.2M   1.9G  75.1
+                                                                FasterViT-1 (Hatamizadeh et al. 2024) 2242  53M    5.3G  83.2 CA-PVT-T               2242  12.2M   2.0G  78.1 (+3.0)
+                                                                 EfficientViT-B3 (Cai et al. 2023)     2242  49M    4.0G  83.5 PVT-S (Wang et al. 2021)   2242  24.5M   3.8G  79.8
+                                               CAT-T                          2242  27M    4.3G  83.6 CA-PVT-S               2242  22.8M   4.0G  81.7 (+1.9)
+ PVT-M (Wang et al. 2021)   2242  44.2M   6.7G  81.2      LocalVMamba-S (Huang et al. 2024) 2242  50M   11.4G 83.7
+ CA-PVT-M               2242  42.5M   6.8G  82.6 (+1.4)  QFormerh-S (Zhang et al. 2024)      2242  51M    8.9G  84.0
+ PVT-L (Wang et al. 2021)   2242  61.4M   9.8G  81.7       BiFormer-B (Zhu et al. 2023)        2242  57M    9.8G  84.3
+ CA-PVT-L               2242  58.6M  10.1G 82.9 (+1.2)  MILA-S (Han et al. 2024b)          2242  43M    7.3G  84.4
+                                                        TransXNet-B (Lou et al. 2025)       2242  48M    8.3G  84.6 Swin-T (Liu et al. 2021)     2242  29M    4.5G  81.3
+                                                 CAT-S                          2242  51M    7.9G  84.5 CA-Swin-T               2242  28M    4.6G  82.2 (+0.9)
+ Swin-S (Liu et al. 2021)     2242  50M    8.7G  83.0      VMamba-B (Liu et al. 2024)         2242  89M   15.4G 83.9
+ CA-Swin-S               2242  50M    8.8G  83.6 (+0.6)   InLine-Swin-B (Han et al. 2024a)    2242  88M   15.4G 84.1
+ Swin-B (Liu et al. 2021)     2242  88M   15.4G 83.5      SOFT-L++ (Lu et al. 2024)          2242  85M   15.4G 84.1
+ CA-Swin-B               2242  88M   15.7G 83.9 (+0.4)   FasterViT-3 (Hatamizadeh et al. 2024) 2242  160M   18.2G 84.9
+ Swin-B (Liu et al. 2021)     3842  88M   47.0G 84.5       OverLock-B (Lou and Yu 2025)      2242  95M   16.7G 85.1
+ CA-Swin-B               3842  88M   47.1G 85.1 (+0.6)  CAT-B                          2242  90M   15.2G 85.0
+
+              Table 2: Comparison with baseline models (left) and advanced methods (right) on ImageNet-1K.
+
+
+  In Fig. 1, we provide an illustration of the proposed cir-     method to further improve our design. Specifically, there are
+culant attention paradigm. It can be observed that our design     two ways to implement this design: the pre-reweighting
+is structurally similar to vanilla self-attention, with the key
+                                           O = CirAttn(Q, K, V ⊙T),          (19)differences being the use of BCCB attention matrices and
+DFT-based efficient multiplication.                                                       and the post-reweighting
+Complexity analysis. Leveraging the efficient computation
+algorithm, the overall complexity of our circulant attention           O = CirAttn(Q, K, V ) ⊙T,          (20)
+is expressed as:
+                                                       where T = SiLU(xWT ) ∈RN×d is an input-dependent to-
+ Ω(CA) = 2N(log2N)d + 2Nd + N log2N +                                                        ken reweighting factor, and CirAttn represents our circulant
+           |      DFT, Product,{zIDFT in Eq. (7)    }                     attention operator.
+         N(log2N)(d + 1) + 2Nd + N(log2N)d  (17)
+                                                          4.3  Implementation
+           |          DFT, Product,{zIDFT in Eq. (8)        }
+                                                   Our circulant attention serves as a plug-in module and can
+       =N(log2N)(4d + 2) + 4Nd,                      be applied to various vision Transformer models. As a show-
+which is much more efficient than the computation complex-       case, we employ three representative Transformer architec-
+ity of vanilla self-attention:                                           tures: DeiT (Touvron et al. 2021), PVT (Wang et al. 2021),
+                                                       and Swin Transformer (Liu et al. 2021) to implement our ap-          Ω(SA) = N 2d + N 2d = 2N 2d.         (18)
+                                                               proach. These three models represent global self-attention,
+Token reweighting module. In standard self-attention, a       sparse attention and local attention, respectively. We replace
+row-wise Softmax is applied to the raw attention map A ∈       the original attention module in these models with circulant
+RN×N, ensuring that each row sums to one. Notably, this       attention to establish our models. Since our method bene-
+operation does not constrain the column sums of σ(A),         fits from N log N complexity, it is possible to directly pro-
+allowing certain keys to accumulate higher total attention       cess a high-resolution feature map in the early stages without
+scores across queries. Consequently, different queries can       incurring high computational cost. Therefore, for hierarchi-
+emphasize similar keys and values, helping the model dis-       cal models like Swin and PVT, we mainly restrict the atten-
+tinguish more informative tokens from others. However, the       tion replacement to the first two stages. Beyond baseline im-
+block circulant structure of our circulant attention map σ( ˜A)      provements, we have also developed a family of specialized
+enforces both row and column sums to equal one, thereby      models, termed Circulant Attention Transformer (CAT), to
+limiting its ability to highlight salient tokens. As a rem-      compare with various advanced vision Transformers. De-
+edy, we introduce a simple yet effective token reweighting       tailed model architectures are shown in the Appendix.
+
+===== PDF PAGE 6 =====
+       Mask R-CNN Object Detection on COCO                          Semantic Segmentation on ADE20K
+ Backbone   FLOPs Sch. APb APb50 APb75 APm APm50 APm75          Backbone     Method   FLOPs   #Params   mIoU
+ PVT-T      240G   1x  36.7  59.2  39.3  35.1  56.7  37.3         PVT-T        S-FPN    158G    17M      35.7
+CA-PVT-T  218G   1x  40.5  63.4  43.9  37.9  60.4  40.7         CA-PVT-T    S-FPN    135G    16M      39.4
+ PVT-S      305G   1x  40.4  62.9  43.8  37.8  60.1  40.3         PVT-S        S-FPN    225G    28M      39.8
+CA-PVT-S  269G   1x  44.2  66.9  48.3  40.7  63.9  43.7         CA-PVT-S    S-FPN    187G    26M      42.3
+PVT-M     392G   1x  42.0  64.4  45.6  39.0  61.6  42.1        PVT-M       S-FPN    315G    48M      41.6
+CA-PVT-M  356G   1x  45.2  67.7  49.4  41.2  64.7  44.1        CA-PVT-M    S-FPN    278G    46M      43.7
+ PVT-L      494G   1x  42.9  65.0  46.6  39.5  61.9  42.5         PVT-L        S-FPN    420G    65M      42.1
+CA-PVT-L  444G   1x  46.3  68.8  50.8  41.9  65.4  45.0         CA-PVT-L    S-FPN    369G    62M      44.2
+
+ Swin-T     267G   1x  43.7  66.6  47.7  39.8  63.3  42.7          Swin-T       UperNet   945G    60M      44.5
+ CA-Swin-T  269G   1x  44.5  67.3  48.9  40.5  64.2  43.5         CA-Swin-T   UperNet   947G    59M      45.2
+ Swin-S     358G   1x  45.7  67.9  50.4  41.1  64.9  44.2          Swin-S       UperNet   1038G    81M      47.6
+ CA-Swin-S  361G   1x  46.8  69.3  51.7  42.2  66.2  45.3          CA-Swin-S    UperNet   1040G    80M      48.6
+ Swin-B     503G   1x  46.9    -       -    42.3     -       -
+ CA-Swin-B  507G   1x  47.5  70.1  52.2  42.8  66.8  45.9       Table 4: Results of semantic segmentation. The FLOPs are
+ Swin-T     267G   3x  46.0  68.1  50.3  41.6  65.1  44.9      computed over encoders and decoders with an input image
+ CA-Swin-T  269G   3x  46.7  68.8  51.2  42.5  65.9  45.9         at the resolution of 512×2048. S-FPN is short for Seman-
+                                                        ticFPN (Kirillov et al. 2019) model.
+Table 3: Results on COCO dataset. The FLOPs are com-
+puted with an input resolution of 1280×800.
+
+
+             5  Experiments
+
+In this section, we conduct extensive experiments to evaluate
+the effectiveness of our method, including ImageNet clas-
+sification (Deng et al. 2009), COCO object detection (Lin
+                                                                                                                     (a)                                           (b)
+et al. 2014), and ADE20K semantic segmentation (Zhou
+et al. 2019). Visualization and analysis are also provided.
+
+5.1  ImageNet Classification
+
+The ImageNet-1K (Deng et al. 2009) dataset comprises 1.28
+million training and 50 thousand validation images span-
+ning 1,000 classes. To ensure a fair comparison, we adopt                      (c)                                           (d)
+identical training settings as the baseline models. Specifi-
+cally, models are trained from scratch for 300 epochs using      Figure 4: Comparisons between self-attention and the pro-
+the AdamW (Loshchilov and Hutter 2018) optimizer, with      posed circulant attention in (a) FLOPs, (b) inference FPS,
+cosine learning rate decay and a linear warm-up over the      and  (c, d) throughput-accuracy trade-off. Throughput  is
+first 20 epochs. The initial learning rate is set to 1 × 10−3,      measured on a RTX3090 GPU.
+and the weight decay is 0.05. Augmentation and regulariza-
+tion strategies include RandAugment (Cubuk et al. 2020),
+Mixup (Zhang et al. 2018), CutMix (Yun et al. 2019) and    We see that circulant attention delivers better results than
+random erasing (Zhong et al. 2020).                             highly optimized methods, validating the superior capacity
+  From Table 2 left, we observe that replacing self-attention       of our approach.
+in the three representative models with circulant atten-
+tion leads to consistent improvements. For example, the      5.2  Object Detection
+CA-DeiT outperforms the global  self-attention baseline     The COCO (Lin et al. 2014) object detection and instance
+DeiT (Touvron et al. 2021). This indicates that our method      segmentation dataset contains 118K training images and 5K
+not only enjoys high efficiency, but also facilitates the learn-       validation images. We follow the training and testing strate-
+ing of vision Transformers. Furthermore, compared to the       gies of the baseline models. The results are shown in Table 3.
+sparse attention PVT (Wang et al. 2021) and local atten-       Circulant attention offers effective global modeling with
+tion Swin Transformer (Liu et al. 2021), circulant atten-    O(N log N) complexity, making it ideally suitable for high-
+tion demonstrates significant advantages. Our CA-PVT-S       resolution image modeling scenarios. Notably, CA-PVT-S
+matches PVT-L’s accuracy using 30% of the parameters and      outperforms the larger PVT-L model by 1.3 box AP with
+40% of the FLOPs. These results establish circulant atten-       substantially fewer FLOPs. This gain is more pronounced
+tion as a promising alternative to self-attention.                  than in the classification task, where CA-PVT-S and PVT-L
+  Table 2 right compares our CAT model against various       yield the same accuracy. These results highlight the superi-
+state-of-the-art vision Transformers and Mamba variants.       ority of our method in high-resolution scenarios.
+
+===== PDF PAGE 7 =====
+                Figure 5: An illustration of the equivalent global convolution kernels from CA-DeiT model.
+
+
+5.3  Semantic Segmentation                                                   FLOPs #Param Acc.  Diff.
+ADE20K (Zhou et al. 2019) is a well-established benchmark                                                               DeiT-S (Touvron et al. 2021)     4.6G   22M   79.8   -1.2
+for semantic segmentation, consisting of 20K training im-                                       +  Circulant Attention        4.4G   22M   79.7   -1.3
+ages, 2K validation images, and 150 semantic categories. We                                       + Head Dim d = 1          4.4G   22M   80.2   -0.8
+use the same settings as baseline models. Similar to the ob-                                                                  Token Pre-Reweighting    4.8G   24M   80.9   -0.1
+ject detection task, the results in Table 4 demonstrate that      +                                                                  Token Post-Reweighting   4.8G   24M   81.0  Ours
+circulant attention consistently enhances the performance of
+PVT and Swin models. We observe up to 3.7% mIoU gain       DeiT-S + Token Reweighting    5.0G   24M   80.0   -1.0
+with comparable or less computation cost and parameters.
+                                                               Table 5: Ablation on the key designs based on DeiT-S.
+5.4  Analysis and Visualization
+Efficiency analysis. Benefiting from O(N log N) com-
+plexity, our circulant attention shows remarkable efficiency       vision Transformers and does not sacrifice expressiveness.
+advantages over self-attention operation. As demonstrated    On this basis, we find that our design benefits from a small
+in Fig. 4(a), CA-DeiT-T requires 8× fewer FLOPs at a      head dimension and more heads. Setting the head dimension
+15362 image resolution, highlighting its potential for high-     d = 1 improves the accuracy to 80.2%, outperforming the
+resolution modeling tasks. Moreover, these theoretical sav-      DeiT-S baseline. This can be attributed to the fact that circu-
+ings directly translate into practical gains, with our method       lant attention score is a summation of N query-key pairs
+delivering a 7× speedup at 15362 resolution in Fig. 4(b).       (see Eq. (14)), thus having an equivalent head dimension
+Additionally, Fig. 4(c, d) shows that our model achieves a       of Nd, which is still large enough when d = 1. Addition-
+better trade-off between throughput and accuracy at the de-        ally, we study the two token reweighting methods defined in
+fault ImageNet resolution 2242, enjoying up to 1.5× faster      Eq. (19) and Eq. (20). Both designs lead to further improve-
+inference speed with improved performance.                   ment, while the post-reweighting delivers a slightly better
+Visualization. As discussed in Section 3.3, the BCCB matri-        result. Notably, token reweighting offers limited gains on the
+ces correspond to 2D global convolution operations. There-      DeiT-S baseline. In this paper, we employ post-reweighting
+fore, it is easy to visualize and interpret the equivalent global       as default, achieving 81.0% accuracy on DeiT-S. These re-
+convolution kernels. As shown in Fig. 5, our model can gen-       sults confirm the effectiveness of our design.
+erate diverse equivalent kernels based on the input image.
+For example, given the first image, our model generates bird-                  6  Conclusion
+and wire-shaped kernels (the first two). There are also ker-      This paper reveals an interesting pattern in vision Trans-
+nels focusing more on spatial patterns, such as local, global,      formers, where the self-attention maps frequently exhibit
+half-plane, strip, and cross-shaped ones.                          nearly block circulant with circulant blocks (BCCB) struc-
+                                                                         tures. This observation directly inspires our design of Cir-
+5.5  Ablation Study                                          culant Attention, a novel attention paradigm that explicitly
+We conduct ablation studies to assess the contribution of       leverages this inherent pattern to optimize computational ef-
+each component in our circulant attention design. Experi-       ficiency while preserving expressive power. Extensive ex-
+ments are performed on ImageNet-1K under the CA-DeiT      periments across classification, object detection, and seman-
+framework. As shown in Table 5, we begin with the DeiT-        tic segmentation fully demonstrate the effectiveness of the
+S baseline and introduce our designs in turn. Simply intro-      proposed circulant attention, establishing it as an efficient
+ducing circulant attention leads to a negligible 0.1% perfor-      and competitive alternative to widely adopted self-attention
+mance drop, indicating that the BCCB pattern is suitable for       for vision Transformer architectures.
+
+===== PDF PAGE 8 =====
+           Acknowledgements                       Hassani, A.; Walton, S.; Li, J.; Li, S.; and Shi, H. 2023.
+This work is supported in part by the National Key R&D      Neighborhood attention transformer. In CVPR.
+Program of China under Grant 2024YFB4708200, the Na-      Hatamizadeh, A.; Heinrich, G.; Yin, H.; Tao, A.; Alvarez,
+tional Natural Science Foundation of China under Grants        J. M.; Kautz, J.; and Molchanov, P. 2024.  FasterViT: Fast
+U24B20173 and 42327901, and the Scientific Research In-      Vision Transformers with Hierarchical Attention. In ICLR.
+novation Capability Support Project for Young Faculty un-      Huang, T.; Pei, X.; You, S.; Wang, F.; Qian, C.; and Xu,
+der Grant ZYGXQNJSKYCXNLZCXM-I20.                  C. 2024. Localmamba: Visual state space model with win-
+                                                  dowed selective scan. In ECCVW.
+                References                        Huang, Z.; Zhang, Z.; Lan, C.; Zha, Z.-J.; Lu, Y.; and Guo,
+Cai, H.;  Li,  J.; Hu, M.; Gan,  C.; and Han, S. 2023.      B. 2023. Adaptive frequency filters as efficient global token
+Efficientvit: Lightweight  multi-scale  attention  for high-      mixers. In ICCV.
+resolution dense prediction. In ICCV.                               Kirillov, A.; Girshick, R.; He, K.; and Doll´ar, P. 2019.
+Carion, N.; Massa, F.; Synnaeve, G.; Usunier, N.; Kirillov,      Panoptic feature pyramid networks. In CVPR.
+A.; and Zagoruyko, S. 2020.  End-to-end object detection      Kong, L.; Dong, J.; Ge, J.; Li, M.; and Pan, J. 2023.  Effi-
+with transformers. In ECCV.                                       cient frequency domain-based transformers for high-quality
+Chu, X.; Tian, Z.; Zhang, B.; Wang, X.; and Shen, C. 2023.      image deblurring. In CVPR.
+Conditional Positional Encodings for Vision Transformers.       Li, Z.; Kovachki, N. B.; Azizzadenesheli, K.; Bhattacharya,
+In ICLR.                                                        K.; Stuart, A.; Anandkumar, A.; et al. 2021. Fourier Neural
+Cubuk, E. D.; Zoph, B.; Shlens, J.; and Le, Q. V. 2020. Ran-      Operator for Parametric Partial Differential Equations.  In
+daugment: Practical automated data augmentation with a re-      ICLR.
+duced search space. In CVPRW.                                  Lin, T.-Y.; Maire, M.; Belongie, S.; Hays, J.; Perona, P.; Ra-
+Davis, P. J. 1979. Circulant Matrices. John Wiley & Sons.      manan, D.; Doll´ar, P.; and Zitnick, C. L. 2014.  Microsoft
+ISBN 9780471057710.                                        coco: Common objects in context. In ECCV.
+Deng, J.; Dong, W.; Socher, R.; Li, L.-J.; Li, K.; and Fei-       Liu, Y.; Tian, Y.; Zhao, Y.; Yu, H.; Xie, L.; Wang, Y.; Ye,
+Fei, L. 2009.  Imagenet: A large-scale hierarchical image       Q.; Jiao, J.; and Liu, Y. 2024. Vmamba: Visual state space
+database. In CVPR.                                         model. In NeurIPS.
+Dong, X.; Bao, J.; Chen, D.; Zhang, W.; Yu, N.; Yuan, L.;       Liu, Z.; Lin, Y.; Cao, Y.; Hu, H.; Wei, Y.; Zhang, Z.; Lin,
+Chen, D.; and Guo, B. 2022. Cswin transformer: A general       S.; and Guo, B. 2021. Swin transformer: Hierarchical vision
+vision transformer backbone with cross-shaped windows. In      transformer using shifted windows. In ICCV.
+CVPR.                                                        Loshchilov, I.; and Hutter, F. 2018. Decoupled weight decay
+                                                                     regularization. In ICLR.Dosovitskiy, A.; Beyer, L.; Kolesnikov, A.; Weissenborn,
+D.; Zhai, X.; Unterthiner, T.; Dehghani, M.; Minderer, M.;      Lou, M.; and Yu, Y. 2025. OverLoCK: An Overview-first-
+Heigold, G.; Gelly, S.; et al. 2021.  An image is worth      Look-Closely-next ConvNet with Context-Mixing Dynamic
+16x16 words: Transformers for image recognition at scale.      Kernels. In CVPR.
+In ICLR.                                                  Lou, M.; Zhang, S.; Zhou, H.-Y.; Yang, S.; Wu, C.; and Yu,
+Guibas, J.; Mardani, M.; Li, Z.; Tao, A.; Anandkumar, A.;      Y. 2025. TransXNet: learning both global and local dynam-
+and Catanzaro, B. 2021.  Adaptive fourier neural opera-       ics with a dual dynamic token mixer for visual recognition.
+tors: Efficient token mixers for transformers. arXiv preprint     TNNLS.
+arXiv:2111.13587.                                          Lu, J.; Zhang, J.; Zhu, X.; Feng, J.; Xiang, T.; and Zhang, L.
+Guo, J.; Chen, X.; Tang, Y.; and Wang, Y. 2024. SLAB: Ef-      2024. Softmax-free linear transformers. IJCV.
+ficient Transformers with Simplified Linear Attention and     Meng, W.; Luo, Y.; Li, X.; Jiang, D.; and Zhang, Z. 2025.
+Progressive Re-parameterized Batch Normalization.   In      PolaFormer: Polarity-aware Linear Attention  for Vision
+ICML.                                                        Transformers. In ICLR.
+Han, D.; Pan, X.; Han, Y.; Song, S.; and Huang, G. 2023.       Pitas, I. 2000. Digital image processing algorithms and ap-
+FLatten Transformer: Vision Transformer using Focused       plications. John Wiley & Sons.
+Linear Attention. In ICCV.                                  Rao, Y.; Zhao, W.; Zhu, Z.; Lu, J.; and Zhou, J. 2021. Global
+Han, D.; Pu, Y.; Xia, Z.; Han, Y.; Pan, X.; Li, X.; Lu, J.;         filter networks for image classification. In NeurIPS.
+Song, S.; and Huang, G. 2024a. Bridging the divide: Recon-      Sun, W.; Qin, Z.; Deng, H.; Wang, J.; Zhang, Y.; Zhang, K.;
+sidering softmax and linear attention. In NeurIPS.               Barnes, N.; Birchfield, S.; Kong, L.; and Zhong, Y. 2023.
+Han, D.; Wang, Z.; Xia, Z.; Han, Y.; Pu, Y.; Ge, C.; Song,       Vicinity vision transformer. TPAMI.
+J.; Song, S.; Zheng, B.; and Huang, G. 2024b.  Demys-      Touvron, H.; Cord, M.; Douze, M.; Massa, F.; Sablayrolles,
+tify Mamba in Vision: A Linear Attention Perspective.  In       A.; and J´egou, H. 2021. Training data-efficient image trans-
+NeurIPS.                                                    formers & distillation through attention. In ICML.
+Han, D.; Ye, T.; Han, Y.; Xia, Z.; Song, S.; and Huang, G.      Vaswani, A.; Shazeer, N.; Parmar, N.; Uszkoreit, J.; Jones,
+2024c. Agent attention: On the integration of softmax and       L.; Gomez, A. N.; Kaiser, Ł.; and Polosukhin, I. 2017. At-
+linear attention. In ECCV.                                         tention is all you need. In NeurIPS.
+
+===== PDF PAGE 9 =====
+Wang, C. 2019. Kernel learning for visual perception. Ph.D.
+thesis, Columbia University.
+Wang, W.; Xie, E.; Li, X.; Fan, D.-P.; Song, K.; Liang, D.;
+Lu, T.; Luo, P.; and Shao, L. 2021. Pyramid vision trans-
+former: A versatile backbone for dense prediction without
+convolutions. In ICCV.
+Wang, Y.; Yue, Y.; Yue, Y.; Wang, H.; Jiang, H.; Han, Y.; Ni,
+Z.; Pu, Y.; Shi, M.; Lu, R.; et al. 2025. Emulating human-
+like adaptive vision for efficient and flexible machine visual
+perception. Nature Machine Intelligence.
+Xia, Z.; Han, D.; Han, Y.; Pan, X.; Song, S.; and Huang, G.
+2024. Gsva: Generalized segmentation via multimodal large
+language models. In CVPR.
+Xia, Z.; Pan, X.; Song, S.; Li, L. E.; and Huang, G. 2022.
+Vision transformer with deformable attention. In CVPR.
+Xie, E.; Wang, W.; Yu, Z.; Anandkumar, A.; Alvarez, J. M.;
+and Luo, P. 2021. SegFormer: Simple and efficient design
+for semantic segmentation with transformers. In NeurIPS.
+Yun, S.; Han, D.; Oh, S. J.; Chun, S.; Choe, J.; and Yoo, Y.
+2019. Cutmix: Regularization strategy to train strong classi-
+fiers with localizable features. In ICCV.
+Zhang, H.; Cisse, M.; Dauphin, Y. N.; and Lopez-Paz, D.
+2018.  mixup: Beyond Empirical Risk Minimization.  In
+ICLR.
+Zhang, Q.; Zhang, J.; Xu, Y.; and Tao, D. 2024. Vision trans-
+former with quadrangle attention. TPAMI.
+Zhong, Z.; Zheng, L.; Kang, G.; Li, S.; and Yang, Y. 2020.
+Random erasing data augmentation. In AAAI.
+Zhou, B.; Zhao, H.; Puig, X.; Xiao, T.; Fidler, S.; Barriuso,
+A.; and Torralba, A. 2019. Semantic understanding of scenes
+through the ade20k dataset. IJCV.
+Zhu, L.; Wang, X.; Ke, Z.; Zhang, W.; and Lau, R. W. 2023.
+BiFormer: Vision Transformer with Bi-Level Routing At-
+tention. In CVPR.
+
+===== PDF PAGE 10 =====
+        A BCCB Matrix                         Let kx = (jx −ix) mod H and ky = (jy −iy) mod W.
+                                                            This implies jx = (ix+kx) mod H and jy = (iy+ky) modBlock Circulant matrix with Circulant Blocks (BCCB) is
+                                        W. Substituting these into the summation yields:the 2D generalization of circulant matrix (Davis 1979). A
+BCCB matrix B ∈RN×N, N = H × W has a block circu-            H−1 W −1
+lant structure with H × H blocks:                                     y(ix,iy) = X X b(kx,ky)x((ix+kx) mod H,(iy+ky) mod W )
+         C0   C1    · · ·  CH−1                          kx=0 ky=0
+            CH−1  C0    · · ·  CH−2                                                                          (24)
+      B =                     (21)      This expression is the definition of the 2D circular cross-                                                        ,                 correlation between the 2D kernel b and the 2D signal x.                     ...                               ...     ...                            ...
+               C1   C2    · · ·   C0                We leverage the 2D Cross-Correlation Theorem, which
+                                                                                is a direct extension of the 1D theorem. It states that the 2D
+where each block Ci is a circulant matrix of size W × W.                                                                Fourier transform of a cross-correlation is the element-wise
+Similar to the circulant matrix, the BCCB matrix B is fully                                                             product of the first signal’s conjugated 2D Fourier transform
+determined by its first row b = [c0, c1, . . . , cHW −1].                                                       and the second signal’s 2D Fourier transform:
+  Let ˆb, ˆx ∈RH×W be the 2D reshaped versions of b, x,
+respectively. We now prove that the multiplication y = Bx               F2D(Bx) = F2D(b) ⊙F2D(x)          (25)
+is equivalent to the 2D circular cross-correlation between ˆb                                                       Thus,we have:
+and ˆx, i.e., the 2D global convolution with circular padding
+in deep learning. Notably, the concept of convolution in deep                                              Bx = F−12D  F2D(b) ⊙F2D(x)          (26)
+learning does not involve flipping the kernel, thus corre-
+sponding to the cross-correlation operation.                                                       where F2D, F−12D denotes the 2D DFT and its inversion.  We interpret the index 0 ≤k < N as a pair of two-                                                          For simplicity, the reshaping operations between 1D RN se-
+dimensional coordinates (kx, ky), where kx = ⌊k/W⌋and                                                          quences and 2D RH×W feature maps are not demonstrated,
+ky = k mod W. Using this mapping, the matrix entry Bi,j
+                                                       and we define the inputs/outputs of F2D, F−12D to be 1D se-can be written as B(ix,iy),(jx,jy) and bi can be written as                                                             quences. Therefore, we can also compute it using the fast
+b(ix,iy).                                                                Fourier transform with a time complexity of O(N log N).
+  Then, for the matrix entry Bi,j = B(ix,iy),(jx,jy), we can
+see that:
+                                        B  Model Architectures
+ • The indices ix and jx (from 0 to H−1) specify the block-                                         We provide the architectures of CA-DeiT, CA-PVT, CA-
+  row and block-column.                                                    Swin and CAT in Table 6, Table 7, Table 8, Table 9 and
+ • The indices iy and jy (from 0 to W −1) specify the intra-      Table 10. Our circulant attention serves as a plug-in mod-
+   block row and intra-block column.                             ule. We simply replace the original attention module with
+Thus, the element B(ix,iy),(jx,jy) is located in the row iy and       the proposed circulant attention, while keeping the other net-
+column jy of the matrix block in the block row ix and block     work components unchanged. To introduce positional infor-
+column jx.                                                   mation, we employ conditional positional encodings (Chu
+  Since the matrix B has a block circulant structure, the        et al. 2023). Since our method benefits from N log N com-
+                                                                        plexity, it is possible to directly process a high-resolutionblock in block row ix and block column jx is given by
+C(jx−ix) mod H.                                                   feature map in the early stages without incurring high
+                                                             computational cost. Therefore, for hierarchical models, we  We can see that
+                                                          mainly restrict the attention replacement to the first two
+    B(ix,iy),(jx,jy) = (C(jx−ix) mod H)iy,jy                         stages.
+         = (C(jx−ix) mod H)(jy−iy) mod W   (22)
+         = b((jx−ix) mod H,(jy−iy) mod W )
+
+  We can express the matrix multiplication Bx, where B ∈
+RN×N and x ∈RN, as follows:
+
+          N−1
+(Bx)(ix,iy) = X B(ix,iy),(jx,jy)x(jx,jy)
+             j=0
+
+          H−1 W −1
+      = X X B(ix,iy),(jx,jy)x(jx,jy)
+             jx=0 jy=0
+
+          H−1 W −1
+      = X X b((jx−ix) mod H,(jy−iy) mod W )x(jx,jy)
+             jx=0 jy=0
+                                                     (23)
+
+===== PDF PAGE 11 =====
+                      CA-DeiT-T                    CA-DeiT-S                    CA-DeiT-B
+
+             CA Block      DeiT Block     CA Block      DeiT Block     CA Block      DeiT Block
+
+                                                    
+                res 14×14                     res 14×14                     res 14×14
+
+             dim 192  ×12   None      dim 384  ×12   None      dim 768  ×12   None                                                                                                                                                                                                                                                                
+              head 192                  head 384                  head 768
+
+
+                          Table 6: Architectures of CA-DeiT models.
+
+
+
+
+
+                                    CA-PVT-T                                    CA-PVT-S
+Stage       Output
+                    CA Block            PVT Block           CA Block            PVT Block
+
+                                                           Conv4×4, stride=4, 64, LN
+
+                                                    
+                      win 56×56                                win 56×56
+ res1     56 × 56
+                      dim 64   ×2            None              dim 64   ×3            None                                                                                                                                                                                                                                                                       
+                       head 64                                   head 64
+
+                                                          Conv2×2, stride=2, 128, LN
+
+                                                    
+                      win 28×28                                win 28×28
+ res2     28 × 28
+                      dim 128  ×2            None             dim 128  ×4            None                                                                                                                                                                                                                                                                       
+                       head 128                                  head 128
+
+                                                          Conv2×2, stride=2, 320, LN
+
+                                                                    
+                                          win 14×14                                win 14×14
+ res3     14 × 14
+                            None             dim 320  ×2            None             dim 320  ×6                                                                                                                                                                                                                                                                                                                                                      
+                                             head 5                                    head 5
+
+                                                          Conv2×2, stride=2, 512, LN
+
+                                                                     
+                                           win 7×7                                  win 7×7
+ res4      7 × 7
+                            None             dim 512  ×2             None             dim 512  ×3                                                                                                                                                                                                                                                                                                                                                    
+                                             head 8                                    head 8
+
+
+                       Table 7: Architectures of CA-PVT models (Part1).
+
+===== PDF PAGE 12 =====
+                                          CA-PVT-M                                    CA-PVT-L
+           Stage       Output
+                           CA Block             PVT Block            CA Block             PVT Block
+
+                                                                      Conv4×4, stride=4, 64, LN
+
+                                                           
+                              win 56×56                                 win 56×56
+            res1     56 × 56
+                             dim 64   ×3            None              dim 64   ×3            None                                                                                                                                                                                                                                                                                                          
+                               head 64                                    head 64
+
+                                                                     Conv2×2, stride=2, 128, LN
+
+                                                           
+                              win 28×28                                 win 28×28
+            res2     28 × 28
+                             dim 128  ×4            None              dim 128  ×8            None                                                                                                                                                                                                                                                                                                          
+                               head 128                                   head 128
+
+                                                                     Conv2×2, stride=2, 320, LN
+
+                                                                           
+                                                  win 14×14                                 win 14×14
+            res3     14 × 14
+                                     None             dim 320   ×18            None             dim 320   ×27                                                                                                                                                                                                                                                                                                                                                                                         
+                                                     head 5                                     head 5
+
+                                                                     Conv2×2, stride=2, 512, LN
+
+                                                                           
+                                                    win 7×7                                   win 7×7
+            res4      7 × 7
+                                     None              dim 512  ×3             None              dim 512  ×3                                                                                                                                                                                                                                                                                                                                                                                       
+                                                     head 8                                     head 8
+
+
+                               Table 8: Architectures of CA-PVT models (Part2).
+
+
+
+
+
+                             CA-Swin-T                              CA-Swin-S                              CA-Swin-B
+Stage    Output
+                CA Block           Swin Block        CA Block           Swin Block        CA Block           Swin Block
+
+                               concat 4 × 4, 96, LN                          concat 4 × 4, 96, LN                          concat 4 × 4, 128, LN
+
+                                                                   
+                win 56×56                         win 56×56                          win 56×56
+ res1   56 × 56
+                 dim 96   ×2        None          dim 96   ×2        None          dim 128  ×2        None                                                                                                                                                                                                                                                                                                                                                
+                  head 96                            head 96                            head 128
+
+                              concat 2 × 2, 192, LN                         concat 2 × 2, 192, LN                          concat 2 × 2, 256, LN
+
+                                                                   
+                win 28×28                         win 28×28                          win 28×28
+ res2   28 × 28
+                dim 192  ×2        None          dim 192  ×2        None          dim 256  ×2        None                                                                                                                                                                                                                                                                                                                                                
+                 head 192                           head 192                            head 256
+
+                              concat 2 × 2, 384, LN                         concat 2 × 2, 384, LN                          concat 2 × 2, 512, LN
+
+                                                                                
+                                  win 7×7                           win 7×7                           win 7×7
+ res3   14 × 14
+                      None          dim 384  ×6         None          dim 384  ×18         None          dim 512  ×18                                                                                                                                                                                                                                                                                                                                                                                                              
+                                   head 12                            head 12                            head 16
+
+                              concat 2 × 2, 768, LN                         concat 2 × 2, 768, LN                         concat 2 × 2, 1024, LN
+
+                                                                                
+                                  win 7×7                           win 7×7                           win 7×7
+ res4    7 × 7
+                      None          dim 768  ×2         None          dim 768  ×2         None          dim 1024 ×2                                                                                                                                                                                                                                                                                                                                                                                                                
+                                   head 24                            head 24                            head 32
+
+
+                                  Table 9: Architectures of CA-Swin models.
+
+===== PDF PAGE 13 =====
+                              CAT-T                                 CAT-S                                CAT-B
+Stage    Output
+                CA Block             Attn Block        CA Block              Attn Block         CA Block              Attn Block
+
+                             Stem, stride 4, 64, BN                         Stem, stride 4, 64, BN                          Stem, stride 4, 96, BN
+
+                                                                     
+                win 56×56                         win 56×56                          win 56×56
+ res1   56 × 56
+                 dim 64   ×1        None           dim 64   ×2         None           dim 96   ×2         None                                                                                                                                                                                                                                                                                                                                                    
+                  head 64                            head 64                             head 96
+
+                       Conv 3×3, stride 2, 128, BN                 Conv 3×3, stride 2, 128, BN                 Conv 3×3, stride 2, 192, BN
+
+                                                                     
+                win 28×28                         win 28×28                          win 28×28
+ res2   28 × 28
+                dim 128  ×2        None          dim 128  ×4         None           dim 192  ×4         None                                                                                                                                                                                                                                                                                                                                                    
+                 head 128                           head 128                            head 192
+
+                       Conv 3×3, stride 2, 320, BN                 Conv 3×3, stride 2, 320, BN                 Conv 3×3, stride 2, 448, BN
+
+                                                                                  
+                                 win 14×14                         win 14×14                          win 14×14
+ res3   14 × 14
+                      None          dim 320  ×9        None          dim 320  ×18        None          dim 448  ×18                                                                                                                                                                                                                                                                                                                                                                                                                      
+                                   head 10                            head 10                             head 14
+
+                       Conv 3×3, stride 2, 512, BN                 Conv 3×3, stride 2, 512, BN                 Conv 3×3, stride 2, 640, BN
+
+                                                                                
+                                  win 7×7                            win 7×7                            win 7×7
+ res4    7 × 7
+                      None          dim 512 ×4          None           dim 512 ×8          None           dim 640 ×8                                                                                                                                                                                                                                                                                                                                                                                                                   
+                                   head 16                             head 16                             head 20
+
+
+                                     Table 10: Architectures of CAT models.

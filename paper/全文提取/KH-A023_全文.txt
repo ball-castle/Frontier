@@ -1,0 +1,616 @@
+KH-A023 | Aggregated Residual Transformations for Deep Neural Networks
+来源：https://arxiv.org/abs/1611.05431
+本地PDF：专题文献/何恺明/KH-A023_Aggregated_Residual_Transformations_for_Deep_Neural_Networks_CVPR2017.pdf
+SHA-256：8bc101f654a100ce8c71dc36d1e326875b40d564e49d1a8fc0f51f4505d57705
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+            Aggregated Residual Transformations for Deep Neural Networks
+
+
+              Saining Xie1     Ross Girshick2      Piotr Doll´ar2    Zhuowen Tu1     Kaiming He2
+                         1UC San Diego     2Facebook AI Research
+                         {s9xie,ztu}@ucsd.edu       {rbg,pdollar,kaiminghe}@fb.com
+
+
+
+                        Abstract                                                     256-d in                                    256-d in
+
+         We present a simple, highly modularized network archi-           256, 1x1, 64              256, 1x1, 4      256, 1x1, 4   total 32  256, 1x1, 42017                                                                                                                                                                          paths
+          tecture for image classiﬁcation. Our network is constructed             64, 3x3, 64                   4, 3x3, 4          4, 3x3, 4    ....     4, 3x3, 4
+        by repeating a building block that aggregates a set of trans-
+         formations with the same topology. Our simple design re-            64, 1x1, 256                 4, 1x1, 256       4, 1x1, 256             4, 1x1, 256Apr
+           sults in a homogeneous, multi-branch architecture that has          +                           +
+         only a few hyper-parameters to set. This strategy exposes a                   256-d out11                                                                                               +
+       new dimension, which we call “cardinality” (the size of the                                                              256-d out
+           set of transformations), as an essential factor in addition to                                                                            Figure 1. Left: A block of ResNet [14].  Right: A block of
+          the dimensions of depth and width. On the ImageNet-1K     ResNeXt with cardinality = 32, with roughly the same complex-
+          dataset, we empirically show that even under the restricted        ity. A layer is shown as (# in channels, ﬁlter size, # out channels).
+         condition of maintaining complexity, increasing cardinality
+            is able to improve classiﬁcation accuracy.  Moreover, in-[cs.CV]         creasing cardinality is more effective than going deeper or     ing blocks of the same shape.  This strategy is inherited
+         wider when we increase the capacity. Our models, named     by ResNets [14] which stack modules of the same topol-
+         ResNeXt, are the foundations of our entry to the ILSVRC     ogy.  This simple rule reduces the free choices of hyper-
+        2016 classiﬁcation task in which we secured 2nd place.     parameters, and depth is exposed as an essential dimension
+       We further investigate ResNeXt on an ImageNet-5K set and      in neural networks. Moreover, we argue that the simplicity
+          the COCO detection set, also showing better results than     of this rule may reduce the risk of over-adapting the hyper-
+            its ResNet counterpart. The code and models are publicly     parameters to a speciﬁc dataset. The robustness of VGG-
+          available online1.                                               nets and ResNets has been proven by various visual recog-
+                                                                             nition tasks [7, 10, 9, 28, 31, 14] and by non-visual tasks
+                                                                       involving speech [42, 30] and language [4, 41, 20].
+         1. Introduction                                           Unlike VGG-nets, the family of Inception models [38,
+                                                                        17, 39, 37] have demonstrated  that carefully designed
+           Research on visual recognition is undergoing a transi-                                                                        topologies are able to achieve compelling accuracy with low
+          tion from “feature engineering” to “network engineering”                                                                              theoretical complexity. The Inception models have evolved
+          [25, 24, 44, 34, 36, 38, 14]. In contrast to traditional hand-                                                                    over time [38, 39], but an important common property isarXiv:1611.05431v2         designed features (e.g., SIFT [29] and HOG [5]), features                                                                   a split-transform-merge strategy. In an Inception module,
+         learned by neural networks from large-scale data [33] re-                                                                         the input is split into a few lower-dimensional embeddings
+          quire minimal human involvement during training, and can                                                                   (by 1×1 convolutions), transformed by a set of specialized
+        be transferred to a variety of recognition tasks [7, 10, 28].                                                                               ﬁlters (3×3, 5×5, etc.), and merged by concatenation.  It
+          Nevertheless, human effort has been shifted to designing                                                                 can be shown that the solution space of this architecture is a
+          better network architectures for learning representations.                                                                                          strict subspace of the solution space of a single large layer
+           Designing architectures becomes increasingly difﬁcult                                                                                         (e.g., 5×5) operating on a high-dimensional embedding.
+         with the growing number of hyper-parameters (width2, ﬁl-                                                          The split-transform-merge behavior of Inception modules
+           ter sizes, strides, etc.), especially when there are many lay-                                                                                          is expected to approach the representational power of large
+           ers. The VGG-nets [36] exhibit a simple yet effective strat-                                                              and dense layers, but at a considerably lower computational
+        egy of constructing very deep networks:  stacking build-                                                                      complexity.
+               1https://github.com/facebookresearch/ResNeXt                         Despite good accuracy, the realization of Inception mod-
+             2Width refers to the number of channels in a layer.                       els has been accompanied with a series of complicating fac-
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+tors — the ﬁlter numbers and sizes are tailored for each    we secured second place.  This paper further evaluates
+individual transformation, and the modules are customized    ResNeXt on a larger ImageNet-5K set and the COCO object
+stage-by-stage.  Although careful combinations of these      detection dataset [27], showing consistently better accuracy
+components yield excellent neural network recipes, it is in     than its ResNet counterparts. We expect that ResNeXt will
+general unclear how to adapt the Inception architectures to      also generalize well to other visual (and non-visual) recog-
+new datasets/tasks, especially when there are many factors      nition tasks.
+and hyper-parameters to be designed.
+   In this paper, we present a simple architecture which     2. Related Work
+adopts VGG/ResNets’ strategy of repeating layers, while                                                      Multi-branch convolutional networks.  The Inception
+exploiting the split-transform-merge strategy in an easy, ex-                                                      models [38, 17, 39, 37] are successful multi-branch ar-
+tensible way. A module in our network performs a set                                                                  chitectures where each branch  is carefully customized.
+of transformations, each on a low-dimensional embedding,                                                       ResNets [14] can be thought of as two-branch networks
+whose outputs are aggregated by summation. We pursuit a                                                     where one branch is the identity mapping. Deep neural de-
+simple realization of this idea — the transformations to be                                                                 cision forests [22] are tree-patterned multi-branch networks
+aggregated are all of the same topology (e.g., Fig. 1 (right)).                                                          with learned splitting functions.
+This design allows us to extend to any large number of
+                                                Grouped convolutions. The use of grouped convolutionstransformations without specialized designs.
+                                                               dates back to the AlexNet paper [24], if not earlier. The   Interestingly, under this simpliﬁed situation we show that
+                                                             motivation given by Krizhevsky et al. [24] is for distributingour model has two other equivalent forms (Fig. 3). The re-
+                                                                the model over two GPUs. Grouped convolutions are sup-formulation in Fig. 3(b) appears similar to the Inception-
+                                                             ported by Caffe [19], Torch [3], and other libraries, mainlyResNet module [37] in that it concatenates multiple paths;
+                                                                   for compatibility of AlexNet. To the best of our knowledge,but our module differs from all existing Inception modules
+                                                                 there has been little evidence on exploiting grouped convo-in that all our paths share the same topology and thus the
+                                                                   lutions to improve accuracy. A special case of grouped con-number of paths can be easily isolated as a factor to be in-
+                                                               volutions is channel-wise convolutions in which the numbervestigated. In a more succinct reformulation, our module
+                                                              of groups is equal to the number of channels. Channel-wisecan be reshaped by Krizhevsky et al.’s grouped convolu-
+                                                             convolutions are part of the separable convolutions in [35].tions [24] (Fig. 3(c)), which, however, had been developed
+as an engineering compromise.                           Compressing convolutional networks. Decomposition (at
+  We empirically demonstrate that our aggregated trans-      spatial [6, 18] and/or channel [6, 21, 16] level) is a widely
+formations outperform the original ResNet module, even     adopted technique to reduce redundancy of deep convo-
+under the restricted condition of maintaining computational      lutional networks and accelerate/compress them.   Ioan-
+complexity and model size — e.g., Fig. 1(right) is designed     nou et al. [16] present a “root”-patterned network for re-
+to keep the FLOPs complexity and number of parameters of     ducing computation, and branches in the root are realized
+Fig. 1(left). We emphasize that while it is relatively easy to     by grouped convolutions. These methods [6, 18, 21, 16]
+increase accuracy by increasing capacity (going deeper or     have shown elegant compromise of accuracy with lower
+wider), methods that increase accuracy while maintaining     complexity and smaller model sizes. Instead of compres-
+(or reducing) complexity are rare in the literature.                sion, our method is an architecture that empirically shows
+  Our method indicates that cardinality (the size of the      stronger representational power.
+set of transformations) is a concrete, measurable dimen-     Ensembling. Averaging a set of independently trained net-
+sion that is of central importance, in addition to the dimen-     works is an effective solution to improving accuracy [24],
+sions of width and depth. Experiments demonstrate that in-     widely adopted in recognition competitions [33]. Veit et al.
+creasing cardinality is a more effective way of gaining accu-     [40] interpret a single ResNet as an ensemble of shallower
+racy than going deeper or wider, especially when depth and     networks, which results from ResNet’s additive behaviors
+width starts to give diminishing returns for existing models.      [15]. Our method harnesses additions to aggregate a set of
+  Our neural networks, named ResNeXt (suggesting the      transformations. But we argue that it is imprecise to view
+next dimension), outperform ResNet-101/152 [14], ResNet-     our method as ensembling, because the members to be ag-
+200 [15], Inception-v3 [39], and Inception-ResNet-v2 [37]     gregated are trained jointly, not independently.
+on the ImageNet classiﬁcation dataset.  In particular, a
+101-layer ResNeXt is able to achieve better accuracy than     3. Method
+ResNet-200 [15] but has only 50% complexity. Moreover,
+                                                               3.1. Template
+ResNeXt exhibits considerably simpler designs than all In-
+ception models. ResNeXt was the foundation of our sub-     We  adopt  a  highly  modularized  design  following
+mission to the ILSVRC 2016 classiﬁcation task, in which     VGG/ResNets. Our network consists of a stack of resid-
+
+======================== PDF 第 3 页 ========================
+  stage  output        ResNet-50         ResNeXt-50 (32×4d)                              x
+ conv1 112×112    7×7, 64, stride 2        7×7, 64, stride 2                        x1      x2      x3                  .......      xD
+             3×3                 max                             pool,                                      stride                                 2                               3×3                                    max                                                        pool, stride
+                                                                                                                                                       2                  w1   w2  w3           wD                   1×1,                        64                                     1×1,                                            128
+ conv2  56×56                   3×3, 64            3×3, 128, C=32                             +                                  ×3                     ×3
+                   1×1, 256           1×1, 256
+                                                                       Figure 2. A simple neuron that performs inner product.             1×1, 128      1×1, 256     
+ conv3  28×28       3×3, 128 ×4      3×3, 256, C=32 ×4
+                   1×1, 512           1×1, 512
+                                                                       nel.  This operation (usually including some output non-
+             1×1, 256       1×1, 512                                                                            linearity) is referred to as a “neuron”. See Fig. 2.
+ conv4  14×14      3×3, 256  ×6     3×3, 512, C=32 ×6        The above operation can be recast as a combination of
+                  1×1, 1024           1×1, 1024
+                                                                          splitting, transforming, and aggregating.  (i) Splitting: the
+             1×1, 512       1×1, 1024     
+                                                               vector x is sliced as a low-dimensional embedding, and
+ conv5   7×7       3×3, 512  ×3     3×3, 1024, C=32 ×3       in the above,  it is a single-dimension subspace xi.   (ii)                  1×1, 2048          1×1, 2048
+                                                           Transforming: the low-dimensional representation is trans-
+                    global average pool        global average pool
+        1×1                                               formed, and in the above, it is simply scaled: wixi.  (iii)
+                  1000-d fc, softmax       1000-d fc, softmax
+                                                            Aggregating: the transformations in all embeddings are ag-
+   # params.       25.5×106            25.0×106
+                                                             gregated by PDi=1.   FLOPs         4.1×109             4.2×109
+                                                               3.3. Aggregated Transformations
+Table 1. (Left) ResNet-50.  (Right) ResNeXt-50 with a 32×4d
+template (using the reformulation in Fig. 3(c)). Inside the brackets       Given the above analysis of a simple neuron, we con-
+are the shape of a residual block, and outside the brackets is the      sider replacing the elementary transformation (wixi) with
+number of stacked blocks on a stage. “C=32” suggests grouped                                                          a more generic function, which in itself can also be a net-
+convolutions [24] with 32 groups. The numbers of parameters and
+                                                         work. In contrast to “Network-in-Network” [26] that turns
+FLOPs are similar between these two models.
+                                                             out to increase the dimension of depth, we show that our
+                                                        “Network-in-Neuron” expands along a new dimension.
+ual blocks. These blocks have the same topology, and are                                                                Formally, we present aggregated transformations as:
+subject to two simple rules inspired by VGG/ResNets:  (i)
+if producing spatial maps of the same size, the blocks share                         C
+                                                              F(x) = X Ti(x),                  (2)the same hyper-parameters (width and ﬁlter sizes), and (ii)
+each time when the spatial map is downsampled by a fac-                                i=1
+tor of 2, the width of the blocks is multiplied by a factor     where Ti(x) can be an arbitrary function. Analogous to a
+of 2. The second rule ensures that the computational com-     simple neuron, Ti should project x into an (optionally low-
+plexity, in terms of FLOPs (ﬂoating-point operations, in #     dimensional) embedding and then transform it.
+of multiply-adds), is roughly the same for all blocks.               In Eqn.(2), C is the size of the set of transformations
+  With these two rules, we only need to design a template      to be aggregated. We refer to C as cardinality [2].  In
+module, and all modules in a network can be determined     Eqn.(2) C is in a position similar to D in Eqn.(1), but C
+accordingly. So these two rules greatly narrow down the     need not equal D and can be an arbitrary number. While
+design space and allow us to focus on a few key factors.      the dimension of width is related to the number of simple
+The networks constructed by these rules are in Table 1.         transformations (inner product), we argue that the dimen-
+                                                              sion of cardinality controls the number of more complex
+3.2. Revisiting Simple Neurons                            transformations. We show by experiments that cardinality
+                                                                              is an essential dimension and can be more effective than the
+  The simplest neurons in artiﬁcial neural networks per-
+                                                         dimensions of width and depth.
+form inner product (weighted sum), which is the elemen-
+                                                                 In this paper, we consider a simple way of designing thetary transformation done by fully-connected and convolu-
+                                                              transformation functions: all Ti’s have the same topology.tional layers. Inner product can be thought of as a form of
+                                                          This extends the VGG-style strategy of repeating layers ofaggregating transformation:
+                                                                the same shape, which is helpful for isolating a few factors
+                D                               and extending to any large number of transformations. We
+       X wixi,                      (1)                                                                      set the individual transformation Ti to be the bottleneck-
+                       i=1                                shaped architecture [14], as illustrated in Fig. 1 (right). In
+where x = [x1, x2, ..., xD] is a D-channel input vector to      this case, the ﬁrst 1×1 layer in each Ti produces the low-
+the neuron and wi is a ﬁlter’s weight for the i-th chan-     dimensional embedding.
+
+======================== PDF 第 4 页 ========================
+       equivalent
+                                       256-d in                                                    256-d in                                        256-d in
+
+             256, 1x1, 4      256, 1x1, 4   total 32  256, 1x1, 4             256, 1x1, 4      256, 1x1, 4   total 32  256, 1x1, 4                 256, 1x1, 128
+                                              paths                                                             paths
+                 4, 3x3, 4          4, 3x3, 4    ....     4, 3x3, 4                   4, 3x3, 4          4, 3x3, 4    ....     4, 3x3, 4                 128, 3x3, 128
+                                                                                                         group = 32
+               4, 1x1, 256       4, 1x1, 256             4, 1x1, 256                        concatenate
+                       +                                                128, 1x1, 256                                  128, 1x1, 256
+
+                       +                                     +                             +
+                                      256-d out                                                   256-d out                                      256-d out
+                             (a)                                             (b)                                    (c)
+
+Figure 3. Equivalent building blocks of ResNeXt. (a): Aggregated residual transformations, the same as Fig. 1 right. (b): A block equivalent
+to (a), implemented as early concatenation. (c): A block equivalent to (a,b), implemented as grouped convolutions [24]. Notations in bold
+text highlight the reformulation changes. A layer is denoted as (# input channels, ﬁlter size, # output channels).
+
+
+  The aggregated transformation in Eqn.(2) serves as the           equivalent
+residual function [14] (Fig. 1 right):
+                                                                                                                      64, 3x3, 4       64, 3x3, 4    total 32   64, 3x3, 4               64, 3x3, 128
+                     C                                                                                                   paths
+                                                                                                                         ....    4, 3x3, 64             128, 3x3, 64             y = x + X Ti(x),                 (3)                    4, 3x3, 64        4, 3x3, 64
+                           i=1                                                    +                          +
+
+where y is the output.                                                               +
+
+Relation to Inception-ResNet.  Some tensor manipula-                                                                  Figure 4. (Left):  Aggregating transformations of depth =  2.
+tions show that the module in Fig. 1(right) (also shown in                                                                     (Right): An equivalent block, which is trivially wider.
+Fig. 3(a)) is equivalent to Fig. 3(b).3 Fig. 3(b) appears sim-
+ilar to the Inception-ResNet [37] block in that it involves
+branching and concatenating in the residual function. But     We note  that  the  reformulations produce  nontrivial
+unlike all Inception or Inception-ResNet modules, we share     topologies only when the block has depth ≥3. If the block
+the same topology among the multiple paths. Our module     has depth = 2 (e.g., the basic block in [14]), the reformula-
+requires minimal extra effort designing each path.                tions lead to trivially a wide, dense module. See the illus-
+                                                                      tration in Fig. 4.
+Relation to Grouped Convolutions. The above module be-
+comes more succinct using the notation of grouped convo-     Discussion. We note that although we present reformula-
+lutions [24].4 This reformulation is illustrated in Fig. 3(c).      tions that exhibit concatenation (Fig. 3(b)) or grouped con-
+All the low-dimensional embeddings (the ﬁrst 1×1 layers)     volutions (Fig. 3(c)), such reformulations are not always ap-
+can be replaced by a single, wider layer (e.g., 1×1, 128-d      plicable for the general form of Eqn.(3), e.g., if the trans-
+in Fig 3(c)).  Splitting is essentially done by the grouped     formation Ti takes arbitrary forms and are heterogenous.
+convolutional layer when it divides its input channels into   We choose to use homogenous forms in this paper because
+groups. The grouped convolutional layer in Fig. 3(c) per-     they are simpler and extensible. Under this simpliﬁed case,
+forms 32 groups of convolutions whose input and output     grouped convolutions in the form of Fig. 3(c) are helpful for
+channels are 4-dimensional.  The grouped convolutional     easing implementation.
+layer concatenates them as the outputs of the layer. The
+                                                               3.4. Model Capacityblock in Fig. 3(c) looks like the original bottleneck resid-
+ual block in Fig. 1(left), except that Fig. 3(c) is a wider but       Our experiments in the next section will show that
+sparsely connected module.                                  our models improve accuracy when maintaining the model
+                                                          complexity and number of parameters. This is not only in-
+  3An informal but descriptive proof is as follows. Note the equality:                                                                    teresting in practice, but more importantly, the complexity
+A1B1 + A2B2 = [A1, A2][B1; B2] where [ , ] is horizontal concatena-
+                                                      and number of parameters represent inherent capacity oftion and [ ; ] is vertical concatenation. Let Ai be the weight of the last layer
+and Bi be the output response of the second-last layer in the block. In the     models and thus are often investigated as fundamental prop-
+case of C = 2, the element-wise addition in Fig. 3(a) is A1B1 + A2B2,      erties of deep networks [8].
+the weight of the last layer in Fig. 3(b) is [A1, A2], and the concatenation                                              When we evaluate different cardinalities C while pre-
+of outputs of second-last layers in Fig. 3(b) is [B1; B2].
+   4In a group conv layer [24], input and output channels are divided into     serving complexity, we want to minimize the modiﬁcation
+C groups, and convolutions are separately performed within each group.       of other hyper-parameters. We choose to adjust the width of
+
+======================== PDF 第 5 页 ========================
+              cardinality C       1    2    4     8     32             volutions in Fig. 3(c).6 ReLU is performed right after each
+        width of bottleneck d   64   40   24    14     4
+                                                BN, expect for the output of the block where ReLU is per-         width of group conv.   64   80   96   112   128
+                                                      formed after the adding to the shortcut, following [14].
+Table 2. Relations between cardinality and width (for the template     We note that the three forms in Fig. 3 are strictly equiv-
+of conv2), with roughly preserved complexity on a residual block.      alent, when BN and ReLU are appropriately addressed as
+The number of parameters is ∼70k for the template of conv2. The     mentioned above. We have trained all three forms and
+number of FLOPs is ∼0.22 billion (# params×56×56 for conv2).     obtained the same results. We choose to implement by
+                                                                  Fig. 3(c) because it is more succinct and faster than the other
+                                                    two forms.the bottleneck (e.g., 4-d in Fig 1(right)), because it can be
+isolated from the input and output of the block. This strat-
+egy introduces no change to other hyper-parameters (depth     5. Experiments
+or input/output width of blocks), so is helpful for us to focus                                                               5.1. Experiments on ImageNet-1K
+on the impact of cardinality.
+   In Fig. 1(left), the original ResNet bottleneck block [14]     We conduct ablation experiments on the 1000-class Im-
+has 256 · 64 + 3 · 3 · 64 · 64 + 64 · 256 ≈70k parameters and     ageNet classiﬁcation task [33]. We follow [14] to construct
+proportional FLOPs (on the same feature map size). With     50-layer and 101-layer residual networks. We simply re-
+bottleneck width d, our template in Fig. 1(right) has:            place all blocks in ResNet-50/101 with our blocks.
+
+                                                            Notations. Because we adopt the two rules in Sec. 3.1, it is      C · (256 · d + 3 · 3 · d · d + d · 256)         (4)
+                                                               sufﬁcient for us to refer to an architecture by the template.
+parameters and proportional FLOPs. When C = 32 and     For example, Table 1 shows a ResNeXt-50 constructed by a
+d = 4, Eqn.(4) ≈70k. Table 2 shows the relationship be-     template with cardinality = 32 and bottleneck width = 4d
+tween cardinality C and bottleneck width d.                      (Fig. 3). This network is denoted as ResNeXt-50 (32×4d)
+   Because we adopt the two rules in Sec. 3.1, the above      for simplicity. We note that the input/output width of the
+approximate equality is valid between a ResNet bottleneck     template is ﬁxed as 256-d (Fig. 3), and all widths are dou-
+block and our ResNeXt on all stages (except for the sub-     bled each time when the feature map is subsampled (see
+sampling layers where the feature maps size changes). Ta-     Table 1).
+ble 1 compares the original ResNet-50 and our ResNeXt-50                                                          Cardinality vs. Width. We ﬁrst evaluate the trade-off be-
+that is of similar capacity.5 We note that the complexity can                                                      tween cardinality C and bottleneck width, under preserved
+only be preserved approximately, but the difference of the                                                          complexity as listed in Table 2. Table 3 shows the results
+complexity is minor and does not bias our results.                                                      and Fig. 5 shows the curves of error vs. epochs. Compar-
+                                                             ing with ResNet-50 (Table 3 top and Fig. 5 left), the 32×4d
+4. Implementation details                                                    ResNeXt-50 has a validation error of 22.2%, which is 1.7%
+  Our implementation follows [14] and the publicly avail-     lower than the ResNet baseline’s 23.9%. With cardinality C
+able code of fb.resnet.torch [11]. On the ImageNet     increasing from 1 to 32 while keeping complexity, the error
+dataset, the input image is 224×224 randomly cropped      rate keeps reducing. Furthermore, the 32×4d ResNeXt also
+from a resized image using the scale and aspect ratio aug-     has a much lower training error than the ResNet counter-
+mentation of [38] implemented by [11]. The shortcuts are      part, suggesting that the gains are not from regularization
+identity connections except for those increasing dimensions     but from stronger representations.
+which are projections (type B in [14]). Downsampling of        Similar trends are observed in the case of ResNet-101
+conv3, 4, and 5 is done by stride-2 convolutions in the 3×3      (Fig. 5 right, Table 3 bottom), where the 32×4d ResNeXt-
+layer of the ﬁrst block in each stage, as suggested in [11].     101 outperforms the ResNet-101 counterpart by 0.8%. Al-
+We use SGD with a mini-batch size of 256 on 8 GPUs (32     though this improvement of validation error is smaller than
+per GPU). The weight decay is 0.0001 and the momentum      that of the 50-layer case, the improvement of training er-
+is 0.9. We start from a learning rate of 0.1, and divide it by      ror is still big (20% for ResNet-101 and 16% for 32×4d
+10 for three times using the schedule in [11]. We adopt the     ResNeXt-101, Fig. 5 right).  In fact, more training data
+weight initialization of [13]. In all ablation comparisons, we      will enlarge the gap of validation error, as we show on an
+evaluate the error on the single 224×224 center crop from     ImageNet-5K set in the next subsection.
+an image whose shorter side is 256.                             Table 3 also suggests that with complexity preserved, in-
+  Our models are realized by the form of Fig. 3(c). We     creasing cardinality at the price of reducing width starts
+perform batch normalization (BN) [17] right after the con-      to show saturating accuracy when the bottleneck width is
+
+   5The marginally smaller number of parameters and marginally higher         6With BN, for the equivalent form in Fig. 3(a), BN is employed after
+FLOPs are mainly caused by the blocks where the map sizes change.            aggregating the transformations and before adding to the shortcut.
+
+======================== PDF 第 6 页 ========================
+      50                                             ResNet-50 (1 x 64d) train         50                                           ResNet-101 (1 x 64d) train
+                                                    ResNet-50 (1 x 64d) val                                                       ResNet-101 (1 x 64d) val
+                                                   ResNeXt-50 (32 x 4d) train                                                   ResNeXt-101 (32 x 4d) train
+                                                   ResNeXt-50 (32 x 4d) val                                                    ResNeXt-101 (32 x 4d) val
+      45                                                                                 45
+
+
+
+
+      40                                                                                 40
+
+      (%)                                                                                                                           (%)
+         error 35                                                                                                                                                                                                       error 35
+         top-1 30                                                                                                                                                                                                       top-1 30
+
+
+
+
+      25                                                                                 25
+
+
+
+
+      20                                                                                 20
+
+
+
+
+      15                                                                                 15
+        0      10      20      30      40      50      60      70      80      90           0      10      20      30      40      50      60      70      80      90
+                                        epochs                                                                        epochs
+
+Figure 5. Training curves on ImageNet-1K. (Left): ResNet/ResNeXt-50 with preserved complexity (∼4.1 billion FLOPs, ∼25 million
+parameters); (Right): ResNet/ResNeXt-101 with preserved complexity (∼7.8 billion FLOPs, ∼44 million parameters).
+
+
+                               setting        top-1 error (%)                                                 setting    top-1 err (%)  top-5 err (%)
+       ResNet-50        1 × 64d          23.9              1× complexity references:
+       ResNeXt-50      2 × 40d          23.0                   ResNet-101        1 × 64d      22.0          6.0
+       ResNeXt-50      4 × 24d          22.6                  ResNeXt-101      32 × 4d      21.2          5.6
+       ResNeXt-50      8 × 14d          22.3              2× complexity models follow:
+       ResNeXt-50      32 × 4d          22.2                   ResNet-200 [15]    1 × 64d      21.7          5.8
+       ResNet-101       1 × 64d          22.0                    ResNet-101, wider  1 × 100d     21.3          5.7
+       ResNeXt-101     2 × 40d          21.7                  ResNeXt-101      2 × 64d      20.7          5.5
+       ResNeXt-101     4 × 24d          21.4                  ResNeXt-101      64 × 4d      20.4          5.3
+       ResNeXt-101     8 × 14d          21.3
+       ResNeXt-101     32 × 4d          21.2                  Table 4. Comparisons on ImageNet-1K when the number of
+                                                   FLOPs is increased to 2× of ResNet-101’s. The error rate is evalu-
+Table 3. Ablation experiments on ImageNet-1K. (Top): ResNet-      ated on the single crop of 224×224 pixels. The highlighted factors
+50 with preserved complexity (∼4.1 billion FLOPs); (Bottom):      are the factors that increase complexity.
+ResNet-101 with preserved complexity (∼7.8 billion FLOPs). The
+error rate is evaluated on the single crop of 224×224 pixels.
+                                                                   better results than going deeper or wider.  The 2×64d
+                                                    ResNeXt-101 (i.e., doubling C on 1×64d ResNet-101 base-
+small. We argue that it is not worthwhile to keep reducing      line and keeping the width) reduces the top-1 error by 1.3%
+width in such a trade-off. So we adopt a bottleneck width      to 20.7%. The 64×4d ResNeXt-101 (i.e., doubling C on
+no smaller than 4d in the following.                     32×4d ResNeXt-101 and keeping the width) reduces the
+                                                              top-1 error to 20.4%.
+Increasing Cardinality vs. Deeper/Wider.  Next we in-
+                                          We also note that 32×4d ResNet-101 (21.2%) performs
+vestigate increasing complexity by increasing cardinality C
+                                                                    better than the deeper ResNet-200 and the wider ResNet-
+or increasing depth or width. The following comparison
+                                                           101, even though it has only ∼50% complexity. This again
+can also be viewed as with reference to 2× FLOPs of the
+                                                    shows that cardinality is a more effective dimension than
+ResNet-101 baseline. We compare the following variants
+                                                                the dimensions of depth and width.
+that have ∼15 billion FLOPs. (i) Going deeper to 200 lay-
+ers. We adopt the ResNet-200 [15] implemented in [11].     Residual connections. The following table shows the ef-
+(ii) Going wider by increasing the bottleneck width.  (iii)      fects of the residual (shortcut) connections:
+Increasing cardinality by doubling C.
+                                                                                                                  setting   w/ residual  w/o residual
+   Table 4 shows that increasing complexity by 2× consis-
+                                                                    ResNet-50   1 × 64d     23.9        31.2
+tently reduces error vs. the ResNet-101 baseline (22.0%).
+                                                                 ResNeXt-50  32 × 4d     22.2        26.1
+But the improvement is small when going deeper (ResNet-
+200, by 0.3%) or wider (wider ResNet-101, by 0.7%).        Removing shortcuts from the ResNeXt-50 increases the er-
+  On the contrary, increasing cardinality C shows much      ror by 3.9 points to 26.1%. Removing shortcuts from its
+
+======================== PDF 第 7 页 ========================
+                                                                                             55
+ResNet-50 counterpart is much worse (31.2%). These com-                                                        ResNet-101ResNeXt-101(1(32x 64d)x 4d)valval
+parisons suggest that the residual connections are helpful           50
+for optimization, whereas aggregated transformations are
+stronger representations, as shown by the fact that they           45
+perform consistently better than their counterparts with or
+without residual connections.                                                                            (%) 40
+                                                                                                                                                                                                                                     errorPerformance.   For simplicity we use Torch’s  built-in
+
+                                                                                             35grouped convolution implementation, without special opti-                      top-1
+mization. We note that this implementation was brute-force
+and not parallelization-friendly. On 8 GPUs of NVIDIA           30
+M40, training 32×4d ResNeXt-101 in Table 3 takes 0.95s
+per mini-batch, vs. 0.70s of ResNet-101 baseline that has           25
+similar FLOPs. We argue that this is a reasonable overhead.
+We expect carefully engineered lower-level implementation           20
+(e.g., in CUDA) will reduce this overhead. We also expect                            1              2  mini-batches 3              4          ×1055
+that the inference time on CPUs will present less overhead.
+                                                                  Figure 6. ImageNet-5K experiments. Models are trained on the
+Training the 2×complexity model (64×4d ResNeXt-101)                                               5K set and evaluated on the original 1K validation set, plotted as
+takes 1.7s per mini-batch and 10 days total on 8 GPUs.                                                                 a 1K-way classiﬁcation task. ResNeXt and its ResNet counterpart
+Comparisons with state-of-the-art results. Table 5 shows     have similar complexity.
+more results of single-crop testing on the ImageNet val-
+idation set.  In addition to testing a 224×224 crop, we                           5K-way classiﬁcation 1K-way classiﬁcation
+also evaluate a 320×320 crop following [15].  Our re-                        setting    top-1      top-5      top-1      top-5
+sults compare favorably with ResNet, Inception-v3/v4, and      ResNet-50   1 × 64d   45.5     19.4      27.1      8.2
+Inception-ResNet-v2, achieving a single-crop top-5 error      ResNeXt-50  32 × 4d   42.3     16.8      24.4      6.6
+rate of 4.4%. In addition, our architecture design is much      ResNet-101  1 × 64d   42.4     16.9      24.2      6.8
+simpler than all Inception models, and requires consider-      ResNeXt-101 32 × 4d   40.1     15.1      22.2      5.7
+ably fewer hyper-parameters to be set by hand.
+                                                                  Table 6. Error (%) on ImageNet-5K. The models are trained on  ResNeXt is the foundation of our entries to the ILSVRC
+                                                          ImageNet-5K and tested on the ImageNet-1K val set, treated as a
+2016 classiﬁcation task, in which we achieved 2nd place.
+                                                      5K-way classiﬁcation task or a 1K-way classiﬁcation task at test
+We note that many models (including ours) start to get sat-                                                                       time. ResNeXt and its ResNet counterpart have similar complex-
+urated on this dataset after using multi-scale and/or multi-                                                                                             ity. The error is evaluated on the single crop of 224×224 pixels.
+crop testing. We had a single-model top-1/top-5 error rates
+of 17.7%/3.7% using the multi-scale dense testing in [14],
+on par with Inception-ResNet-v2’s single-model results of     5.2. Experiments on ImageNet-5K
+17.8%/3.7% that adopts multi-scale, multi-crop testing. We
+                                                    The performance on ImageNet-1K appears to saturate.had an ensemble result of 3.03% top-5 error on the test set,
+                                                      But we argue that this is not because of the capability of theon par with the winner’s 2.99% and Inception-v4/Inception-
+                                                      models but because of the complexity of the dataset. NextResNet-v2’s 3.08% [37].
+                                             we evaluate our models on a larger ImageNet subset that
+                                                          has 5000 categories.                           224×224    320×320 / 299×299
+                              top-1 err top-5 err top-1 err  top-5 err        Our 5K dataset is a subset of the full ImageNet-22K set
+                                                                    [33]. The 5000 categories consist of the original ImageNet- ResNet-101 [14]           22.0     6.0        -           -
+                                           1K categories and additional 4000 categories that have the ResNet-200 [15]           21.7     5.8     20.1      4.8
+                                                                     largest number of images in the full ImageNet set. The 5K Inception-v3 [39]               -          -      21.2      5.6
+                                                                      set has 6.8 million images, about 5× of the 1K set. There is Inception-v4 [37]               -          -      20.0      5.0
+                                                    no ofﬁcial train/val split available, so we opt to evaluate on Inception-ResNet-v2 [37]      -          -      19.9      4.9
+                                                                the original ImageNet-1K validation set. On this 1K-class
+ ResNeXt-101 (64 × 4d)    20.4     5.3     19.1      4.4
+                                                                 val set, the models can be evaluated as a 5K-way classiﬁca-
+Table 5. State-of-the-art models on the ImageNet-1K validation      tion task (all labels predicted to be the other 4K classes are
+set (single-crop testing).  The test size of ResNet/ResNeXt is     automatically erroneous) or as a 1K-way classiﬁcation task
+224×224 and 320×320 as in [15] and of the Inception models     (softmax is applied only on the 1K classes) at test time.
+is 299×299.                                            The implementation details are the same as in Sec. 4.
+                                                  The 5K-training models are all trained from scratch, and
+
+======================== PDF 第 8 页 ========================
+                                                                                           4.5
+                          # params  CIFAR-10  CIFAR-100                                         ResNet-29 (increase width)
+                                                                                           4.4     1x64d               ResNeXt-29 (increase cardinality)   Wide ResNet [43]     36.5M     4.17      20.50
+    ResNeXt-29, 8×64d   34.4M     3.65      17.77                    4.3
+    ResNeXt-29, 16×64d  68.1M     3.58      17.31                    4.2                                                                                                         1x128d
+Table 7. Test error (%) and model size on CIFAR. Our results are      (%)4.1
+the average of 10 runs.                                                                               error4.0
+                                                                                                 2x64d               1x192d
+                                                                                            test3.9                                         1x256d
+are trained for the same number of mini-batches as the 1K-            3.8                                                     1x384d
+training models (so 1/5× epochs). Table 6 and Fig. 6 show                                                                                           3.7                       4x64d
+the comparisons under preserved complexity. ResNeXt-50
+                                                                                           3.6                                    8x64dreduces the 5K-way top-1 error by 3.2% comparing with                                                                                                                                         16x64d
+ResNet-50, and ResNetXt-101 reduces the 5K-way top-1            3.5
+                                                                               4          8          16         32         64         128
+error by 2.3% comparing with ResNet-101. Similar gaps                        # of parameters (M)
+are observed on the 1K-way error. These demonstrate the
+                                                                  Figure 7. Test error vs. model size on CIFAR-10. The results are
+stronger representational power of ResNeXt.                                                           computed with 10 runs, shown with standard error bars. The labels
+   Moreover, we ﬁnd that the models trained on the 5K     show the settings of the templates.
+set (with 1K-way error 22.2%/5.7% in Table 6) perform
+competitively comparing with those trained on the 1K set                                         setting    AP@0.5    AP
+(21.2%/5.6% in Table 3), evaluated on the same 1K-way             ResNet-50      1 × 64d      47.6      26.5
+classiﬁcation task on the validation set.  This result  is            ResNeXt-50     32 × 4d      49.7      27.5
+achieved without increasing the training time (due to the             ResNet-101     1 × 64d      51.1      29.8
+same number of mini-batches) and without ﬁne-tuning. We            ResNeXt-101    32 × 4d      51.9      30.0
+argue that this is a promising result, given that the training
+task of classifying 5K categories is a more challenging one.      Table 8. Object detection results on the COCO minival set.
+                                                       ResNeXt and its ResNet counterpart have similar complexity.
+5.3. Experiments on CIFAR
+
+  We conduct more experiments on CIFAR-10 and 100     5.4. Experiments on COCO object detection
+datasets [23]. We use the architectures as in [14] and re-
+                                                        Next we evaluate the generalizability on the COCO ob-place the basic residual block by the bottleneck template
+     1×1, 64                                                          ject detection set [27]. We train the models on the 80k train-
+of    3×3, 64    Our networks start with a single 3×3 conv                   .                                                ing set plus a 35k val subset and evaluate on a 5k val subset
+      1×1, 256
+                                                                   (called minival), following [1]. We evaluate the COCO-layer, followed by 3 stages each having 3 residual blocks,
+                                                                     style Average Precision (AP) as well as AP@IoU=0.5 [27].and end with average pooling and a fully-connected classi-
+                                        We adopt the basic Faster R-CNN [32] and follow [14] toﬁer (total 29-layer deep), following [14]. We adopt the same
+                                                          plug ResNet/ResNeXt into it. The models are pre-trainedtranslation and ﬂipping data augmentation as [14]. Imple-
+                                                    on ImageNet-1K and ﬁne-tuned on the detection set. Im-mentation details are in the appendix.
+                                                            plementation details are in the appendix.  We compare two cases of increasing complexity based
+                                                              Table 8 shows the comparisons. On the 50-layer base-on the above baseline:  (i) increase cardinality and ﬁx all
+                                                                          line, ResNeXt improves AP@0.5 by 2.1% and AP by 1.0%,widths, or (ii) increase width of the bottleneck and ﬁx car-
+                                                           without increasing complexity. ResNeXt shows smaller im-dinality = 1. We train and evaluate a series of networks
+                                                        provements on the 101-layer baseline. We conjecture thatunder these changes. Fig. 7 shows the comparisons of test
+                                                   more training data will lead to a larger gap, as observed onerror rates vs. model sizes. We ﬁnd that increasing cardi-
+                                                                the ImageNet-5K set.nality is more effective than increasing width, consistent to
+                                                                                         It is also worth noting that recently ResNeXt has beenwhat we have observed on ImageNet-1K. Table 7 shows the
+                                                         adopted in Mask R-CNN [12] that achieves state-of-the-artresults and model sizes, comparing with the Wide ResNet
+                                                                      results on COCO instance segmentation and object detec-[43] which is the best published record. Our model with a
+                                                                   tion tasks.similar model size (34.4M) shows results better than Wide
+ResNet. Our larger method achieves 3.58% test error (aver-
+                                            Acknowledgment
+age of 10 runs) on CIFAR-10 and 17.31% on CIFAR-100.
+To the best of our knowledge, these are the state-of-the-art        S.X. and Z.T.’s research was partly supported by NSF
+results (with similar data augmentation) in the literature in-     IIS-1618477. The authors would like to thank Tsung-Yi
+cluding unpublished technical reports.                       Lin and Priya Goyal for valuable discussions.
+
+======================== PDF 第 9 页 ========================
+A. Implementation Details: CIFAR                      [7]  J. Donahue, Y. Jia, O. Vinyals, J. Hoffman, N. Zhang,
+                                                                 E. Tzeng, and T. Darrell. Decaf: A deep convolutional
+  We train the models on the 50k training set and evaluate                                                                        activation feature for generic visual recognition.  In
+on the 10k test set. The input image is 32×32 randomly                                                     ICML, 2014.
+cropped from a zero-padded 40×40 image or its ﬂipping,
+                                                                    [8] D. Eigen, J. Rolfe, R. Fergus, and Y. LeCun. Under-following [14]. No other data augmentation is used. The
+                                                                  standing deep architectures using a recursive convolu-ﬁrst layer is 3×3 conv with 64 ﬁlters. There are 3 stages
+                                                                          tional network. arXiv:1312.1847, 2013.each having 3 residual blocks, and the output map size is
+32, 16, and 8 for each stage [14]. The network ends with a       [9] R. Girshick. Fast R-CNN. In ICCV, 2015.
+global average pooling and a fully-connected layer. Width                                                              [10] R. Girshick, J. Donahue, T. Darrell, and J. Malik. Rich
+is increased by 2× when the stage changes (downsampling),                                                                       feature hierarchies for accurate object detection and
+as in Sec. 3.1. The models are trained on 8 GPUs with a                                                               semantic segmentation. In CVPR, 2014.
+mini-batch size of 128, with a weight decay of 0.0005 and
+                                                              [11] S. Gross and M. Wilber.   Training and  investi-
+a momentum of 0.9. We start with a learning rate of 0.1
+                                                                    gating Residual Nets.  https://github.com/
+and train the models for 300 epochs, reducing the learning
+                                                facebook/fb.resnet.torch, 2016.
+rate at the 150-th and 225-th epoch. Other implementation
+details are as in [11].                                          [12] K. He, G. Gkioxari, P. Doll´ar, and R. Girshick. Mask
+                                                  R-CNN. arXiv:1703.06870, 2017.
+B. Implementation Details: Object Detection        [13] K. He, X. Zhang, S. Ren, and J. Sun. Delving deep
+                                                                        into rectiﬁers: Surpassing human-level performance  We adopt the Faster R-CNN system [32]. For simplicity
+                                                        on imagenet classiﬁcation. In ICCV, 2015.we do not share the features between RPN and Fast R-CNN.
+In the RPN step, we train on 8 GPUs with each GPU holding     [14] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual
+2 images per mini-batch and 256 anchors per image. We           learning for image recognition. In CVPR, 2016.
+train the RPN step for 120k mini-batches at a learning rate     [15] K. He, X. Zhang, S. Ren, and J. Sun.  Identity map-
+of 0.02 and next 60k at 0.002. In the Fast R-CNN step, we          pings in deep residual networks. In ECCV, 2016.
+train on 8 GPUs with each GPU holding 1 image and 64
+                                                              [16] Y. Ioannou, D. Robertson, R. Cipolla, and A. Crimin-
+regions per mini-batch. We train the Fast R-CNN step for
+                                                                                              isi. Deep roots: Improving cnn efﬁciency with hierar-
+120k mini-batches at a learning rate of 0.005 and next 60k at
+                                                                       chical ﬁlter groups. arXiv:1605.06489, 2016.
+0.0005, We use a weight decay of 0.0001 and a momentum
+of 0.9. Other implementation details are as in https://     [17] S. Ioffe and C. Szegedy.  Batch normalization: Ac-
+github.com/rbgirshick/py-faster-rcnn.                celerating deep network training by reducing internal
+                                                                      covariate shift. In ICML, 2015.
+References                                                 [18] M. Jaderberg, A. Vedaldi, and A. Zisserman. Speed-
+                                                                  ing up convolutional neural networks with low rank [1] S. Bell, C. L. Zitnick, K. Bala, and R. Girshick. Inside-
+                                                                  expansions. In BMVC, 2014.     outside net:  Detecting objects in context with skip
+     pooling and recurrent neural networks.   In CVPR,     [19] Y. Jia, E. Shelhamer, J. Donahue, S. Karayev, J. Long,
+     2016.                                                    R. Girshick, S. Guadarrama, and T. Darrell.  Caffe:
+                                                                 Convolutional architecture for fast feature embedding. [2] G. Cantor.  ¨Uber unendliche, lineare punktmannich-
+                                                                arXiv:1408.5093, 2014.      faltigkeiten, arbeiten zur mengenlehre aus den jahren
+     1872-1884. 1884.                                        [20] N. Kalchbrenner, L. Espeholt, K. Simonyan, A. v. d.
+ [3] R. Collobert, S. Bengio, and J. Mari´ethoz. Torch: a          Oord, A. Graves, and K. Kavukcuoglu.  Neural ma-
+     modular machine learning software library. Technical          chine translation in linear time.  arXiv:1610.10099,
+      report, Idiap, 2002.                                         2016.
+ [4] A. Conneau, H. Schwenk, L. Barrault, and Y. Le-     [21] Y.-D. Kim, E. Park, S. Yoo, T. Choi, L. Yang, and
+     cun. Very deep convolutional networks for natural lan-         D. Shin.  Compression of deep convolutional neural
+     guage processing. arXiv:1606.01781, 2016.                  networks for fast and low power mobile applications.
+                                                                    In ICLR, 2016. [5] N. Dalal and B. Triggs. Histograms of oriented gradi-
+     ents for human detection. In CVPR, 2005.                 [22] P. Kontschieder, M. Fiterau, A. Criminisi, and S. R.
+                                                                             Bul`o. Deep convolutional neural decision forests. In [6] E. Denton, W. Zaremba,  J. Bruna, Y. LeCun, and
+                                                        ICCV, 2015.     R. Fergus.  Exploiting linear structure within convo-
+      lutional networks for efﬁcient evaluation.  In NIPS,     [23] A. Krizhevsky.  Learning multiple layers of features
+     2014.                                                 from tiny images. Tech Report, 2009.
+
+======================== PDF 第 10 页 ========================
+[24] A. Krizhevsky,  I. Sutskever, and G. Hinton.  Im-     [40] A. Veit, M. Wilber, and S. Belongie.  Residual net-
+     agenet classiﬁcation with deep convolutional neural         works behave like ensembles of relatively shallow net-
+     networks. In NIPS, 2012.                                  work. In NIPS, 2016.
+[25] Y. LeCun, B. Boser, J. S. Denker, D. Henderson, R. E.     [41] Y. Wu, M. Schuster, Z. Chen, Q. V. Le, M. Norouzi,
+    Howard, W. Hubbard, and L. D. Jackel.  Backprop-        W.  Macherey,  M.  Krikun,  Y.  Cao,  Q.  Gao,
+     agation applied to handwritten zip code recognition.         K. Macherey, et al.  Google’s neural machine trans-
+     Neural computation, 1989.                                        lation system: Bridging the gap between human and
+[26] M. Lin, Q. Chen, and S. Yan. Network in network. In         machine translation. arXiv:1609.08144, 2016.
+    ICLR, 2014.                                             [42] W. Xiong, J. Droppo, X. Huang, F. Seide, M. Seltzer,
+[27] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona,         A. Stolcke, D. Yu, and G. Zweig.  The Microsoft
+    D. Ramanan, P. Doll´ar, and C. L. Zitnick. Microsoft         2016  Conversational Speech Recognition System.
+    COCO: Common objects in context. In ECCV. 2014.          arXiv:1609.03528, 2016.
+[28]  J. Long, E. Shelhamer, and T. Darrell. Fully convolu-     [43] S. Zagoruyko and N. Komodakis. Wide residual net-
+      tional networks for semantic segmentation. In CVPR,          works. In BMVC, 2016.
+     2015.                                                    [44] M. D. Zeiler and R. Fergus.  Visualizing and under-
+[29] D. G. Lowe.  Distinctive image features from scale-          standing convolutional neural networks.  In ECCV,
+      invariant keypoints. IJCV, 2004.                             2014.
+[30] A.  Oord,  S.  Dieleman,  H.  Zen,  K. Simonyan,
+    O. Vinyals, A. Graves, N. Kalchbrenner, A. Senior,
+     and K. Kavukcuoglu. Wavenet: A generative model
+      for raw audio. arXiv:1609.03499, 2016.
+[31] P. O. Pinheiro, R. Collobert, and P. Dollar. Learning
+      to segment object candidates. In NIPS, 2015.
+[32] S. Ren, K. He, R. Girshick, and J. Sun.  Faster R-
+    CNN: Towards real-time object detection with region
+     proposal networks. In NIPS, 2015.
+[33] O.  Russakovsky,   J.  Deng,  H.  Su,   J.  Krause,
+     S. Satheesh, S. Ma, Z. Huang, A. Karpathy, A. Khosla,
+    M. Bernstein, A. C. Berg, and L. Fei-Fei. ImageNet
+     Large Scale Visual Recognition Challenge.  IJCV,
+     2015.
+[34] P. Sermanet, D. Eigen, X. Zhang, M. Mathieu, R. Fer-
+     gus, and Y. LeCun.  Overfeat:  Integrated recogni-
+      tion, localization and detection using convolutional
+     networks. In ICLR, 2014.
+[35] L. Sifre and S. Mallat.  Rigid-motion scattering for
+     texture classiﬁcation. arXiv:1403.1687, 2014.
+[36] K. Simonyan and A. Zisserman. Very deep convolu-
+      tional networks for large-scale image recognition. In
+    ICLR, 2015.
+[37] C. Szegedy, S. Ioffe, and V. Vanhoucke.  Inception-
+     v4, inception-resnet and the impact of residual con-
+     nections on learning. In ICLR Workshop, 2016.
+[38] C. Szegedy, W. Liu, Y. Jia, P. Sermanet, S. Reed,
+    D. Anguelov, D. Erhan, V. Vanhoucke, and A. Rabi-
+     novich. Going deeper with convolutions.  In CVPR,
+     2015.
+[39] C. Szegedy, V. Vanhoucke, S. Ioffe, J. Shlens, and
+     Z. Wojna.  Rethinking the inception architecture for
+     computer vision. In CVPR, 2016.

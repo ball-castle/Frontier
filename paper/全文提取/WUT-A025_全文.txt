@@ -1,0 +1,1262 @@
+WUT-A025 | Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+来源：https://openreview.net/forum?id=GtNkETQE6w
+本地PDF：专题文献/武汉理工AI_CCF-A/WUT-A025_Forget_by_Uncertainty_ICML2026.pdf
+SHA-256：1771dfb7c5a12358dcd6556f5d90a8fe0df65f33585b4689c3d6150487080f95
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+       Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural
+                                   Networks
+
+
+
+                     Tian Zhang * 1 Yujia Tong * 1 Junhao Dong 2 Ke Xu 1 Yuze Wang 1  Jingling Yuan 1
+
+
+                         Abstract                           lenges for quantized neural networks (QNNs). These regula-
+                                                                              tions establish the “right to be forgotten”, granting users the             The deployment of quantized neural networks on
+                                                                              legal authority to demand the erasure of their data from ma-              edge devices, combined with privacy regulations
+                                                                      chine learning systems (Nguyen et al., 2025). Consequently,                 like GDPR, creates an urgent need for machine
+                                                               implementing effective machine unlearning in QNNs has               unlearning in quantized models. However, exist-2026                                                         become an urgent yet underexplored challenge.               ing methods face critical challenges: they induce
+                forgetting by training models to memorize incor-       Machine unlearning (MU) offers a solution by removing
+                 rect labels, conflating forgetting with misremem-         specific data influences from trained models without fullMay         bering, and employ scalar gradient reweighting          retraining (Nguyen et al., 2025; Dong et al., 2026; Mavrotha-
+22          thatgradients.cannot WeresolveproposedirectionalOEU, conflictsa novel Orthogo-between           lassitislearninget(Bourtouleal., 2026).etExistingal., 2021),approacheswhich retrainsincludeonexactretainedun-
+                nal Entropy Unlearning framework with two key         data but incurs high computational cost, and approximate un-
+                innovations: 1) Entropy-guided unlearning pro-         learning (He et al., 2025), which efficiently modifies model
+               vides an unbiased forgetting direction by maxi-        parameters to approximate the retrained state. Approximate
+              mizing prediction uncertainty on forgotten data,        methods, e.g., gradient ascent (Graves et al., 2021; Thudi
+               avoiding confident misprediction toward any spe-          et al., 2022; Dong et al., 2025), influence functions (Koh &[cs.LG]           cific class, and 2) Gradient orthogonal projection         Liang, 2017; Izzo et al., 2021), and random label (Golatkar
+               eliminates interference by projecting forgetting          et al., 2020) assignment show promising results, yet they
+                gradients onto the orthogonal complement of re-         are designed for full-precision models and assume continu-
+                 tain gradients, providing theoretical guarantees        ous parameter spaces. These assumptions fail in quantized
+                for utility preservation under first-order approxi-        networks, where discrete weight representations introduce
+               mation. Extensive experiments demonstrate that        unique challenges. Q-MUL (Tong et al., 2025) emerged as
+         OEU outperforms existing methods in both for-         the first unlearning framework for QNNs, employing Simi-
+                getting effectiveness and retain accuracy.                    lar Labels to reduce noise injection and Adaptive Gradient
+                                                                Reweighting to balance forgetting and retain gradients.
+                                                                   Despite its pioneering contributions, Q-MUL (Tong et al.,          1. Introduction
+                                                               2025) exhibits two fundamental limitations that hinder its
+         Model quantization is indispensable for deploying deep neu-    unlearning effectiveness. First, the Similar Labels strategy
+            ral networks on edge devices (Howard et al., 2017; Zhou      still adheres to the paradigm of “learning incorrect answers.”
+            et al., 2018), reducing computational overhead through   As illustrated in Figure 1(a), the original model correctlyarXiv:2602.00567v2    low-bit parameter representations. While this technique    assigns high confidence to the true label (class 0). However,
+          enables efficient on-device inference, data protection leg-    the Similar Labels approach simply shifts this confidence to
+            islation, including the General Data Protection Regulation    an alternative wrong label (class 1), essentially training the
+        (GDPR) (Hoofnagle et al., 2019), has introduced new chal-   model to memorize this mislabel. This conflates forgetting”
+                                                                    with “remembering incorrectly,” potentially introducing sys-
+             *Equal contribution  1Hubei Key Laboratory of Transporta-                                                                        tematic biases toward specific classes and ultimately failing             tion Internet of Things, School of Computer Science and Ar-
+               tificial Intelligence, Wuhan University of Technology, China.    to achieve genuine data influence removal.
+           2College of Computing and Data Science, Nanyang Techno-
+                                                                  Second, Adaptive Gradient Reweighting merely adjusts the             logical University, Singapore. Correspondence to: Yujia Tong
+           <tyjjjj@whut.edu.cn>.                                       scalar magnitudes of gradients while entirely neglecting
+                                                                                their directional conflicts. As depicted in Figure 1(b), when
+           Proceedings of the 43 rd International Conference on Machine     the angle between the forgetting gradient and retain gradient
+           Learning, Seoul, South Korea. PMLR 306, 2026. Copyright 2026    exceeds 90◦, any update along the forgetting direction
+          by the author(s).
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+
+                                                           2    Retain gradient             2    Retain gradient
+                                                                                                                                                                                                                                    Forgetting                                                                                                                                                                                                                                                 gradient                                                                                                                                                                           Forgetting                                                                                                                                                                                        gradient
+                                                                                                                                                                        Region                                                                                                                                                                             that                                                                                                                                                                                                       Projected                                                                                                                                                                                 𝑔𝑓                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             Dimension                                                                                                                                                      harms                                                                                                                                                                                            retain    Original Model           Similar Labels     Entropy Guided(Ours)                                                                                                                 Dimension
+                                                                                                                                      𝑔𝑟                                                                                                        𝑔𝑟
+          True Label                   Learn Wrong     Become Uncertain
+                                                                                                                                                                           Dimension 1                                            Dimension 1
+                                                                  𝜃> 90°                            𝑔1
+                                                                                                                                                    𝑓
+
+                                                                                      𝑔𝑓
+                                                                                                                     𝑔𝑓         𝑔1                                                                                                                                         = 𝑔𝑓−𝑔𝑓,𝑔𝑟𝑔𝑟 𝑔𝑟                                                                                                                                                                                                                                        𝑓
+   0  1  2  3  4  5         0  1  2  3  4  5        0  1  2  3  4  5
+
+                                    (a)                                                      (b)                               (c)
+
+Figure 1. Motivation of OEU. (a) Similar Labels shifts confidence to a wrong class, while our entropy-guided approach drives predictions
+away from confident outputs without class-specific bias. (b) Directional conflict between forgetting and retain gradients. (c) Orthogonal
+projection eliminates this conflict.
+
+
+inevitably harms retain performance—no scalar weighting     • We introduce gradient orthogonal projection (GOP) to
+scheme can ever prevent this. This directional conflict is      eliminate directional interference between forgetting and
+particularly pronounced in QNNs, where the constrained       retain gradients, providing theoretical guarantees for util-
+parameter space amplifies gradient interference.                    ity preservation under first-order approximation.
+These limitations motivate us to fundamentally rethink the
+challenges of unlearning in QNNs:                                • Extensive evaluations across multiple datasets and quanti-
+                                                                zation configurations demonstrate that OEU consistently
+                                                            outperforms existing methods in both forgetting effective-  Challenges:
+                                                             ness and retain accuracy.
+  • C1: What should be the unlearning objective? Ex-
+    isting methods train models to memorize incorrect
+                                                        2. Related Work    labels, conflating “forgetting” with “misremembering”
+   and introducing systematic biases.                  Model Quantization has emerged as a fundamental tech-
+  • C2: How to optimize without harming retain per-     nique for deploying deep neural networks on resource-
+   formance?  Scalar gradient reweighting cannot re-      constrained devices by reducing the bit-width of weights and
+    solve directional conflicts between forgetting and re-      activations. Existing methods include Post-Training Quan-
+    tain gradients, especially in constrained quantized pa-      tization (PTQ) (Nagel et al., 2020; Cai et al., 2020; Zhang
+    rameter spaces.                                                et al., 2024), which directly quantizes pre-trained models
+                                                           but often suffers accuracy degradation at low bit-widths,
+To address these challenges, we propose OEU, a novel Or-   and Quantization-Aware Training (QAT), which simulates
+                                                              quantization during training to better adapt to quantization-thogonal Entropy Unlearning framework with two innova-
+                                                         induced errors. QAT relies on the Straight-Through Estima-tions. For C1, we reconceptualize the unlearning objective
+                                                                      tor (STE) (Bengio et al., 2013) for gradient backpropagationthrough an entropy-guided perspective: instead of training
+                                                         through non-differentiable operations, with subsequent ad-the model to produce incorrect predictions, we maximize
+output entropy to provide an unbiased forgetting direction,    vances including learnable clipping thresholds (Choi et al.,
+guiding predictions away from confident outputs without    2018), differentiable soft quantization (Gong et al., 2019),
+                                                    and learnable step sizes (Esser et al., 2019; Bhalgat et al.,introducing class-specific biases, as shown in Figure 1(a).
+                                                       2020; Li et al., 2024).  These techniques have enabledFor C2, we propose gradient orthogonal projection to re-
+                                                        widespread deployment of QNNs on edge devices (Bruschisolve directional conflicts. As illustrated in Figure 1(c), by
+                                                                      et al., 2020; Shen et al., 2024; Tong et al., 2026). However,projecting the forgetting gradient onto the orthogonal com-
+plement of the retain gradient, we mathematically guarantee    as user data becomes increasingly entangled with model
+that unlearning updates do not interfere with retained knowl-    parameters, significant privacy concerns arise—a challenge
+                                                                   that existing quantization literature has largely overlooked.edge. Together, maximum entropy defines what to forget,
+                                                Our work addresses this gap by investigating machine un-and orthogonal projection ensures how to forget without
+                                                              learning specifically designed for QNNs.collateral damage. We summarize our contributions below:
+                                               Machine Unlearning aims to remove the influence of spe-
+• We challenge the prevailing “learn incorrect labels” ap-     cific training data from learned models, motivated by privacy
+  proach and propose entropy-guided unlearning (EGU), ,    regulations such as GDPR (Hoofnagle et al., 2019) that grant
+  which provides an unbiased forgetting direction by maxi-    individuals the “right to be forgotten.” The gold standard
+  mizing prediction uncertainty on forgotten data.                is retraining from scratch on retained data, but this remains
+
+                                                2
+
+======================== PDF 第 3 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+computationally prohibitive for large-scale models. Approx-    leakage (Jia et al., 2023; Fan et al., 2024; Tong et al., 2025).
+imate methods have been developed to efficiently modify
+model parameters, including influence function-based ap-    3.2. Revisiting Quantization-Aware Training
+proaches (Koh & Liang, 2017; Izzo et al., 2021), gradient
+                                                         Quantization-Aware Training (QAT) simulates quantizationascent methods (Graves et al., 2021; Thudi et al., 2022),
+                                                                    effects during training by inserting fake quantization nodesand label manipulation techniques such as Random La-
+                                                                    that perform quantization and dequantization operations onbels (Golatkar et al., 2020), ℓ1-sparse (Jia et al., 2023),
+                                                                floating-point values. For n-bit signed quantization withand SalUn (Fan et al., 2024).  However, these methods
+                                                               scale factor s, the quantization function q(·) is defined as:are designed for full-precision models and operate under
+a “learning wrong answers” paradigm that may introduce                             xr
+                                                       xq = q(xr) = s× clamp        , −2n−1, 2n−1 −1     (1)systematic biases. Q-MUL (Tong et al., 2025) is the first                              s
+work addressing unlearning for QNNs, but it inherits the
+                                                   where ⌊·⌉denotes  rounding  to  the  nearest  integer,same paradigm and only adjusts gradient magnitudes with-
+                                                    and clamp(x, rlow, rhigh) constrains x within the rangeout resolving directional conflicts. Our work departs from
+                                                                         [rlow, rhigh].this paradigm by proposing EGU for genuine uncertainty,
+complemented by GOP to eliminate directional conflicts.      In neural networks with quantized weights and activations,
+                                                              the forward pass computes outputs using quantized values:
+3. Preliminaries                                         Forward:  Output(x) = xq · wq = q(xr) · q(wr)   (2)
+In this section, we establish the foundational concepts for    Since the quantization function is non-differentiable, the
+our work by revisiting machine unlearning and Quantization-    Straight-Through Estimator (STE) (Bengio et al., 2013) is
+Aware Training (QAT). As MU methods typically require    employed for gradient computation during backpropagation:
+gradient-based optimization, unlearning in QNNs can be                                            ( ∂L                                                   ∂L                                                                                                                               if x ∈[−QxN, QxP ]                                            =   ∂xqnaturally formulated as a QAT process.                       Backward:                                                                                                                           (3)
+                                                               ∂xr     0     otherwise
+3.1. Revisiting Machine Unlearning                    where L denotes the loss function, and [−QxN, QxP ] repre-
+Let D = {(xi, yi)}Ni=1 denote the complete training dataset    sents the quantization range. The gradient with respect to
+with N samples, where xi ∈Rd represents the i-th input    weights follows an analogous formulation.
+sample and yi ∈{1, 2, . . . , K} is the corresponding class la-    For image classification tasks, the quantized model maps
+bel. The forgotten dataset Df ⊆D represents the subset of    input images to predicted probability distributions through
+data that needs to be removed from the trained model, while                                                               the forward function f(x; wq). Given a sample (xi, yi) from
+the retained dataset Dr denotes its complement, satisfying    the dataset D, the quantized model’s output probability
+Df ∩Dr = ∅and Df ∪Dr = D. Based on the compo-    distribution is:
+sition of Df, machine unlearning in image classification
+can be categorized into two scenarios: class-wise forgetting,              pQ(xi; wq) = softmax(f(xqi ; wq))          (4)
+where Df consists entirely of samples from specific classes    For notational simplicity, we hereafter use x to denote the
+to eliminate, and random data forgetting, where Df contains    quantized input and θ to represent the quantized model
+randomly selected samples from one or multiple classes.      parameters unless otherwise specified.
+We denote the original model trained on D as M0 with   The discrete nature of quantized parameters further ampli-
+parameters θ0. The retrained model Mr, obtained by train-     fies the challenges identified above. First, the constrained
+ing from scratch solely on the retained dataset Dr, serves    parameter space (limited to 2n possible values per weight)
+as the “gold standard” for unlearning evaluation (Nguyen    magnifies the systematic biases introduced by the “learning
+et al., 2025). However, retraining incurs substantial compu-   wrong answers” paradigm, as QNNs have limited capacity to
+tational overhead, particularly for large-scale models. Ap-    absorb label noise. Second, the STE-based gradient approx-
+proximate unlearning methods aim to obtain an unlearned    imation exacerbates directional conflicts between forgetting
+model Mu by efficiently modifying the original model M0    and retain gradients, making conflict-free optimization even
+to eliminate the influence of Df, such that Mu approxi-   more critical. These challenges motivate the design of our
+mates Mr in terms of both prediction behavior and privacy    proposed OEU framework.
+guarantees. The effectiveness of unlearning is typically
+evaluated through multiple metrics: Forget Accuracy (FA)
+                                                        4. Methodologymeasuring performance on Df, Retain Accuracy (RA) on
+Dr, Test Accuracy (TA) on held-out test data, and Member-    In this section, we provide a comprehensive introduction
+ship Inference Attack (MIA) success rate assessing privacy     to the proposed OEU (Orthogonal Entropy Unlearning)
+
+                                                3
+
+======================== PDF 第 4 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+        𝐷𝑓𝑡
+
+                                                     ℒ𝑓𝑜𝑟𝑔𝑒𝑡  𝑔𝑓                                    Maximize  Entropy
+                                        (Uncertainty)
+                                                                                         ℒ𝑡𝑜𝑡𝑎𝑙
+        𝐷𝑟𝑡
+                                                                   𝑔𝑟
+                                                       ℒ𝑟𝑒𝑡𝑎𝑖𝑛        Gradient Orthogonal                     Quantized
+                     Model           Cross-Entropy                                 Projection
+                                     (Maintain Accuracy)                                                             Parameter Update
+                                                     Backward
+
+Figure 2. Overview of the proposed OEU framework. The forget set is trained with entropy maximization to achieve uncertainty, while
+the retain set uses cross-entropy to maintain accuracy. Gradient orthogonal projection resolves conflicts between the two gradients before
+parameter update.
+
+
+framework. We first introduce the overview of OEU. Subse-    the model genuinely uncertain about forgotten data.
+quently, we provide a detailed description of two core com-                  Q
+                                                        For a quantized model fθ with parameters θ, given an inputponents of OEU: Entropy-Guided Unlearning (Section 4.2)                                                              x, the output probability distribution is:and Gradient Orthogonal Projection (Section 4.3).
+                                                                      exp(zk)
+                                                            pθ(k|x) =                       ,  k ∈{1, 2, . . . , K},   (5)
+4.1. The Overview of OEU                       PKj=1 exp(zj)
+In Figure 2, we present an overview of OEU, which consists           Q
+                                                   where z = fθ (x) denotes the logits and K is the numberof two parallel branches for processing the forget set and
+                                                            of classes. The entropy of this distribution measures thethe retain set, followed by a gradient reconciliation module.
+                                                        model’s uncertainty:Given a forget set Df and a retain set Dr, both are fed into
+the quantized model to obtain predictions. For the forget set,                  K
+we apply entropy maximization to guide predictions away           H(pθ(x)) = − X pθ(k|x) log pθ(k|x),       (6)
+from confident outputs without bias toward any particular                        k=1
+class, providing an unbiased forgetting direction rather than                                                    1
+                                                The entropy is maximized when pθ(k|x) = K for all k,learning incorrect answers. For the retain set, we employ the
+                                                             yielding Hmax = log K. This uniform distribution repre-standard cross-entropy loss to maintain prediction accuracy
+                                                              sents the theoretical optimum of Lforget in isolation. Weon retained data. The two objectives produce the forgetting
+                                                          provide a visualization of this effect in Appendix A.2.gradient gf and the retain gradient gr, respectively. To re-
+solve potential directional conflicts between these gradients,  We define the entropy-guided forgetting loss as the nega-
+we introduce a gradient orthogonal projection module that     tive entropy over the forgotten dataset Df:
+projects gf onto the orthogonal complement of gr, ensur-
+ing that unlearning updates do not interfere with retained              Lforget = −Ex∈Df [H(pθ(x))]
+knowledge. The projected gradients are then combined to                   " K               #      (7)
+compute the total loss for parameter update. In the follow-         = Ex∈Df X pθ(k|x) log pθ(k|x)   .
+ing two subsections, we will provide a detailed introduction                         k=1
+to the two core components of OEU.                                                     Minimizing  Lforget maximizes the entropy, driving the
+                                                  model toward maximum uncertainty on forgotten sam-
+4.2. Entropy-Guided Unlearning                              ples. To preserve performance on retained data Dr, we
+                                                  employ the standard cross-entropy retain loss Lretain =Existing unlearning methods, including Q-MUL’s Sim-
+                                                          E(x,y)∈Dr [−log pθ(y|x)].ilar Labels, operate under a “learning wrong answers”
+paradigm—they assign incorrect labels to forgotten sam-
+                                                        Theoretical Analysis of EGU. We provide theoreticalples and train the model to memorize these mislabels. We
+                                                                      justifications for EGU by comparing it with label manipula-argue that this approach conflates forgetting with misremem-                                1
+                                                                tion methods. Let U(k) = K denote the uniform distribu-bering, potentially introducing systematic biases. Instead,
+                                                                  tion over K classes, representing the ideal “forgotten” statewe propose Entropy-Guided Unlearning (EGU) to render
+                                                    where the model has no preference for any class.
+
+                                                4
+
+======================== PDF 第 5 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+Theorem 4.1 (Bias of Label Manipulation). Label manipu-  We also introduce a hyperparameter α ∈[0, 1] to control
+lation methods (Random Labels, Similar Labels) minimize    the degree of orthogonalization: g(α)f = gf −α · ⟨gf∥gr∥2,gr⟩ gr.
+cross-entropy with incorrect labels ˜y ̸= y. The optimal   When α = 0, no projection is applied; when α = 1, full
+prediction distribution is p∗(k|x) = 1[k =  ˜y], yielding    orthogonalization is enforced, allowing practitioners to trade
+H(p∗) = 0 and DKL(p∗∥U) = log K.                          off between forgetting aggressiveness and retain protection.
+Theorem 4.2 (Unbiasedness of Maximum Entropy). EGU
+maximizes H(pθ(·|x)). The optimal prediction distribution    Theoretical Analysis of GOP.  We provide theoretical jus-
+is p∗(k|x) = K1  for all k, yielding H(p∗) = log K and     tifications for GOP under first-order approximation. We as-
+DKL(p∗∥U) = 0.                                   sume gr ̸= 0, which holds when the retain set is non-trivial.
+                                                The following theorem establishes that GOP guarantees
+Theorem 4.1 shows that label manipulation methods train                                                                   conflict-free optimization.
+the model to confidently predict incorrect labels, replacing
+correct memorization with incorrect memorization. This   Theorem 4.3 (Retain Preservation).  Let g⊥f =  gf −
+introduces systematic bias that may be exploited by member-     ⟨gf                                                                               ,gr⟩ gr be the projected forgetting gradient. For param-                                                                  ∥gr∥2
+ship inference attacks. In contrast, Theorem 4.2 shows that     eter update θ′ = θ −ηg⊥f , we have ⟨g⊥f , gr⟩= 0, which
+EGU provides an unbiased optimization direction toward    implies Lr(θ′) ≈Lr(θ) under first-order approximation.
+higher entropy, avoiding class-specific biases inherent in
+                                             Theorem 4.4 (Forgetting Effectiveness).  If gf  is notlabel manipulation methods. Detailed proofs are provided
+                                                              collinear with  gr,  then g⊥f   ̸=  0 and  ⟨gf, g⊥f ⟩ =in Appendix A.7.
+                                                     ∥gf∥2 sin2 ϕ > 0, where ϕ is the angle between gf and
+                                                                 gr. This guarantees Lf(θ′) < Lf(θ).4.3. Gradient Orthogonal Projection
+While EGU defines an appropriate forgetting objective,   Theorem 4.3 shows that the projected gradient is orthogonal
+naively optimizing it may conflict with the retain objec-    to gr, ensuring updates along g⊥f do not increase retain loss.
+tive. Let gf = ∇θLforget and gr = ∇θLretain denote the   Theorem 4.4 confirms that projection preserves the descent
+gradients from forgetting and retain losses. When their co-    direction for forgetting. Together, they guarantee that GOP
+sine similarity cos(θfr) = ∥gf⟨gf∥·∥gr∥<,gr⟩     0, any update along    achieves forgetting without harming retain. When gradients
+                                                                     conflict (⟨gf, gr⟩< 0), naive gradient descent increases Lr,gf will increase Lretain. This conflict is particularly severe
+                                                        while GOP eliminates this interference entirely. Detailedin quantized models, where the constrained parameter space
+                                                            proofs are provided in Appendix A.8.amplifies gradient interference. Q-MUL’s Adaptive Gra-
+dient Reweighting adjusts gradient magnitudes, but scalar
+weighting cannot resolve directional conflicts.                  4.4. Overall Pipeline
+To eliminate such conflicts, we propose Gradient Orthogo-  We now present the complete OEU framework that inte-
+nal Projection (GOP), which projects the forgetting gradi-    grates entropy-guided unlearning with gradient orthogonal
+ent onto the orthogonal complement of the retain gradient.     projection. The overall optimization objective combines the
+                                                         entropy-based forgetting loss and the cross-entropy retain
+                                gr⟩             g⊥f = gf −⟨gf,    gr,               (8)     loss:
+                           ∥gr∥2                                                                                                   Ltotal = Lforget + βLretain,            (11)
+By construction, ⟨g⊥f , gr⟩= 0, ensuring that updates along    where β balances the two objectives. However, rather than
+g⊥f do not affect the retain loss under first-order approxima-    directly optimizing this combined loss, we compute separate
+tion.                                                           gradients and apply orthogonal projection to ensure conflict-
+                                                                free updates. At each iteration, the model parameters are
+Layer-wise Normalized Projection.  In quantized models,    updated as:
+gradients propagated through the Straight-Through Estima-
+tor (STE) contain approximation errors that vary across                  θt+1 = θt −η  ˆg⊥f + gr   .            (12)
+layers. We apply layer-wise normalization before projec-
+tion:                                               where ˆg⊥f  is the orthogonally projected forgetting gradient
+                                                    and gr is the retain gradient. This update simultaneously                       g(l)f                      g(l)r
+              ˜g(l)f =                 ,    ˜g(l)r =                 ,       (9)    drives the model toward uncertainty on forgotten data while
+                  ∥g(l)f ∥+ ϵ            ∥g(l)r ∥+ ϵ              preserving performance on retained data. The complete
+                                     OEU algorithm is presented in Algorithm 1.where l indexes the layer and ϵ ensures numerical stability.
+The layer-wise orthogonal projection is:
+                                                  Computational Complexity.  The computational over-
+ g⊥(l)f  = ˜g(l)f  −⟨˜g(l)f  , ˜g(l)r  ⟩·˜g(l)r  ,    ˆg(l)f = g⊥(l)f   ·∥g(l)f ∥. (10)    head of OEU compared to standard unlearning is minimal.
+
+                                                5
+
+======================== PDF 第 6 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+Algorithm 1 OEU: Orthogonal Entropy Unlearning           train serves as the gold standard by retraining from scratch
+Input: Quantized model MQ with parameters θ0, forgotten    on retained data. Fine-Tuning (FT) (Golatkar et al., 2020;
+    dataset Df, retained dataset Dr, total epochs T, learning   Warnecke et al., 2021) fine-tunes the original model on re-
+     rate η, orthogonality strength α                              tained data. Gradient Ascent (GA) (Graves et al., 2021;
+Output: Unlearned model M′Q with parameters θu                                                      Thudi et al., 2022) reverses learning by performing gradient
+ 1: for t ∈[0, . . . , T −1] do                                                             ascent on forgotten data. Influence Unlearning (IU) (Koh 2:   Compute entropy-guided forgetting loss Lforget by Eq. (7);
+ 3:   Compute forgetting gradient gf ←∇θLforget;        & Liang, 2017; Izzo et al., 2021) removes data influence via
+ 4:   Compute retain loss Lretain ←E(x,y)∈Dr [CE(fθ(x), y)];     Newton-step updates. Label manipulation methods include
+ 5:   Compute retain gradient gr ←∇θLretain;              Random Labels (RL) (Golatkar et al., 2020), ℓ1-sparse (Jia
+ 6:    for each layer l do                                            et al., 2023) that combines random labeling with weight
+ 7:     Compute layer-wise gradients ˜g(l)f  , ˜g(l)r  by Eq. (9);          sparsification, and SalUn (Fan et al., 2024) that incorpo-
+ 8:     Compute orthogonal projection ˆg(l)f  by Eq. (10);            rates gradient-based saliency maps. Q-MUL (Tong et al.,
+ 9:   end for                                          2025) is the state-of-the-art method specifically designed
+10:   Update parameters θt+1 ←θt −η · (ˆgf + gr);
+                                                                 for QNNs.11: end for
+12: Return Unlearned model M′Q with parameters θT                                                      Evaluation Metrics. Following established protocols (Jia
+                                                                     et al., 2023; Fan et al., 2024; Tong et al., 2025), we adopt
+                                                                     five complementary metrics to assess both forgetting effec-
+Entropy computation requires O(K) per sample, where K                                                               tiveness and utility preservation. Forget Accuracy (FA)
+is the number of classes; GOP requires O(|θ|) per iteration,                                                     measures accuracy on forgotten data, which should ide-
+where |θ| is the number of parameters. Both operations are                                                                  ally match that of a retrained model. Retain Accuracy
+linear in their respective dimensions and negligible com-   (RA) evaluates accuracy on retained data to ensure knowl-
+pared to the forward and backward passes. The overall time                                                     edge preservation. Test Accuracy (TA) assesses general-
+complexity remains O(T · (|Df| + |Dr|) · Cmodel), where     ization on held-out data. Membership Inference Attack
+Cmodel is the cost of a single forward-backward pass.We pro-   (MIA) (Shokri et al., 2017) quantifies privacy leakage by
+vide a runtime comparison of all methods in Appendix A.3.                                                       measuring the distinguishability between forgotten and un-
+                                                        seen samples. Average Gap (AG) computes the mean ab-
+Synergy of Components.  The two components of OEU    solute difference between each method and Retrain across
+are complementary: EGU defines what to forget—providing    the above four metrics. Since Retrain represents the gold
+an unbiased forgetting direction that avoids class-specific    standard, effective unlearning is characterized by minimal
+biases, while GOP and Lretain jointly constrain the forget-    gaps rather than simply higher or lower values. Therefore,
+ting degree to prevent over-unlearning; GOP defines how to  AG serves as our primary indicator, where lower values
+forget—ensuring that the forgetting process does not inter-    indicate closer approximation to the ideal retrained model.
+fere with retained knowledge and providing mathematical   We provide further elaboration in the Appendix A.1.
+guarantees for utility preservation. Together, they form a
+                                                   Implementation details. We adopt LSQ+ (Bhalgat et al.,principled framework for effective and conflict-free machine
+                                                      2020) as the default quantization method. For training, weunlearning in QNNs.
+                                                        use SGD with an initial learning rate of 0.1 and cosine an-
+                                                                 nealing. The original model is trained for 182 epochs, while
+5. Experiments                                                           Retrain uses 160 epochs with identical optimizer settings.
+                                        We primarily focus on random data forgetting due to its prac-5.1. Experimental Setup
+                                                                        tical relevance. Class-wise forgetting results are provided
+Datasets and Networks. Our experiments are conducted     in the Appendix A.5,and additional training configurations,
+on four benchmark datasets: CIFAR-10 (Krizhevsky, 2009),    hyperparameter settings are presented in Appendix A.6
+CIFAR-100 (Krizhevsky, 2009), SVHN (Netzer et al., 2011),
+and Tiny-ImageNet (Le et al., 2015).  Consistent with     5.2. Performance Evaluation
+Q-MUL (Tong et al., 2025), we adopt ResNet-18 (He
+et al., 2016) with 4-bit weights and activations, and Mo-   As presented in Table 1, we evaluate various MU methods
+bileNetV2 (Howard et al., 2017) with 2-bit weights and     for quantized ResNet18 under random data forgetting. OEU
+full-precision activations. We evaluate under two unlearn-    consistently achieves the best performance across differ-
+ing scenarios: random data forgetting with forget ratios of    ent forgetting ratios on both datasets. On CIFAR-10 with
+10%, 30%, and 50%, and class-wise forgetting. We pri-   10% forgetting ratio, OEU attains FA of 93.58% and RA
+marily focus on random data forgetting as it better reflects    of 99.86%, with minimal gaps of only 0.20% and 0.14%
+real-world privacy removal requests.                      from Retrain, significantly outperforming Q-MUL which
+                                                        has gaps of 3.30% and 0.33%. The average gap of OEU
+Baselines. We compare OEU against eight methods. Re-
+
+                                                6
+
+======================== PDF 第 7 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+Table 1. Performance of various MU methods for ResNet18 with both activations and weights quantized to 4 bits CIFAR-10 and
+CIFAR-100. The unlearning scenario is random data forgetting. Bold indicates the best performance and underline indicates the runner-up.
+A performance gap against Retrain is provided in(•).
+
+                                      CIFAR-10                                                   CIFAR-100
+    Method       FA        RA         TA        MIA     AG↓      FA        RA         TA        MIA     AG↓
+
+                                           The proportion of forgotten data samples to all samples is 10%
+
+     Retrain        93.38          100.0          92.64          13.36        0         74.76          99.98          72.43          56.36         0
+     FT        99.42(6.04)     99.96(0.04)     93.05(0.41)     2.82(10.54)     4.26     91.82(17.06)     94.12(5.86)     65.29(7.14)    16.69(39.67)    17.43
+    GA        99.38(6.00)     99.38(0.62)     93.35(0.71)     1.22(12.14)     4.87     95.02(20.26)     96.86(3.12)     71.84(0.59)     9.56(46.80)     17.69
+      IU        95.64(2.26)     95.53(4.47)     87.85(4.79)      7.93(5.43)     4.24     3.69(71.07)     4.03(95.95)     3.85(68.58)     98.8(42.44)     69.51
+     RL        96.29(2.91)     98.96(1.04)     92.23(0.41)     16.67(3.31)     1.92     68.51(6.25)     98.91(1.07)     69.47(2.96)    85.62(29.26)     9.89
+    ℓ1-sparse     98.71(5.33)     99.88(0.12)     92.92(0.28)      5.29(8.07)     3.45     88.20(13.44)     99.65(0.33)     70.80(1.63)    29.64(26.72)    10.53
+     SalUn      96.82(3.44)     99.45(0.55)     92.32(0.32)     14.27(0.91)     1.31     82.22(7.46)     98.71(1.27)     67.38(5.05)    66.78(10.42)     6.05
+   Q-MUL      97.11(3.3)      99.67(0.33)     92.39(0.25)     12.49(0.87)     1.30     75.71(0.95)     97.89(2.09)     67.27(5.16)     52.11(4.25)     3.11
+    OEU       93.58(0.20)     99.86(0.14)     92.97(0.33)     15.00(1.64)     0.58     74.86(0.10)     99.36(0.62)     67.61(4.82)     49.56(6.80)     3.08
+
+                                           The proportion of forgotten data samples to all samples is 30%
+
+     Retrain        91.61          99.97          91.29          16.11        0         67.67          99.98          67.54          58.47         0
+     FT        99.19(7.58)     99.95(0.02)     92.94(1.65)     3.10(13.01)     5.57     96.24(28.57)     99.94(0.04)     71.49(3.95)    20.57(37.90)    17.62
+    GA        99.35(7.74)     99.38(0.59)     93.39(2.10)     1.28(14.83)     6.32     96.73(29.06)     97.30(2.68)     73.35(5.81)     6.19(52.28)     22.46
+      IU       76.21(15.40)    75.93(24.04)    71.48(19.81)    24.53(8.42)    16.92     2.81(64.86)     3.19(96.79)     3.09(64.45)    96.33(37.86)    65.99
+     RL        93.96(2.35)     96.03(3.94)     90.34(0.95)     19.07(2.96)     2.55     75.50(7.83)     99.58(0.40)     66.56(0.98)    87.33(28.86)     9.52
+    ℓ1-sparse     99.06(7.45)     99.90(0.07)     93.01(1.72)     4.54(11.57)     5.20     88.59(20.92)     99.79(0.19)     70.72(3.18)    33.16(25.31)    12.40
+     SalUn      96.17(4.56)     97.78(2.19)     91.57(0.30)     15.50(0.66)     1.93     79.60(11.93)     96.70(3.28)     63.41(4.13)     57.73(0.74)     5.02
+   Q-MUL     93.57(1.96)     96.77(3.20)     90.24(1.05)     15.59(0.52)     1.68     73.90(6.23)     97.63(2.35)     65.80(1.74)     63.76(5.29)     3.90
+    OEU       95.25(3.64)     99.83(0.14)     91.640.35)     15.02(1.09)     1.31     66.41(1.26)     98.40(1.58)     64.59(2.95)     56.36(2.11)     1.98
+
+                                           The proportion of forgotten data samples to all samples is 50%
+
+     Retrain        90.75          100.0          90.28          18.76        0         65.40          99.99          65.74          68.19         0
+     FT        99.29(8.54)     99.96(0.04)     93.28(3.00)     2.85(15.91)     6.87     97.10(31.70)     99.98(0.01)     72.82(7.08)    16.86(51.33)    22.71
+    GA        99.34(8.59)     99.34(0.66)     93.44(3.16)     1.27(17.49)     7.48     96.82(31.42)     97.33(2.66)     73.37(7.63)     5.93(62.26)     25.99
+      IU       16.12(74.63)    16.02(83.98)    16.22(74.06)    16.36(2.40)    58.77     0.96(64.44)     1.04(98.95)     1.00(64.74)    98.96(30.77)    64.73
+     RL        95.32(4.57)     97.17(2.83)     90.85(0.57)     21.33(2.57)     2.64     69.20(3.80)     85.60(14.39)    64.39(1.35)    54.58(13.61)     8.29
+    ℓ1-sparse     99.25(8.50)     99.95(0.05)     92.67(2.39)     3.91(14.85)     6.45     96.48(31.08)     99.98(0.01)     72.26(6.52)    25.11(43.08)    20.17
+     SalUn      96.56(5.81)     98.03(1.97)     91.55(1.27)     18.05(0.71)     2.44     87.75(22.35)     98.99(1.00)     64.69(1.05)     73.12(4.93)     7.33
+   Q-MUL     91.09 (0.34)     93.94(6.06)     89.12(1.16)    18.68 (0.08)    1.91     67.25(1.85)     89.65(10.34)    61.38(4.36)    56.52(11.67)     7.06
+    OEU       95.25(4.50)     99.64(0.36)     90.81(0.59)     18.72(0.04)     1.37     70.42(5.02)     98.79(1.20)     60.38(5.36)     65.08(3.11)     3.67
+
+
+Table 2. Impact of Removing Components of OEU. Ablation study     perior unlearning effectiveness even under more challenging
+is from ResNet18 on CIFAR-100. The unlearning scenario is                                                              conditions. At 50% forgetting ratio, OEU achieves an av-random data forgetting (30%).
+                                                          erage gap of 3.67%, substantially outperforming Q-MUL’s
+   Method      FA       RA       TA       MIA    AG↓     7.06% and SalUn’s 7.33%. These results validate the effec-
+    Retrain        67.67        99.98        67.54        58.47       0       tiveness of OEU in balancing forgetting efficacy and model
+   OEU      66.41(1.26)   98.40(1.58)   64.59(2.95)   56.36(2.11)   1.98       utility preservation for QNNs. More additional results can
+   w/oGOP     63.16(4.51)   97.13(2.85)   63.87(3.67)   61.54 (3.07)   3.53
+   w/oEGU     75.10(7.43)   99.43(0.55)   67.64(0.10)   50.62(7.85)   3.98     be found in the Appendix A.4 and A.9.
+  GOPglobal   57.99(9.68)   97.04(2.94)   62.35(5.19)   62.24(3.77)   5.40
+
+                                                                    5.3. The Impact of Different Components
+
+                                      We conduct ablation experiments with two variants: w/o
+is only 0.58%, which is 55% lower than Q-MUL’s 1.30%.                                     GOP and w/o EGU. As shown in Table 3, the complete
+As the forgetting ratio increases to 30% and 50%, OEU                                    OEU achieves an average gap of only 1.98%. When GOP
+maintains its superiority with average gaps of 1.31% and                                                                           is removed, AG rises to 3.53%, with the RA gap increas-
+1.37%, compared to Q-MUL’s 1.68% and 1.91% respec-                                                          ing from 1.58% to 2.85% and the FA gap from 1.26% to
+tively. These results demonstrate that OEU effectively re-                                                     4.51%. This demonstrates that without orthogonal projec-
+moves the influence of forgotten data while preserving the                                                                     tion, the forgetting gradient conflicts with the retain gra-
+model’s knowledge on retained data.                                                                  dient, degrading both forgetting precision and retain per-
+On CIFAR-100, the advantages of OEU become even more    formance. When EGU is removed, the model reverts to
+pronounced. At 10% forgetting ratio, OEU achieves an av-    the “learning wrong labels” paradigm, resulting in an FA
+erage gap of 3.08%, slightly better than Q-MUL’s 3.11%.    of 75.10%—significantly higher than the retrained model’s
+When the forgetting ratio increases to 30%, OEU achieves    67.67%—indicating incomplete forgetting. The MIA gap
+FA of 66.41% with a gap of 1.26% from Retrain, resulting    also increases from 2.11% to 7.85%, revealing weaker pri-
+in an average gap of only 1.98%, approximately 49% lower    vacy protection. These results validate that both components
+than Q-MUL’s 3.90%. This indicates that OEU maintains su-    are indispensable: EGU defines the appropriate forgetting
+
+                                                7
+
+======================== PDF 第 8 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+           FA                RA                 TA                 MIA                 Aggregate results
+                                                                                    50   20
+                                                         4                                                                                    40                         60                                3
+   15
+                                                         3                          30
+   10                           2                        2                          20                         40
+    5                           1                        1                          10                         20
+    0                                0                                                         0                                                                                     0                                                                                                                0
+      OEUQ-MULFT GA IU RLℓ1-sparseSalUn                                 OEUQ-MULFT GA IU RLℓ1-sparseSalUn                                                          OEUQ-MULFT GA IU RLℓ1-sparseSalUn                                                                                      OEUQ-MULFT GA IU RLℓ1-sparseSalUn                                                                                                                 OEUQ-MULFT GA IU RLℓ1-sparseSalUn
+
+           FA                RA                 TA                 MIA                 Aggregate results
+   25                          15.0                                                         5                                                                                    25                                                                                                               50   20                          12.5                                                         4                                                                                    20                                                                                                               40                                10.0
+   15                                  7.5                         3                          15                         30
+   10                                  5.0                         2                          10                         20
+    5                            2.5                         1                           5                         10
+    0                                  0.0                                                         0                                                                                     0                                                                                                                0
+      OEUQ-MULFT GA IU RLℓ1-sparseSalUn                                OEUQ-MULFT GA IU RLℓ1-sparseSalUn                                                          OEUQ-MULFT GA IU RLℓ1-sparseSalUn                                                                                      OEUQ-MULFT GA IU RLℓ1-sparseSalUn                                                                                                                 OEUQ-MULFT GA IU RLℓ1-sparseSalUn
+
+           FA                RA                 TA                 MIA                 Aggregate results
+   30                         12                         5
+   25                         10                         4                          30                         60
+   20                          8
+                                                         3                          20                         40   15                          6
+                                                         2
+   10                          4                                                    10                         20
+    5                          2                         1
+    0                               0                                                         0                                                                                     0                                                                                                                0
+      OEUQ-MULFT GA IU RLℓ1-sparseSalUn                                OEUQ-MULFT GA IU RLℓ1-sparseSalUn                                                          OEUQ-MULFT GA IU RLℓ1-sparseSalUn                                                                                      OEUQ-MULFT GA IU RLℓ1-sparseSalUn                                                                                                                 OEUQ-MULFT GA IU RLℓ1-sparseSalUn
+
+Figure 3. Performance gaps of ResNet18 on CIFAR-100. The three rows correspond to full-precision ResNet18, ResNet18 quantized with
+PACT (Choi et al., 2018), and ResNet18 quantized with DSQ (Gong et al., 2019), respectively. The unlearning scenario is random data
+forgetting (10%). A shorter bar (smaller gap) indicates performance is closer to that of the Retrained model. The average gap for each
+method is calculated by dividing the values in the Aggregate Results bar chart by 4.
+
+objective, while GOP ensures conflict-free optimization.       5.5. OEU with Different QAT Methods
+We further investigate the impact of projection granularity   Beyond LSQ+, we validate OEU under other QAT methods
+by comparing layer-wise projection with global projection.    including PACT (Choi et al., 2018) and DSQ (Gong et al.,
+Replacing layer-wise GOP with global projection increases    2019). As shown in Figure 3, OEU consistently achieves
+AG from 1.98% to 5.40%, with FA dropping from 66.41%    the smallest performance gaps across all metrics for both
+to 57.99%, far below the retrained model’s 67.67%, indi-    quantization methods. Compared to Q-MUL, OEU reduces
+cating over-forgetting. Global projection computes a single    the average gap by 60.5% for PACT and 56.2% for DSQ.
+orthogonal direction across all parameters, failing to capture    Moreover, OEU demonstrates superior MIA performance,
+layer-specific gradient dynamics. In contrast, layer-wise pro-    indicating more thorough forgetting of target data. These
+jection allows each layer to independently resolve gradient     results validate the generalizability of OEU across different
+conflicts, providing finer-grained control over the forgetting-    quantization-aware training frameworks.
+retain trade-off.
+                                                        6. Conclusions
+5.4. OEU with Full-precision Models
+                                                            In this paper, we address machine unlearning for quan-
+To more comprehensively evaluate the generalizability of                                                                tized neural networks by identifying two fundamental lim-
+OEU beyond quantized settings, we compare the effects                                                                    itations of existing methods:  the “learning wrong an-
+of different unlearning methods on full-precision models,                                                        swers” paradigm that introduces biases, and scalar gradient
+as shown in Figure 3. The issues of directional gradient                                                          reweighting that ignores directional conflicts. We propose
+conflicts and biased forgetting objectives also exist in full-                                                         orthogonal entropy unlearning, featuring entropy-guided
+precision models, although they are not as severe as in                                                            unlearning that provides an unbiased forgetting direction by
+quantized models with constrained parameter spaces. Nev-                                                      maximizing prediction uncertainty, and gradient orthogonal
+ertheless, OEU can still effectively address these two issues.                                                              projection that mathematically guarantees conflict-free op-
+Specifically, the average gap of OEU reaches only 3.60%,                                                               timization. Extensive experiments demonstrate that OEU
+which is significantly lower than that of existing methods.                                                               consistently outperforms existing methods across multiple
+This demonstrates that OEU can achieve superior unlearning                                                                datasets and quantization configurations.
+performance even in full-precision models, further validat-
+ing the effectiveness of our approach.
+
+                                                8
+
+======================== PDF 第 9 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+Impact Statement                                    Advances in Neural Information Processing Systems, 38:
+                                                      166676–166707, 2026.
+This paper presents work whose goal is to advance the field
+of machine learning, with direct relevance to privacy regula-    Esser, S. K., McKinstry, J. L., Bablani, D., Appuswamy, R.,
+tions such as GDPR that mandate individuals’ right to data      and Modha, D. S. Learned step size quantization. arXiv
+removal. Incomplete forgetting and residual information       preprint arXiv:1902.08153, 2019.
+leakage are shared risks across all approximate unlearning
+methods. OEU specifically mitigates these: entropy-guided    Fan, C., Liu, J., Zhang, Y., Wei, D., Wong, E., and Liu,
+unlearning drives predictions toward maximum uncertainty,       S. Salun: Empowering machine unlearning via gradient-
+inherently reducing identifiable patterns from forgotten data;      based weight saliency in both image classification and
+gradient orthogonal projection ensures forgetting does not       generation.  In International Conference on Learning
+compromise retained knowledge, maintaining a stable and       Representations, 2024.
+reliable unlearned model.
+                                                            Golatkar, A., Achille, A., and Soatto, S. Eternal sunshine
+                                                                of the spotless net: Selective forgetting in deep networks.
+References                                                                In Proceedings of the IEEE/CVF conference on computer
+Bengio, Y., L´eonard, N., and Courville, A. Estimating or       vision and pattern recognition, pp. 9304–9312, 2020.
+  propagating gradients through stochastic neurons for con-
+                                                    Gong, R., Liu, X., Jiang, S., Li, T., Hu, P., Lin, J., Yu, F., and   ditional computation. arXiv preprint arXiv:1308.3432,
+                                                         Yan, J. Differentiable soft quantization: Bridging full-  2013.
+                                                               precision and low-bit neural networks. In Proceedings
+Bhalgat, Y., Lee, J., Nagel, M., Blankevoort, T., and Kwak,       of the IEEE/CVF international conference on computer
+  N. Lsq+: Improving low-bit quantization through learn-       vision, pp. 4852–4861, 2019.
+   able offsets and better initialization. In Proceedings of the
+                                                         Graves, L., Nagisetty, V., and Ganesh, V. Amnesiac ma-  IEEE/CVF conference on computer vision and pattern
+                                                            chine learning. In Proceedings of the AAAI Conference  recognition workshops, pp. 696–697, 2020.
+                                                    on Artificial Intelligence, volume 35, pp. 11516–11524,
+Bourtoule, L., Chandrasekaran, V., Choquette-Choo, C. A.,      2021.
+   Jia, H., Travers, A., Zhang, B., Lie, D., and Papernot,
+                                                      He, K., Zhang, X., Ren, S., and Sun, J. Deep residual learn-  N. Machine unlearning. In 2021 IEEE symposium on
+                                                             ing for image recognition. In Proceedings of the IEEE   security and privacy (SP), pp. 141–159. IEEE, 2021.
+                                                           conference on computer vision and pattern recognition,
+Bruschi, N., Garofalo, A., Conti, F., Tagliavini, G., and       pp. 770–778, 2016.
+  Rossi, D.  Enabling mixed-precision quantized neural
+                                                     He, Z., Li, T., Cheng, X., Huang, Z., and Huang, X. To-  networks in extreme-edge devices.  In Proceedings of
+  the 17th ACM International Conference on Computing      wards natural machine unlearning. IEEE Transactions on
+                                                               Pattern Analysis and Machine Intelligence, 2025.  Frontiers, pp. 217–220, 2020.
+Cai, Y., Yao, Z., Dong, Z., Gholami, A., Mahoney, M. W.,    Hoofnagle, C. J., Van Der Sloot, B., and Borgesius, F. Z. The
+  and Keutzer, K. Zeroq: A novel zero shot quantization      european union general data protection regulation: what
+  framework. In Proceedings of the IEEE/CVF conference          it is and what it means. Information & Communications
+  on computer vision and pattern recognition, pp. 13169–      Technology Law, 28(1):65–98, 2019.
+  13178, 2020.
+                                                     Howard, A. G., Zhu, M., Chen, B., Kalenichenko, D., Wang,
+Choi, J., Wang, Z., Venkataramani, S., Chuang, P. I.-J., Srini-      W., Weyand, T., Andreetto, M., and Adam, H. Mobilenets:
+  vasan, V., and Gopalakrishnan, K. Pact: Parameterized        Efficient convolutional neural networks for mobile vision
+   clipping activation for quantized neural networks. arXiv       applications. arXiv preprint arXiv:1704.04861, 2017.
+   preprint arXiv:1805.06085, 2018.
+                                                               Izzo, Z., Smart, M. A., Chaudhuri, K., and Zou, J. Ap-
+Dong, J., Koniusz, P., Qu, X., and Ong, Y.-S. Stabilizing      proximate data deletion from machine learning models.
+  modality gap & lowering gradient norms improve zero-      In International conference on artificial intelligence and
+   shot adversarial robustness of vlms. In Proceedings of the        statistics, pp. 2008–2016. PMLR, 2021.
+  31st ACM SIGKDD Conference on Knowledge Discovery
+                                                                         Jia, J., Liu, J., Ram, P., Yao, Y., Liu, G., Liu, Y., Sharma,  and Data Mining V. 1, pp. 236–247, 2025.
+                                                                                  P., and Liu, S. Model sparsity can simplify machine
+Dong, J., Zhu, H., Zhang, Y., Qu, X., Ong, Y. S., and Ko-      unlearning. Advances in Neural Information Processing
+   niusz, P. Machine unlearning via task simplex arithmetic.      Systems, 36:51584–51605, 2023.
+
+                                                9
+
+======================== PDF 第 10 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+Koh, P. W. and Liang, P. Understanding black-box predic-    Tong, Y., Yuan, J., and Hu, C. Enhancing quantization-
+   tions via influence functions. In International conference      aware training on edge devices via relative entropy coreset
+  on machine learning, pp. 1885–1894. PMLR, 2017.           selection and cascaded layer correction. IEEE Transac-
+                                                                    tions on Mobile Computing, 2026.
+Krizhevsky, A. Learning multiple layers of features from
+   tiny images. 2009.                                   Warnecke, A., Pirch, L., Wressnegger, C., and Rieck, K.
+                                                      Machine unlearning of features and labels. arXiv preprint
+Le, Y., Yang, X., et al. Tiny imagenet visual recognition      arXiv:2108.11577, 2021.
+  challenge. CS 231N, 7(7):3, 2015.
+                                                       Zhang, A., Wang, N., Deng, Y., Li, X., Yang, Z., and Yin, P.
+Li, Y., Xu, S., Lin, M., Cao, X., Liu, C., Sun, X., and      Magr: Weight magnitude reduction for enhancing post-
+  Zhang, B. Bi-vit: Pushing the limit of vision transformer       training quantization. Advances in neural information
+   quantization. In Proceedings of the AAAI Conference on       processing systems, 37:85109–85130, 2024.
+   Artificial Intelligence, volume 38, pp. 3243–3251, 2024.
+                                                     Zhou, Y., Moosavi-Dezfooli, S.-M., Cheung, N.-M., and
+Mavrothalassitis, I., Puigdemont, P., Levi, N., and Cevher,      Frossard, P. Adaptive quantization for deep neural net-
+  V. Ascent fails to forget. Advances in Neural Information      work. In Proceedings of the AAAI Conference on Artificial
+  Processing Systems, 38:45330–45365, 2026.                    Intelligence, volume 32, 2018.
+
+Nagel, M., Amjad, R. A., Van Baalen, M., Louizos, C.,
+  and Blankevoort, T. Up or down? adaptive rounding for
+  post-training quantization. In International conference
+  on machine learning, pp. 7197–7206. PMLR, 2020.
+
+Netzer, Y., Wang, T., Coates, A., Bissacco, A., Wu, B.,
+  Ng, A. Y., et al. Reading digits in natural images with
+  unsupervised feature learning. In NIPS workshop on deep
+  learning and unsupervised feature learning, volume 2011,
+  pp. 4. Granada, 2011.
+
+Nguyen, T. T., Huynh, T. T., Ren, Z., Nguyen, P. L., Liew,
+  A. W.-C., Yin, H., and Nguyen, Q. V. H. A survey of
+  machine unlearning. ACM Transactions on Intelligent
+  Systems and Technology, 16(5):1–46, 2025.
+
+Shen, X., Dong, P., Lu, L., Kong, Z., Li, Z., Lin, M., Wu, C.,
+  and Wang, Y. Agile-quant: Activation-guided quantiza-
+   tion for faster inference of llms on the edge. In Proceed-
+  ings of the AAAI Conference on Artificial Intelligence,
+  volume 38, pp. 18944–18951, 2024.
+
+Shokri, R., Stronati, M., Song, C., and Shmatikov, V. Mem-
+  bership inference attacks against machine learning mod-
+   els. In 2017 IEEE symposium on security and privacy
+  (SP), pp. 3–18. IEEE, 2017.
+
+Thudi, A., Deza, G., Chandrasekaran, V., and Papernot,
+  N. Unrolling sgd: Understanding factors influencing ma-
+  chine unlearning. In 2022 IEEE 7th European Symposium
+  on Security and Privacy (EuroS&P), pp. 303–319. IEEE,
+  2022.
+
+Tong, Y., Wang, Y., Yuan, J., and Hu, C. Robust machine
+  unlearning for quantized neural networks via adaptive
+  gradient reweighting with similar labels. In Proceedings
+   of the IEEE/CVF International Conference on Computer
+  Vision (ICCV), pp. 20603–20612, October 2025.
+
+                                                10
+
+======================== PDF 第 11 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+A. Appendix
+
+A.1. More Discussion on Evaluation Metrics
+
+We provide additional justification for our choice of Average Gap (AG) as the primary evaluation metric.
+Consistency with Existing Literature. We adopt AG as the primary evaluation metric to maintain consistency with the
+established machine unlearning literature. Baseline methods such as ℓ1-sparse (Jia et al., 2023), SalUn (Fan et al., 2024),and
+Q-MUL (Tong et al., 2025) employ the same evaluation framework, which facilitates direct and objective comparisons
+across different approaches.
+Measuring Deviation from the Gold Standard. The fundamental purpose of AG is to quantify the overall deviation
+of an unlearning method from the “gold standard”—the Retrain baseline, which represents the ideal unlearning outcome
+achieved by retraining from scratch exclusively on the retain set Dr. By computing the mean absolute deviation across all
+four metrics, AG provides a holistic assessment of how closely an approximate unlearning method approximates this ideal
+behavior.
+Balanced Evaluation of Dual Objectives. Machine unlearning inherently involves two competing objectives: (1) unlearning
+effectiveness—ensuring that the influence of forgotten data is thoroughly removed, and (2) utility preservation—maintaining
+the model’s performance on retained and unseen data. Our evaluation framework captures both objectives through a balanced
+2:2 design:
+
+
+   • Unlearning Effectiveness: Forget Accuracy (FA) and Membership Inference Attack success rate (MIA) jointly
+     evaluate how effectively the model has forgotten the target data.
+
+
+   • Utility Preservation: Retain Accuracy (RA) and Test Accuracy (TA) assess the model’s utility on retained training
+     data and held-out test data, respectively. These metrics ensure that the unlearning process does not catastrophically
+     degrade the model’s predictive capability.
+
+
+The equal-weight averaging in AG thus reflects a principled balance between these dual demands, rather than biasing toward
+any single aspect. This design choice ensures that methods achieving strong unlearning at the cost of utility degradation (or
+vice versa) are appropriately penalized, promoting the development of approaches that excel across both dimensions.
+In summary, the AG metric provides a comprehensive, balanced, and comparable evaluation framework that aligns with the
+fundamental goals of machine unlearning research.
+
+A.2. Visualization of Entropy-Guided Unlearning
+
+To provide qualitative evidence for the effectiveness of our entropy-guided unlearning objective, we visualize the output
+probability distribution of a randomly selected sample from the forget set. The experiment is conducted on CIFAR-100
+using MobileNetV2 with 2-bit weight quantization. As shown in Figure 4, the original model produces a peaked distribution
+with high confidence on a single class (left). After applying our entropy-guided unlearning, the output transforms into a
+nearly uniform distribution (right), where each class receives approximately equal probability. This visualization shows the
+isolated effect of entropy maximization. In the complete OEU pipeline, joint optimization with Lretain constrains the entropy
+increase through shared features, preventing over-unlearning while avoiding incorrect memorization.
+
+A.3. Efficiency Analysis
+
+We compare the runtime of different unlearning methods. As illustrated in Figure 5, Retrain incurs substantial computational
+cost, requiring approximately 20 minutes to complete. While GA and IU exhibit minimal time overhead, their poor unlearning
+performance on quantized models (as evidenced in Table 1) renders them impractical. OEU maintains comparable efficiency
+to other approximate methods such as Q-MUL, SalUn, and RL, completing within approximately 3 minutes despite
+incorporating entropy maximization and gradient orthogonal projection. This is because both operations are computationally
+lightweight—entropy computation is O(K) per sample and layer-wise projection is dominated by standard backpropagation.
+Combined with its superior unlearning effectiveness demonstrated in our experiments, OEU achieves a favorable balance
+between performance and computational efficiency.
+
+                                                11
+
+======================== PDF 第 12 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+                                  Original Model Output              After Max-Entropy Unlearning
+
+
+                                            0.75
+
+
+
+
+
+                                            0.50
+                                                                                       Probability
+                                            0.25
+
+
+
+
+
+                                            0.00
+                                               0     1     2     3     4     5     6     7     8     9            0     1     2     3     4     5     6     7     8     9
+                                                Class                                        Class
+
+Figure 4. Output probability distribution of a randomly selected forget sample from CIFAR-100 on MobileNetV2 (green: ground-truth
+class; blue: other classes). Left: output distribution of original model . Right: output distribution after applying max-entropy unlearning.
+
+
+
+
+
+                                              20
+
+                                                                   (min) 15
+                                                      Time 10
+
+                                               5
+
+
+                                               0
+                                                 Retrain  FT GA  IU  RLℓ1-sparse SalUnQ-MUL OEU
+
+
+Figure 5. Runtime comparison of different unlearning methods on MobileNetV2 with CIFAR-100 under 10% random data forgetting.
+OEU achieves comparable efficiency to other approximate methods while delivering superior unlearning performance.
+
+
+
+
+
+A.4. Performance Evaluation on Tiny-Imagenet dataset
+
+To validate the scalability of OEU on larger datasets, we conduct experiments on Tiny-ImageNet, which contains 200
+classes with higher image resolution. As shown in Table 3, OEU achieves the best average gap of only 5.03%, significantly
+outperforming Q-MUL (8.17%) and ℓ1-sparse (9.02%). Notably, OEU attains an FA of 60.84%, closely matching the
+Retrain baseline (62.15%) with a gap of merely 1.31%, and achieves the smallest MIA gap of 3.39%, indicating superior
+privacy protection. These results demonstrate that OEU maintains its effectiveness on larger and more complex datasets,
+further validating its practical applicability.
+
+A.5. Performance Evaluation under Class-wise Forgetting
+
+We further evaluate OEU under the class-wise forgetting scenario, where all samples from a specific class are removed. As
+shown in Table 4, on CIFAR-10, most approximate methods achieve near-optimal performance, with ℓ1-sparse (0.08%),
+SalUn (0.10%), Q-MUL (0.11%), and OEU (0.12%) all attaining average gaps below 0.15%. This is because class-wise
+forgetting on CIFAR-10 (10 classes) is a relatively simple task where multiple methods can effectively eliminate the target
+class. However, on the more challenging CIFAR-100 dataset with 100 classes (Table 5), OEU demonstrates clear advantages,
+achieving the best average gap of 0.21%, outperforming Q-MUL (0.32%) and ℓ1-sparse (0.55%). OEU perfectly forgets the
+target class (FA=0.00%) while maintaining minimal degradation on RA (0.34% gap) and TA (0.51% gap). These results
+indicate that OEU scales effectively to more complex class-wise forgetting scenarios.
+
+                                                12
+
+======================== PDF 第 13 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+Table 3. Performance of various MU methods for ResNet18 with 4-bit quantization on Tiny-Imagenet. The unlearning scenario is random
+data forgetting(10%). Bold indicates the best performance and underline indicates the runner-up.
+
+                                                     Tiny-Imagenet                Method
+                         FA       RA        TA       MIA     AG↓
+                    Retrain       62.15         99.46         62.65         51.51       0
+                FT      74.45(12.30)   91.99(7.47)    56.57(6.08)   33.67(17.84)   10.92
+             GA      92.95(30.8)    93.01(6.45)    57.19(5.46)   11.77(39.74)   20.61
+                  IU       0.45(61.70)    0.51(98.95)    0.50(62.15)    0.45(51.06)   68.47
+               RL      60.05(2.10)   82.60(16.86)   51.59(11.06)   45.13(6.38)    9.10
+                    ℓ1-sparse    60.89(1.26)   75.44(24.02)   56.41(6.24)    46.94(4.57)    9.02
+                 SalUn     65.28(3.13)   81.70(17.76)   51.77(10.88)   37.08(14.43)   11.55
+             Q-MUL    72.10(9.95)    91.99(7.47)    56.53(6.32)    42.56(8.95)    8.17
+             OEU     60.84(1.31)    92.69(6.77)    54.01(8.64)    48.12(3.39)    5.03
+
+Table 4. Performance of various MU methods for ResNet18 with 4-bit quantization on CIFAR-10. The unlearning scenario is class-wise
+forgetting (one class is forgotten.). Bold indicates the best performance and underline indicates the runner-up.
+
+                                               CIFAR-10                 Method
+                         FA       RA        TA       MIA    AG↓
+                     Retrain        0.00          99.99         93.34         100.0       0
+                 FT      62.40(62.40)   99.95(0.04)    93.59(0.25)   94.67(5.33)   17.02
+             GA     11.20(11.20)   92.28(7.71)    85.49(7.85)   92.13(7.87)   8.66
+                  IU       0.00(0.00)    29.75(70.24)   28.92(64.42)   100.0(0.00)   33.67
+               RL       0.00(0.00)     99.87(0.12)    93.74(0.40)   100.0(0.00)   0.13
+                    ℓ1-sparse    0.00(0.00)     99.85(0.14)    93.51(0.17)   100.0(0.00)   0.08
+                  SalUn      0.04(0.04)     99.84(0.15)    93.56(0.22)   100.0(0.00)   0.10
+             Q-MUL     0.00(0.00)     99.69(0.30)    93.20(0.13)   100.0(0.00)   0.11
+             OEU      0.00(0.00)     99.82(0.17)    93.64(0.30)   100.0(0.00)   0.12
+
+Table 5. Performance of various MU methods for ResNet18 with 4-bit quantization on CIFAR-100. The unlearning scenario is class-wise
+forgetting (one class is forgotten). Bold indicates the best performance and underline indicates the runner-up.
+
+                                               CIFAR-100                Method
+                         FA       RA        TA       MIA     AG↓
+                    Retrain        0.00          99.96         70.63         100.0       0
+                FT       7.11(7.11)     99.79(0.27)    71.10(0.47)    100.0(0.00)    1.96
+             GA     37.56(37.56)   88.69(11.27)   61.75(8.88)   79.78(20.22)   19.48
+                  IU       0.00(0.00)    72.25(17.71)   51.22(19.41)   100.0(0.00)    9.28
+               RL       0.89(0.89)     99.97(0.01)    72.78(2.15)    100.0(0.00)    0.76
+                    ℓ1-sparse    0.00(0.00)     98.33(1.63)    70.06(0.57)    100.0(0.00)    0.55
+                 SalUn      1.33(1.33)     99.92(0.04)    73.12(2.49)    100.0(0.00)    0.97
+             Q-MUL     0.00(0.00)     99.50(0.46)    69.79(0.84)    100.0(0.00)    0.32
+             OEU      0.00(0.00)     99.62(0.34)    70.12(0.51)    100.0(0.00)    0.21
+
+
+
+A.6. Hyperparameter Settings and Training Details
+
+We follow the experimental settings of SalUn and Q-MUL for baseline methods, and all experiments use the SGD optimizer
+on a single NVIDIA RTX 4090 GPU. For FT and RL, we train for 10 epochs with learning rates searched within [1e-3,
+1e-1]. For GA, we train for 5 epochs with learning rates in [1e-5, 1e-3]. For IU, we search the parameter α associated with
+the Woodfisher Hessian inverse approximation within [1, 20]. For ℓ1-sparse, we search the parameter γ within [1e-6, 1e-4]
+and learning rates within [1e-3, 1e-1]. For SalUn, we train for 10 epochs with learning rates in [5e-4, 5e-2] and sparsity
+
+                                                13
+
+======================== PDF 第 14 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+ratios in [0.1, 0.9]. For Q-MUL, we train for 10 epochs with learning rates in the range [1e-3, 1e-1]. For our proposed
+OEU, we train for 10 epochs with learning rates searched within [1e-2, 1e-1] and a batch size of 256, with the orthogonality
+strength α set to 1.0 by default across all datasets and forgetting scenarios.
+
+A.7. Theoretical Analysis of Entropy-Guided Unlearning
+
+This section provides theoretical justifications for entropy-guided unlearning by analyzing its properties compared to label
+manipulation methods.
+
+A.7.1. PROBLEM SETUP
+
+Consider a K-class classification problem. For a forget sample (x, y) with true label y ∈{1, . . . , K}, the model produces
+a prediction distribution pθ(·|x) = softmax(fθ(x)). We define the uniform distribution U(k) = K1  as the reference
+distribution representing the ideal “forgotten” state, where the model has no knowledge about the sample.
+
+A.7.2. ANALYSIS OF LABEL MANIPULATION METHODS
+
+Label manipulation methods assign incorrect labels to forget samples and train the model via cross-entropy loss.
+Definition A.1 (Random Labels). For a forget sample (x, y), Random Labels assigns a random incorrect label ˜y ∼
+Uniform({1, . . . , K} \ {y}) and minimizes:
+
+                                    LRL(θ; x, ˜y) = −log pθ(˜y|x)                                        (13)
+
+Definition A.2 (Similar Labels). Similar Labels assigns the most similar incorrect label ˜y = arg maxk̸=y sim(k, y) and
+minimizes the same cross-entropy loss.
+
+Proof of Theorem 4.1. The cross-entropy loss LRL(θ; x, ˜y) = −log pθ(˜y|x) is minimized when pθ(˜y|x) = 1. Under the
+constraint PKk=1 pθ(k|x) = 1, the optimal distribution is:
+
+                                 (                                                       1  k = ˜y
+                                       p∗(k|x) = 1[k = ˜y] =                                                  (14)
+                                                       0  k ̸= ˜y
+
+
+The entropy of this distribution is:
+
+
+                            K
+                          H(p∗) = − X p∗(k|x) log p∗(k|x) = −1 · log 1 = 0                             (15)
+
+                                      k=1
+
+The KL divergence from the uniform distribution is:
+
+                                   K          p∗(k)
+                              DKL(p∗∥U) = X p∗(k) log
+                                                         U(k)
+                                                k=1
+                                                      1
+                             = 1 · log   = log K                                     (16)
+                                          1/K
+
+
+
+Remark A.3. The optimal solution p∗(k|x) = 1[k =  ˜y] indicates that label manipulation methods train the model to
+memorize incorrect labels with full confidence. This does not achieve genuine forgetting but rather replaces correct
+memorization with incorrect memorization.
+
+A.7.3. ANALYSIS OF ENTROPY-GUIDED UNLEARNING
+
+Entropy-guided unlearning maximizes the prediction entropy on forget samples.
+
+                                                14
+
+======================== PDF 第 15 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+Definition A.4 (Entropy-Guided Unlearning). For a forget sample x, entropy-guided unlearning minimizes the negative
+entropy:
+                                       K
+                        LME(θ; x) = −H(pθ(·|x)) = X pθ(k|x) log pθ(k|x)                            (17)
+
+                                                     k=1
+
+Proof of Theorem 4.2. We seek to maximize entropy H(p) = −PKk=1 pk log pk subject to PKk=1 pk = 1 and pk ≥0.
+Using the method of Lagrange multipliers:
+
+                               K           K    !
+                                 L(p, λ) = − X pk log pk + λ X pk −1                                   (18)
+
+                                          k=1              k=1
+
+Taking the derivative with respect to pk and setting it to zero:
+
+                             ∂L
+                          = −log pk −1 + λ = 0                                        (19)
+                                     ∂pk
+
+This yields pk = eλ−1, which is constant for all k. Applying the constraint PKk=1 pk = 1:
+
+                                                            1
+                     K · eλ−1 = 1 =⇒eλ−1 =                                           (20)
+                                   K
+
+Therefore, the optimal distribution is:
+                                            1
+                                       p∗(k|x) =     ,  ∀k ∈{1, . . . , K}                                      (21)
+                          K
+
+The entropy of the uniform distribution is:
+
+                                  K
+                                                1     1
+                                 H(p∗) = − X    log  = log K                                      (22)
+                            K  K
+                                              k=1
+
+The KL divergence from the uniform distribution is:
+
+                                   K
+                                                   1   1/K
+                              DKL(p∗∥U) = X    log   = 0                                     (23)
+                              K   1/K
+                                                k=1
+
+
+
+A.7.4. EXPECTED BIAS ANALYSIS
+
+We further analyze the expected behavior of Random Labels when considering the randomness in label assignment.
+Proposition A.5 (Expected Target Distribution). Let ˜y be sampled uniformly from {1, . . . , K} \ {y}. The expected target
+distribution induced by Random Labels is:
+
+                                 (                                                       0     k = y
+                                          ¯p(k|x) = E˜y[1[k = ˜y]] =     1                                             (24)
+                                               K−1  k ̸= y
+
+Proof. For k = y, since ˜y ̸= y by construction, we have 1[k = ˜y] = 0 with probability 1.
+For k ̸= y, the probability that ˜y = k is K−11   since ˜y is sampled uniformly from the K −1 incorrect labels.
+Proposition A.6 (Bias of Expected Distribution). The expected target distribution ¯p has non-zero divergence from the
+uniform distribution:
+                                K
+                                    DKL(¯p∥U) = log    > 0                                        (25)
+                               K −1
+
+                                                15
+
+======================== PDF 第 16 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+Proof. Computing the KL divergence:
+
+                               K
+                                                                      ¯p(k)
+                            DKL(¯p∥U) = X ¯p(k) log
+                                                  U(k)
+                                          k=1
+                                                                  ¯p(y)                   ¯p(k)
+                         = ¯p(y) log   + X ¯p(k) log                                    (26)
+                                               U(y)             U(k)
+                                                                          k̸=y
+
+For k = y: ¯p(y) = 0, and by convention 0 · log 0 = 0, so this term contributes 0.
+For k ̸= y (total of K −1 terms):
+
+                              1     1/(K −1)              1     K
+         X        log       = (K −1) ·            · log
+                 K −1     1/K        K −1   K −1
+                                  k̸=y
+                                K
+                              = log                                                    (27)
+                               K −1
+
+Since K ≥2, we have K−1K > 1, thus DKL(¯p∥U) > 0.
+Remark A.7. Proposition A.6 reveals that even in expectation, Random Labels introduces a systematic bias: the true class
+y is suppressed to probability 0 rather than the uniform K1 . This asymmetry may be exploited by membership inference
+attacks to distinguish forgotten samples from unseen samples.
+
+A.8. Theoretical Analysis of Gradient Orthogonal Projection
+
+This section provides detailed proofs for the theoretical results presented in Section 4. We establish that Gradient Orthogonal
+Projection (GOP) guarantees conflict-free optimization under first-order approximation.
+
+A.8.1. PRELIMINARIES AND ASSUMPTIONS
+Consider a quantized neural network with parameters θ ∈Rd. Let Lf(θ) and Lr(θ) denote the forgetting and retain losses,
+respectively, with corresponding gradients:
+
+                                         gf = ∇θLf(θ),   gr = ∇θLr(θ)                                       (28)
+
+Assumption A.8. The retain gradient is non-vanishing, i.e., gr ̸= 0. This assumption holds in practice when the retain set
+contains sufficient samples for meaningful gradient computation.
+
+The projected forgetting gradient is defined as:
+                                   g⊥f = gf −⟨gf, gr⟩ gr                                            (29)
+                                                      ∥gr∥2
+
+A.8.2. PROOF OF THEOREM 4.3 (RETAIN PRESERVATION)
+
+We first establish a key lemma showing that the projected gradient is orthogonal to the retain gradient.
+Lemma A.9 (Orthogonality). The projected gradient g⊥f  satisfies ⟨g⊥f , gr⟩= 0.
+
+Proof. By the definition of g⊥f in Eq. (29):
+                                 ⟨g⊥f , gr⟩=  gf −⟨gf, gr⟩ gr, gr
+                                                      ∥gr∥2
+                                                               gr⟩                          = ⟨gf, gr⟩−⟨gf,    ⟨gr, gr⟩
+                                                         ∥gr∥2
+                                                               gr⟩                          = ⟨gf, gr⟩−⟨gf,       · ∥gr∥2
+                                                         ∥gr∥2
+                          = ⟨gf, gr⟩−⟨gf, gr⟩= 0                                        (30)
+
+                                                16
+
+======================== PDF 第 17 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+
+
+Proof of Theorem 4.3. The orthogonality ⟨g⊥f , gr⟩= 0 follows directly from Lemma A.9. To show retain preservation, we
+apply Taylor’s first-order expansion of Lr at θ:
+
+                                      Lr(θ′) = Lr(θ −ηg⊥f )
+                                  ≈Lr(θ) + ⟨∇θLr(θ), −ηg⊥f ⟩
+                          = Lr(θ) −η⟨gr, g⊥f ⟩
+                          = Lr(θ) −η · 0 = Lr(θ)                                         (31)
+
+Thus, the retain loss remains unchanged under first-order approximation.
+
+A.8.3. PROOF OF THEOREM 4.4 (FORGETTING EFFECTIVENESS)
+
+Proof. We prove the two claims sequentially.
+Claim 1: g⊥f  ̸= 0 when gf is not collinear with gr.
+Suppose for contradiction that g⊥f = 0. By Eq. (29):
+
+                                                     ⟨gf, gr⟩
+                                             gf =         gr = λgr                                            (32)
+                                                 ∥gr∥2
+
+where λ = ⟨gf∥gr∥2,gr⟩ . This implies gf is collinear with gr, contradicting the assumption. Therefore, g⊥f  ̸= 0.
+Claim 2: ⟨gf, g⊥f ⟩= ∥gf∥2 sin2 ϕ > 0.
+Expanding the inner product:
+
+                                          ⟨gf, g⊥f ⟩=  gf, gf −⟨gf, gr⟩ gr
+                                                          ∥gr∥2
+                           = ∥gf∥2 −⟨gf, gr⟩2                                           (33)
+                                                         ∥gr∥2
+
+Let ϕ denote the angle between gf and gr. By the definition of cosine:
+
+                                                           ⟨gf, gr⟩
+                                              cos ϕ =                                                        (34)
+                                                 ∥gf∥∥gr∥
+
+Substituting:
+
+                                       ⟨gf, g⊥f ⟩= ∥gf∥2 −∥gf∥2∥gr∥2 cos2 ϕ
+                                                           ∥gr∥2
+                          = ∥gf∥2(1 −cos2 ϕ)
+                          = ∥gf∥2 sin2 ϕ                                                   (35)
+
+Since gf and gr are non-collinear, ϕ /∈{0, π}, implying sin ϕ ̸= 0. Combined with gf ̸= 0, we have ⟨gf, g⊥f ⟩> 0.
+Descent guarantee. Applying Taylor’s expansion to Lf:
+
+                              Lf(θ −ηg⊥f ) ≈Lf(θ) −η⟨gf, g⊥f ⟩< Lf(θ)                                 (36)
+
+for η > 0, since ⟨gf, g⊥f ⟩> 0.
+
+                                                17
+
+======================== PDF 第 18 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+A.9. Performance evaluation on MobileNetV2
+
+To further validate the generalizability of OEU, we conduct experiments on MobileNetV2 with 2-bit weight quantization
+across CIFAR-10, CIFAR-100, and SVHN datasets under random data forgetting scenarios. As shown in Tables 6, 7, and 8,
+OEU consistently achieves the lowest average gap across all datasets and forgetting ratios, demonstrating its effectiveness
+on lightweight architectures with aggressive quantization.
+
+
+
+
+
+                                                18
+
+======================== PDF 第 19 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+
+
+
+
+Table 6. Performance of various MU methods for MobileNetV2 with activations kept at full precision and weights quantized to 2 bits on
+CIFAR-10. The unlearning scenario is random data forgetting. Bold indicates the best performance and underline indicates the runner-up.
+A performance gap against Retrain is provided in (•).
+
+                                               CIFAR-10
+               Method                        FA       RA         TA        MIA     AG↓
+                       The proportion of forgotten data samples to all samples is 10%
+                   Retrain       85.97         94.39          85.49          18.60        0
+               FT      93.64 (7.67)    95.42 (1.03)    87.37 (1.88)    9.62 (8.98)     4.89
+            GA      93.97 (8.00)    94.87 (0.48)    87.21 (1.72)    8.49 (10.11)    5.08
+                 IU      13.13(72.84)   14.28(80.11)   13.97(71.52)   84.51(66.91)    75.85
+              RL      85.82 (0.15)    87.46 (6.93)    84.05 (1.44)    17.27 (1.33)    2.46
+                   ℓ1-sparse   93.17 (7.20)    95.15 (0.76)    87.66 (2.17)    9.89 (8.71)     4.71
+                SalUn     90.87(4.90)    92.08(2.31)     86.63(1.14)     15.71(2.89)     2.81
+            Q-MUL    90.71(4.74)    93.60(0.79)     87.51(2.02)     15.00(3.60)     2.79
+            OEU     88.00(2.03)    91.86(2.53)     85.98(0.49)     16.78(1.82)    1.72
+                                               CIFAR-10
+               Method                        FA       RA         TA        MIA     AG↓
+                       The proportion of forgotten data samples to all samples is 30%
+                   Retrain       84.87         93.87          84.19          19.90        0
+               FT      91.53 (6.66)    93.17 (0.70)    86.21 (2.02)    12.07 (7.83)    4.30
+            GA      89.16 (4.29)    89.40 (4.47)    82.79 (1.40)    15.20 (4.70)    3.72
+                 IU      12.67(72.20)   13.11(80.76)   12.65(71.54)   86.47(66.57)    72.77
+              RL      88.04 (3.17)    88.86 (5.01)    84.26 (0.07)    21.81(1.91)     2.54
+                   ℓ1-sparse   92.90 (8.03)    94.53 (0.66)    86.80 (2.61)    10.76 (9.14)    5.11
+                SalUn    95.20(10.33)    96.83(2.96)     90.49(6.30)     16.87(3.03)     5.66
+            Q-MUL    87.56(2.69)    89.24(4.63)     85.63(1.44)     18.56(1.34)     2.53
+            OEU     86.75(1.88)    89.93(3.94)     82.94(1.25)     20.27(0.37)    1.86
+                                               CIFAR-10
+               Method                        FA       RA         TA        MIA     AG↓
+                       The proportion of forgotten data samples to all samples is 50%
+                   Retrain       82.27         94.76          82.17          22.17        0
+               FT      89.50 (7.23)    91.26 (3.50)    84.32 (2.15)    13.05 (9.12)     5.5
+            GA      75.99 (6.28)   76.07 (18.69)   72.07 (10.10)   24.30 (2.13)     9.3
+                 IU      21.89(60.38)   22.03(72.73)   21.67(60.50)   78.52(56.35)    62.49
+              RL      86.81 (4.54)    87.85 (6.91)    83.70(1.53)    17.98 (4.19)    4.29
+                   ℓ1-sparse   6.64 (11.09)    95.70 (0.94)    87.11 (4.94)   10.00 (12.17)    7.29
+                SalUn     87.98(5.71)    88.95(5.81)     84.56(2.39)     15.04(7.13)     5.26
+            Q-MUL    87.08(4.81)    89.48(5.28)     84.76(2.59)     22.24(0.07)     3.19
+            OEU     87.62(5.35)    90.77(3.99)     83.37(1.20)     21.33(0.84)    2.85
+
+
+
+
+
+                                                19
+
+======================== PDF 第 20 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+
+
+
+
+Table 7. Performance of various MU methods for MobileNetV2 with activations kept at full precision and weights quantized to 2 bits
+on CIFAR-100. The unlearning scenario is random data forgetting. Bold indicates the best performance and underline indicates the
+runner-up. A performance gap against Retrain is provided in (•).
+
+                                               CIFAR-100
+               Method                        FA        RA         TA        MIA     AG↓
+                       The proportion of forgotten data samples to all samples is 10%
+                   Retrain       61.53          89.44          60.90          40.20        0
+               FT      82.89 (21.36)   88.18 (1.26)    63.56 (2.66)   19.11 (21.09)   11.59
+            GA     83.82 (22.29)   85.20 (4.24)    61.80 (0.90)   17.33 (22.87)   12.58
+                 IU       2.40(59.13)     2.81(86.63)     2.76(58.14)     2.62(37.58)    60.37
+              RL     81.53 (20.00)   88.41 (1.03)    63.26 (2.36)   26.38 (13.82)    9.30
+                  ℓ1-sparse   81.31 (19.78)   85.97 (3.47)    62.33 (1.43)   19.98 (20.22)   11.23
+                SalUn     82.22(20.69)    88.15(1.29)     63.26(2.36)    27.38(12.82)    9.29
+            Q-MUL    69.96(8.43)     80.25(9.19)     62.29(1.39)     33.15(7.05)    6.52
+            OEU      69.29(7.76)     85.79(3.65)     61.72(0.82)     39.27(0.93)    3.29
+                                               CIFAR-100
+               Method                        FA        RA         TA        MIA     AG↓
+                       The proportion of forgotten data samples to all samples is 30%
+                   Retrain       53.90          83.38          54.97          46.46        0
+               FT      79.36 (25.46)   86.34 (2.96)    62.04 (7.07)   22.03 (24.43)   14.98
+            GA     66.02 (12.12)   66.34 (17.04)   51.44 (3.53)   24.67 (21.79)   13.62
+                 IU       6.68(47.22)     7.30(76.08)     6.75(48.22)    94.62(48.16)    54.92
+              RL     77.16 (23.26)    83.49(0.11)    61.31 (6.34)    25.43(21.03)    12.69
+                  ℓ1-sparse   82.53 (28.63)   88.77 (5.39)    63.30 (8.33)   19.75 (26.71)   17.27
+                SalUn     76.26(22.36)    83.46(0.08)     61.19(6.22)    26.08(20.38)    12.26
+            Q-MUL    67.77(13.87)    79.60(3.78)     61.99(7.02)    34.87(11.59)    9.07
+            OEU     65.59(11.69)    78.09(5.29)     55.68(0.71)     51.55(5.09)    5.70
+                                               CIFAR-100
+               Method                        FA        RA         TA        MIA     AG↓
+                       The proportion of forgotten data samples to all samples is 50%
+                   Retrain       49.20          85.03          50.21          51.44        0
+               FT      83.76 (34.56)   91.24 (6.21)   63.92 (13.71)   20.10(31.34)    18.65
+            GA      41.20 (8.00)   40.60 (44.43)   33.94 (16.27)   46.70 (5.44)    18.54
+                 IU       1.40(47.80)     1.51(83.52)     1.26(48.95)     22(29.44)     52.43
+              RL     75.36 (26.16)    80.92(4.11)    60.57(10.36)   33.59(17.85)    14.62
+                  ℓ1-sparse   18.69 (19.78)   85.97 (3.47)    62.33 (1.43)   19.98 (20.22)   11.23
+                SalUn     73.56(24.36)    79.50(5.53)     59.31(9.10)    34.78(16.66)    13.91
+            Q-MUL    67.93(18.73)    78.83(6.20)    60.38(10.17)    44.41(7.03)    10.53
+            OEU     64.41(15.21)    75.56(9.47)     52.80(2.59)     47.50(3.94)    7.80
+
+
+
+
+
+                                                20
+
+======================== PDF 第 21 页 ========================
+                  Forget by Uncertainty: Orthogonal Entropy Unlearning for Quantized Neural Networks
+
+
+
+
+
+Table 8. Performance of various MU methods for MobileNetV2 with activations kept at full precision and weights quantized to 2 bits on
+SVHN. The unlearning scenario is random data forgetting. Bold indicates the best performance and underline indicates the runner-up. A
+performance gap against Retrain is provided in (•).
+
+                                     SVHN
+                 Method                         FA       RA        TA       MIA     AG↓
+                       The proportion of forgotten data samples to all samples is 10%
+                     Retrain       94.25         99.99         94.17          9.33       0
+                 FT      99.12 (4.87)   99.98 (0.01)   94.71 (0.54)    2.18 (7.15)    3.14
+             GA     99.21 (4.96)   99.43 (0.56)   94.84 (0.67)   10.77 (1.44)   1.91
+                  IU      98.65 (4.40)   98.83 (1.16)   93.96 (0.21)    2.43 (6.90)    3.17
+               RL     96.81 (2.56)   98.36 (1.63)   94.46 (0.29)   20.20 (10.87)   3.84
+                    ℓ1-sparse   99.07 (4.82)   99.97 (0.02)   94.67 (0.50)    2.68 (6.65)    3.00
+                  SalUn    96.42 (2.17)   98.19 (1.80)   94.51 (0.34)   20.39 (11.06)   3.84
+             Q-MUL   96.47 (2.22)   99.48 (0.51)   94.96 (0.79)    9.16 (0.17)    0.92
+             OEU     94.40(0.15)   99.82(0.17)   94.25(0.08)    11.17(1.84)    0.56
+                                     SVHN
+                 Method                         FA       RA        TA       MIA     AG↓
+                       The proportion of forgotten data samples to all samples is 30%
+                     Retrain       93.12         100.0         93.81         11.21       0
+                 FT      99.28 (6.16)   99.98 (0.02)   94.72 (0.91)    2.13 (9.08)    4.04
+             GA     99.27 (6.15)   99.46 (0.54)   94.77 (0.96)   1.08 (10.13)   4.45
+                  IU      98.63 (5.41)   98.83 (1.17)   93.05 (0.76)    2.92 (8.29)    3.91
+               RL     94.55 (1.43)   96.99 (3.01)   93.79 (0.02)   22.33 (11.12)   3.90
+                    ℓ1-sparse   99.21 (6.09)   99.96 (0.04)   94.81 (1.00)    2.53 (8.68)    3.95
+                  SalUn    95.33 (2.21)   96.75 (3.25)   93.88 (0.07)   25.44 (14.23)   4.94
+             Q-MUL   96.80 (3.68)   99.46 (0.54)   94.95 (1.14)   12.77 (1.56)   1.73
+             OEU     95.83(2.71)   99.83(0.17)   93.94(0.13)     9.66(1.55)    1.14
+                                     SVHN
+                 Method                         FA       RA        TA       MIA     AG↓
+                       The proportion of forgotten data samples to all samples is 50%
+                     Retrain       92.57         95.83         93.19         12.46       0
+                 FT      99.26 (6.69)   99.98 (4.15)   94.59 (1.40)   2.03 (10.43)   5.67
+             GA     99.31 (6.74)   99.48 (3.65)   94.75 (1.56)   10.53 (1.93)   3.47
+                  IU      97.82 (5.25)   97.87 (2.04)   92.90 (0.29)    3.92 (8.54)    4.03
+               RL     94.23 (1.66)   95.36 (0.47)   93.05 (0.14)   32.43 (19.97)   5.56
+                    ℓ1-sparse   99.27 (6.70)   99.97 (4.14)   94.57 (1.38)   2.44 (10.02)   5.56
+                  SalUn    93.93 (1.36)   95.02 (0.81)   92.87 (0.32)   33.78 (21.32)   5.95
+             Q-MUL   95.30 (2.73)   98.50 (2.67)   94.31 (1.12)   19.90 (7.44)   3.49
+             OEU     95.33(2.76)   99.79(3.96)   93.45(0.26)    12.18(0.28)    1.82
+
+
+
+
+
+                                                21

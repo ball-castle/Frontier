@@ -1,0 +1,672 @@
+KH-A048 | An Empirical Study of Training Self-Supervised Vision Transformers
+来源：https://arxiv.org/abs/2104.02057
+本地PDF：专题文献/何恺明/KH-A048_An_Empirical_Study_of_Training_Self_Supervised_Vision_Transformers_ICCV2021.pdf
+SHA-256：5f75bd90555f8d549e2b57328ede2f4383757114c8d9fc7955f959d62723b1c7
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+        An Empirical Study of Training Self-Supervised Vision Transformers
+
+                                  Xinlei Chen∗     Saining Xie∗    Kaiming He
+                                     Facebook AI Research (FAIR)
+
+                                     Code: https://github.com/facebookresearch/moco-v3
+
+                        Abstract                                 framework               model         params     acc. (%)
+                                                                                                 linear probing:
+            This paper does not describe a novel method. Instead,        iGPT [9]                iGPT-L       1362M      69.0
+              it studies a straightforward, incremental, yet must-know        iGPT [9]               iGPT-XL     6801M      72.0
+         baseline given the recent progress in computer vision: self-      MoCo v3                ViT-B         86M      76.7
+         supervised learning for Vision Transformers (ViT). While      MoCo v3                ViT-L        304M      77.6
+                                                            MoCo v3                ViT-H        632M      78.1
+          the training recipes for standard convolutional networks2021                                                       MoCo v3               ViT-BN-H     632M      79.1
+        have been highly mature and robust, the recipes for ViT are      MoCo v3                ViT-BN-L/7    304M      81.0
+          yet to be built, especially in the self-supervised scenarios         end-to-end ﬁne-tuning:
+        where training becomes more challenging. In this work, we        masked patch pred. [16]    ViT-B         86M      79.9†Aug   go back to basics and investigate the effects of several fun-      MoCo v3                ViT-B         86M      83.2
+16   damentalobserve thatcomponentsinstability foris atrainingmajor issueself-supervisedthat degradesViT.accu-We      TableMoCo1. v3 State-of-the-artViT-LSelf-supervised304MTransformers84.1   in
+          racy, and it can be hidden by apparently good results. We     ImageNet classiﬁcation, evaluated by linear probing (top panel)
+          reveal that these results are indeed partial failure, and they      or end-to-end ﬁne-tuning (bottom panel).  Both iGPT [9] and
+        can be improved when training is made more stable. We     masked patch prediction [16] belong to the masked auto-encoding
+                                                                          paradigm. MoCo v3 is a contrastive learning method that com-        benchmark ViT results in MoCo v3 and several other self-
+                                                                               pares two (224×224) crops. ViT-B, -L, -H are the Vision Trans-
+         supervised frameworks, with ablations in various aspects.
+                                                                           formers proposed in [16]. ViT-BN is modiﬁed with BatchNorm,[cs.CV]  We discuss the currently positive evidence as well as chal-                                                                     and “/7” denotes a patch size of 7×7. †: pre-trained in JFT-300M.
+         lenges and open questions. We hope that this work will pro-
+         vide useful data points and experience for future research.
+                                                                         others [10, 18, 7].
+         1. Introduction                                           Unlike standard convolutional networks whose training
+                                                                            practice has been extensively studied thanks to continuous
+           Unsupervised  pre-training has revolutionized  natural    community effort, ViT models are new and their recipes
+         language processing (NLP) [37, 15, 38, 4]. In computer vi-      are yet to be established. In this work, we go back to ba-
+          sion, the un-/self-supervised pre-training paradigms differ      sics and investigate the fundamental components of train-
+        from their NLP counterparts in at least two aspects: (i) the     ing deep neural networks: the batch size, learning rate, and
+          learners in NLP are masked auto-encoders, while in vision      optimizer. We ﬁnd that under various cases, instability is a
+          the recently popular choices are Siamese networks (e.g.,     major issue that impacts self-supervised ViT training.
+          [20, 10, 18, 7]); (ii) the backbone architectures in NLP are         Interestingly, we observe that unstable ViT training may
+          self-attentional Transformers [43], while in vision the com-     not result in catastrophic failure (e.g., divergence); instead,
+       mon choice is convolutional [28]—yet non-attentional—        it can cause mild degradation in accuracy (e.g., 1∼3%).arXiv:2104.02057v4        deep residual networks (ResNets) [21]. To complete the big     Such a degree of degradation may not be noticeable, unless
+          picture of self-supervised learning in vision, and towards     a more stable counterpart is available for comparison. To
+          closing the gap of pre-training methodology between vision      the best of our knowledge, this phenomena is rare in the lit-
+        and language,  it is of scientiﬁc merit to investigate these      erature of training convolutional networks1, and we believe
+          differences.                                                           this problem and its hidden degradation are worth noticing.
+            This work focuses on training Transformers with the       To demonstrate the possible harm of  instability, we
+         leading self-supervised frameworks in vision.  This in-      investigate a simple trick that can improve  stability in
+          vestigation is a straightforward extension given the recent      practice.  Based on an empirical observation on gradient
+         progress on Vision Transformers (ViT) [16]. In contrast to     changes, we freeze the patch projection layer in ViT, i.e.,
+          prior works [9, 16] that train self-supervised Transformers    we use ﬁxed random patch projection. We empirically show
+         with masked auto-encoding, we study the frameworks that      that this trick alleviates the instability issue in several sce-
+          are based on Siamese networks, including MoCo [20] and      narios and consistently increases accuracy.
+
+                 *: equal contribution.                                                  1See also postscript on a related discussion.
+
+======================== PDF 第 2 页 ========================
+  We benchmark and ablate self-supervised ViT in a va-     methods suggest that it is of central importance to learn in-
+riety of cases.  We provide ViT results in several self-      variant features by matching positive samples.
+supervised frameworks. We conduct ablations on architec-                                                       Transformers. Transformers [43] were originally intro-
+ture designs and discuss the implications. Furthermore, we                                                      duced for machine translation and later became a dominant
+explore scaling up the ViT models, including the non-trivial                                                      backbone in NLP [37, 15, 38, 4].  The long-range, self-
+ViT-Large and ViT-Huge [16] — the latter has 40× more                                                                    attentional behavior makes Transformers an effective tool
+computation than ResNet-50 [21]. Based on these experi-                                                            given the non-local, relational nature of languages.
+mental results, we discuss both the currently positive evi-                                                          There have been continuous  efforts on generalizing
+dence as well as the challenges and open questions.                                                          Transformers to computer vision [44, 5, 39, 49, 6, 16].
+  We report that self-supervised Transformers can achieve                                                  The recent work on Vision Transformers (ViT) [16] greatly
+strong results using a contrastive learning framework, com-                                                         pushes this frontier. ViT is purely Transformer-based, rather
+pared against masked auto-encoding (Table 1). This behav-                                                            than interlaced with non-degenerated (i.e., non-1×1) convo-
+ior of Transformers differs from the existing trend in NLP.                                                                      lutions.2 This largely closes the architectural gap between
+Moreover, as a promising signal, our bigger self-supervised                                         NLP and vision. ViT achieves compelling accuracy in su-
+ViT can achieve better accuracy, unlike the ImageNet-                                                             pervised learning, especially with large-scale data and high-
+supervised ViT in [16] whose accuracy degrades if get-                                                              capacity models. Given these properties, we believe ViT is
+ting bigger. For instance, for the very big ViT-Large, our                                                          a must-study baseline for self-supervised learning in com-
+self-supervised pre-training can outperform its supervised                                                               puter vision.
+pre-training counterpart for  transfer learning in certain
+cases. This presents a proof-of-concept scenario where self-     Self-supervised Transformers for vision. In pioneering
+supervised pre-training is needed.                          works [9, 16], training self-supervised Transformers for vi-
+   In addition, we report  that our self-supervised ViT     sion problems in general follows the masked auto-encoding
+models have competitive results vs. the big convolutional     paradigm in NLP [37, 15] (Table 1). iGPT [9] masks and
+ResNets in prior art [11, 18]. On one hand, this compari-      reconstructs pixels, and the self-supervised variant of ViT
+son shows the potential of ViT, especially considering that      in [16] masks and reconstructs patches.  In this work, we
+it achieves these results using relatively “fewer inductive bi-     focus on training Transformers in the contrastive/Siamese
+ases” [16]. On the other hand, we suggest that there could     paradigm, in which the loss is not deﬁned for reconstruct-
+be room for self-supervised ViT models to further improve.     ing the inputs.
+As one example, we observe that removing the position em-
+                                                          3. MoCo v3bedding in ViT only degrades accuracy by a small margin.
+This reveals that self-supervised ViT can learn strong rep-                                          We introduce a “MoCo v3” framework that facilitates
+resentations without the positional inductive bias, but it also                                                          our study. MoCo v3 is an incremental improvement of
+implies that the positional information has not been sufﬁ-                                         MoCo v1/2 [20, 12], and we strike for a better balance be-
+ciently exploited.                                                      tween simplicity, accuracy, and scalability. The pseudocode
+   In summary, we believe that the evidence, challenges,                                                              of MoCo v3 is in Alg. 1, described next.
+and open questions in this study are worth knowing, if self-                                                 As common practice (e.g., [20, 10]), we take two crops
+supervised Transformers will close the gap in pre-training                                                                   for each image under random data augmentation. They are
+between vision and language. We hope our data points and                                                       encoded by two encoders, fq and fk, with output vectors q
+experience will be useful to push this frontier.                                                      and k.  Intuitively, q behaves like a “query” [20], and the
+                                                            goal of learning is to retrieve the corresponding “key”. This
+2. Related Work                                                     is formulated as minimizing a contrastive loss function [19].
+                                        We adopt the form of InfoNCE [34]:Self-supervised visual representation learning. In com-
+puter vision, contrastive learning [19] has become increas-                               exp(q·k+/τ)
+                                                           Lq = −log                                                  .      (1)ingly successful for self-supervised learning, e.g., [45, 34,                                                                           exp(q·k+/τ) + X exp(q·k−/τ)
+22, 2, 20, 10].  The methodology is to learn representa-                                  k−
+tions that attract similar (positive) samples and dispel dif-
+                                                     Here k+ is fk’s output on the same image as q, known asferent (negative) samples. The representations from con-
+                                                                    q’s positive sample. The set {k−} consists of fk’s outputstrastive self-supervised pre-training can outperform their
+supervised counterparts in certain tasks [20, 10].                2We argue that it is imprecise to simply compare self-attention against
+   Contrastive learning is commonly instantiated as some       “convolutions”. Convolutions [28] by deﬁnition have several properties:
+forms of Siamese networks [3]. Recently, a series of works       weight-sharing, locally-connected, translation-equivariant. All projection
+                                                                                  layers in a self-attention block have all these properties of convolutions,
+[18, 7, 13] retain the Siamese architectures but eliminate      and are equivalent to 1×1 convolutions. The counterpart of self-attention
+the requirement of negative samples. The success of these        is more appropriately the non-degenerated (e.g., 3×3) convolutions.
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+Algorithm 1 MoCo v3: PyTorch-like Pseudocode                                    50
+
+# f_q: encoder: backbone + proj mlp + pred mlp
+# f_k: momentum encoder: backbone + proj mlp                                                                                                                                                                                                                                                                                                                                                                                                                                                           accuracy# m: momentum coefficient                                                                                                         batch=1024
+# tau: temperature                                                                                                                       kNN                                               batch=2048
+                                                                                                                                             batch=4096
+for x in loader: # load a minibatch x with N samples                                                                 batch=6144
+   x1, x2 = aug(x), aug(x) # augmentation                                            0
+   q1, q2 = f_q(x1), f_q(x2) # queries: [N, C] each                           0                                  epochs                                 100
+   k1, k2 = f_k(x1), f_k(x2) # keys: [N, C] each                   batch       1024       2048       4096       6144
+   loss = ctr(q1, k2) + ctr(q2, k1) # symmetrized                 linear acc.      71.5         72.6         72.2         69.7
+   loss.backward()
+                                                                  Figure 1.  Training curves of different batch sizes (MoCo v3,
+   update(f_q) # optimizer update: f_q                      ViT-B/16, 100-epoch ImageNet, AdamW, lr=1.0e-4).
+   f_k = m*f_k + (1-m)*f_q # momentum update: f_k
+
+# contrastive loss
+def ctr(q, k):                                                     training. In Sec. 4.1, we study how the basic factors inﬂu-
+   logits = mm(q, k.t()) # [N, N] pairs
+   labels = range(N) # positives are in diagonal          ence stability. The curves suggest that the training can be
+   loss = CrossEntropyLoss(logits/tau, labels)              “partially successful”, or in other words, “partially failed”.
+   return 2 * tau * loss
+                                                              In Sec. 4.2, we explore a simple trick that can improve sta-
+Notes: mm is matrix multiplication. k.t() is k’s transpose. The predic-       bility. As a result, the accuracy is improved in various cases.
+tion head is excluded from f k (and thus the momentum update).
+                                                               4.1. Empirical Observations on Basic Factors
+
+                                                    Batch size. ViT models in [16] are by design computa-
+from other images, known as q’s negative samples. τ is a
+                                                                    tionally heavy (see Table 2 and 3), and large-batch train-
+temperature hyper-parameter [45] for ℓ2-normalized q, k.
+                                                             ing [17, 47, 48] is a desirable solution to big ViT models.
+   Following [46, 22, 2, 10], in MoCo v3 we use the keys
+                                    A large batch is also beneﬁcial for accuracy in recent self-
+that naturally co-exist in the same batch. We abandon the
+                                                             supervised learning methods [10, 18, 7]. Fig. 1 presents the
+memory queue [20], which we ﬁnd has diminishing gain if
+                                                                   training curves with different batch sizes.
+the batch is sufﬁciently large (e.g., 4096). With this simpli-
+                                      A batch of 1k and 2k produces reasonably smooth
+ﬁcation, the contrastive loss in (1) can be implemented by
+                                                                curves, with 71.5% and 72.6% linear probing accuracy. In
+a few lines of code: see ctr(q, k) in Alg. 1. We adopt a
+                                                                        this regime, the larger batch improves accuracy thanks to
+symmetrized loss [18, 7, 13]: ctr(q1, k2)+ctr(q2, k1).
+                                                   more negative samples [20, 10]. The curve of a 4k batch
+  Our encoder fq consists of a backbone (e.g., ResNet,                                                    becomes noticeably unstable: see the “dips” in Fig. 1. It has
+ViT), a projection head [10], and an extra prediction head
+                                                  72.2% linear probing accuracy. Although this seems to be
+[18]; the encoder fk has the backbone and projection head,                                                          a marginal decrease vs. the 2k batch, its accuracy is harmed
+but not the prediction head. fk is updated by the moving-                                                    by the instability, as we will show in the next subsection.
+average of fq [20], excluding the prediction head.                                                    The curve of a 6k batch has worse failure patterns (big
+  As a reference, we examine the MoCo v3 accuracy with
+                                                              dips in Fig. 1). We hypothesize that the training is partially
+ResNet-50 (R50) (detailed in appendix). This table com-
+                                                                 restarted and jumps out of the current local optimum, then
+pares the linear probing accuracy in ImageNet:
+                                                            seeks a new trajectory. As a consequence, the training does
+    R50, 800-ep   MoCo v2 [12]  MoCo v2+ [13]   MoCo v3          not diverge, but the accuracy depends on how good the local
+      linear acc.         71.1            72.2            73.8              restart is. When this partial failure happens, it still provides
+                                                       an apparently decent result (69.7%). This behavior is harm-
+The improvement here is mainly due to the extra prediction                                                                      ful to explorative research: unlike catastrophic failure that is
+head and large-batch (4096) training.                                                                   easily noticeable, the small degradation can be fully hidden.
+                                          We also ﬁnd that the mild instability does not result in
+4. Stability of Self-Supervised ViT Training         a noticeably large variation. In many of our ablations, run-
+                                                          ning the same conﬁguration for a second trial often results   In principle,  it is straightforward to replace a ResNet
+                                                                   in a small difference of 0.1∼0.3%. This also makes it difﬁ-backbone with a ViT backbone in the contrastive/Siamese
+                                                                     cult to notice the potential degradation caused by instability.self-supervised frameworks. But in practice, a main chal-
+lenge we have met is the instability of training.               Learning rate. In practice, the learning rate is often scaled
+  We observe that the instability problem can not be simply    when the batch size increases [27, 17]. In all experiments
+reﬂected by accuracy numbers. In fact, as we will show, the      in this paper, we adopt the linear scaling rule [27, 17]: we
+training is “apparently good” and provides decent results,      set the learning rate as lr×BatchSize/256, where lr is a
+even when it is potentially unstable. To reveal the instabil-     “base” learning rate.  lr is the hyper-parameter being set
+ity, we monitor the kNN curves [45] (see appendix) during      [20, 10, 18]. In Fig. 2 we study the inﬂuence of lr.
+
+
+                                                 3
+
+======================== PDF 第 4 页 ========================
+           50                                                                                                                 ﬁrst layer                                                                                                                                                                                                                                                                                                               ℓ∞-norm                                     last layer
+                                          accuracy                kNN                                                      lr=0.5e-4                                                                                            gradient,
+                                                                 lr=1.0e-4                                  6000                      # iter.                        7000
+                                                                 lr=1.5e-4              Figure 4. We monitor the gradient magnitude, shown as relative            0
+              0                                  epochs                                 100            values for the layer. A “spike” in the gradient causes a “dip” in the
+            lr, ×1e-4      0.5          1.0          1.5                     training curve. We observe that a spike happens earlier in the ﬁrst
+            linear acc.      70.4         72.2         71.7                     layer, and are delayed by tens of iterations in the last layers.
+Figure 2. Training curves of different learning rates (MoCo v3,
+ViT-B/16, 100-epoch ImageNet, AdamW, batch 4096).
+                                                                                                                         50
+
+
+
+
+           50                                                                                                                                                                                                                                                                                                                                                                                                                                                           accuracy
+                                                                                                                                                                      kNN
+                                                                                                                                                                 learned, lr=1.0e-4                                          accuracy
+                                                                lr=3e-4                                                                    random, lr=1.0e-4
+                kNN                                                     lr=5e-4                                   0
+                                                                lr=6e-4                                     0                                  epochs                                 100
+                                                                lr=8e-4
+                                                                                                                         50
+            0
+              0                                  epochs                                 100
+      lr, ×1e-4       3.0          5.0          6.0          8.0                                                                                                                        accuracy    linear acc.      71.6         72.5         70.9         66.5
+                                                                                                                                                                      kNN
+Figure 3. Training curves of LAMB optimizer (MoCo v3, ViT-                                                                      learned, lr=1.5e-4
+B/16, 100-epoch ImageNet, wd=1e-3, batch 4096).                                                                          random, lr=1.5e-4
+                                                                                                                          0
+                                                                                                                            0                                  epochs                                 100
+                                                                                                     lr, ×10−4          0.5          1.0          1.5
+  When lr is smaller, the training is more stable, but it is             learned patch proj.      70.4         72.2         71.7
+prone to under-ﬁtting. In Fig. 2, lr=0.5e-4 has 1.8% worse           random patch proj.      70.8         72.8         73.4
+accuracy than lr=1.0e-4 (70.4 vs. 72.2). In this regime, the      Figure 5.  Random vs. learned patch projection (MoCo v3,
+accuracy is determined by ﬁtting vs. under-ﬁtting.  Train-      ViT-B/16, 100-epoch ImageNet, AdamW, batch 4096).  Top:
+ing with a larger lr becomes less stable. Fig. 2 shows that      lr=1.0e-4. Bottom: lr=1.5e-4.
+lr=1.5e-4 for this setting has more dips in the curve, and
+its accuracy is lower. In this regime, the accuracy is deter-
+                                                                    different architecture designs without extra lr search. As amined by stability.
+                                                                          result, we opt to use AdamW in other parts of this paper.
+Optimizer. By default, we use AdamW [31] as the opti-
+                                                               4.2. A Trick for Improving Stabilitymizer, which is the common choice for training ViT mod-
+els [16, 42, 36].3 On the other hand, recent self-supervised        All these experiments suggest that instability is a major
+methods [10, 18, 7] are based on the LARS optimizer [47]      issue.  Next we describe a simple trick that can improve
+for large-batch training. In Fig. 3, we study the LAMB op-      stability in various cases in our experiments.
+timizer [48], which is an AdamW-counterpart of LARS.          During training, we notice that a sudden change of gradi-
+  Given an appropriate learning rate (lr=5e-4, Fig. 3),      ents (a “spike” in Fig. 4) causes a “dip” in the training curve,
+LAMB achieves  slightly  better accuracy (72.5%) than     which is as expected. By comparing all layers’ gradients,
+AdamW. But the accuracy drops rapidly when lr is larger    we observe that the gradient spikes happen earlier in the
+than the optimal value. LAMB with lr=6e-4 and 8e-4 has      ﬁrst layer (patch projection), and are delayed by couples of
+1.6% and 6.0% lower accuracy. Interestingly, the training      iterations in the last layers (see Fig. 4). Based on this obser-
+curves are still smooth, but they degrade gradually in the      vation, we hypothesize that the instability happens earlier in
+middle. We hypothesize that although LAMB can avoid      the shallower layers. Motivated by this, we explore freezing
+sudden change in the gradients, the negative impact of un-      the patch projection layer during training. In other words,
+reliable gradients is accumulated.                      we use a ﬁxed random patch projection layer to embed the
+   During our exploration, we ﬁnd that LAMB can achieve      patches, which is not learned. This can be easily done by
+comparable accuracy with AdamW, if lr is appropriately     applying a stop-gradient operation right after this layer.
+chosen. But the sensitivity to lr makes it difﬁcult to ablate
+                                                     Comparisons. In Fig. 5 we show the MoCo v3 results with
+   3In original ViT [16] in JAX, the weight decay is “AdamW style”:      learnable vs. random patch projection. Random patch pro-
+https://github.com/google/flax/blob/master/flax/optim/adam.py        jection stabilizes training, with smoother and better training
+
+
+                                                 4
+
+======================== PDF 第 5 页 ========================
+           50                                                                                     it. The model can still be unstable if lr is too big. The
+                                                                   ﬁrst layer is unlikely the essential reason for the instabil-
+                                                                              ity; instead, the issue concerns all layers. The ﬁrst layer is                                          accuracy
+                                                        merely easier to be handled separately, e.g., it is the only                kNN
+                                          SimCLR: learned proj.            non-Transformer layer in the backbone. We hope to see a
+                                          SimCLR: random proj.          more fundamental solution in future work.            0
+              0                                  epochs                                 100
+
+
+           50                                                          5. Implementation Details
+                                          accuracy                                                      This section describes the details of ViT+MoCo v3.
+                                                More subtleties are described in the appendix.                kNN
+                                        BYOL:                                                               learned                                                                             proj.
+                                        BYOL:                                                   random                                                                             proj.            Optimizer. By default we use AdamW [31] and a batch
+
+            0              0                                  epochs                                 100            size of 4096 [10, 18, 7]. We search for lr and weight de-
+                         SimCLR    BYOL                cay wd based on 100-epoch results, and then apply it for
+             learned patch proj.      69.3         69.7                  longer training. We adopt learning rate warmup [17] for
+           random patch proj.      70.1         71.0                40 epochs (as per “warmup of 10k steps”, Table 4 in [16]).
+Figure 6. Random vs. learned patch projection (ViT-B/16, 100-     This long warmup helps alleviate instability, though all un-
+epoch ImageNet, AdamW, batch 4096). Top: SimCLR: lr=2e-4,      stable results are already with this warmup. After warmup,
+wd=0.1. Bottom: BYOL: lr=1e-4, wd=0.03.                       lr follows a cosine decay schedule [30].
+
+                                   MLP heads. The projection head [10] is a 3-layer MLP,
+curves. This stability beneﬁts the ﬁnal accuracy, boosting                                                            following [11]. The prediction head [18] is a 2-layer MLP.
+the accuracy by 1.7% to 73.4% at lr=1.5e-4. The improve-                                                  The hidden layers of both MLPs are 4096-d and are with
+ment is bigger for a larger lr (0.4%, 0.6%, 1.7%).  This                                           ReLU [32]; the output layers of both MLPs are 256-d,
+comparison conﬁrms that the training instability is a main                                                           without ReLU. In MoCo v3, all layers in both MLPs have
+issue that impacts accuracy.                                     BN [23], following SimCLR [10]. The MLP heads of BY-
+  Besides MoCo, we ﬁnd that other related methods [10, 18,                                           OL/SwAV have different BN designs (see appendix).
+7] can also be unstable. Fig. 6 presents the training curves
+of ViT in SimCLR [10] and BYOL [18]. Random patch     Loss. We scale the contrastive loss in (1) by a constant 2τ
+projection improves stability in both SimCLR and BYOL,      (see Alg. 1), following [18]’s appendix. This scale is redun-
+and increases the accuracy by 0.8% and 1.3%. We also ob-     dant because it can be absorbed by adjusting lr and wd. But
+serve the instability issue for SwAV [7], in which, however,      this scale makes it less sensitive to the τ value when lr and
+the loss diverges (NaN) when it is unstable. Random patch    wd are ﬁxed. We set τ=0.2 [12] as the default.
+projection helps SwAV by enabling a relatively larger lr
+                                                ViT architecture. We closely follow the designs in [16].
+without diverging, and improves its accuracy from 65.8%
+                                                  The input patch size is 16×16 or 14×14 (‘/16’ or ‘/14’), and
+to 66.4% when using the largest stable lr. In sum, this trick
+                                                                       after projection it results in a sequence of length 196 or 256
+is effective in all these self-supervised frameworks.
+                                                                   for a 224×224 input. Position embeddings are added to the
+  We have also tried BatchNorm (BN) [24], WeightNorm                                                            sequence, and we use the sine-cosine variant [43] in 2-D.
+(WN) [40], or gradient clip on patch projection. We observe                                                          This sequence is concatenated with a learnable class token.
+that BN or WN on the learnable patch projection layer does                                                  The sequence is then encoded by a stack of Transformer
+not improve instability, and produces similar results; gradi-                                                            blocks [43] following the design in [16]. The class token
+ent clip on this layer is useful if given a sufﬁciently small                                                                       after the last block (and after the ﬁnal LayerNorm [1]) is
+threshold, which to the extreme becomes freezing the layer.                                                                   treated as the output of the backbone, and is the input to the
+                                      MLP heads.
+Discussions.  It is an interesting observation that it is not
+necessary to train the patch projection layer. For the stan-     Linear probing. Following common practice, we evaluate
+dard ViT patch size, the patch projection matrix is com-      the representation quality by linear probing.  After self-
+plete (768-d output for a 3-channel 16×16 patch) or over-     supervised pre-training, we remove the MLP heads and
+complete. In this case, random projection should be sufﬁ-      train a supervised linear classiﬁer on frozen features. We
+cient to preserve the information of the original patches.        use the SGD optimizer, with a batch size of 4096, wd of 0,
+  We note that freezing the ﬁrst layer does not change     and sweep lr for each case. We train this supervised classi-
+the architecture, and it actually narrows down the solution     ﬁer for 90 epochs in the ImageNet training set, using only
+space. This indicates that the underlying problem is on op-    random resized cropping and ﬂipping augmentation. We
+timization. The trick alleviates the issue, but does not solve      evaluate single-crop top-1 accuracy in the validation set.
+
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+        model            blocks    dim   heads   params                 model       MoCo v3  SimCLR   BYOL    SwAV
+        ViT-Small         12      384    12      22 M                   R-50, 800-ep      73.8       70.4       74.3       71.8
+        ViT-Base [16]     12      768    12      86 M                    ViT-S, 300-ep     72.5       69.0       71.0       67.1
+        ViT-Large [16]     24     1024    16     304 M                   ViT-B, 300-ep     76.5       73.9       73.9       71.6
+        ViT-Huge [16]     32     1280    16     632 M                                                                  Table 4. ViT-S/16 and ViT-B/16 in different self-supervised
+Table 2. Conﬁgurations of ViT models in our experiments. Here      learning frameworks (ImageNet, linear probing). R-50 results
+“blocks” is the number of Transformer blocks, “dim” is the in-      of other frameworks are from the improved implementation in
+put/output channel dimension of all blocks, and “heads” is the       [13]. For fair comparisons, all are pre-trained with two 224×224
+number of heads in multi-head attention. The MLP hidden di-      crops for each image (multi-crop training [7] could improve re-
+mension is 4×dim.                                                             sults, which is beyond the focus of this work).
+
+           model      FLOPs   vs. R50  TPUs   hours                               MoCo v3
+                                                                                                                            76                     Figure 7.   Different self-supervised
+           ViT-S/16        4.6 G    1.1×    256     1.2                                                                                                  learning frameworks perform differ-
+           ViT-B/16       17.5 G    4.3×    256     2.1                               74SimCLR      BYOL          ently between R-50 [21] (x-axis) and
+           ViT-L/16       61.3 G   15.0×    256     6.1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         ViT-Base                    ViT-B [16] (y-axis).  The numbers
+          ViT-H/14     166.7 G   40.7×    512     9.8                               72    SwAV
+                                                                                                   are ImageNet linear probing accuracy
+Table 3. Training time of ViT + MoCo v3, per 100 ImageNet-                                                                                                                            70                   from Table 4.
+epochs, in our TensorFlow implementation. The FLOPs number                  70      72      74      76
+                                                                                                                                 ResNet-50
+(in multiply-adds) is per 224×224 crop, and “vs. R50” is the rela-
+tive FLOPs vs. ResNet-50 (4.1G).                                   ferent between ViT-B and R50: see Fig 7. MoCo v3 and
+                                            SimCLR are more favorable for ViT-B than R50 (above the
+6. Experimental Results                                diagonal line).
+   In this section we benchmark and ablate self-supervised     6.2. Ablations of ViT + MoCo v3
+ViT. We perform self-supervised training on the 1.28M Im-
+ageNet training set [14], and evaluate by linear probing.          Next we ablate the designs of the ViT + MoCo v3 sys-
+   Table 2 summarizes the ViT conﬁgurations we study.     tem. We use random patch projection in all ablations.
+ViT-B/L/H follow [16], and ViT-S is similar to that in [42].     Position embedding. The following table compares the
+We use ViT-B by default in our ablations.                      choice of position embedding (our default is sin-cos):
+Training time. We train our models in TPUs (v3) that are           ViT-B, 300-ep      sin-cos         learned        none
+publicly available in Google Cloud Platform (GCP). Table 3               linear acc.         76.5           76.1           74.9
+summarizes the training time (per 100 epochs). It takes 2.1                                                  The learned version works well, but not better than sin-cos.
+hours training ViT-B for 100 epochs, and our ablations typ-                                                                  Surprisingly, the model works decently even with no po-
+ically take 6.3 hours each (300 epochs). This is a compet-                                                                      sition embedding (74.9%). The capability to encode po-
+itive performance, as it enables us to ablate many design                                                                      sitions contributes only 1.6%. We believe this data point
+decisions. The TPU implemenataion also makes it possible                                                                 reveals both strengths and limitations of the current model.
+to explore the ViT-H model, which takes 9.8 hours per 100                                           On the positive side, it suggests that the model can learn
+epochs using 512 TPUs. This is a gigantic scale of training:                                                              strong representations just by a set of patches, which are
+for the 300-epoch ViT-H, this amounts to ∼625 TPU·days,                                                                     fully permutation-invariant. This is analogous to bag-of-
+or ∼1.7 TPU·years of training.                                                     words models [41]. This model has no positional inductive
+  We also verify our models in GPUs using PyTorch.  It                                                                      bias. On the negative side, it also suggests that the model
+takes 24 hours for ViT-B in 128 GPUs (vs. 2.1 hours in 256                                                          has not made good use of positions, and the gesture of the
+TPUs). With an increasing number of devices, we observe                                                                object contributes relatively little to the representation. We
+that TPUs scale up more favorably than GPUs. While fur-                                                     hope this data point will draw attention to future study.
+ther engineering optimization could speed up our GPU sys-
+                                                         Class token. The following table ablates the role of thetem, we opt to use the TPU system for the ease of research.
+                                                                   class token [CLS] in ViT:
+6.1. Self-supervised Learning Frameworks
+                                                                          ViT-B, 300-ep   w/ [CLS]   w/o [CLS]; LN+pool   w/o [CLS]; pool
+  We benchmark self-supervised ViT in four frameworks:            linear acc.        76.5             69.7                 76.3
+MoCo v3, SimCLR [10], BYOL [18], and SwAV [7].We use
+the same random projection trick in all cases. We sweep lr     Global average pooling is used right after the ﬁnal block if
+and wd for each individual framework for fair comparisons.     [CLS] is not used. ViT has an extra LayerNorm (LN) af-
+   Table 4 reports the results of ViT-S/16 and ViT-B/16.      ter the ﬁnal block [16], and if we keep this LN and remove
+MoCo v3 has better accuracy on ViT than other frame-     [CLS], the result is much worse (69.7%). But if we remove
+works. The relative accuracy among these methods is dif-      this LN and [CLS], the result is nearly unchanged (76.3%).
+
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+                                                                                                                                                    ViT-BN-L/7
+                                                                                                        81
+This comparison indicates that the class token is not essen-
+                                                                                                                                                                                     R152-3x
+                                                                                                                                          R152-2xtial for the system to work. It also suggests that the choice              80     ViT-BN-B/7    R200-2x
+                                                                                                                                                                          ViT-BN-H                                                                                                                                R101-2x
+of normalization layers can make a difference.                                  79                                R50-4x
+                                                                                                                                                                                   ViT-H
+                                                                                                                                                          (%) 78                                                                                                                       R50-2x                                                                                                                                                            ViT-LBatchNorm in MLP heads. Unlike the standard ResNets                                                                                                                  R50-2xR152
+                                                                                                                   ViT-BN-S/7                                                                                                                                     R152-2x
+                                                                                                        77
+                                                                                                                              ViT-B      R101-2x[21], ViT models by default have no BN, and thus all BN                                                accuracy     R101
+layers are in the MLP heads. The following table compares              76
+                                                                                                                        R50-2xwith vs. without BN in the heads:                                                                                                                                                                                     probing 75 R50
+
+                                                                                                         R152       ViT-B, 300-ep      heads w/ BN       heads w/o BN                                                                          linear 74R50
+           linear acc.            76.5               74.4                                       ViT-SR101                                      ResNet, SimCLR v2
+                                                                                                        73                                             SK-ResNet, SimCLR v2
+We have to set the batch size as 2048 when removing BN,              72                                              ResNet,ViT, MoCoBYOLv3
+otherwise it does not converge. Removing BN reduces ac-                  R50                                          ViT-BN, MoCo v3
+curacy by 2.1%. Despite the decrease, this is a completely              71 0        100      200      300      400      500      600      700      800
+BN-free system.  This data point suggests that BN is not                                              params (M)
+                                                     MoCo v3 w/     ViT-S      ViT-B      ViT-L      ViT-H
+necessary for contrastive learning to work, yet appropriate                                                                 ViT baseline      73.4         76.7         77.6         78.1
+usage of BN can improve accuracy.                              ViT-BN          74.1         77.5         78.6         79.1
+                                                                    ViT-BN/7        77.0         79.5         81.0             -
+Prediction head. MoCo v3 uses a prediction MLP head as
+                                                                  Figure 8. Comparisons with state-of-the-art big ResNets, pre-
+per [18]. The next table ablates this design:
+                                                                    sented as parameters-vs.-accuracy trade-off. All entries are pre-
+       ViT-B, 300-ep     w/ pred. MLP     w/o pred. MLP               trained with two 224×224 crops, and are evaluated by linear prob-
+           linear acc.            76.5               75.5                     ing. SimCLR v2 results are from Table 1 in [11], and BYOL re-
+Removing the prediction MLP head has a decent result of       sults are from Table 1 in [18].
+75.5%. While this extra head boosts accuracy, MoCo as
+                                                      and BERT [15]). Our MoCo-based ViT has higher accuracya contrastive method does not need the predictor MLP to
+                                                      and smaller models than iGPT, under the same linear prob-work, unlike the negative-free methods in [18, 13].
+                                                             ing protocol and training data. The mask patch prediction in
+Momentum encoder. The following table compares the                                                              [16] is pre-trained on JFT-300M and end-to-end ﬁne-tuned
+momentum coefﬁcient (m) in the momentum encoder:                                                                   in ImageNet, which we append as a reference.
+    ViT-B, 300-ep   m=0    m=0.9   m=0.99  m=0.999         Our self-supervised ViT models have higher accuracy
+       linear acc.        74.3       75.6       76.5       75.0        when the models are bigger.  This is in contrast to the
+The optimal value is m=0.99 (our default). The case of     supervised results in [16], where ViT-L has lower accuracy
+m=0 is analogous to SimCLR (plus the prediction head     than ViT-B when pre-trained in ImageNet-1k/21k.  Actu-
+and stop-gradient on the keys), and its accuracy of 74.3%       ally, for ViT-L, our self-supervised pre-training with linear
+is similar to SimCLR’s (73.9%, Table 4). The usage of the     probing (77.6%) is better than the supervised counterpart in
+momentum encoder leads to 2.2% increase.                     [16] (76.53%) when trained in ImageNet-1k.4 These com-
+                                                              parisons suggest that self-supervised learning as a tool for
+Training length. In the following table we report ViT-S/B                                                              generic representation learning is less prone to over-ﬁtting.
++ MoCo v3 vs. training length:
+                                                  Comparisons with big ResNets.5 In Fig. 8 we com-                              300-ep      600-ep
+                ViT-S/16        72.5         73.4                    pare with the  state-of-the-art big ResNets reported by
+                ViT-B/16        76.5         76.7              SimCLR v2 [11] and BYOL [18].  We note that both
+                                            SimCLR v2 and BYOL use a momentum encoder.  Our
+The smaller ViT-S enjoys the beneﬁt of training longer, and
+                                                               baseline ViT MoCo (the curve of “ViT, MoCo v3”)  is
+improves by 0.9% when extending to 600 epochs. This is
+                                                                     slightly better than ResNet SimCLR v2 in the small-model
+similar to the behavior of R50, which was typically trained
+                                                            regime, but the envelopes become just comparable for larger
+for 800 epochs [10]. But the gain of training longer is di-
+                                                          models.  SimCLR v2 with SK-ResNet (Selective Kernel
+minishing on ViT-B. Based on this ablation, we train the
+                                                                    [29], a form of attention) has a higher envelope. BYOL
+bigger ViT-L/H for 300 epochs presented next (Table 1).
+                                                                also has a higher envelope with wider ResNets (1-4×), and
+6.3. Comparisons with Prior Art                        has an outstanding point with a deeper ResNet (R200-2×).
+
+Self-supervised Transformers. Table 1 in Sec. 1 presents          4Stronger regularization could reduce over-ﬁtting for supervised ViT
+MoCo v3 results with different ViT models, compared with       [42], though regularizing the very big ViT-L/H is yet to be explored.
+                                                                            5Transformers [43] by design consist of residual blocks [21], and thusstate-of-the-art self-supervised Transformers.  Both iGPT
+                                                                                are a form of residual networks.  In the literature on “Transformer vs.
+[9] and the masked patch prediction in [16] can be catego-      ResNet”, precisely speaking, the term of “ResNet” refers to the speciﬁc
+rized as the masked auto-encoding paradigm (e.g., GPT [37]      design that has non-degenerated (e.g., 3×3) convolutions.
+
+
+                                                 7
+
+======================== PDF 第 8 页 ========================
+                           CIFAR-10 [26]            CIFAR-100 [26]         Oxford Flowers-102 [33]        Oxford-IIIT-Pets [35]
+pre-train                 ViT-B    ViT-L    ViT-H    ViT-B    ViT-L    ViT-H    ViT-B    ViT-L    ViT-H    ViT-B    ViT-L    ViT-H
+random init.               77.8      77.1       75.9    48.5      48.3       48.0    54.4      54.3       52.8    40.1      42.8       40.4
+ImNet supervised [16]     98.1      97.9        n/a     87.1      86.4        n/a     89.5      89.7        n/a     93.8      93.6        n/a
+ImNet self-sup., MoCo v3  98.9 ↑0.8 99.1 ↑1.2   99.1    90.5 ↑3.4 91.1 ↑4.7   91.2    97.7 ↑8.2 98.6 ↑8.9   98.8    93.2 ↓0.6 93.7 ↑0.1   94.2
+
+Table 6.  Transfer learning accuracy (%) in four datasets.  All entries are end-to-end ﬁne-tuned [16].  Pre-training are performed in
+the ImageNet-1k training set. The models are ViT-B/16, ViT-L/16, and ViT-H/14. Results of ImageNet-supervised pre-training are from
+Table 3 in [16]. The arrows indicate the changes w.r.t. the ImageNet-supervised counterparts.
+
+  case                           pre-train     ViT-S   ViT-B   ViT-L        ter than DeiT’s 81.8% at 300 epochs.
+ masked patch pred. [16]    JFT-300M         -       79.9         -
+                                                                 In addition, MoCo v3 has 84.1% with ViT-L when ﬁne-
+ DeiT [42]                             -          79.9     81.8      n/a
+ MoCo v3                ImageNet-1k    81.4     83.2     84.1       tuned for only 100 epochs with a drop path rate of 0.5. This
+                                                                 short schedule demonstrates the effectiveness of MoCo pre-
+Table 5. End-to-end ﬁne-tuning accuracy (%) in ImageNet-1k.        training. We have also found DeiT-L diverges under its de-
+                                                                       fault settings, and a different solution may be needed.
+  We notice that this comparison concerns a composition
+of many choices. As one example, the default ViT backbone                                                               6.4. Transfer Learning
+in [16] uses LayerNorm (LN), while the default ResNet [21]
+uses BatchNorm (BN). These design choices can lead to a        In Table 6 we evaluate transfer learning. We study the
+systematic gap. In our preliminary experiments, we explore     four downstream datasets as in [16]. We ﬁne-tune the mod-
+replacing LN with BN in the ViT backbone’s MLP blocks      els end-to-end, also following [16].
+(i.e., excluding self-attention blocks).6 We simply refer to       Our self-supervised ViT has better transfer learning ac-
+this as a “ViT-BN” backbone. It leads to ∼1% improvement     curacy when the model size increases from ViT-B to ViT-L,
+consistently (see Fig. 8).                                        yet it gets saturated when increased to ViT-H. As a com-
+   In iGPT [9], accuracy can be improved by using longer      parison, the ImageNet-supervised ViT in [16] becomes sat-
+sequences in the pixel domain. Here we explore longer se-     urated or overﬁtted starting at ViT-L. Our self-supervised
+quences by reducing the patch size to 7×7 (“/7” in Fig. 8).    ViT achieves better results than its ImageNet-supervised
+This keeps the model size unchanged, but increases FLOPs     counterparts in three of these four datasets.
+to ∼6×.  It can improve the accuracy by ∼2-3%. The gain       The overﬁtting is more prominent when training the big
+of using small patches is also observed in [8]. MoCo v3    ViT models from scratch in these small datasets: the ac-
+achieves 81.0% with ViT-BN-L/7.7 As a comparison, the     curacy in general decreases with bigger ViT. We also ﬁnd
+previous best results under the linear probing protocol are      that the from-scratch ViT results are much worse than their
+79.8% with SimCLR v2 (SK-ResNet152-3×), and 79.6%     ResNet-counterparts (c.f., Table 8 in [10]) in these small
+with BYOL (ResNet200-2×).                                     datasets. This suggests that if data are not enough, it is difﬁ-
+   Discussion. While the bigger self-supervised ViT can      cult for ViT to learn representations in the lack of inductive
+achieve better accuracy, the results are saturated.  This is      biases. Self-supervised pre-training can close this gap and
+unlike the trend in NLP, where bigger Transformers learn      largely reduce overﬁtting in small datasets.
+better representations (e.g., [4]). A potential solution is to         Finally, we note that with supervised pre-training in
+use more data. The saturation can also be caused by the     bigger datasets (ImageNet-21k or JFT-300M), the ViT re-
+limited power of the existing instance-based pretext task      sults in [16] can be better than ours when transferring to
+[45]. It may be desired to design more difﬁcult pretext tasks.     these small datasets. A potential future work is to perform
+  Our self-supervised ViT models are competitive with the      self-supervised pre-training for big ViT models in bigger
+big convolutional ResNets.  It suggests that ViT can learn      data.  This is analogous to the trajectory of unsupervised
+strong representations with “fewer inductive biases” [16].      pre-training in NLP in the past years [37, 15, 38, 4], i.e.,
+However, we also ﬁnd that the accuracy only decreases by a     both models and datasets are scaled up.
+bit even if removing the only positional inductive bias (po-
+sition embedding), suggesting that in our method ViT relies     7. Conclusion
+less on positional information than convolutional networks.
+                                          We have explored training ViT in the recently popu-
+End-to-end ﬁne-tuning. Table 5 reports end-to-end ﬁne-                                                                          lar self-supervised frameworks. Our comparisons concern
+tuning results. We use the DeiT codebase [42] and all its                                                                 several aspects, including ViT vs. convolutional networks,
+default settings unless speciﬁed. MoCo v3 achieves 83.2%                                                             supervised vs. self-supervised, and contrastive learning vs.
+with ViT-B under 150-epoch ﬁne-tuning, substantially bet-                                                   masked auto-encoding. We report positive evidence as well
+                                                              as challenges, open questions, and opportunities. We hope  6We are trying to replace every LN with BN in the ViT backbone. In
+preliminary experiments, doing so leads to convergence problems.           our empirical study will be useful for the community to
+   7ViT-BN-H/7 is out of memory in our unoptimized implementation.        close the gap of pre-training between vision and language.
+
+
+                                                 8
+
+======================== PDF 第 9 页 ========================
+Postscript. After the ﬁrst version of this manuscript, an au-     so it requires no extra feature extraction. We use the features
+thor of BiT [25] and ViT [16], Lucas Beyer, echoed that     from the class token for kNN monitoring, so the monitor is
+“the exact same behaviour” was observed for supervised     independent of the choice of the head. Other details follow
+BiT-ResNet in ImageNet-21k. The instability problem can      the kNN implementation in [45]. We ﬁnd that this approx-
+be more general than the scope of this paper.                  imate kNN monitor is sufﬁcient to reﬂect the stability of
+                                                                      training.
+A. Additional Implementation Details                                       MoCo v3 for ResNet-50. The implementation follows the
+Data augmentation. We follow the good practice in exist-     good practice in recent works [10, 18].  It uses the LARS
+ing works [45, 20, 10, 18]. Our augmentation policy in-     optimizer [47] with a 4096 batch [10], lr=0.3, wd=1.5e-6.
+cludes random resized cropping, horizontal ﬂipping, color    The temperature is τ=1.0. The encoder fk’s momentum co-
+jittering [45], grayscale conversion [45], blurring [10], and      efﬁcient is m=0.996 and increases to 1 with a cosine sched-
+solarization [18]. We take two 224×224 crops for each im-      ule [18]. The augmentation is the same as described above.
+age in each iteration.
+                                               References
+BatchNorm. We use SyncBN as our default BatchNorm
+implementation, following [10]. When BN is used, there are        [1] Jimmy Lei Ba, Jamie Ryan Kiros, and Geoffrey E Hinton. Layer
+                                                                               normalization. arXiv:1607.06450, 2016. 5
+two options on batching: (i) all samples and crops are in the
+                                                                                [2] Philip Bachman, R Devon Hjelm, and William Buchwalter.
+same batch, i.e., BN is over 4096×2 crops for 4096 images;
+                                                                         Learning representations by maximizing mutual information
+and (ii) only different images are in the same batch, i.e.,            across views. In NeurIPS, 2019. 2, 3
+the two crops of the same image are separately forwarded        [3] Jane Bromley, Isabelle Guyon, Yann LeCun, Eduard S¨ackinger,
+in two 4096 batches. We notice that the code of SimCLR          and Roopak Shah. Signature veriﬁcation using a “Siamese” time
+[10] adopts the former option, while the code in BYOL [18]           delay neural network. In NeurIPS, 1994. 2
+adopts the latter. The pseudo-code in our Alg. 1 implies        [4] Tom Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah,
+that we adopt the latter. The BN batching size inﬂuences            Jared D Kaplan, Prafulla Dhariwal, Arvind Neelakantan, Pranav
+                                                                 Shyam, Girish Sastry, Amanda Askell, Sandhini Agarwal, Arielthe gradient variance, and the two implementations should
+                                                                             Herbert-Voss, Gretchen Krueger, Tom Henighan, Rewon Child,
+lead to different results.                                                                        Aditya Ramesh, Daniel Ziegler, Jeffrey Wu, Clemens Winter,
+AdamW implementation. We  notice  that  in PyTorch           Chris Hesse, Mark Chen, Eric Sigler, Mateusz Litwin, Scott
+                                                                           Gray, Benjamin Chess, Jack Clark, Christopher Berner, Sam Mc-
+and JAX, the weight decay in AdamW is implemented
+                                                                              Candlish, Alec Radford, Ilya Sutskever, and Dario Amodei. Lan-
+as  “-lr ∗wd ∗weight’’  (consistent  with  [31]),  but  in          guage models are few-shot learners. In NeurIPS, 2020. 1, 2, 8
+TensorFlow it is implemented as “-wd ∗weight”, and wd        [5] Yue Cao, Jiarui Xu, Stephen Lin, Fangyun Wei, and Han Hu. Gc-
+needs to be scaled beforehand.8 In our TPU/TensorFlow             net: Non-local networks meet squeeze-excitation networks and
+code, we follow the version consistent with [31].                      beyond. In ICCV Workshops, 2019. 2
+                                                                                [6] Nicolas Carion, Francisco Massa, Gabriel Synnaeve, Nicolas
+MLP heads in BYOL and SwAV. In our BYOL+ViT im-                                                                              Usunier, Alexander Kirillov, and Sergey Zagoruyko. End-to-end
+plementation, the projection/prediction MLP heads have            object detection with Transformers. In ECCV, 2020. 2
+BN in their hidden layers, but not in their output layers,        [7] Mathilde Caron, Ishan Misra, Julien Mairal, Priya Goyal, Piotr
+which faithfully follow [18]. In our SwAV+ViT implemen-           Bojanowski, and Armand Joulin. Unsupervised learning of vi-
+tation, we use no BN in the MLP heads, which is a conﬁgu-            sual features by contrasting cluster assignments.  In NeurIPS,
+ration that performs the best in our SwAV experiments.               2020. 1, 2, 3, 4, 5, 6
+                                                                                [8] Mathilde Caron, Hugo Touvron, Ishan Misra, Herv´e J´egou,
+kNN monitor. The kNN monitor [45] is a widely used tool            Julien  Mairal,   Piotr  Bojanowski,  and  Armand  Joulin.
+in self-supervised learning research. The kNN evaluation          Emerging  properties  in  self-supervised  vision  transformers.
+was often performed sparsely, e.g., once per epoch. We no-           arXiv:2104.14294, 2021. 8
+tice that this may hide the sudden “dips” in the curves.              [9] Mark Chen, Alec Radford, Rewon Child, Jeffrey Wu, Heewoo
+  To better reveal the sudden changes, we monitor the kNN            Jun, David Luan, and Ilya Sutskever.  Generative pretraining
+                                                                    from pixels. In ICML, 2020. 1, 2, 7, 8
+performance more densely, e.g., every tens of iterations.
+                                                                         [10] Ting Chen, Simon Kornblith, Mohammad Norouzi, and Geof-
+This is prohibitive even though the kNN classiﬁer does not
+                                                                                  frey Hinton. A simple framework for contrastive learning of
+need training. We adopt a few approximations to make it            visual representations.  In ICML, 2020.  1, 2, 3, 4, 5, 6, 7, 8,
+feasible. We maintain a small memory bank [45] (whose          9
+length is 10% of ImageNet) for the purpose of kNN search.      [11] Ting Chen, Simon Kornblith, Kevin Swersky, Mohammad
+This memory bank is updated per iteration by the features           Norouzi, and Geoffrey Hinton. Big self-supervised models are
+from the training samples (which are augmented images).            strong semi-supervised learners. In NeurIPS, 2020. 2, 5, 7
+This memory bank is maintained as a queue similar to [20],      [12] Xinlei Chen, Haoqi Fan, Ross Girshick, and Kaiming He.
+                                                                    Improved  baselines  with momentum  contrastive  learning.
+   8https://www.tensorflow.org/addons/api_docs/python/tfa/optimizers/AdamW            arXiv:2003.04297, 2020. 2, 3, 5
+
+
+                                                 9
+
+======================== PDF 第 10 页 ========================
+[13] Xinlei Chen and Kaiming He. Exploring simple Siamese repre-      [31]  Ilya Loshchilov and Frank Hutter. Decoupled weight decay reg-
+      sentation learning. In CVPR, 2021. 2, 3, 6, 7                                 ularization. In ICLR, 2019. 4, 5, 9
+[14]  Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li      [32] Vinod Nair and Geoffrey E Hinton.  Rectiﬁed linear units im-
+      Fei-Fei. ImageNet: A large-scale hierarchical image database.           prove restricted boltzmann machines. In ICML, 2010. 5
+     In CVPR, 2009. 6                                                   [33] Maria-Elena Nilsback and Andrew Zisserman.   Automated
+[15] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina          ﬂower classiﬁcation over a large number of classes.  In Indian
+     Toutanova. BERT: Pre-training of deep bidirectional transform-           Conference on Computer Vision, Graphics & Image Processing,
+      ers for language understanding. In NAACL, 2019. 1, 2, 7, 8               2008. 8
+[16] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk      [34] Aaron van den Oord, Yazhe Li, and Oriol Vinyals.   Rep-
+     Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa De-            resentation  learning  with  contrastive  predictive  coding.
+     hghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, Jakob           arXiv:1807.03748, 2018. 2
+     Uszkoreit, and Neil Houlsby. An image is worth 16x16 words:      [35] Omkar M Parkhi, Andrea Vedaldi, Andrew Zisserman, and CV
+     Transformers for image recognition at scale. In ICLR, 2021. 1,           Jawahar. Cats and dogs. In CVPR, 2012. 8
+      2, 3, 4, 5, 6, 7, 8, 9                                                                         [36] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh,
+[17] Priya Goyal, Piotr Doll´ar, Ross Girshick, Pieter Noordhuis,           Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell,
+     Lukasz Wesolowski, Aapo Kyrola, Andrew Tulloch, Yangqing          Pamela Mishkin, Jack Clark, et al. Learning transferable visual
+       Jia, and Kaiming He. Accurate, large minibatch SGD: Training          models from natural language supervision. 2021. 4
+     ImageNet in 1 hour. arXiv:1706.02677, 2017. 3, 5                                                                         [37] Alec Radford, Karthik Narasimhan, Tim Salimans, and Ilya
+[18] Jean-Bastien  Grill,  Florian Strub,  Florent  Altch´e,  Corentin            Sutskever. Improving language understanding by generative pre-
+      Tallec,  Pierre Richemond,  Elena Buchatskaya,  Carl Doer-             training. 2018. 1, 2, 7, 8
+      sch, Bernardo Avila Pires, Zhaohan Guo, Mohammad Ghesh-      [38] Alec Radford, Jeffrey Wu, Rewon Child, David Luan, Dario
+      laghi Azar, Bilal Piot, koray kavukcuoglu, Remi Munos, and          Amodei, and Ilya Sutskever. Language models are unsupervised
+     Michal Valko.  Bootstrap your own latent - a new approach to            multitask learners. 2019. 1, 2, 8
+      self-supervised learning. In NeurIPS, 2020. 1, 2, 3, 4, 5, 6, 7, 9
+                                                                         [39]  Prajit Ramachandran, Niki Parmar, Ashish Vaswani, Irwan
+[19] Raia Hadsell, Sumit Chopra, and Yann LeCun. Dimensionality            Bello, Anselm Levskaya, and Jonathon Shlens. Stand-alone self-
+     reduction by learning an invariant mapping. In CVPR, 2006. 2              attention in vision models. In NeurIPS, 2019. 2
+[20] Kaiming He, Haoqi Fan, Yuxin Wu, Saining Xie, and Ross Gir-      [40] Tim Salimans and Diederik P Kingma. Weight normalization: A
+      shick. Momentum contrast for unsupervised visual representa-           simple reparameterization to accelerate training of deep neural
+      tion learning. In CVPR, 2020. 1, 2, 3, 9                                  networks. In NeurIPS, 2016. 5
+[21] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep      [41] Josef Sivic and Andrew Zisserman.  Video Google: a text re-
+      residual learning for image recognition. In CVPR, 2016. 1, 2, 6,              trieval approach to object matching in videos. In ICCV, 2003.
+      7, 8                                                          6
+[22] R Devon Hjelm, Alex Fedorov, Samuel Lavoie-Marchildon,      [42] Hugo Touvron,  Matthieu Cord,  Matthijs Douze,  Francisco
+     Karan Grewal, Adam Trischler, and Yoshua Bengio. Learning           Massa, Alexandre Sablayrolles, and Herv´e J´egou.   Training
+     deep representations by mutual information estimation and max-            data-efﬁcient image transformers & distillation through atten-
+      imization. In ICLR, 2019. 2, 3                                                   tion. arXiv:2012.12877, 2020. 4, 6, 7, 8
+
+[23] Sergey Ioffe.  Batch renormalization: Towards reducing mini-      [43] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit,
+     batch dependence in batch-normalized models.  In NeurIPS,           Llion Jones, Aidan N Gomez, Lukasz Kaiser, and Illia Polo-
+     2017. 5                                                                  sukhin.  Attention is all you need.  In NeurIPS, 2017.  1, 2, 5,
+                                                                  7[24] Sergey Ioffe and Christian Szegedy. Batch normalization: Ac-
+      celerating deep network training by reducing internal covariate      [44] Xiaolong Wang, Ross Girshick, Abhinav Gupta, and Kaiming
+       shift. In ICML, 2015. 5                                             He. Non-local neural networks. In CVPR, 2018. 2
+[25] Alexander  Kolesnikov,  Lucas  Beyer,  Xiaohua  Zhai,  Joan      [45] Zhirong Wu,  Yuanjun Xiong,  Stella Yu,  and Dahua  Lin.
+     Puigcerver, Jessica Yung, Sylvain Gelly, and Neil Houlsby. Big           Unsupervised feature learning via non-parametric instance dis-
+     Transfer (BiT): General visual representation learning. In ECCV,            crimination. In CVPR, 2018. 2, 3, 8, 9
+     2020. 9                                                            [46] Mang Ye, Xu Zhang, Pong C Yuen, and Shih-Fu Chang.
+[26] Alex Krizhevsky. Learning multiple layers of features from tiny           Unsupervised embedding learning via invariant and spreading
+     images. Tech Report, 2009. 8                                              instance feature. In CVPR, 2019. 3
+[27] Alex Krizhevsky. One weird trick for parallelizing convolutional      [47] Yang You, Igor Gitman, and Boris Ginsburg. Large batch train-
+     neural networks. arXiv:1404.5997, 2014. 3                               ing of convolutional networks. arXiv:1708.03888, 2017.  3, 4,
+                                                                  9
+[28] Yann LeCun, Bernhard Boser, John S Denker, Donnie Hen-
+                                                                         [48] Yang You, Jing Li, Sashank Reddi, Jonathan Hseu, Sanjiv Ku-     derson, Richard E Howard, Wayne Hubbard, and Lawrence D
+                                                                          mar, Srinadh Bhojanapalli, Xiaodan Song, James Demmel, Kurt      Jackel. Backpropagation applied to handwritten zip code recog-
+                                                                              Keutzer, and Cho-Jui Hsieh. Large batch optimization for deep      nition. Neural computation, 1989. 1, 2
+                                                                                   learning: Training bert in 76 minutes. In ICLR, 2020. 3, 4
+[29] Xiang Li, Wenhai Wang, Xiaolin Hu, and Jian Yang. Selective
+                                                                         [49] Hengshuang Zhao, Jiaya Jia, and Vladlen Koltun.  Exploring     kernel networks. In CVPR, 2019. 7
+                                                                                       self-attention for image recognition. In CVPR, 2020. 2
+[30]  Ilya Loshchilov and Frank Hutter. SGDR: Stochastic gradient
+     descent with warm restarts. In ICLR, 2017. 5
+
+
+                                                 10

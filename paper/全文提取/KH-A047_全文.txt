@@ -1,0 +1,1067 @@
+KH-A047 | A Large-Scale Study on Unsupervised Spatiotemporal Representation Learning
+来源：https://arxiv.org/abs/2104.14558
+本地PDF：专题文献/何恺明/KH-A047_A_Large_Scale_Study_on_Unsupervised_Spatiotemporal_Representation_Learning_CVPR2021.pdf
+SHA-256：72db088b576d9aabb541866cf8b0d67a9e8bb4b13bcb1669d452a35d5b72eecb
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+    A Large-Scale Study on Unsupervised Spatiotemporal Representation Learning
+
+
+            Christoph Feichtenhofer     Haoqi Fan    Bo Xiong     Ross Girshick    Kaiming He
+
+                                     Facebook AI Research (FAIR)
+
+
+                        Abstract                                                  MoCo    BYOL     SimCLR    SwAV
+                                                                                                              75
+
+                                                                                                              65         We present a large-scale study on unsupervised spatiotem-                                    accuracy2021
+                                                                                                              55         poral representation learning from videos. With a uniﬁed per-                           linear
+          spective on four recent image-based frameworks, we study                                                                                                              45
+        a simple objective that can easily generalize all these meth-Apr                                                                                                                                                                                                                                                                          Kinetics 35
+        ods to space-time. Our objective encourages temporally-                                                                                                                             1                    2                    3
+          persistent features in the same video, and in spite of its                             Number of temporal clips ρ29
+          simplicity, it works surprisingly well across:  (i) different                                                                                                            k 1                        q                 k 2
+         unsupervised frameworks, (ii) pre-training datasets, (iii)
+        downstream datasets, and (iv) backbone architectures. We                    θ                      θθ               θ
+                                                                                                                                                                         1                          t 2             Time        draw a series of intriguing observations from this study,                                             t
+            e.g., we discover that encouraging long-spanned persis-        …                                            …
+         tency can be effective even if the timespan is 60 seconds.[cs.CV]                                                                    Figure 1.  Learning to maximize the similarity between differ-         In addition to state-of-the-art results in multiple bench-
+                                                                                ent temporal clips of the same video encourages feature persis-         marks, we report a few promising cases in which unsuper-
+                                                                            tency over time. A query clip (q) is matched to multiple key clips
+         vised pre-training can outperform its supervised counter-
+                                                                                  (k1, k2, . . .) that are temporally shifted. This method can be incor-
+          part. Code is made available at https://github.com/                                                                               porated into several unsupervised learning frameworks (MoCo [36],
+       facebookresearch/SlowFast.                    SimCLR [12], BYOL [32], SwAV [9]). The ﬁgure on the top shows
+                                                                                          that increasing the number (ρ) of temporal clips improves represen-
+                                                                                        tation quality for all these frameworks.
+         1. Introduction
+                                                                            to be similar. We empirically ﬁnd that this objective works
+       A series of recent methods on unsupervised representation     well across different unsupervised frameworks (MoCo [36],
+         learning from images [36,12,32,9] are based on maximiz-    SimCLR [12], BYOL [32], SwAV [9]), either with or without
+         ing a similarity objective for different views of the same     using dissimilar (negative) samples.
+        image under data augmentations [18, 89].  In addition to       Our objective is a natural generalization of crops in im-
+         the artiﬁcial augmentations on images, videos can provide     ages [18, 89] to clips in videos. This allows us to make
+         natural augmentations of visual content under various chang-     use of the recent unsupervised learning frameworks witharXiv:2104.14558v1
+         ing factors, such as motion, deformation, occlusion, and illu-    minimal modiﬁcations. We aim to learn a high-level repre-
+         mination. This work aims to generalize these image-based      sentation of the categorical semantics present in a video by
+        methods [36,12,32,9] into space-time.                        enforcing persistency of the representation over space-time.
+        We study a simple objective that can be easily incorpo-   We investigate factors such as the effective timespan, t, be-
+          rated into these image-based methods. Our hypothesis is     tween positives, and number of temporal clips, ρ, to ﬁnd that
+          that the visual content is often temporally-persistent along     longer timespans (up to a minute) and multiple samples are
+         a timespan in the video. This persistency may involve an     beneﬁcial for downstream performance (Fig. 1).
+         action (e.g., a person dancing), an object (e.g., an individ-      Our unsupervised training is performed on large-scale
+         ual person, who transitions from running to walking), and      data, including Kinetics [47] (240k videos) and three ver-
+         a scene (e.g., a room with people moving), covering short      sions of million-scale Instagram sets. In addition to standard
+          to long spans, with different levels of visual invariance (ac-     linear probing, we evaluate representation quality on mul-
+           tion, object, scene). Our objective simply encourages the      tiple classiﬁcation and detection downstream datasets, e.g.,
+          visual representations in different clips of the same video     Charades [75], Something-Something [31], and AVA [33].
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+  Our results suggest that unsupervised pre-training can   We investigate this aspect by looking at different encoders
+achieve competitive performance in videos, and it can sur-    and 6 different downstream benchmarks for evaluation.
+pass the supervised pre-training counterparts in a few cases.
+Finally, our study also reveals room for improvement along                                                          3. Approach
+multiple directions.
+   In summary, our large-scale study involves the following       The objective of this work is to study several recent un-
+ﬁve aspects:                                                supervised representation learning methodologies to train
+    (i) Four unsupervised learning frameworks (MoCo [36],     a spatiotemporal encoder fθ, exploring implementation de-
+SimCLR [12], BYOL [32], SwAV [9]) viewed from a uni-      tails and comparing them on a common ground to measure
+ﬁed perspective, and incorporated with a simple temporal      their efﬁcacy in video understanding. We focus on two
+persistency objective;                                            contrastive approaches using positive and negative samples:
+    (ii) Three pre-training datasets, including the relatively    SimCLR [12] and MoCo [36], as well as two approaches that
+well-controlled Kinetics [47] and the relatively “in-the-wild”     solely rely on positives, BYOL [32] and SwAV [9] (Sec. 3.2).
+Instagram sets at million-scale;                                                        These approaches were originally presented for learn-
+    (iii) Six downstream datasets/tasks for evaluating repre-                                                            ing image representations, and they all share the objec-
+sentation quality;                                                                      tive of learning invariant features across different views
+   (iv) Ablation experiments on different factors, such as                                                            (crops/augmentations) of the spatial image input. In this
+temporal samples, contrastive objective, momentum en-                                                               paper, this idea is extended to the temporal domain. Our
+coders, training duration, backbones, data augmentation,                                                              core idea is to learn an encoder fθ that produces embeddings
+curated vs. uncurated, trimmed vs. untrimmed, etc.; and                                                     which are persistent in space-time, over multiple (ρ) tempo-
+   (v) State-of-the-art results of unsupervised video represen-                                                                       rally distant clips of the same video. This is related to Slow
+tation learning on established benchmarks, UCF-101 [77],                                                              Feature Analysis [88] where the objective is to minimize the
+HMDB51 [50] and Kinetics-400 [47] .                                                                  representations’ temporal derivative over the input. The gen-
+                                                                       eral idea of learning temporally persistent features is not new
+2. Related Work                                                     and has been proposed in the past with similar motivation
+                                                                             e.g., [6,61,29].Unsupervised learning in images has been actively re-
+searched recently with approaches focusing on various
+pretext tasks related to color- or patch-based processing     3.1. Persistent temporal feature learning
+[67,94,17,64], instance discrimination with contrastive ob-
+                                                   Our framework takes different augmented clips x  of
+jectives [18, 89, 83, 40, 41, 46, 36, 95, 12, 81] and ones that
+                                                      an unlabeled video and passes them through an encoder
+focus on positive pairs [8,9,32].
+                                                            fθ with weights θ to obtain corresponding embeddings
+Unsupervised learning in videos has followed a similar     q = fθ(x). The encoder is spatiotemporal ConvNet, by
+trajectory with earlier methods focusing on predictive tasks      default a ResNet-50 (R-50) [39], Slow-only pathway of
+based on motion, color and spatiotemporal ordering [29,43,1,     SlowFast Networks [20], which is a 3D ResNet-50 [39]
+44,78,85,60,84,58,57,21,51,86,66,22,48,91,16,87,70,45],     without temporal pooling in convolutional feature maps, fol-
+and contrastive objectives with visual [74,79,34,53,28,92]     lowed by an MLP projection head, that produces and output
+and audio-visual input [65,4,5,49,3,68,69].                   of dimension d.
+   Several recent ones [28, 35,3, 68,2,71, 92,62] relate to       The input clips are stacks of RGB frames of size
+image-based approaches [36,8,12,89]. With some of them    3 × T × S2 for temporal × spatial dimensions, which are
+using additional modalities of optical-ﬂow [81,35], audio [3,    sampled with temporal stride τ , i.e., the encoder processes
+68, 2, 62] and text [79, 2] to transfer supervision from one     only one out of τ frames of the raw video. Therefore, T × τ
+modality to another.                                     deﬁne the timespan and resolution of the encoder.
+   In relation to these previous efforts, our work studies                                                       Given a minibatch of B videos, our framework creates
+purely visual unsupervised learning from video and tries to                                                          a set of ρB positive examples by sampling ρ clips from the
+compare the meta-methodologies on common ground.                                                              videos. The learning methodologies studied in this section
+Evaluation protocols and backbones in most image-    maximize similarity of a “query” sample q with a set of
+based approaches have converged to ResNet-50 [39] en-     positive “key” samples {k+} that are encoded versions of
+coders with ImageNet linear-classiﬁcation protocol, and sev-     different clips of the same video as q is computed from.
+eral smaller downstream tasks [36,12,32,9] for evaluation.     Fig. 1 illustrates an example where ρ=3 clips are used.
+In video understanding research, the ﬁeld has not yet con-      The next section describes how the contrastive and non-
+verged and is using different backbones with focus on ﬁne-     contrastive unsupervised representation learning methodolo-
+tuning performance on two relatively small datasets [77,50].     gies are exempliﬁed.
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+                                                            p                                       k+
+     q                k±                                                                𝜃p                                                      SK
+                                  q                k±       q                k+         q
+      𝜃            𝜃                      queue
+                             𝜃            𝜃m         𝜃            𝜃m         𝜃            𝜃
+                    B
+
+                       S 2
+
+                                   𝜏
+                      T
+
+                (a) SimCLR                            (b) MoCo                               (c) BYOL                             (d) SwAV
+
+Figure 2. Conceptual comparison of four unsupervised learning mechanisms applied to video. The inputs consist of ρ=2 clips from
+B videos. Each clip is a stack of T frames with temporal stride τ and spatial resolution S2. Each method trains encoder weights θ by
+computing a positive loss component w.r.t. to the other clips of the same video. SimCLR (a) and MoCo (b) use a contrastive loss with
+negatives coming from different videos in the batch or a a queue. respectively. MoCo (b) and BYOL (c) use extra momentum encoders with
+weights θm being moving averages of the trained θ. SwAV (d) uses a Sinkhorn-Knop (SK) transform to generate the positive targets.
+
+
+3.2. Unsupervised learning frameworks            SwAV [9] (Fig. 2d) can be viewed as a form of SimCLR
+                                                                    that does not use negative samples. SwAV ﬁrst performs a
+   Contrastive learning maximizes the similarity of a sample                                                                    linear mapping of the positive embeddings q, k+ to learned
+q with positive ones {k+} and minimizes similarity to neg-                                                            prototypes ˜q, ˜k+ and then transforms the targets with an
+ative ones {k−}. The contrastive approaches in this paper
+                                                                  extra Sinkhorn-Knopp (SK) step. Then the SwAV loss is
+use the InfoNCE [83] objective,
+                                                              Lq = DKL(˜q∥SK(˜k+)),               (3)
+         Pk∈{k+} exp (sim(q, k)/α)
+       Lq = −log        Pk∈{k+,k−}exp (sim(q, k)/α),       (1)     where DKL is the The Kullback-Leibler divergence and gra-
+                                                                 dients are not back-propagated through the SK operation.
+with α being a temperature hyper-parameter for scaling and       Compared to SimCLR and MoCo, in BYOL and SwAV, q
+{k+} are embedded clips of the same video as q. All the     and k are not typical “query” and “key” samples (but rather
+embeddings are ℓ2 normalized and dot product (cosine) sim-     “source” and “target” samples); however, for consistency we
+ilarity is used to compare them sim(q, k) = q⊤k/∥q∥∥k∥.      use q, k terminology in notation for all methods.
+SimCLR [12] (Fig. 2a) uses the embeddings of clips of     Implementation speciﬁcs. We implement the methods
+other videos in the minibatch as negatives {k−}.              with a symmetric loss, as in original SimCLR, BYOL and
+                                                SwAV, where every input clip is used to produce a loss (and
+MoCo [36] (Fig. 2b) is a method that uses an explicit mo-     gradient) signal. For each of the ρ ≥2 clips, we compute
+mentum encoder which parameters, θm, are a moving aver-      q, while all other ρ−1 clips of the same video are used as
+age θm ←mθk + (1 −m)θ with m a momentum parameter.    {k+} to evaluate sub-loss Lq and the symmetric loss is the
+In eq. (1) MoCo uses this encoder to compute the positive     average over all ρ sub-losses. Thus, for MoCo and BYOL,
+embeddings {k+} from clips of the same video as q, and neg-     every input clip is processed by both encoders.
+ative embeddings {k−} are taken from a queue that stores        For MoCo and BYOL, our symmetric loss is aggregated
+embeddings of clips from previous iterations. There is no     sequentially which implies that memory consumption for
+backpropagation into the momentum-encoder weights θm.     ρ > 2 equals to a single clips’ forward and backward pass,
+                                                              since these methods do not backpropagate through the mo-
+BYOL [32] (Fig. 2c) can be viewed as a form of MoCo that                                                mentum encoder. For SimCLR and SwAV the overall loss is
+does not use negative samples, but an extra predictor MLP                                                             evaluated in parallel across all clips and therefore memory
+with weights θp, which is stacked on top of fθ’s MLP head.    consumption grows linearly with the number of clips used.
+For a sample q = fθp(fθ(x)), BYOL minimizes negative        All details on implementation and pre-training are in
+cosine similarity,                                                            §B.1.
+
+    Lq = − X  sim(q, k) = − X q⊤k+/∥q∥∥k∥,   (2)     4. Experiments
+            k∈{k+}            k∈{k+}
+                                                             Datasets. Unless otherwise noted, we perform unsupervised
+with {k+ =fθm(x+)} being embedded clips x+ from the      pre-training on Kinetics-400 [47] (K400) with ∼240k train-
+same video as q, encoded with momentum weights θm.         ing videos in 400 human action categories.
+
+
+                                                 3
+
+======================== PDF 第 4 页 ========================
+             data           #videos tmedian tmean   tstd  tmin   tmax            MoCo      BYOL      SimCLR      SwAV
+   Kinetics-400 (K400) [47]  240K    10.0   9.3  1.7  1.0  10.0         ρ  K400 UCF101 K400 UCF101 K400 UCF101 K400 UCF101
+   IG-Curated [24]       1M     18.9  26.3 19.8  1.5  60.0          1   61.0    90.8    60.6    91.2    36.1    84.2    38.6    74.7
+   IG-Uncurated         1M     29.4  35.3 38.4  0.5 600.0          2   65.8    91.0    65.8    92.7    60.5    88.9    61.6    87.3
+   IG-Uncurated-Short     1M     13.0  13.1  1.6 10.0  15.9          3   67.3    92.8    68.3    93.8    62.0    87.9    62.7    89.4
+Table 1. Pre-training data statistics with timings in seconds.         4   67.8    93.5    68.9    93.8            out of memory
+
+                                                                Table 2. Number of temporal clips ρ. Data: K400, 200 epochs.
+  To study learning from “in-the-wild” videos from the                                                                Learning temporally persistent features (ρ ≥2) is effective.
+web, we  pre-train  the methods on Instagram videos:
+IG-Curated [24], a dataset with hashtags similar to K400           MoCo      BYOL      SimCLR      SwAV
+classes; IG-Uncurated which has videos taken randomly       ep  K400 UCF101 K400 UCF101 K400 UCF101 K400 UCF101
+from Instagram; and IG-Uncurated-Short which is similar,      50   52.6    84.6    30.2    78.5    45.7    79.7    55.9    81.4
+but has constrained duration. Each dataset has 1M videos.       100   60.5    89.5    47.6    88.6    57.3    85.6    59.4    85.5
+   Table 1 shows dataset statistics of all datasets used for      200   65.8    91.0    65.8    92.7    60.5    88.9    61.6    87.3
+                                                                  400   67.4    92.5    66.9    92.8    62.0    87.9    62.9    88.3
+unsupervised pre-training. Most of Kinetics videos are of 10                                                                  800   67.4    93.2    66.2    93.6    61.8    88.4    63.2    89.5
+seconds in duration. IG-Curated is a dataset with Instagram
+videos that have an average duration tmean of 26.3 seconds      Table 3. Training duration in epochs (ep): Dataset: K400, ρ=2.
+                                                                  Training longer brings consistent gains for all methods up to 400and a standard deviation tstd of 29.8 seconds. The maximum
+                                                                epochs and saturates for K400 but not for UCF101 at 800ep. SwAV
+duration tmax is 60s. IG-Uncurated contains videos taken
+                                                                                       is the strongest performer for short training (50ep).
+randomly from Instagram, with larger deviation in length
+and maximum duration of 10 minutes (600s). IG-Uncurated-
+Short is a dataset consisting of random Instagram videos                                                  Temporal augmentation. The ﬁrst row in Table 2, ρ=1,
+that have a duration between 10 and 16 seconds, to study                                                            uses two spatial crops at the same temporal instance, while
+the effect of a ﬁxed duration and the assumption that short                                                               the ρ=2 row uses clips at different temporal locations as
+videos may hold more useful information for pre-training.                                                                    positives; therefore, learns persistent features in time. This
+Evaluation protocols. For evaluation we use two protocols.     difference has a large impact on performance, especially for
+  The ﬁrst one is common to evaluate unsupervised image    SimCLR (60.5 →36.1) and SwAV (61.6 →38.6) perfor-
+representations [36,12]. It validates the linear classiﬁer per-    mance degrades signiﬁcantly when sampling positives from
+formance based on frozen encoder features that are taken      the same temporal instance (ρ=1).
+from the global average pooling layer. We report top-1 clas-
+siﬁcation accuracy (%) on the K400 validation set.          More clips are beneﬁcial. The remaining rows in Table 2
+  The second protocol reports ﬁnetuning accuracy on the    show that accuracy is further increasing with the number of
+ﬁrst split of the UCF101 dataset [77] which contains 13k     temporal samples per video, e.g. at ρ=4 the best accuracy is
+videos in 101 human action classes; this is a common pro-     achieved with BYOL at 68.9% K400 and 93.8% UCF101.
+cedure used to evaluate unsupervised video representations.
+                                                         Negatives do not help but momentum encoders do.Finally, we also report ﬁnetuning accuracy on AVA [33], Cha-
+                                           When comparing the methods in Table 2, we see that:rades [75], Something-Something [31] and HMDB51 [50].
+                                                                                     (i) There is no clear performance difference between
+Architecture. By default, we use a R-50 [39] following the                                                                contrastive/non-contrastive methods.  This indicates that
+Slow pathway in [20] with clips of T=8 frames sampled with                                                              learning space-time persistence within a video is key for
+stride τ=8 from 64 raw-frames of video. The supervised                                                                 the methods, but learning in-persistence across videos is not.
+performance for training 200, 400, 800 epochs on K400 is
+                                                                                         (ii) There is a clear difference of ∼4% on K400 between
+74.7%, 74.3% and 72.7%, respectively, and does not improve
+                                                      methods that employ momentum encoders (MoCo, BYOL),
+for training longer due to overﬁtting.                                                                        vs. these that do not (SimCLR, SwAV).
+Implementation details. We follow default settings in        Increasing the number of clips per training iteration in-
+video classiﬁcation [20]. Speciﬁcs on the approaches, their     creases training cost, so it is reasonable to compare it to
+training and evaluation and the impact of implementation on      training more epochs. Table 3 is studying the base case ρ=2
+performance are provided in §B and §A.3, respectively.          for various number of epochs (ep).
+                                                                     Overall, the results show that there is a clear gain for train-
+4.1. Persistent temporal learning
+                                                            ing longer which has been also observed in image-related
+   Here, we investigate the impact of learning spatiotempo-     tasks [12,36,32,9]. BYOL performs the worst when training
+ral vs. only spatial persistent features. Table 2 shows the      short durations. This might be related to hyper-parameter
+accuracy of the four methods when trained for 200 epochs      settings which we do not adjust for this experiment (the orig-
+on K400, and evaluated on K400 (linear) and UCF101 (ﬁne-      inal implementation [32] uses different hyper-parameters for
+tuned), i.e. our default setting.                                     different number of training epochs).
+
+
+                                                 4
+
+======================== PDF 第 5 页 ========================
+4.2. Timespan between positives                       which consists of a random sampling of 1M videos from In-
+                                                             stagram. These videos can be between 0.5s and 10 minutes
+   All experiments with ρ≥2 so far were using global tempo-
+                                                             of duration. Most of the videos however are much shorter
+ral sampling of positives, which means that the clips can be
+                                                            than 10 minutes, with a mean duration of 35.3 seconds and
+sampled at unconstrained temporal locations from the input
+                                                          a standard deviation of 38.4 seconds (Table 1). For this
+video. This might be counter-productive because if there is
+                                                                    data, Table 4c shows the results of progressively increasing
+a long duration that has passed between a pair of positive
+                                                               the maximum timespan between positive samples.  It can
+clips they might no longer share the same semantic context
+                                                       be observed that increasing the maximum distance between
+for learning high-level features corresponding in time.
+                                                                   positives up to 36 seconds is beneﬁcial and beyond that per-
+                                                        formance decreases, but only slightly, even when performing    tmax in seconds    0     2     3     4     5     8     10
+   K400 acc in %   60.6   65.2   65.7   65.8   65.8   65.6   65.8       global sampling of positives (the default).
+                  (a) Dataset: K400, 200 epochs training.
+                                                               4.3. Backbone architectures
+          tmax in seconds    4      8     16     32     60
+        K400 acc in %    62.7   63.1   63.1   63.9   64.1           So far all experiments were using a R-50, 8×8 Slow
+            (b) Dataset: IG-Curated-1M, 50 epochs training.             pathway [39, 20] as backbone. The next set of ablations
+                                                                   studies different architectures for the spatiotemporal encoder.
+          tmax in seconds    12s    24     36     48    600
+        K400 acc in %    59.3   59.2   59.9   59.6   58.9                                                                                                                    training          sup.  MoCo (ρ=2)
+           (c) Dataset: IG-Uncurated-1M, 50 epochs training.                 backbone  T × τ  FLOPs  Param   s/iter  K400  K400 UCF101
+Table 4. Maximum frame distance for positives.  Method:       R-50      8×8   41.7G  31.8M  1.6s   74.7   65.8    91.0
+BYOL, ρ = 2. Training is surprisingly robust with increasing       R-18      8×8   20.0G  20.2M  1.2s   68.9   56.2    87.1
+accuracy for increased distance between samples. Accuracy only       R-101     8×8   93.3G  51.4M  2.1s   75.8   67.7    92.4
+(mildly) degrades when sampling positives that are more than 36       R-50      16×4   83.5G  31.8M  2.5s   76.1   67.6    93.3
+seconds apart when using uncurated (random) videos.                  R-50      32×2  167.0G  31.8M  4.6s   76.3   67.8    94.2
+                                                              R2+1D-18  32×2   48.5G  15.4M  4.0s   71.7   57.2    93.7
+                                                           S3D-G    32×2   36.0G  9.1M   4.1s   74.7   63.2    94.5
+   This experiment is concerned with the maximum distance
+                                                                   Table 5. Backbone comparison. The ResNet [39] backbone (Slow
+between the positive training samples. We use BYOL pre-                                                           pathway [20]) is used with different depth (R-18, R-50, R-101),
+training on K400, IG-Curated-1M and IG-Uncurated-1M      input frames T and stride τ. R2+1D [82] and S3D-G [90] are
+and report 400 linear readout accuracy in Table 4.             commonly used backbones for unsupervised video representation
+   Table 4a shows performance for increasing the maximum      learning with downstream evaluation on UCF101.
+temporal distance between positives in K400 pre-training. It
+can be seen that using positives from the same time (tmax=0)        Table 5 compares different backbones for usage with
+degrades perforance b ∼5% but other than that performance   MoCo in our default setting (ρ=2, 200 epoch pre-training
+is relatively robust up to global sampling of positive clips    on K400). From left to right, the table shows the input
+from the whole video (tmax=10s). This is interesting as it     duration T, sampling-rate τ, FLOPs (at 2242 spatial reso-
+seems that a long-temporal correspondence objectives does      lution) and parameters of these backbones, as well as the
+not hurt performance (but also does not boost it).               average duration for training one iteration of the MoCo algo-
+   Table 4b shows performance for increasing the temporal     rithm (measured on a single machine with 8 V100 GPUs in
+distance between positive samples on IG-Curated-1M. This    PySlowFast [19] and torchvision decoder), the su-
+dataset has a maximum duration of 60 seconds; statistics are     pervised performance on K400 and UCF101 (ﬁnetuned from
+in Table 1. Table 4b reveals that increasing the maximum     K400), as well as the downstream performance for K400
+duration between positive pairs is beneﬁcial for performance      linear evaluation and UCF101 ﬁnetuning.
+and unrestricted sampling of positives is the best with 64.1%      The ﬁrst observation in Table 5 is that for the Slow ar-
+top-1 accuracy for evaluation on K400. This is especially      chitecture [20], using shallower (R-18) or deeper (R-101)
+interesting, as it shows that even longer videos beneﬁt from     networks can inﬂuence supervised and downstream perfor-
+global sampling. There is no beneﬁt from restricting the time    mance in a sizable manner, with MoCo, K400 evaluation
+window of positives, which can be interpreted as the objective     beneﬁting from more parameters. Doubling the input frame-
+of learning extremely-slow features [88] that do not change      rate (8×8 →16×4) boosts accuracy on UCF101.
+over 60 seconds of video. Long-temporal-distance samples       The second observation is that R2+1D [82] has a large
+might also increase robustness of the model by providing     gap on Kinetics (71.7% supervised vs. 57.2% unsupervised),
+“hard-positive” samples for learning. Note that here the     while being remarkably strong on UCF101 (93.7%). This
+videos are still sampled according to hashtags related to     gap is also observed for S3D-G [90]. The reason for this
+K400 classes [24]; therefore, the conjecture might be biased.    might be that UCF101 is a small dataset which is easy to
+    Finally, we are looking at the IG-Uncurated-1M dataset     overﬁt and can beneﬁt from fewer parameters.
+
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+                                                                           MoCo    BYOL     SimCLR    SwAV
+
+      MoCo      BYOL      SimCLR      SwAV                67
+ ep  K400 UCF101 K400 UCF101 K400 UCF101 K400 UCF101           62
+ 50   64.8    91.1    64.1    93.5    55.5    86.4    61.0    89.0             57
+200   69.0    93.4    60.2    92.7    56.9    86.6    64.3    91.2                                                                                                                                                                                                                                                                                                           accuracy 52
+                      (a) Training                           on IG-Curated-1M.
+      MoCo                BYOL                            SimCLR      SwAV                                      linear 4742
+ ep  K400 UCF101 K400 UCF101 K400 UCF101 K400 UCF101           37
+50   61.8    90.9    58.9    90.1    52.1    85.1    56.0    86.7                                                                                                                                                                                                                                                                                                           Kinetics 32
+200   65.4    91.9    57.9    91.6    51.9    85.3    58.8    87.8
+                                                                                    27
+                    (b) Training on IG-Uncurated-1M.                                                                                    22
+      MoCo      BYOL      SimCLR      SwAV                        Base      T       T C      T S C      S C      C
+ ep  K400 UCF101 K400 UCF101 K400 UCF101 K400 UCF101
+                                                                    Figure 3. Ablating augmentations. We explore temporal (T), spa-50   61.0    89.6    62.3    91.4   53.61   86.4    55.0    86.2
+200   64.5    91.0    57.0    90.9   55.97   86.9    58.4    87.2          tial (S), and color (C) augmentations to learn persistent features.
+                 (c) Training on IG-Uncurated-Short-1M.
+Table 6. Training on curated (a), uncurated (b) and short duration
+                                                                                         (ii) When minimizing the augmentations by resizing the
+video (c) data from the web. Longer training degrades performance
+                                                                 shorter size of the video to the input size of 224 and onlyfor BYOL, possibly due to suboptimal hyper-parameters. ρ=2.
+                                                          cropping along the long side of the video (Base in Fig. 3),
+                                        MoCo  still provides 42.2% K400 linear accuracy, over
+4.4. Uncurated data and video duration             BYOLs’ 32.4%, showing an advantage of the contrastive
+                                                                   loss in a weak augmentation scenario.
+   In Table 6 we show the performance of all four method-                                                                                             (iii) Among the augmentations, learning temporal (T) per-
+ologies on IG-Curated-1M (a), IG-Uncurated-1M (b) and                                                                    sistency, has the largest impact on performance, except for
+IG-Uncurated-Short-1M (c) for pre-training with 50 and 200                                         MoCo which beneﬁts more from color (C) (incl. grayscale)
+epochs. We make the following observations:                                                           augmentations. Especially SimCLR and SwAV show sig-
+    (i) Among the methods MoCo performs the best with e.g.                                                            niﬁcant drops in performance when removing T, i.e. when
+69.0% vs. second-best 64.3% of SwAV on curated data (a).                                                                  extracting positive clips from the same instance in time.
+    (ii) MoCo and SwAV scale the best for training longer,                                                                   In the remainder of this section, we explore using stronger
+gaining roughly 3-4% for 200ep vs. 50ep.                                                           augmentations than the default ones in previous experiments.
+    (iii) On uncurated data, MoCo and SwAV perform ∼1%                                        We perform the ablations with MoCo in the basic setting of
+better on the unconstrained duration videos in Table 6b.                                                   ρ = 2, 200 epochs K400 pre-training.
+    (iv) BYOL and SimCLR show better performance on
+IG-Uncurated-Short (10-16s videos) in Table 6c, seemingly           color      grayscale     temporal     fps         accuracy
+beneﬁting from shorter videos, but there is no clear beneﬁt          strength    probability    difference     jitter   K400   UCF101
+                                                                                   0.5          0.2                             65.8      91.0
+from either longer or shorter duration among all methods.
+                                                                               0.75         0.2                             66.0      92.1
+   (v) BYOL degrades performance for training longer            1.0          0.2                             65.8      91.2
+which might be due to the requirement of different hyper-           0.5          0.4                             65.5      91.0
+parameters for different schedules (as noted in Sec. 4.1).               0.5          0.2      ✓                66.2      91.3
+                                                                                   0.5          0.2           ✓     65.6      91.5
+  We will return to this point in §A.1, where we show that
+                                                                 Table 7. Radiometric augmentation.  Method: MoCo, 200increasing clips-size ρ can overcome this issue in BYOL,
+                                                                  epochs, ρ = 2.  Dataset: K400.  Stronger color augmentation
+along with further studies on the trade-off against training
+                                                                           in K400 pre-training can especially beneﬁt UCF101 (+1.3%).
+more epochs, and dataset scale.
+
+                                                        Stronger color augmentation. In Table 7 color strength4.5. Data augmentations
+                                                             of 0.5 indicates the default one for MoCo [14], 0.75 and
+Importance of augmentations. Augmentations can have a     1.0 increase the strength of randomly jittering brightness,
+major impact on visual unsupervised feature learning [12,      contrast, saturation and hue proportionally.
+14].  In Fig. 3, we ablate spatial cropping (S), temporal        Table 7 shows that increasing it to 0.75 can improve
+clipping (T) and radiometric color (C) augmentations from    K400/UCF101 accuracy. Increasing the random grayscale
+the four unsupervised learning methods (e.g. “T S C” are      probability from 0.2 to 0.4 does not provide an improve-
+the baselines using all augmentations and removing “S C”    ment on either of the datasets. However, using a temporal-
+equals ρ=1 in Table 2). We make three main observations:      difference augmentation which randomly (with probability
+    (i) Among the methods, MoCo and BYOL perform most      0.2) ﬁrst converts the frames to grayscale and then subtracts
+robust for using fewer augmentations; their advantage over    them across time, can increase K400 accuracy by 0.4%. Fi-
+SimCLR and SwAV might be related to the momentum      nally, using frame-rate jittering of ±50% of the original
+encoder which can provide extra augmentation in training.      frame-rate does not improve K400 but UCF101 slightly.
+
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+                  area           aspect        accuracy
+                [ min,     max]       ratio   K400   UCF101               4.6. Alternative downstream tasks
+            default [76,39,20]              65.8      91.0
+            [0.49,      0.76]               64.8      91.7                The gap between K400 and UCF101 accuracy in Sec. 4.3
+            [0.49,      0.76]    ✓      65.4      91.7
+                                                            question if solely looking at typical evaluation of UCF101            [0.20,      0.76]    ✓      66.8      91.8
+            [0.20,      0.50]    ✓      66.3      91.8                 (or the smaller HMDB51) is enough to identify and rank
+            [0.20,      1.00]    ✓      66.6      91.7               approaches for unsupervised learning in video.
+            [0.08,      0.50]    ✓      64.3      91.6                                                             Table 10 studies several new downstream tasks for un-
+            [0.08,      1.00]    ✓      65.3      91.2
+                                                            supervised representation learning in video. We use our
+Table 8. Cropping augmentation. Method: MoCo, 200 epochs,
+                                              MoCo, SimCLR, BYOL and SwAV models trained with
+ρ = 2. Dataset: K400. Stronger cropping and aspect ratio augmen-
+                                            ρ=3 for 200 epochs on K400 and evaluate their performancetation can be beneﬁcial by +1.0% (K400) and 0.7% UCF101.
+                                                   by ﬁnetuning on Charades [75], AVA [33], or Something-
+Spatial cropping. Our default implementation uses VGG-    Something [31] (in addition to the K400 linear readout per-
+style [76, 39] cropping that randomly resizes the shorter     formance and UCF101 performance reported in Table 2).
+spatial side of a video between [256, 320] pixels and takes a      Details on implementation are given in §B.
+random 2242 crop extended over time to extract a clip [20].       The ﬁrst two rows in Table 10 show the two main com-
+   Since unsupervised learning might beneﬁt from more ag-     petitors for this evaluation: (i) training from scratch on the
+gressive cropping, we explore Inception-style [80] cropping      datasets and (ii) K400 pre-training. First, we observe that
+with aspect ratio augmentation that is commonly used in     the supervised pre-trained backbones outperform the train-
+unsupervised learning from images [36,12,32,9]. This crop-     from-scratch counterpart signiﬁcantly, as expected.
+ping procedure randomly resizes the input area between a
+                                                Downstream datasets. For K400 pre-training and linearminimum scale and a maximum scale and jitters aspect ratio
+                                                                evaluation, its supervised counterpart has an advantage be-between 3/4 to 4/3, before taking a 2242 crop.
+                                                       tween 12.7% and 6.4% top-1 accuracy among the methods.  We do not change the cropping for downstream training,
+                                             On UCF101 unsupervised pre-training is only 1% loweras this can drop accuracy signiﬁcantly (by ∼2% on K400).
+                                                             than the supervised counterpart for BYOL (the strongest).   In Table 8 we ablate this approach for MoCo (the aug-
+                                            On AVA short-term action detection we observe that thementation in the downstream evaluators are unchanged).
+                                      BYOL pre-trained model is able to outperform the super-   The ﬁrst ablation shows the comparison of default crop-
+                                                             vised counterpart by +1.2% mAP, when using the same,ping [76, 39] with a similar version that randomly crops a
+                                                     ﬁxed region proposals [20]. This result is signiﬁcant, as e.g.fraction between [0.49, 0.76] = [2242/3202, 2242/2562] of
+                                                           switching from K400 to K600 (nearly double the size ofthe original area, instead of the short-side. The performance
+                                                    K400) pre-training on AVA leads to a smaller gains in perfor-degrades by 1% on K400 linear evaluation. Randomly crop-
+                                                  mance [20]. Overall this is a surprising result as the tasks inping based on area favors larger crops over the short-side
+                                                K400 and AVA are similar [52], only that the temporal granu-resizing and we observe lower training error for this variant.
+                                                                            larity of the actions in AVA is ﬁner while their semantic gran-   Next, adding aspect ratio augmentation can recover some
+                                                                       ularity is coarser; e.g. “shoot” in AVA vs. “playing paintball”of this performance (65.4%), and using a smaller minimum
+                                                                  in Kinetics, which might be better captured by the BYOLarea of 0.2, with the maximum area of 0.76 leads to best
+                                                                objective which solely works on positive temporal samplesperformance of 66.8%. Using the default values for Incep-
+                                                                of a video, without contrasting them to other videos (“shoot”tion [80] training, [0.08, 1.00], appears to be too aggressive.
+                                                       might be a positive appearing in many different videos and
+               MoCo (ρ=4)   BYOL (ρ=4)                   contrasting them could be harmful to downstream perfor-
+            aug+   K400  UCF101 K400  UCF101               mance). This line of thinking is supported with MoCo’s
+                        67.8    93.5    68.9    93.8                    (contrastive objective) performance that is 3.1% worse than
+         ✓     69.0    93.6    69.8    93.9                                      BYOL on AVA. Similarly, SimCLR (contrastive) is worse
+Table 9. Stronger augmentations.  Data: K400, 200 epochs.                                                             than SwAV (non-contrastive) when benchmarked on AVA.
+“aug+’’ combines the best color and cropping augmentations from
+                                            On Charades, long-term action classiﬁcation, we ob-
+Table 7 and Table 8, respectively.
+                                                             serve the opposite. Here, the contrastive MoCo is clearly
+Combined augmentations. We pull together the best color      the best performer with 33.5% mAP (close to the supervised
+and cropping augmentations in Tables 7 & 8, and train MoCo      pre-training performance of 34.7% mAP), while the non-
+and BYOL with ρ=4 for 200ep on K400. The result shown      contrastive BYOL is 12.5% lower. Similarly, now SimCLR
+as “aug+” in Table 9 can increase performance on K400      (contrastive) is better than SwAV (non-contrastive). Com-
+by ∼1%. Training the linear classiﬁer of BYOL (ρ=4) for     pared to AVA, Charades is a temporally less localized dataset
+100ep instead of 60ep leads to our best accuracy of 70.0% on     containing activities that need to be recognized from a longer
+K400, which is 4.7% below the supervised R-50, Slow 8×8     temporal range video, for which contrastive pre-training ap-
+accuracy of 74.7%.                                           pears to be outperforming the non-contrastive variants.
+
+
+                                                 7
+
+======================== PDF 第 8 页 ========================
+                                                      linear protocol                          ﬁnetuning accuracy
+            method         pre-train          K400          UCF101     AVA (mAP)    Charades (mAP)    SSv2
+              supervised     scratch               74.7              68.8           11.7            7.4                  48.8
+              supervised    K400-240K              -                  94.8           22.2            34.7                 52.8
+         SimCLR                           62.0 (−12.7)       87.9 (−6.9)     17.6 (−4.6)     11.4 (−23.3)         52.0 (−0.8)
+         SwAV                              62.7 (−11.5)       89.4 (−5.4)     18.2 (−4.0)     10.7 (−24.0)         51.7 (−1.1)
+                       K400-240K
+        BYOL                             68.3 (−6.4)        93.8 (−1.0)     23.4 (+1.2)     21.0 (−13.7)         55.8 (+3.0)
+         MoCo                              67.3 (−7.4)        92.8 (−2.0)     20.3 (−1.9)     33.5 (−1.2)          54.4 (+1.8)
+         MoCo       IG-Curated-1M       69.9 (−4.8)        94.4 (−0.4)     20.4 (−1.8)     34.9 (+0.2)          54.5 (+1.8)
+         MoCo       IG-Uncurated-1M     66.0 (−8.7)        92.9 (−2.1)     20.5 (−1.7)     31.3 (−3.4)          53.2 (+0.4)
+Table 10. Downstream benchmarks: We use linear evaluation on K400 and ﬁnetuning accuracy on the other datasets. 200 epochs. ρ=3.
+
+
+                                                                   method    pre-train  backbone  param T  mod UCF HMDB K400
+  On Something-Something v2 (SSv2 in Table 10), all    XDC [3]    K400    R(2+1)D-18 15.4M 32 V+A  84.2   47.1
+the methods perform strong, with BYOL pre-training show-   GDT [68]   K400    R(2+1)D-18 15.4M 32 V+A  89.3   60.0
+ing the largest gain of +3% over supervised pre-training on   MMV [2]   AS+HT S3D-G     9.1M 32  V+A+T  92.5   69.6
+                                                                  SpeedNet [7] K400   S3D-G     9.1M 64  V   81.1   48.8
+Kinetics (55.8% vs. 52.8% top-1 accuracy).                                                    CoCLR [35] K400   S3D-G     9.1M 32  V   87.9   54.6
+                                                    CoCLR [35] K400   2×S3D-G  9.1M 32  V   90.6   62.9
+Pre-training sets: Kinetics vs. IG. Next, we experiment    VTHCL [92] K400    R-50     31.8M  8  V   82.1   49.2    37.8
+with pre-training on videos from the web. We ﬁrst investigate    CVRL [71]  K400    R-50     31.8M 32  V   92.2   66.7    66.1
+IG-Curated-1M [24], which is a dataset that has been col-   ρBYOL     K400    R-50     31.8M  8  V   94.2   72.1    70.0
+lected with hashtags that are similar to Kinetics labels. This    ρBYOL     K400    R-50     31.8M 16  V   95.5   73.6    71.5
+data is a 1M subset of the original 65M introduced in [24].   ρBYOL     K400    R(2+1)D-18 15.4M 32  V   94.4   72.2
+                                                ρBYOL     K400   S3D-G     9.1M 32  V   96.3   75.0
+Using this data (penultimate row in Table 10) can excel the                                                                 Table 11. Comparison with state-of-the-art. “param” indicates
+performance of MoCo with K400 pre-training, which has a                                                                      the number of parameters, T inference frames, in the backbone.
+training set of 240K samples (roughly 4.2× smaller), and    “V” is Vision, “A” is Audio, “T” Text modality. ρBYOL is our
+surprisingly even outperforms pre-training on K400 linear      best model trained with temporal persistency of ρ=4. We report
+readout itself (69.9% vs. 67.3% accuracy).                       ﬁne-tuning accuracy on UCF/HMDB and linear accuracy on K400.
+   Second, we ablate the effect of using uncurated videos,
+with IG-Uncurated-1M which are purely random videos    (V+A+T), with the latter training on a Audioset (AS) [23]
+taken from the web. On most downstream tasks perfor-    and HowTo100M (HT) [59], and CoCLR [35] can be seen
+mance shown in the last row of Table 10 is equal or only     as a variant of MoCo on rgb and optical-ﬂow input.
+slightly lower than pre-training on K400. Speciﬁcally, MoCo        In comparisons, our best performing model ρBYOL,
+changes by -1.3% on K400 (as expected), +0.1% on UCF,    which is BYOL trained with temporal persistency over
++0.2% on AVA, -2.2% on Charades and -1.2% on Something-   ρ=4 clips, (cf. Tables 2 & 9), provides a substantial per-
+Something v2. This is an encouraging result for unsuper-    formance gain over the best published method [35]: +5.7%
+vised learning, as only ∼4.2×the number of videos but ran-    and +12.1% top-1 accuracy on UCF101 and HMDB51 (us-
+dom ones are required to match the performance of super-     ing identical backbone and pre-training data).
+vised K400 pre-training on the UCF101 and AVA.            On K400 linear evaluation with the same data and R-50,
+   Overall, our  results indicate  that unsupervised pre-    Slow pathway [20] as backbone, our approach outperforms
+training can be a new paradigm for all of these downstream      the concurrent CVRL [71] by +5.4% accuracy.
+tasks, for which supervised pre-training is the de-facto stan-
+dard to achieve best performance.  Further, the large dif-     5. Conclusion
+ference in performance for pre-training methodologies and                                                               This paper has studied four meta-methodologies for unsu-
+objectives (e.g. contrastive/non-contrastive) revealed in the                                                              pervised learning from video. Our ﬁndings include that it is
+light of these benchmarks signals large room for future work.                                                              beneﬁcial to sample positives with longer timespans between
+                                                           them, contrastive objectives are less inﬂuential than momen-
+4.7. Comparison to previous work
+                                                  tum encoders, and training duration, backbones, video aug-
+   In a ﬁnal experiment we take the best model from Ta-     mentation and curation are all critical for good performance.
+ble 9 and compare it with the state-of-the-art using the com-    Our resulting models which learn persistent features across
+monly used protocols on UCF101 and HMDB51 (across all     augmented spacetime clips set a new state-of-the-art.
+3 train/val splits) and K400. In Table 11 we show the results.     We observed that linear readout on Kinetics is a good
+   The strongest previous approaches are using multi-modal      indicator of the performance on other datasets and that un-
+input, Vision “V”, Audio “A”, Text “T”, to train a contrastive     supervised pre-training can compete with the supervised
+objective across modalities; XDC [3] performs DeepClus-     counterpart on several datasets, but there is room for im-
+ter [8] on (V+A), CVRL [71], GDT [68] and MMV [2]     provement. We hope that our baselines will foster research
+use an objective similar to SimCLR on (V), (V+A), and     and provide common ground for future comparisons.
+
+
+                                                 8
+
+======================== PDF 第 9 页 ========================
+   This appendix provides additional material: §A contains                 Kinetics     IG-Curated     IG-Curated-Unbalanced     IG-Uncurated
+further results on “in-the-wild” data (§A.1), Kinetics-600           70
+(K600) [10] and Kinetics-700 (K700) [11] data (§A.2) and           65
+on the effect of key implementation details (§A.3).                                                                       accuracy 60
+  §B contains additional implementation details for: Unsu-
+                                                                                   55                                                                                                                                                                                                                                linearpervised pre-training (§B.1), and downstream evaluation in
+Kinetics (§B.2), AVA (§B.3), Charades (§B.4), Something-           50
+                                                                                   45Something V2 (§B.5), UCF101 (§B.6), HMDB51 (§B.7).                                        Kinetics
+
+                                                                                   40
+A. Additional Results                                                      128K          240K          512K         1M
+                                                                                                          Data scale in #videos
+A.1. Scaling “in-the-wild” data
+                                                                    Figure 4. Data scale and curation. We increase dataset size (num-
+  As a follow-up experiment Table 12 compares training      ber of videos) for IG-Curated, IG-Curated-Unbalanced, and IG-
+BYOL longer (200ep) to increasing its clips-size ρ but not      Uncurated. By using 4× the number of videos, IG-Uncurated
+training longer (50ep). For both (a) curated and (b) random     approaches the heavily curated Kinetics (K400) pre-training on
+data, this results in a signiﬁcant gain of performance.          K400 linear evaluation protocol. The dotted line represents a linear
+                                                                           trend. Method: MoCo, 200 epochs, ρ=2.
+             BYOL              BYOL
+        ρ  ep K400 UCF101      ρ  ep K400 UCF101          IG-Uncurated (which are random IG videos). The experi-
+        2  50  64.1    93.5        2  50  58.9    90.1
+                                                     ment with 200-epoch MoCo with ρ=2, linear protocol down-
+        2 200  60.2    92.7        2 200  57.9    91.6
+        4  50  67.7    94.5        4  50  63.8    91.8            stream evaluation on K400 is shown in Fig. 4 and reveals:
+              (a) IG-Curated-1M.       (b) IG-Uncurated-1M.                    (i) Comparing the curation axis: At 240K training sam-
+                                                                    ples, the four data sources provide 65.8%, 63.2%, 63.1%,
+Table 12. More epochs (ep) vs. more clips (ρ), Longer training    60.6% top-1 accuracy for K400, IG-Curated, IG-Curated-
+degrades performance for BYOL, but increasing ρ does not.                                                        Unbalanced and IG-Uncurated, respectively. The decay from
+                                                                the heavily curated K400 to IG-Curated (2.6%) is similar to
+  We also explore an experiment for increasing the clip-                                                                the one from IG-Curated to IG-Uncurated (2.5%), while the
+size in MoCo and training longer (as MoCo works stable for                                                                   class balancing seems to have a minor effect on accuracy.
+more epochs). Table 13 shows the results. It can be observed
+                                                                                       (ii) Comparing the scale axis: Doubling the data scale
+that increasing the number of clips from ρ=2 to ρ=3 can
+                                                     (number of videos) roughly linearly increases the accuracy
+increase the results by 1.6%/0.9% K400 and 0.4%/1% on
+                                                             across all datasets. With 1M uncurated videos the perfor-
+UCF101 for 100/200ep training. Going to ρ = 4 brings
+                                                  mance approaches 65.4% which is similar to the 65.8% pro-
+further gain. In terms of efﬁciency, increasing ρ is both more
+                                                        duced by using K400 pre-training. The experiment indicates
+accurate and faster than increasing the number of epochs, e.g.
+                                                                    that it is possible to approach unsupervised Kinetics pre-
+training MoCo (ρ=3, 100ep) takes only 63% of the duration
+                                                                    training when using 4×more (1M vs. 240K in Kinetics), but
+that MoCo (ρ=2, 200ep) requires.
+                                                      random, videos when evaluating on Kinetics.
+
+         MoCo (ρ=2)  MoCo (ρ=3)  MoCo (ρ=4)
+        ep  K400 UCF101 K400 UCF101 K400 UCF101          A.2. Scaling Kinetics data
+       100   67.5    93.3    69.1    93.7    69.8    94.9
+       200   69.0    93.4    69.9    94.4    69.9    94.9             As referenced in Sec. 4 of the main paper, Table 14 shows
+                                                         a series of extra results for pre-training on the larger-scaleTable 13. More epochs (ep) vs. more clips (ρ):  Dataset: IG-
+Curated-1M, ρ=2. Training longer is less effective than increasing     Kinetics-600 (K600) [10] and Kinetics-700 (K700) [11]
+the number of temporal clips per iteration (ρ).                        datasets, and is analyzed next: The ﬁrst row of the table
+                                                     shows supervised training on the respective datasets, where
+   Finally, we remark that the IG-Curated-1M is subsam-    UCF101 has two entries, one for training-from-scratch and
+pled such that the hastags are uniformly distributed (roughly     one for using K400 as pre-training.
+balanced). Therefore this dataset is matching K400 in terms       For the experiments we focus on our temporally persis-
+of content and distribution. We revisit this point next by      tent MoCo algorithm and, as in the main paper, evaluate
+investigating the effect of scale, curation and balancing of     Kinetics with the linear classiﬁcation protocol and UCF101
+the video data.                                       by ﬁnetuning all weights. The ﬁrst unsupervised row in
+   In this experiment, we increase the scale of the data     Table 14 shows our best K400 pre-trained MoCo (ρ=4)
+from 128K to 1M distinct videos. We increase dataset     model, achieving 69.0%, 70.0%, 54.2% and 93.6% on K400,
+size (number of videos) for IG-Curated [24], IG-Curated-    K600, K700 and UCF101, respectively (this is the model
+Unbalanced [24] (which has random class distribution), and     with strong augmentations from Table 10 of the main paper).
+
+
+                                                 9
+
+======================== PDF 第 10 页 ========================
+                                                            pre-train                                             ﬁnetune
+                           method           data      #videos     K400     K600     K700    UCF101
+                                                        scratch             74.7        78.1        65.2        68.8
+                               supervised
+                                      K400      240k                linear protocol               94.8
+                   MoCo (ρ=4)     K400      240k        69.0        70.0        54.2        93.6
+                   MoCo (ρ=2)                               69.6        70.7        55.1        92.7
+                                      K600      387k
+                   MoCo (ρ=4)                               71.5        72.8        57.7        94.5
+                   MoCo (ρ=2)                               70.0        71.4        56.2        92.8
+                                      K700      522k
+                   MoCo (ρ=4)                               71.7        73.2        58.1        94.8
+
+Table 14. Dataset scale: Conﬁguration: backbone: R-50, Slow 8 × 8, 200 epochs. Our approach, MoCo (ρ=4), is able to approach
+supervised pre-training on the popular UCF101 evaluation protocol, but there remains a gap for the linear protocol on K400, K600 and K700.
+
+   The next row shows MoCo trained on K600 with a tempo-                      MoCo    BYOL     SimCLR    SwAV
+ral persistency objective across two clips, ρ=2. This version                70
+is able to slightly outperform the K400 pre-trained variant                60
+on all datasets, except UCF101. Directly comparing thisversion with learning temporal persistency across ρ=4 clips                                                accuracy 50
+
+                                                                                                40can signiﬁcantly increase accuracy on all datasets by ∼2%.                                      linear
+   The ﬁnal two rows of Table 14, show the same two models                30
+when pre-trained on K700. Here, we see that going from                                                Kinetics 20
+K400 to K700 increases accuracy by 2.7%, 3.2% and 3.9%,
+1.2% on K400, K600, K700 and UCF101, respectively.                     10       None          LARS          LARS          LARS
+   Overall the experiments suggest clear beneﬁts of using                                                     SyncBN         SyncBN
+                                                                                                                               MLP-BN
+larger-scale datasets for unsupervised pre-training and room                                                                    Figure 5. Key implementation speciﬁcs. BYOL, SimCLR, SwAV
+for improvement under the linear classiﬁcation protocol,                                                                    heavily rely on LARS, SyncBN, and BN in the MLP (MLP-BN),
+especially when evaluated on larger datasets.              MoCo does not require these, but does not beneﬁt of having them.
+
+A.3. Key implementation speciﬁcs                     Normalization and optimization. Here, we present nor-
+                                                            malization speciﬁcs that we found critical to achieve good   While the full implementation details of all four meta-
+                                                        performance in the underlying implementation of the meth-methodologies are provided in §B.1, we want to discuss the
+                                                             ods: SimCLR, BYOL and SwAV are using synchronizedmost impactful ones, which we found critical to achieve good
+                                                           Batch-Normalization (BN) [42] statistics (SyncBN) across 8performance in their realizations, throughout this section.
+                                            GPUs during training, batch-normalization after every MLP
+                                                                layer (MLP-BN), and a large-batch optimizer (LARS) [93].     mbase   N/A    0.988    0.990    0.992    0.994    0.996
+       acc.     64.5    65.5     65.5     65.6     65.8     65.1       LARS adaptively scales the learning rate for each individual
+Table 15. Momentum annealing for MoCo. Dataset: K400, 200     parameter by using the ratio between gradient and parameter
+epochs, ρ= 2. Using cosine-annealing of the momentum brings     magnitudes. MoCo is not using these components (None) by
+gains of ∼1% accuracy. We use 0.994 as default for MoCo.             default. In Fig. 5 we illustrate the results. It shows accuracy
+                                                     on K400 linear readout, if step-by-step adding these speciﬁcs
+Momentum annealing. BYOL is using an annealing of the      to the methods. We make the following observations:
+rate at which parameters of the momentum encoder θm, that           (i) Using None of the augmentations provides best per-
+are a moving average, with momentum m, of the trained     formance for MoCo (its default) but signiﬁcantly degrades
+encoder θ. During training BYOL starts with a momentum    BYOL, SimCLR and SwAV. Here, it is worth noting that
+of mbase=0.996 and increases it to 1 with a cosine anneal-   BYOL provides decent accuracy of 32.9% without SyncBN,
+ing m = 1 −(1 −mbase) · (cos(πk/K) + 1)/2 with k the    LARS and any BN in the MLP.
+current iteration and K the maximum number of training           (ii) Adding LARS optimizer reduces performance in
+iterations [32] (this is unrelated to the learning rate decay).    MoCo and BYOL, while having a boost of around 10% for
+  By default MoCo, is using a ﬁxed momentum of m =     both SimCLR and SwAV. It is interesting, that solely using
+0.999 during training. In Table 15, we ablate the positive     a more advanced optimizer, which adapts the learning rates
+(or negative) effect of using momentum annealing with dif-     of the weights according to their gradient magnitudes, de-
+ferent starting rates mbase for MoCo. We observe that not      creases performance in methods using a momentum encoder
+using any annealing (N/A) produces 64.5% accuracy and    (MoCo, BYOL), but boosts it without (SimCLR, SwAV).
+using momentum annealing can boost this performance by            (iii) further adding SyncBN and MLP-BN increases BYOL
+∼1%, while being relatively stable for different values of     performance dramatically; this related to recent studies [73]
+mbase. Consequently, we are using momentum annealing    which suggest that normalization is important to achieve
+with mbase = 0.994 for all our MoCo experiments.            good performance using BYOL.
+
+
+                                                 10
+
+======================== PDF 第 11 页 ========================
+                                                                                                                            training             accuracy
+                                                                   method    MLP layers
+    (iv) While BYOL, SimCLR and SwAV do show further                             FLOPs    Param    K400   UCF101
+                                                                                  2         41.74G    72.2M     64.6      91.3
+gains for adding SyncBN and MLP-BN, MoCo shows no sig-                                                    MoCo          3         41.74G    80.6M     65.8      91.0
+niﬁcant change for using SyncBN, and degrades drastically                       4         41.75G    88.9M     65.7      91.0
+in performance for using BN in the MLP-head.                                        2, predictor: 2   41.75G    86.4M     65.8      92.7
+                                                  BYOL       3, predictor: 2   41.77G   119.9M    65.8      92.0
+Projection MLP.  It has been shown that using a deeper                       3, predictor: 3   41.78G   153.5M    63.6      90.2
+projection MLP in pre-training can increase the accuracy of                       2         41.74G    36.1M     59.0      88.4
+the resulting representations for image classiﬁcation [12,14,      SimCLR        3         41.75G    40.3M     60.5      88.9
+                                                                                  4         41.75G    44.5M     60.6      88.5
+13]. Here, we investigate the effect of more hidden layers for                       2         41.74G    36.2M     60.3      88.1
+video classiﬁcation, across all four meta architectures. The      SwAV          3         41.75G    40.4M     61.6      87.3
+results are shown in Table 16 and discussed next.                                 4         41.75G    44.6M     62.0      87.1
+                                                                 Table 16. Varying depth of MLPs. Dataset: K400, 200 epochs,    (i) MoCo achieves a signiﬁcant gain of 1.2% on K400
+                                                        ρ=2. Training complexity is measured in ﬂoating point operationsfor using a 3-layer (2 hidden layers) MLP vs. using a 2-
+                                                           (FLOPs) and Parameters. Accuracy is reported as linear evaluation
+layer MLP and there is no gain for using a 4th layer. UCF
+                                                            (K400) and ﬁne-tuning (UCF101) of the backbone without MLPs.
+performance appears stable to this modiﬁcation. The gain is
+in line with results in image classiﬁcation [14].
+    (ii) For BYOL, which has an additional Predictor MLP,     synchronizing across 8 GPUs (SyncBN) for BYOL, SimCLR
+with weights θp (see Fig. 2c), we ablate two dimensions: in-    and SwAV. We adopt a half-period cosine schedule [56] of
+creasing the projection depth, and the prediction depth. Our      learning rate decaying: the learning rate at the n-th iteration
+results show that using 3-layer projection vs. 2-layer does       is η·0.5[cos( nmaxn π)+1], where nmax is the maximum training
+not affect performance on K400, and has a decay of -0.7%      iterations and the base learning rate η is set for each method
+on UCF101. Increasing also the depth of the predictor from      to ηMoCo = 0.4, and ηSimCLR = ηBYOL = ηSwAV = 4.8.
+our default value of 2 to 3 layers will lead to a signiﬁcant   We apply (LARS) [93] (except for bias and BN parame-
+decrease of -2.2% and -2.5% on both K400 and UCF101.        ters [32]), with trust coefﬁcient of 0.001, for BYOL, Sim-
+    (iii) SimCLR, shows similar behavior as MoCo: A con-    CLR, and SwAV training. The SGD weight decay is 10−4
+sistent gain for using 3 projection layers (+1.5% on K400,     for MoCo and 10−6 for for BYOL, SimCLR and SwAV.
++0.5% on UCF101), and no further gain for a 4-layer MLP.     The temperature parameter α = 0.1 for MoCo, SimCLR
+    (iv) SwAV shows continuing gains on K400 for adding     and SwAV. The projection MLP output dimensions are
+more MLP layers, +1.3% for going from 2 to 3 and another     dMoCo = dSimCLR = ηSwAV = 128, and dBYOL = 256, as in
++0.4% for 4-layer MLP; however, its UCF-101 performance      their original publications [36,12,9,32].
+is decaying with more projection layers.               MoCo details. We use a queue storing 65536 negatives and
+   Overall, Table 16 suggests that K400 linear evaluation ac-     shufﬂing BN to avoid intra-batch communication among
+curacy gernally beneﬁts from deeper projection heads, while     samples [36]. We use a 3-layer (2 hidden layers, abla-
+the performance for ﬁne-tuned UCF101 downstream perfor-     tion in Table 6 of the main paper) projection MLP with
+mance is relatively unchanged and rather shows a decaying     hidden dimension 2048, ReLU activation [63] and no BN.
+effect for deeper MLPs. When studying the training com-     Other hyperparameters are as in [36,14]. The momentum
+plexity for pre-training, which we measure as ﬂoating point     encoder weights θm are updated with an annealed momen-
+operations (FLOPs) and Parameters for the full training ar-    tum m = 1 −(1 −mbase) · (cos(πk/K) + 1)/2 with k the
+chitecture (encoders + MLPs), Table 16 shows that FLOPs      current iteration and K the maximum number of training iter-
+are mostly unchanged by deeper MLPs (as they operate on      ations [32], starting with mbase = 0.994. The corresponding
+feature maps of size 1×1×1), but parameters increase lead-     ablation is in Table 3 of the main paper.
+ing to large models especially for momentum encoder based
+                                     BYOL details. Our BYOL implementation uses a momen-approaches (MoCo and BYOL).
+                                                 tum annealing starting from mbase = 0.996. We minimize
+B. Additional Implementation Details                the negative cosine similarity in equation (2) of the main
+                                                          paper multiplied by 2 which is equivalent to BYOL’s MSE
+B.1. Unsupervised pre-training                            of ℓ2-normalized vectors [32]. The projection and prediction
+                                            MLPs have 2 layers (one hidden layer with dimension 4096)
+Training details. We use the initialization outlined in [38].
+                                                      and use BN following the original publication [32].
+The projection and prediction MLP weights are initialized
+with [27]. We optimize with synchronized SGD training    SimCLR  details. We  follow  the  default implementa-
+on 64 GPUs with a mini-batch size of 8 clips per GPU;     tion [12]. We use a 3-layer projection MLP with a hidden
+therefore, the total mini-batch size is 512. We train with     dimension of 2048, ReLU and BN. The loss in equation (1)
+Batch Normalization (BN) [42], and the BN statistics are     of the main paper is computed synchronized over the full
+computed within each 8 clips for MoCo and 64 clips by     batch size.
+
+
+                                                 11
+
+======================== PDF 第 12 页 ========================
+                                                                                           stage          kernels        output sizes T×S2
+SwAV details. We follow the default implementation [9],              raw clip               -           Tτ×2242
+using 3 Sinkhorn-Knopp iterations [15] and freezing the                data layer       stride τ, 12        T×2242
+prototypes for the ﬁrst epoch. The Sinkhorn regularization
+                                                                                      1×72, 64
+parameter is set to 0.05. As in the default implementation [9],                conv1                     T×1122                                                                                                                    stride 1, 22
+the matrix normalization statistics of the Sinkhorn-Knopp                        1×32 max
+                                                                                   pool1                     T×562algorithm are computed synchronized over the full training                                    stride 1, 22
+batch. The projection MLP uses ReLU and BN and is identi-                  1×12, 64 
+cal to the one used in [9], only that we use a 3-layer MLP                    res2    1×32, 64 ×3     T×562
+                                                                                    1×12, 256instead of 2 (ablations are in Table 6 of the main paper).
+                                                           1×12, 128 
+Encoder details. Our default encoder, fθ, is a R-50 Slow                    res3   1×32, 128 ×4     T×282
+model [20], i.e. a ResNet-50 [39] with a temporal dimension                         1×12, 512
+of size T and sample rate τ. We perform all ablations with                  3×12, 256 
+                                                                                             res4                                                                                    1×32, 256 ×6     T×142                                                          default T×τ of 8×8. We show the architecture in Table 17.                                                                                    1×12, 1024
+Augmentation details. We perform video decoding and                  3×12, 512 
+                                                                                             res5      1×32, 512          T×72data augmentation using PyTorch’s torchvision package.                           ×3
+                                                                                    1×12, 2048
+  We obtain different clips from a video by the following
+                                                                                   pool5    global average pool      1×12
+procedure. For the temporal dimension, we randomly sam-                                                                Table 17. R-50, Slow pathway [20]. The dimensions of kernels
+ple a clip (of T×τ frames) from the full-length video, and                                                                      are denoted by {T×S2, C} for temporal, spatial, and channel
+the input to the ResNet encoder are T frames subsampled       sizes.  Strides are denoted as {temporal stride, spatial stride2}.
+from the raw clip with a stride of τ; for the spatial dimen-     Non-degenerate temporal ﬁlters are underlined. Residual blocks
+sion, we randomly crop 224×224 pixels from a video, or      are in brackets. Temporal pooling is only performed at the last
+its horizontal ﬂip, with a shorter side randomly sampled in       layer, collapsing spacetime dimensions. By default T×τ = 8×8.
+[256, 320] pixels [20] (VGG-style [76,39] spatial cropping,
+a comparison to Inception-style [80] cropping, which we use     cosine schedule as for pre-training (Sec. B.1) with a base
+for results in §4.5, is given in Table 9 of the main paper).        learning rate of η = 4.0 (10×higher than in pre-training),
+  To each  clip, we apply a random  horizontal  ﬂip,      linear warm-up in the ﬁrst 8 epochs, and weight decay of 0.
+color distortion and Gaussian blur following the SimCLR
+                                                        Training augmentation. We use the default training aug-
+and MoCo v2 implementation [12, 14].  For color aug-
+                                                            mentation [20]. We randomly sample a clip (of T×τ frames)
+mentation we use the ColorJitter (probability 0.8)
+                                                      from the full-length video and randomly crop 224×224 pix-
+and RandomGrayscale (probability 0.2) method from
+                                                                     els from a video, or its horizontal ﬂip, with a shorter side
+torchvision.transforms module of PyTorch with
+                                                      randomly sampled in [256, 320] pixels.
+the color strength parameter s: {brightness, contrast, satu-
+ration, hue} = {0.4s, 0.4s, 0.4s, 0.1s} By default s=0.5.     Inference. Following common practice, in video classiﬁca-
+Ablations are given in Table 8 of the main paper. For Gaus-     tion [20], we report 30-view, top-1 classiﬁcation accuracy
+sian blur we use a spatial kernel with standard-deviation     on the Kinetics validation set. We uniformly sample 10 clips
+∈[0.1, 2.0] applied with probability of 0.5.                  from a video along its temporal axis. For each clip, we scale
+                                                               the shorter spatial side to 256 pixels and take 3 crops of
+B.2. Details: Kinetics Action Classiﬁcation                                               256×256 to cover the spatial dimensions. We average the
+Datasets. Kinetics-400 [47] consists of ∼240k training     softmax scores for prediction.
+videos and 20k validation videos in 400 human action cat-
+                                                         B.3. Details: AVA Action Detection
+egories. Kinetics-600 [10] has ∼392k training videos and
+30k validation videos in 600 classes.  Kinetics-700 [11]     Dataset. The AVA dataset [33] has bounding box annota-
+has ∼523k training videos and 35k validation videos in 600      tions for spatiotemporal localization of (possibly multiple)
+classes.                                           human actions. It has 211k training and 57k validation video
+                                                          segments. We follow the standard protocol reporting mean
+Linear classiﬁcation protocol. We validate the methods
+                                                       Average Precision (mAP) on 60 classes [33] on AVA v2.2.
+by linear classiﬁcation on frozen features, following the
+common protocol in image classiﬁcation [36]. After unsu-     Detection architecture. We exactly follow the detection
+pervised pre-training on Kinetics, we freeze the features of      architecture in [20] to allow direct comparison of the pre-
+the encoder and train a linear classiﬁer on top of the last      trained models used as a backbone for the AVA task [33].
+layer features (e.g. pool5 in Table 17). For all ablations in    The detector is similar to Faster R-CNN [72] with minimal
+the paper the classiﬁer is trained for 60 epochs (using 100     modiﬁcations adapted for video. Region-of-interest (RoI)
+epochs will increase accuracy by ∼0.2%) using the same      features [26] are extracted at the last feature map of res5
+
+
+                                                 12
+
+======================== PDF 第 13 页 ========================
+(cf. Table 17) by extending a 2D proposal at a frame into a     Inference. This is as for Kinetics (§B.2), but to infer the
+3D RoI by replicating it along the temporal axis, followed     actions over a single video, we spatiotemporally max-pool
+by application of frame-wise RoIAlign [37] and temporal      prediction scores in testing [20].
+global average pooling. We set the spatial stride of res5 to
+                                                         B.5. Details: Something-Something V2 (SSv2)1 (instead of 2), and use a dilation of 2 for its ﬁlters [20].
+This increases the spatial resolution of res5 by 2×. The RoI     Dataset. The Something-Something V2 dataset [31] con-
+features are then max-pooled and fed to a per-class sigmoid      tains 169k training, and 25k validation videos. The videos
+classiﬁer for prediction.                               show human-object interactions to be classiﬁed into 174
+                                                                     classes. We report top-1 accuracy on the validation set.
+Training. For direct comparison, the training procedure and
+hyper-parameters for AVA follow [20] without modiﬁcation.     Training. We ﬁne-tune the pre-trained Kinetics models. We
+The network weights are initialized from the Kinetics models      train for 22 epochs using a batch size of 64 and a base
+and we use step-wise learning rate decay, that is reduced by      learning rate of 0.12 (for 8 GPUs) with 10× step-wise decay
+10× after 16, 24 and 28 epochs. We train for 32 epochs on      at epoch 14 and 18. Weight decay is set to 10−6 and dropout
+∼211k data, with linear warm-up [30] for the ﬁrst 5 epochs      0.5. Our training augmentation is the same as in §B.2, but as
+and use a weight decay of 10−7, as in [20]. For 8 GPU     Something-Something V2 requires distinguishing between
+training, we use a batch-size of 64, a learning rate of 0.05      directions, we disable random ﬂipping during training. We
+for the supervised pre-trained Kinetics models and 0.3 for     use segment-based input frame sampling [54] that splits each
+the unsupervised ones, as this gives the best result for each     video into segments, and from each of them, we sample one
+of them.                                                 frame to form a clip.
+  The region proposal extraction also follows [20] and is     Inference. We perform single center clip testing to form
+summarized here for completeness. Our region proposals      predictions over a single video.
+are computed by an off-the-shelf person detector, i.e., that
+is not jointly trained with the action detection models. We     B.6. Details: UCF-101 Action Classiﬁcation
+adopt a person-detection model trained with Detectron [25].                                                            Dataset. UCF101 [77] has 13320 human action videos in
+It is a Faster R-CNN with a ResNeXt-101-FPN backbone. It                                                   101 categories. Our ablations are performed on the ﬁrst
+is pre-trained on ImageNet and the COCO human keypoint                                                                     train/val split, and for the comparison to prior work we
+images [55]. We ﬁne-tune this detector on AVA for person                                                                 report the mean average accuracy over the three splits.
+(actor) detection. The person detector produces 93.9 AP@50
+on the AVA validation set. Then, the region proposals for     Training. We ﬁne-tune the pre-trained Kinetics models and
+action detection are detected person boxes with a conﬁdence     use the same augmentation as for Kinetics. We train for 200
+of > 0.8, which has a recall of 91.1% and a precision of     epochs using a batch size of 64 and a base learning rate of
+90.7% for the person class.                                 0.025 (for 8 GPUs) with 10× step-wise decay at epoch 60,
+                                                    120 and 180. Weight decay is set to 0 and dropout to 0.8.
+Inference. We perform inference on a single clip with
+                                                             Inference. We use the same procedure as in Kinetics (§B.2).
+8 frames sampled with stride 8 centered at the frame that is
+to be evaluated.                                           B.7. Details: HMDB-51 Action Classiﬁcation
+
+B.4. Details: Charades Action Classiﬁcation            Dataset. HMDB51 [50] contains 6766 videos that have
+                                                      been annotated for 51 actions. Our evaluation follows the
+Dataset. Charades [75] has ∼9.8k training videos and 1.8k                                                               protocol for UCF101.
+validation videos in 157 classes in a multi-label classiﬁcation
+                                                        Training and Inference. Our settings are identical to thesetting of longer activities spanning ∼30 seconds on average.
+                                                          ones used for UCF101 and we expect further tuning of hyper-Performance is measured in mean Average Precision (mAP).
+                                                           parameters to increase its downstream performance.
+Training. For Charades, we ﬁne-tune the Kinetics models,
+but extend their duration by 2× (T×τ = 16×8) to account for    References
+the long-term nature of the dataset. This increase accuracy
+                                                                            [1] Pulkit Agrawal, Jo˜ao Carreira, and Jitendra Malik. Learning
+of all models by ∼3 mAP. Our training augmentation is the
+                                                                                to see by moving. In Proc. ICCV, pages 37–45. IEEE, 2015.
+same as as in §B.2. A per-class sigmoid output is used for                                                              2
+mutli-class prediction. We train for 60 epochs using a batch                                                                            [2] Jean-Baptiste Alayrac, Adri`a Recasens, Rosalia Schneider,
+size of 64 and a base learning rate of 0.2 (for 8 GPUs) with           Relja Arandjelovi´c, Jason Ramapuram, Jeffrey De Fauw, Lu-
+10× step-wise decay at epoch 40 and 50, after warm-up in           cas Smaira, Sander Dieleman, and Andrew Zisserman. Self-
+the ﬁrst 5 epochs. We use weight decay of 10-4 and dropout           supervised multimodal versatile networks. In Proc. NeurIPS,
+of 0.5. Other training details are analogous to Kinetics.               2020. 2, 8
+
+
+                                                 13
+
+======================== PDF 第 14 页 ========================
+ [3] Humam Alwassel, Dhruv Mahajan, Lorenzo Torresani,      [21] Basura Fernando, Hakan Bilen,  Efstratios Gavves, and
+     Bernard Ghanem, and Du Tran.  Self-supervised learning          Stephen Gould. Self-supervised video representation learning
+    by cross-modal audio-video clustering. In Proc. NeurIPS,          with odd-one-out networks. In Proc. ICCV, 2017. 2
+     2020. 2, 8                                                      [22] Chuang Gan, Boqing Gong, Kun Liu, Hao Su, and Leonidas J
+ [4] Relja Arandjelovi´c and Andrew Zisserman. Look, listen and           Guibas. Geometry guided convolutional neural networks for
+      learn. In Proc. ICCV, 2017. 2                                           self-supervised video representation learning. In Proc. CVPR,
+ [5] Relja Arandjelovi´c and Andrew Zisserman.  Objects that           2018. 2
+     sound. In Proc. ECCV, 2018. 2                                  [23] Jort F Gemmeke, Daniel PW Ellis, Dylan Freedman, Aren
+                                                                         Jansen, Wade Lawrence, R Channing Moore, Manoj Plakal, [6] Suzanna Becker. Learning temporally persistent hierarchical
+                                                                  and Marvin Ritter. Audio set: An ontology and human-labeled      representations. In Proc. NeurIPS, 1997. 2
+                                                                             dataset for audio events. In IEEE International Conference
+ [7] Sagie Benaim, Ariel Ephrat, Oran Lang, Inbar Mosseri,
+                                                               on Acoustics, Speech and Signal Processing (ICASSP), 2017.
+     William T. Freeman, Michael Rubinstein, Michal Irani, and
+                                                              8
+      Tali Dekel. SpeedNet: Learning the Speediness in Videos. In
+                                                                     [24] Deepti Ghadiyaram, Matt Feiszli, Du Tran, Xueting Yan,
+     Proc. CVPR, 2020. 8
+                                                        Heng Wang, and Dhruv Mahajan.   Large-scale weakly-
+ [8] Mathilde Caron, Piotr Bojanowski, Armand Joulin, and                                                                         supervised pre-training for video action recognition. In Proc.
+     Matthijs Douze. Deep clustering for unsupervised learning of                                                        CVPR, 2019. 4, 5, 8, 9
+      visual features. In Proc. ECCV, 2018. 2, 8
+                                                                     [25] Ross Girshick, Ilija Radosavovic, Georgia Gkioxari, Piotr
+ [9] Mathilde Caron, Ishan Misra, Julien Mairal, Priya Goyal,                                                                                        Doll´ar, and Kaiming He. Detectron. https://github.
+      Piotr Bojanowski, and Armand Joulin. Unsupervised learning        com/facebookresearch/detectron, 2018. 13
+     of visual features by contrasting cluster assignments. arXiv                                                                     [26] R. B. Girshick. Fast R-CNN. In Proc. ICCV, 2015. 12
+     preprint arXiv:2006.09882, 2020. 1, 2, 3, 4, 7, 11, 12                                                                     [27] Xavier Glorot, Antoine Bordes, and Yoshua Bengio. Deep
+[10] Joao Carreira, Eric Noland, Andras Banki-Horvath, Chloe           sparse rectiﬁer neural networks. In Proceedings of the Four-
+      Hillier, and Andrew Zisserman. A short note about kinetics-           teenth International Conference on Artiﬁcial Intelligence and
+     600. arXiv preprint arXiv:1808.01340, 2018. 9, 12                        Statistics, pages 315–323, 2011. 11
+[11]  Jo˜ao Carreira, Eric Noland, Chloe Hillier, and Andrew Zisser-      [28] Daniel Gordon, Kiana Ehsani, Dieter Fox, and Ali Farhadi.
+    man. A short note on the kinetics-700 human action dataset.         Watching the world go by: Representation learning from
+     arXiv preprint arXiv:1907.06987, 2019. 9, 12                        unlabeled videos. arXiv preprint arXiv:2003.07990, 2020. 2
+[12] Ting Chen, Simon Kornblith, Mohammad Norouzi, and Ge-      [29] Ross Goroshin, Joan Bruna, Jonathan Tompson, David Eigen,
+     offrey Hinton. A simple framework for contrastive learning          and Yann LeCun. Unsupervised learning of spatiotemporally
+     of visual representations. arXiv preprint arXiv:2002.05709,           coherent metrics. In Proc. ICCV, 2015. 2
+     2020. 1, 2, 3, 4, 6, 7, 11, 12                                     [30] Priya Goyal, Piotr Doll´ar, Ross Girshick, Pieter Noord-
+[13] Ting Chen, Simon Kornblith, Kevin Swersky, Mohammad            huis, Lukasz Wesolowski, Aapo Kyrola, Andrew Tulloch,
+     Norouzi, and Geoffrey E Hinton. Big self-supervised models          Yangqing Jia, and Kaiming He. Accurate, large minibatch
+     are strong semi-supervised learners. In Proc. NeurIPS, 2020.        SGD: training ImageNet in 1 hour. arXiv:1706.02677, 2017.
+    11                                                        13
+[14] Xinlei Chen, Haoqi Fan, Ross Girshick, and Kaiming He. Im-      [31] Raghav Goyal, Samira Ebrahimi Kahou, Vincent Michal-
+     proved baselines with momentum contrastive learning. arXiv             ski, Joanna Materzynska, Susanne Westphal, Heuna Kim,
+     preprint arXiv:2003.04297, 2020. 6, 11, 12                            Valentin Haenel, Ingo Fruend, Peter Yianilos, Moritz Mueller-
+                                                                               Freitag, et al. The “Something Something” video database[15] Marco Cuturi. Sinkhorn distances: Lightspeed computation
+                                                                              for learning and evaluating visual common sense. In ICCV,     of optimal transport. In Proc. NeurIPS, 2013. 12
+                                                                     2017. 1, 4, 7, 13
+[16] Ali Diba, Vivek Sharma, Luc Van Gool, and Rainer Stiefelha-
+                                                                     [32] Jean-Bastien Grill, Florian Strub, Florent Altch´e, Corentin
+     gen. DynamoNet: Dynamic Action and Motion Network. In
+                                                                                Tallec, Pierre H. Richemond, Elena Buchatskaya, Carl Do-
+     Proc. ICCV, 2019. 2
+                                                                             ersch, Bernardo Avila Pires, Zhaohan Daniel Guo, Moham-
+[17] Carl Doersch, Abhinav Gupta, and Alexei Efros. Unsuper-                                                      mad Gheshlaghi Azar, Bilal Piot, Koray Kavukcuoglu, R´emi
+     vised visual representation learning by context prediction. In                                                               Munos, and Michal Valko. Bootstrap your own latent: A new
+     Proc. ICCV, 2015. 2                                                                     approach to self-supervised learning. In NeurIPS, 2020. 1, 2,
+[18] A. Dosovitskiy, P. Fischer, J. T. Springenberg, M. Riedmiller,            3, 4, 7, 10, 11
+     and T. Brox. Discriminative unsupervised feature learning      [33] Chunhui Gu, Chen Sun, David A. Ross, Carl Vondrick, Car-
+     with exemplar convolutional neural networks. IEEE PAMI,           oline Pantofaru, Yeqing Li, Sudheendra Vijayanarasimhan,
+     38(9):1734–1747, Sept 2016. 1, 2                                George Toderici, Susanna Ricco, Rahul Sukthankar, Cordelia
+[19] Haoqi Fan, Yanghao Li, Bo Xiong, Wan-Yen Lo, and          Schmid, and Jitendra Malik. AVA: A video dataset of spatio-
+     Christoph Feichtenhofer. PySlowFast. https://github.          temporally localized atomic visual actions. In Proc. CVPR,
+    com/facebookresearch/slowfast, 2020. 5                 2018. 1, 4, 7, 12
+[20] Christoph Feichtenhofer, Haoqi Fan, Jitendra Malik, and      [34] Tengda Han, Weidi Xie, and Andrew Zisserman. Video rep-
+    Kaiming He.  SlowFast Networks for Video Recognition.            resentation learning by dense predictive coding. In Workshop
+     In Proc. ICCV, 2019. 2, 4, 5, 7, 8, 12, 13                         on Large Scale Holistic Video Understanding, ICCV, 2019. 2
+
+
+                                                 14
+
+======================== PDF 第 15 页 ========================
+[35] Tengda Han, Weidi Xie, and Andrew Zisserman.   Self-      [53] Tianhao Li and Limin Wang. Learning spatiotemporal fea-
+     supervised co-training for video representation learning. In            tures via video and text pair discrimination. arXiv preprint
+     Proc. NeurIPS, 2020. 2, 8                                         arXiv:2001.05691, 2020. 2
+[36] Kaiming He, Haoqi Fan, Yuxin Wu, Saining Xie, and Ross      [54]  Ji Lin, Chuang Gan, and Song Han. Temporal shift module
+     Girshick. Momentum contrast for unsupervised visual rep-            for efﬁcient video understanding. In ICCV, 2019. 13
+     resentation learning. In Proc. CVPR, 2020. 1, 2, 3, 4, 7, 11,      [55] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays,
+    12                                                                       Pietro Perona, Deva Ramanan, Piotr Doll´ar, and C Lawrence
+[37] Kaiming He, Georgia Gkioxari, Piotr Doll´ar, and Ross Gir-           Zitnick. Microsoft COCO: Common objects in context. In
+      shick. Mask R-CNN. In Proc. ICCV, 2017. 13                       Proc. ECCV, 2014. 13
+[38] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.                                                                     [56] Ilya Loshchilov and Frank Hutter. SGDR: Stochastic gradient
+     Delving deep into rectiﬁers: Surpassing human-level perfor-                                                                         descent with warm restarts. arXiv:1608.03983, 2016. 11
+    mance on imagenet classiﬁcation. In Proc. ICCV, 2015. 11
+                                                                     [57] William Lotter, Gabriel Kreiman, and David Cox. Deep pre-
+[39] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+                                                                                   dictive coding networks for video prediction and unsupervised
+    Deep residual learning for image recognition. In Proc. CVPR,
+                                                                               learning. In Proc. ICLR, 2017. 2
+     2016. 2, 4, 5, 7, 12
+                                                                     [58] Michael Mathieu, Camille Couprie, and Yann LeCun. Deep[40] Olivier J. H´enaff, Ali Razavi, Carl Doersch, S. M. Ali Es-
+                                                                           multi-scale video prediction beyond mean square error. In     lami, and A¨aron van den Oord. Data-efﬁcient image recog-
+                                                                ICLR, 2016. 2      nition with contrastive predictive coding.  arXiv preprint
+     arXiv:1905.09272, 2019. 2                                      [59] Antoine Miech, Dimitri Zhukov, Jean-Baptiste Alayrac,
+                                                               Makarand Tapaswi, Ivan Laptev, and Josef Sivic. Howto100m:[41] R Devon Hjelm, Alex Fedorov, Samuel Lavoie-Marchildon,
+                                                                    Learning a text-video embedding by watching hundred mil-    Karan Grewal, Phil Bachman, Adam Trischler, and Yoshua
+                                                                                lion narrated video clips. In Proc. CVPR, 2019. 8     Bengio. Learning deep representations by mutual information
+     estimation and maximization. In Proc. ICLR, 2019. 2            [60] Ishan Misra, C. Lawrence Zitnick, and Martial Hebert. Shuf-
+[42] S. Ioffe and C. Szegedy. Batch normalization: Accelerating         ﬂe and learn: Unsupervised learning using temporal order
+     deep network training by reducing internal covariate shift. In            veriﬁcation. In Proc. ECCV, 2016. 2
+     Proc. ICML, 2015. 10, 11                                       [61] Hossein Mobahi, Ronan Collobert, and Jason Weston. Deep
+[43] Phillip Isola, Daniel Zoran, Dilip Krishnan, and Edward H           learning from temporal coherence in video. In Proc. ICML,
+     Adelson.  Learning visual groups from co-occurrences in          pages 737–744, 2009. 2
+     space and time. In Proc. ICLR, 2015. 2                          [62] Pedro Morgado, Nuno Vasconcelos, and Ishan Misra. Audio-
+[44] Dinesh Jayaraman and Kristen Grauman. Learning image            visual instance discrimination with cross-modal agreement.
+      representations tied to ego-motion. In Proc. ICCV, 2015. 2            arXiv preprint arXiv:2004.12943, 2020. 2
+[45] Simon Jenni, Givi Meishvili, and Paolo Favaro. Video repre-      [63] V. Nair and G. E. Hinton.  Rectiﬁed linear units improve
+     sentation learning by recognizing temporal transformations.            restricted boltzmann machines. In Proc. ICML, 2010. 11
+     arXiv preprint arXiv:2007.10730, 2020. 2                                                                     [64] Mehdi Noroozi and Paolo Favaro. Unsupervised learning of
+[46] Xu Ji, Jo˜ao F. Henriques, and Andrea Vedaldi.  Invariant                                                                            visual representations by solving jigsaw puzzles.  In Proc.
+     information clustering for unsupervised image classiﬁcation                                                       ECCV, pages 69–84. Springer, 2016. 2
+     and segmentation. In Proc. ICCV, pages 9865–9874, 2019. 2
+                                                                     [65] Andrew Owens, Phillip Isola, Josh H. McDermott, Antonio
+[47] Will Kay, Jo˜ao Carreira, Karen Simonyan, Brian Zhang,                                                                            Torralba, Edward H. Adelson, and William T. Freeman. Vi-
+     Chloe Hillier, Sudheendra Vijayanarasimhan, Fabio Viola,                                                                             sually indicated sounds. In Proc. CVPR, pages 2405–2413,
+    Tim Green, Trevor Back, Paul Natsev, Mustafa Suleyman,
+                                                                     2016. 2
+     and Andrew Zisserman. The kinetics human action video
+                                                                     [66] Deepak Pathak, Ross Girshick, Piotr Doll´ar, Trevor Darrell,
+      dataset. arXiv preprint arXiv:1705.06950, 2017. 1, 2, 3, 4, 12
+                                                                  and Bharath Hariharan. Learning features by watching objects
+[48] Dahun Kim, Donghyeon Cho, and In So Kweon.  Self-
+                                                                move. In Proc. CVPR, 2017. 2
+     supervised video representation learning with space-time cu-
+                                                                     [67] Deepak Pathak, Philipp Kr¨ahenb¨uhl, Jeff Donahue, Trevor     bic puzzles. In AAAI, 2019. 2
+                                                                               Darrell, and Alexei A. Efros.  Context encoders: Feature[49] Bruno Korbar, Du Tran, and Lorenzo Torresani. Coopera-
+                                                                            learning by inpainting. In Proc. CVPR, 2016. 2      tive learning of audio and video models from self-supervised
+     synchronization. In Proc. NeurIPS, 2018. 2                      [68] Mandela Patrick, Yuki M. Asano, Ruth Fong, Jo˜ao F. Hen-
+[50] H. Kuehne, H. Jhuang, E. Garrote, T. Poggio, and T. Serre.            riques, Geoffrey Zweig, and Andrea Vedaldi. Multi-modal
+   HMDB: A large video database for human motion recognition.            self-supervision from generalized data transformations. arXiv
+     In Proc. ICCV, pages 2556–2563, 2011. 2, 4, 13                       preprint arXiv:2003.04298, 2020. 2, 8
+[51] Hsin-Ying Lee, Jia-Bin Huang, Maneesh Singh, and Ming-      [69] AJ Piergiovanni, Anelia Angelova, and Michael S. Ryoo.
+    Hsuan Yang. Unsupervised representation learning by sorting          Evolving losses for unsupervised video representation learn-
+     sequence. In Proc. ICCV, 2017. 2                                        ing. In Proc. CVPR, 2020. 2
+[52] Ang Li, Meghana Thotakuri, David A Ross, Jo˜ao Carreira,      [70] Senthil Purushwalkam and Abhinav Gupta. Demystifying
+     Alexander Vostrikov, and Andrew Zisserman.  The ava-           contrastive self-supervised learning: Invariances, augmenta-
+      kinetics localized human actions video dataset. arXiv preprint            tions and dataset biases. arXiv preprint arXiv:2007.13916,
+     arXiv:2005.00214, 2020. 7                                        2020. 2
+
+
+                                                 15
+
+======================== PDF 第 16 页 ========================
+[71] Rui Qian, Tianjian Meng, Boqing Gong, Ming-Hsuan Yang,      [88] Laurenz Wiskott and Terrence Sejnowski. Slow feature anal-
+     Huisheng Wang, Serge Belongie, and Yin Cui. Spatiotempo-            ysis: Unsupervised learning of invariances. In Neural Com-
+      ral contrastive video representation learning. arXiv preprint            putation, 2002. 2, 5
+     arXiv:2008.03800, 2020. 2, 8                                   [89] Zhirong Wu, Yuanjun Xiong, Stella Yu, and Dahua Lin. Un-
+[72] S. Ren, K. He, R. Girshick, and J. Sun.  Faster R-CNN:           supervised feature learning via non-parametric instance-level
+    Towards real-time object detection with region proposal net-           discrimination.  In Proc. CVPR, volume abs/1805.01978,
+     works. In Proc. NeurIPS, 2016. 12                                 2018. 1, 2
+[73] Pierre H Richemond, Jean-Bastien Grill, Florent Altch´e,      [90] Saining Xie, Chen Sun, Jonathan Huang, Zhuowen Tu, and
+     Corentin Tallec, Florian Strub, Andrew Brock, Samuel Smith,         Kevin Murphy. Rethinking spatiotemporal feature learning
+    Soham De, Razvan Pascanu, Bilal Piot, et al. Byol works even            for video understanding. In Proc. ECCV, 2018. 5
+     without batch statistics. arXiv preprint arXiv:2010.10241,      [91] Dejing Xu, Jun Xiao, Zhou Zhao, Jian Shao, Di Xie, and
+     2020. 10                                                         Yueting Zhuang. Self-supervised spatiotemporal learning via
+[74] Pierre Sermanet et al.  Time-contrastive networks:  Self-          video clip order prediction. In Proc. CVPR, 2019. 2
+     supervised learning from video.  In Proc. Intl. Conf. on      [92] Ceyuan Yang, Yinghao Xu, Bo Dai, and Bolei Zhou. Video
+     Robotics and Automation, 2018. 2                                      representation learning with visual tempo consistency. arXiv
+[75] Gunnar A Sigurdsson,  G¨ul Varol, Xiaolong Wang, Ali            preprint arXiv:2006.15489, 2020. 2, 8
+     Farhadi, Ivan Laptev, and Abhinav Gupta. Hollywood in      [93] Yang You,  Igor Gitman, and Boris Ginsburg.   Large
+     homes: Crowdsourcing data collection for activity under-          batch training of convolutional networks.  arXiv preprint
+     standing. In ECCV, 2016. 1, 4, 7, 13                                arXiv:1708.03888, 2017. 10, 11
+[76] Karen Simonyan and Andrew Zisserman.   Very deep      [94] Richard Zhang, Phillip Isola, and Alexei A. Efros. Colorful
+     convolutional networks for large-scale image recognition. In          image colorization. In Proc. ECCV, 2016. 2
+     Proc. ICLR, 2015. 7, 12                                         [95] Chengxu Zhuang, Alex Lin Zhai, and Daniel Yamins. Local
+[77] Khurram Soomro, Amir Roshan Zamir, and Mubarak Shah.           aggregation for unsupervised learning of visual embeddings.
+    UCF101: A dataset of 101 human actions classes from videos           In Proc. ICCV, 2019. 2
+      in the wild. arXiv preprint arXiv:1212.0402, 2012. 2, 4, 13
+[78] N. Srivastava, E. Mansimov, and R. Salakhudinov. Unsuper-
+     vised learning of video representations using lstms. In Proc.
+    ICML, 2015. 2
+[79] Chen Sun, Fabien Baradel, Kevin Murphy, and Cordelia
+     Schmid.  Contrastive bidirectional transformer for tempo-
+      ral representation learning. arXiv preprint arXiv:1906.05743,
+     2019. 2
+[80] Christian Szegedy, Wei Liu, Yangqing Jia, Pierre Sermanet,
+     Scott Reed, Dragomir Anguelov, Dumitru Erhan, Vincent
+     Vanhoucke, and Andrew Rabinovich. Going deeper with
+     convolutions. In Proc. CVPR, 2015. 7, 12
+[81] Yonglong Tian, Dilip Krishnan, and Phillip Isola. Contrastive
+     multiview coding. In Proc. ECCV, 2020. 2
+[82] Du Tran, Heng Wang, Lorenzo Torresani, Jamie Ray, Yann
+     LeCun, and Manohar Paluri. A closer look at spatiotemporal
+     convolutions for action recognition. In Proc. CVPR, 2018. 5
+[83] A¨aron van den Oord, Yazhe Li, and Oriol Vinyals. Repre-
+     sentation learning with contrastive predictive coding. arXiv
+     preprint arXiv:1807.03748, 2018. 2, 3
+[84] Carl Vondrick, Hamed Pirsiavash, and Antonio Torralba. An-
+      ticipating visual representations from unlabelled video. In
+     Proc. CVPR, 2016. 2
+[85] Xiaolong Wang and Abhinav Gupta. Unsupervised learning
+     of visual representations using videos. In Proc. ICCV, 2015.
+    2
+[86] Xiaolong Wang, Kaiming He, and Abhinav Gupta. Transitive
+     invariance for self-supervised visual representation learning.
+     In Proc. ICCV, 2017. 2
+[87] Xiaolong Wang, Allan Jabri, and Alexei A. Efros. Learning
+     correspondence from the cycle-consistency of time. In Proc.
+    CVPR, 2019. 2
+
+
+                                                 16

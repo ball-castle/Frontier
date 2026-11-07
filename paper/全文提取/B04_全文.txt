@@ -1,0 +1,688 @@
+B04 | Outcome-Grounded Advantage Reshaping for Fine-Grained Credit Assignment in Mathematical Reasoning
+来源：https://arxiv.org/abs/2601.07408
+本地PDF：B04_Outcome_Grounded_Advantage_Reshaping_for_Fine_Grained_Credit_Assignment_in_Mathematical_Reasoning.pdf
+SHA-256：52716344b12f89ad53c38c91f949e6da6e519b139b2662ee0146b46c700d5efa
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+     Outcome-Grounded Advantage Reshaping for Fine-Grained Credit
+                 Assignment in Mathematical Reasoning
+
+         Ziheng Li1,2,3, Liu Kang2, Feng Xiao2, Luxi Xing2, Qingyi Si4, Zhuoran Li5,
+            Weikang Gong1, Deqing Yang1, YangHua Xiao1, Hongcheng Guo1*
+
+        1Fudan University, 2XingYun lab, HUJING Digital Media & Entertainment Group
+           3University of Science and Technology Beijing 4Chinese Academy of Sciences
+                        5Beijing University of Posts and Telecommunications
+
+                   Abstract                                                                                Every token shares the same advantage                             🤔
+       Group Relative Policy Optimization (GRPO)           we   need    to   follow   these   steps     :   1      .   Calculate   the   total      ...
+        has emerged as a promising critic-free rein-           we   need    to   follow   these   steps     :   1      .   Calculate   the   total      ...
+        forcement learning paradigm for reasoning                                                                                                                                                  Less         More                 More credit on important tokens         tasks. However, standard GRPO employs a                          Important     Important        😃
+        coarse-grained credit assignment mechanism
+         that propagates group-level rewards uniformly        Figure 1: From broadcast credit to token reallocation.
+         to to every token in a sequence, neglecting the
+        varying contribution of individual reasoning
+         steps. We address this limitation by introduc-        et al., 2024) has emerged as a practical critic-
+        ing Outcome-grounded Advantage Reshaping                                                           free algorithm for post-training reasoning models.
+       (OAR), a fine-grained credit assignment mech-                                       By normalizing rewards over a group of sampled       anism that redistributes advantages based on
+                                                       responses, GRPO avoids training a value func-      how much each token influences the model’s
+          final answer. We instantiate OAR via two com-       tion while remaining stable and scalable for long-
+        plementary strategies: (1) OAR-P, which es-       horizon reasoning.
+        timates outcome sensitivity through counter-        However, GRPO relies on a coarse credit as-
+         factual token perturbations, serving as a high-                                                     signment: a single group-normalized advantage is
+          fidelity attribution signal; (2) OAR-G, which                                                       broadcast to all tokens in a sampled response (Wei        uses an input-gradient sensitivity proxy to ap-
+                                                               et al., 2023). This ignores the uneven structure of        proximate the influence signal with a single
+       backward pass. These importance signals are       reasoning traces, where only a small set of tokens
+         integrated with a conservative Bi-Level advan-         (e.g., key deductions or structural decisions) deter-
+        tage reshaping scheme that suppresses low-      mines correctness, while many others are largely
+        impact tokens and boosts pivotal ones while        syntactic (Yang et al., 2025b). Figure 1 illustrates
+        preserving the overall advantage mass. Empir-        this mismatch between coarse sequence-level credit
+          ical results on extensive mathematical reason-                                                     assignment and the desired token-level reallocation.
+        ing benchmarks demonstrate that while OAR-
+                                                      Treating all positions equally increases gradient      P sets the performance upper bound, OAR-G
+                                                      variance and can accelerate entropy collapse dur-         achieves comparable gains with negligible com-
+         putational overhead, both significantly outper-       ing training (Liu et al., 2024; Li et al., 2024).
+        forming a strong GRPO baseline, pushing the      A natural direction is to move from coarse
+        boundaries of critic-free LLM reasoning 1.           sequence-level credit to token-level credit. Recent
+                                              work uses token entropy as a proxy to reweight up-   1  Introduction
+                                                           dates: Cheng et al. (2025) amplifies high-entropy
+    Large Language Models (LLMs) have recently   tokens to encourage exploration, while Chen et al.
+    demonstrated strong performance on complex rea-   (2025) shapes advantages over low-entropy seg-
+    soning tasks (Fedus et al., 2022; Achiam et al.,   ments in a correctness-aware way to consolidate
+    2023; Brown et al., 2020), driven in part by rein-   useful structures and suppress recurring failure pat-
+    forcement learning with verifiable rewards (RLVR;    terns. However, entropy primarily reflects uncer-
+   Lambert et al., 2024). Among these approaches,    tainty or stability(Gal and Ghahramani, 2016), not
+   Group Relative Policy Optimization (GRPO; Shao    outcome-relevant importance, and may therefore
+        *Corresponding author.                              misallocate credit to tokens that are salient to the
+        1code at: https://github.com/XINGYUN-AI-LAB/OAR     policy yet only weakly influential on the final an-
+                                           24681
+Proceedings of the 64th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pages 24681–24693
+                                  July 2-7, 2026 ©2026 Association for Computational Linguistics
+
+======================== PDF 第 2 页 ========================
+swer outcome(Jain and Wallace, 2019).                 soning benchmarks demonstrate that OAR
+  In contrast, we argue that the ideal token-        consistently outperforms strong GRPO base-
+level credit in critic-free RL should be outcome-          lines. While OAR-P sets the performance up-
+grounded, reflecting how much each token influ-        per bound, OAR-G retains the majority of
+ences the model’s final answer. To this end, we         these gains with minimal computational cost.
+propose Outcome-grounded Advantage Reshaping
+                                       2  Preliminaries(OAR), a framework that enhances GRPO with
+outcome-sensitive token attribution. OAR scores                                                    2.1  Group Relative Policy Optimization
+each token by how much perturbing  it shifts
+                             A large language model defines an autoregressivethe model’s final-answer distribution, inspired by
+                                                   policy πθ that generates a token sequence y =perturbation-based feature attribution(Ribeiro et al.,
+                                                      (y1, . . . , yT ). In RLVR, we maximize the expected2016).  While the ideal attribution would mea-
+                                                   sequence-level reward:sure reward changes under interventions, RLVR
+rewards are typically rule-based, sparse, and non-
+                                                     J(θ) = Ex∼D, y∼πθ(·|x) r(y) .       (1)differentiable, making token–reward attribution
+prohibitively expensive. We therefore use the    GRPO eliminates the learned value function in
+model’s own answer distribution as a practical sur-  PPO by using a group-normalized outcome reward
+rogate outcome to estimate token impact.            as the advantage. Given a prompt x, we sample
+  We instantiate OAR with two complementary  G completions {y(1),                                                                                                              . . . , y(G)} from the behav-attribution strategies that trade off fidelity and ef-    ior policy πθold and obtain rewards        . . . ,                                                                                       {r1,    rG}.ficiency: OAR-P estimates outcome sensitivity   The advantage for sample i is computed by within-
+via counterfactual token perturbations, providing   group normalization:
+a high-fidelity but costly signal, while OAR-G                                      PG
+uses an efficient gradient-based proxy suitable for                         ri  G   k=1 rk                                                                     ˆAi = r    −1                          .    (2)scalable online training(Simonyan et al., 2014).                                              2                                                                     1 PG      PG
+                                                       G   j=1 rjHowever, attribution scores alone do not specify           G   k=1  rk −1
+how to inject token-level credit without destabiliz-
+ing GRPO: naively multiplying or adding token   This scalar ˆAi is applied to all token-level log-
+weights can induce sample-dependent changes in    probability terms in y(i).
+the effective update scale.                   GRPO then optimizes the PPO-style clipped sur-
+   Therefore, we introduce a conservative Bi-Level    rogate objective:
+advantage reallocation mechanism that suppresses               h
+low-impact tokens to reduce gradient noise, boosts      = Ei,t min   ρ(i)t  ˆAi,                                         LGRPOhigh-impact tokens to strengthen the learning sig-                                            i
+                                                                                  clip(ρ(i)t  , 1    1 + ϵ)ˆAi    .nal, and renormalizes weights to preserve the over-                                                              −ϵ,
+all advantage mass.                                                                                    (3)
+  Our contributions can be summarized as follows:   with importance ratio
+    • We propose OAR, an outcome-grounded
+                                                                              x, y(i)<t)    framework for fine-grained credit assignment,                        πθ(y(i)t                                                                            ρ(i)t =             |             .          (4)
+    which redistributes sequence-level advantages                           πθold(y(i)t   x, y(i)<t)                                                                                                                       |    based on token influence on the model’s final
+    answer distribution, with two instantiations:     While GRPO avoids value-function training, us-
+   OAR-P (perturbation-based attribution) and    ing a single sequence-level advantage for all tokens
+   OAR-G (gradient-based approximation).       can increase gradient variance due to reward alias-
+                                                        ing; see Appendix A.1.1.
+    • We design a conservative Bi-Level advantage
+     reallocation mechanism that sharpens learn-   2.2  Intrinsic Signals for Token-Level Credit
+     ing signals by boosting pivotal tokens and sup-                                              Recent GRPO  variants  explore  redistributing
+     pressing low-influence noise, while preserv-                                                  sequence-level advantages using intrinsic, model-
+     ing the overall advantage mass to maintain                                                  derived signals as token-importance proxies (Li
+     stable training.                                                           et al., 2025; Xie et al., 2025; Chen et al., 2025).
+    • Extensive experiments on mathematical rea-  Among them, entropy-based advantage shaping
+                                       24682
+
+======================== PDF 第 3 页 ========================
+    OAR-P  Perturbation Token by Token              Bi-Level Advantage Reshaping
+    Now    Solve   for   x   by   adding     ...               Noise Token      Causal Tokens    Now   Solve   for   x
+                                              OAR
+                                                                                by   adding     ...  GRPO
+
+
+                                                                                                 Boost
+                                                                            Suppress
+                                                                                     1
+                                                GRPO   Now   Solve   for   x                  Probability                                                                                by   adding     ...  OAR
+       Vocab Token ID
+
+
+   OAR-G  Gradient via Single-Backward
+    Now    Solve   for   x   by   adding     ...
+
+                                                                                      Mask                                                                                                                                                                                                                                                                                                    Probability
+                                                                     More Important      Add Noise
+                                                               Vocab Token ID
+
+
+             Figure 2: Overall architecture of the proposed OAR framework integrated into GRPO.
+
+(Cheng et al., 2025) is a representative and eas-   3.1  OAR-P
+ily reproducible instance. For token distribution                                         To establish a rigorous causal baseline, OAR-P
+                                            employs a counterfactual masking strategy. Letπθ(· | x, y<t), the token entropy is
+                                            y =  (y1, . . . , yT ) be a reasoning chain gener-   X
+ Ht = −    πθ(v | x, y<t) log πθ(v | x, y<t).     ated by the policy πθ given prompt x. We de-              v                                    note the model’s final prediction distribution as
+                                                 (5)
+                                                                   Pfinal = πθ(·  | x, y), which represents the prob-A typical shaping rule augments the broadcast                                                          ability distribution over the answer span. Here
+advantage A with an entropy-dependent bonus                                                    the answer span is extracted from the model out-
+(Cheng et al., 2025):                                                  put by a deterministic rule (e.g., regex matching
+                                           <answer>... </answer>; see 6.2).
+       ˜At = A + min α · sg(Ht), |A|/κ  ,   (6)    We construct a perturbed sequence ˜y(t) by re-                                                    placing the token at position t with a special token
+                                                                (e.g., [PAD]):
+where sg(·) stops gradients for stability.
+  While simple, intrinsic proxies may not reflect        ˜y(t) = (y1, . . . ,     [PAD], yt+1, . . . , yT ).  (7)                                                                     yt−1,outcome-relevant token importance: entropy mea-
+sures predictive uncertainty and can be high for   Then perform a forward pass to compute the per-
+stylistic or lexically ambiguous tokens with little    turbed final distribution P final(t) =       x, ˜y(t)).                                                                                   πθ(· |effect on correctness. Moreover, additive shaping     The causal importance score Ipertt   for token yt is
+alters the post-normalization advantage mass, in-   defined as the KL divergence between the original
+ducing sequence-dependent update scales unless   and the perturbed distributions:
+renormalization or re-tuning is applied (Theoretical
+Analysis is provided in Appendix A.1.2).                            Ipertt  = DKL   Pfinal P final(t)    .        (8)                                                                                                                         ||
+3  Method                                            Intuitively, Ipertt   measures the information loss in-
+                                                  curred by removing yt.  If yt is a logical pivot,
+We introduce Outcome-grounded Advantage Re-   masking it will significantly alter the final predic-
+                                                                              yt is syntactic filler, the pre-shaping (OAR), which equips GRPO with token-    tion (Ipertt  ≫0); if
+level credit assignment. OAR admits two instan-   diction remains stable (Ipertt  ≈0). A thereoticaltiations: OAR-P, a perturbation-based attribution    perspective is provided in Appendix A.1.3. While
+method, and OAR-G, an efficient gradient-based    accurate, calculating Ipertt   for a sequence of length
+approximation. Figure 2 provides an overview of  L requires L additional forward passes, creating a
+how OAR is integrated into GRPO.                 computational bottleneck.
+                                       24683
+
+======================== PDF 第 4 页 ========================
+3.2  OAR-G                                      3.3  Bi-Level Advantage Reshaping
+To enable scalable fine-grained credit assignment   While the attribution scores It identify pivotal to-
+during online training, we propose OAR-G, which    kens, directly applying them as raw weights can
+approximates the perturbation-based attribution us-    destabilize the training process due to uncontrolled
+ing a single backward pass.  Instead of discrete    variance in update scales. To concentrate credit
+masking, we inject small Gaussian noise into the   on important positions without changing GRPO’s
+input representations of reasoning tokens and mea-   overall update scale, we reallocate Aseq across to-
+sure how sensitive the final outcome distribution   kens by suppressing low-importance tokens and
+is to each token. Let E = (e1, . . . , eT ) denote the    boosting high-importance ones, followed by a sum-
+embeddings of the reasoning tokens in the sampled    preserving renormalization. The token-level advan-
+trajectory. We first compute the teacher outcome    tages are reshaped using the normalized importance
+distribution from the unperturbed input:                      ˆIt. Specifically, we modulate the sequence advan-
+                                                    tage by a bi-level gating function:            P0 = Pfinal(x, E).              (9)
+Next, we apply isotropic Gaussian noise to the em-              AOARt  = Aseq   ˜ωt,           (15)                                                                                                                         ·
+beddings and obtain a student outcome distribution
+                                           where ˜ωt suppresses low-importance tokens andunder the perturbed representations:
+                                                  boosts high-importance tokens. Given a threshold
+                                                 τ (e.g., the 70th percentile in a sequence), we define  ˜et = et + ϵt, ϵt ∼N(0, σ2I), Pϵ = Pfinal(x, ˜E).                                            (10)                             
+We then measure the induced distribution shift via                                              ˆIt                                                                              ,         if ˆIt < τa self-distillation objective:                                                  τ + ϵ                                | {z }                             
+              (x, y) = DKL (P0  Pϵ) =                               Noise Suppression                                                                                                (16)                                                              ω(ˆIt) =       J                                               ||  X                                                                                                      (11)                                                                                                                                                              ˆIt −τ   ,   if ˆIt        P0(v)               (log P0(v)                              Pϵ(v)) .                             1 + β                                                −log                                      · 1   + ϵ    ≥τ                                                                           }       v                          |      {z−τ
+Token-wise sensitivity is obtained by differentiat-                          Signal Boosting
+ing J with respect to each input embedding:                                                  with boosting coefficient β ≥0 and smoothing con-
+                 gt =       (x, y).            (12)    stant ϵ. This function is continuous at ˆIt = τ with               ∇etJ                                            ω(τ) = 1. To avoid changing the overall update
+Following gradient-based attribution methods (Sun-                                                          scale, we apply sum-preserving renormalization:
+dararajan et al., 2017), we define the importance
+
+                                                                                                                                     .       (17)score using Gradient × Input:                                              ˜ωt =  ω(ˆIt) PT T                                                                                                                 ·                                                                         j=1 ω(ˆIj)                  Igradt  =              .            (13)                            |⟨gt, et⟩|
+This score corresponds to a first-order approxima-   This conserves total advantage mass (Pt ˜ωt = T),
+tion of how strongly perturbing token t would af-   so OAR redistributes credit across tokens rather
+fect the outcome distribution. Importantly, OAR-G    than globally rescaling advantages.
+replaces O(L) counterfactual forward passes with       Finally, we replace the standard advantage in the
+a single backward pass, making it computationally    clipped PPO objective with AOARt     :
+negligible compared to the generation process.              "
+Normalization  For both OAR-P and OAR-G, the     = Ei,t min  ρ(i)t AOAR(i)t        ,                                       LOARraw importance scores (Ipertt   or Igradt   ) are mapped                                                                       #
+to a unified scale for stability. We apply a log-
+transform followed by min-max normalization                      clip ρ(i)t  , 1    1 + ϵ AOAR(i)t            .                                                           −ϵ,
+within each sequence:
+                                                                                                (18)
+                                                    ¯It              ¯Ij¯It = log(1 + It),     ˆIt =      −minj                   maxj ¯Ij              ¯Ij + ϵ.     By integrating outcome-grounded credit into the                       −minj
+                                            (14)    surrogate loss, LOAR encourages the policy to pri-These normalized scores ˆIt are then used to mod-    oritize the refinement of critical reasoning steps
+ulate the advantage estimates in the subsequent   while remaining robust to the high-variance noise
+reshaping phase.                                    inherent in long-horizon mathematical traces.
+                                       24684
+
+======================== PDF 第 5 页 ========================
+                         AIME25       AIME24       AMC23     MATH500  GSM8K   Avg   Method
+                    P@1  P@32  P@1   P@32  P@1   P@32    P@1     P@1     Avg
+   Qwen2.5-7B                 2.5     26.4      4.5      43.6     29.5     81.4       52.7        82.0      45.2
+  + GRPO                     9.4     31.0     13.5     45.0     59.8     85.0       75.8        90.5      51.3
+  + GRPO w/ Random Adv     9.2     31.0     13.2     44.3     60.1     85.5       75.2        90.3      51.1
+  + GRPO w/ Entropy Adv    10.3     32.4     14.4     45.7     62.2     86.4       77.2        91.2      52.5
+  + GRPO w/ OAR-G         11.8     33.2     14.8     47.8     61.4     86.9       78.7        91.4      53.2
+  + GRPO w/ OAR-P         12.2     33.9     15.2     48.2     61.9     87.7       78.4        92.0      53.7
+   ∆(vs. GRPO)             +2.8    +2.9     +1.7     +3.2     +2.1     +2.7       +2.6        +1.5     +2.4
+   Qwen2.5-Math-7B            5.7     33.5     11.8     49.4     33.2     88.3       51.2        69.0      42.8
+  + GRPO                    12.2     39.1     31.2     48.9     64.5     90.6       80.8        91.2      57.3
+  + GRPO w/ Random Adv    11.9     39.4     30.8     47.2     64.0     90.2       79.8        91.2      56.8
+  + GRPO w/ Entropy Adv    13.0     39.6     32.4     49.0     65.4     90.6       81.7        91.4      57.9
+  + GRPO w/ KTAE          15.2     42.4     33.3†     50.8     65.1†     89.7       82.4†        92.7      59.0
+  + GRPO w/ OAR-G         14.3     40.3     33.5     51.7     65.2     92.5       83.0        92.9      59.2
+  + GRPO w/ OAR-P         14.5     40.8     33.5     51.9     65.6     92.8       83.8        92.7      59.5
+   ∆(vs. GRPO)             +2.3    +1.7     +2.3     +3.0     +1.1     +2.2       +3.0        +1.5     +2.2
+
+Table 1: Main results on mathematical reasoning benchmarks. bold and underline indicate the best and second-best
+results, respectively. † indicates results quoted from the original KTAE (Sun et al., 2025) report.
+
+         Overall Reward            Accuracy Reward            Format Reward               Policy Entropy
+    2.0                                               1.5                                             0.50                                       3                             GRPO w/ OAR-P
+                                                                                                                                                                                GRPO w/ OAR-G
+
+                                                       1.0                                                                                                                                  2Reward 1.5                                                                  Reward                                                                                                                             GRPOGRPO w/ entropy                                                                                                                                                          Reward                                                                                  Entropy
+    1.0              GRPO w/ OAR-P                     GRPO w/ OAR-P       0.25             GRPO w/ OAR-P
+                   GRPO w/ OAR-G       0.5              GRPO w/ OAR-G                    GRPO w/ OAR-G      1
+    0.5              GRPO                               w/ entropy                                                  GRPO                                                                                                                   w/ entropy                                                                         w/ entropy      Format                GRPO Overall                                                                                                                                                                                                                                                                             Average                                                                                                       Accuracy                   GRPO                                                  GRPO                                                                                  GRPO
+    0.0                                               0.0                                             0.00                                       0
+        0           200          400               0           200          400                0          200         400             0     100    200    300    400    500
+                Training Steps                          Training Steps                          Training Steps                         Training Steps
+
+
+                                                                                                                                                                                                                                                w/                                                                                                                                                                                                          OAR-P                                                                                                    0.50                                       4                             GRPO
+                                                                                                                                                                                GRPO                                                                                                                                                                                                                                                w/                                                                                                                                                                                                OAR-G    2.0                                               1.5
+                                                                                                                                                                                GRPO w/ entropy
+    1.5                                                                                                                                                                         GRPOReward                                                                       Reward 1.0                                                                  Reward                                                                                  Entropy 3
+    1.0              GRPO w/ OAR-P                     GRPO w/ OAR-P       0.25             GRPO w/ OAR-P
+                   GRPO w/ OAR-G                    GRPO w/ OAR-G                    GRPO w/ OAR-G                                                       0.5                                                                                                                                  2                               w/ entropy                                                  GRPO                                                                                                                   w/ entropy                                                                         w/ entropy      Format                GRPO Overall 0.5              GRPO                                                                                                                                                                                                                                                                             Average                                                                                                       Accuracy                   GRPO                                                  GRPO                                                                                  GRPO
+    0.0                                               0.0                                             0.00
+        0        200       400       600         0        200       400       600          0        200       400       600       0         200        400        600
+                Training Steps                          Training Steps                          Training Steps                         Training Steps
+
+      Figure 3: Training dynamics on Qwen2.5-7B-Base(Top Row) and Qwen2.5-Math-7B(Bottom Row).
+
+4  Experiments                                  generation, We set the temperature to 1.0 with a
+                                     max generation length of 1024. For our proposed
+4.1  Experiment Setup                                OAR method, we set the bi-level threshold τ = 0.4
+Datasets  and   Models  Experiments   are   (meaning the top 60% of tokens are boosted) and
+conducted    on    Qwen2.5-7B-Base    and    the boosting coefficient β = 2.0. To accelerate the
+Qwen2.5-Math-7B (Yang et al., 2025a), trained    counterfactual perturbation step during training, we
+with DAPO-MATH (Yu et al., 2025a) dataset, We eval-   implement a parallelized batch decoding strategy,
+uate the resulting performance on four widely used   which computes the perturbed logits for all masked
+math reasoning benchmarks: AIME2024/2025 (LI    positions in a single batched forward pass.  All
+et al., 2024), AMC23 (LI et al., 2024), MATH500    experiments are conducted on 8  H100 GPUs.                                            ×(Hendrycks et al., 2021), and GSM8K (Cobbe
+et al., 2021).  For AIME and AMC, we report    4.2  Baselines
+Pass@k where k ∈{1, 32}; for others we report   To validate the effectiveness of our method, westandard Pass@1(Chen et al., 2021).
+                                           compare OAR against three baselines: (i) Vanilla
+Implementation Details  We employ the GRPO   GRPO, the standard Group Relative Policy Opti-
+framework with a group size of G = 8, learning   mization algorithm with a clip-higher technique
+rate of 1 × 10−6 and a global batch size of 64. For   from DAPO (Yu et al., 2025a) as a strong refer-
+                                       24685
+
+======================== PDF 第 6 页 ========================
+     J  en  ate  three  -quarters  of  the  bag  on  the   first  day    ,  so  that  leaves  one  -quarter  of  the  cookies    .  On  the  second  day    ,  she  ate   half  of  the  remaining  cookies    ,  which   is
+   half  of  one  -quarter    ,  so  she  ate  1   /  8  of  the   original  bag    .  After  the  second  day    ,  she  has  8  cookies   left    .  Let   's   call  the   original  number  of  cookies   in  the  bag   "  x
+    ".  After  the   first  day    ,  she  has  x   /  4  cookies   left    .  After  the  second  day    ,  she  has  x   /  4   -  x   /  8 =  x   /  8  cookies   left    .  Since  she  has  8  cookies   left  on  the   third
+   day    ,  we  have   :  x   /  8 =  8  Now  solve   for  x   :  x =  8  *  8  x =  6  4  The   original  number  of  cookies   in  the  bag  was  6  4    .\  n
+
+     J  en  ate  three  -quarters  of  the  bag  on  the   first  day    ,  so  that  leaves  one  -quarter  of  the  cookies    .  On  the  second  day    ,  she  ate   half  of  the  remaining  cookies    ,  which   is
+   half  of  one  -quarter    ,  so  she  ate  1   /  8  of  the   original  bag    .  After  the  second  day    ,  she  has  8  cookies   left    .  Let   's   call  the   original  number  of  cookies   in  the  bag   "  x
+    ".  After  the   first  day    ,  she  has  x   /  4  cookies   left    .  After  the  second  day    ,  she  has  x   /  4   -  x   /  8 =  x   /  8  cookies   left    .  Since  she  has  8  cookies   left  on  the   third
+   day    ,  we  have   :  x   /  8 =  8  Now  solve   for  x   :  x =  8  *  8  x =  6  4  The   original  number  of  cookies   in  the  bag  was  6  4    .\  n
+
+  Figure 4: Token-importance visualization on a reasoning trace: OAR-P (top) vs. Oracle causal mask (bottom).
+
+
+ (%) 100                                              (%) 100                        Method          AIME24 AMC23 MATH500 Avg
+ Recall 80                                                                                            Recall 80
+     60                                                     60                          Qwen2.5-Math-1.5B    2.9      20.2      40.3     21.1
+ Causal 40                  GRPO w/ OAR-P                  Causal 40                            OAR-P w/ AS-Mean      + GRPO              13.8     56.7      73.0     47.8
+                                                                                            OAR-P                                                                                                                    w/                                                                                            TNT                        GRPO                                     w/                               OAR-G
+                                                                                            OAR-P                                                                                                                    w/                                                                                                                                        entropy       w/ Random Adv       13.8     57.0      72.6     47.8
+                        GRPO                                     w/     20                                              entropy             20                                                                                            OAR-P                                                                                                                    w/ AS-Joint                            Random                                                       Random          w/ Entropy Adv        14.2     58.2      74.5     48.9  Cumulative  0 0       20      40      60      80      100                  Cumulative  0 0       20      40      60      80      100     w/ OAR-G            14.4     58.0      75.1     49.2
+         Top-K% Importance Percentile                  Top-K% Importance Percentile        w/ OAR-P             15.0     58.7      75.5     49.7
+(a) Recall rate of different  (b) Recall rate under different                                                    ∆(vs. GRPO)         +1.2     +2.0      +2.5    +1.9
+credit assignment signals.     outcome definitions.
+
+                                                            Table 2: Results on Qwen2.5-Math-1.5B.Figure 5: Causal-token recall under the counterfactual
+Oracle as a function of the top-K% important tokens.
+                                       5  Analysis
+ence; (ii) GRPO + Random Credit, a diagnostic                                                    5.1   Is OAR Identifying Important Tokens?
+variant that assigns each token a random weight
+                              A core premise of OAR is that the identified token
+w ∼Uniform(0, 1); (iii) GRPO + Entropy, which   importance score ˆIt correlates with a token’s truefollows Cheng et al. (2025) and uses token entropy
+                                                   causal contribution to the final outcome. We testas an importance proxy to reshape advantages; and
+                                                             this premise on Qwen2.5-7B-Base using a counter-(iv) GRPO + KTAE, which follows Sun et al. (2025)
+                                                         factual Oracle and evaluate both OAR-P and OAR-and adds model-free token-level advantage correc-
+                               G against entropy-based weighting in a quantitativetions based on token–correctness association.
+                                                       correlation study.
+4.3  Main Results                                      The Oracle  Given a correct reasoning chain
+Reasoning Performance  Table 1 summarizes re-   y = (y1, . . . , yT ), following the counterfactual
+sults on five mathematical reasoning benchmarks    token-substitution test used to identify critical to-
+using Qwen2.5-7B and Qwen2.5-Math-7B as back-   kens in (Ruan et al., 2025), we construct a coun-
+bones. Incorporating our OAR into GRPO consis-    terfactual sequence by replacing token yt with the
+tently improves performance over vanilla GRPO   second most probable token under       y<t) ,                                                                                       πθ(·  |and alternative token-weighting heuristics. For ex-   and then greedily decoding the remaining suffix.
+ample, on Qwen2.5-7B, OAR-P improves AIME25    Let              denote final-answer correctness.                                                 R(·) ∈{0, 1}P@1 from 9.4 to 11.8 and boosts the overall av-   The Oracle label is:
+erage from 51.3 to 53.7. Similar trends hold for
+Qwen2.5-Math-7B, where OAR-P raises the aver-      Ot = I  R(y(t)                                                                                         replaced) ̸= R(yoriginal)   .    (19)
+age from 57.3 to 59.5.
+                                                                If replacement flips correctness, yt is a Causal
+Training Dynamics  Figure 3 compares training    Pivot (Ot = 1); otherwise it is Non-Causal Noise
+dynamics under different credit assignment strate-   (Ot = 0).gies. Across runs, OAR improves optimization
+                                           Alignment Visualization  Figure 4 visualizes to-stability and reaches higher rewards with fewer
+                                            ken importance for OAR-P (top) alongside thesteps while avoiding premature entropy collapse.
+                                                Oracle mask (bottom). OAR-P assigns high im-
+Scaling to Different Sizes  We additionally con-   portance to outcome-critical symbols while down-
+duct experiments on a smaller Qwen2.5-Math-1.5B   weighting stylistic or redundant tokens, qualita-
+model to verify the consistency and scalability of    tively matching the sparse counterfactual supervi-
+OAR. As shown in Table 2, OAR-G and OAR-P    sion. We provide additional case studies for OAR-
+consistently improve over baselines.          G in Appendix A.2.
+                                       24686
+
+======================== PDF 第 7 页 ========================
+                                                                          =                                                                                                                                          1(Suppress    1.5                                                                          =                                                                                                                              0.7                                             3                                                                                                                                                  Only)    Ratio 1.0                                                        Mass 0.20                                                                          =                                                                                                                       0.3
+                                                                          = 0(Boost                                                                                                        0.9                                                                                                                                                    0.15                                                                                                                                               Only)      Size                                                                                                                                                              vanilla                                                                                                GRPO                                                                                                                                                                                                                                                                     Only)                                                                                                                                          =                                                                                                                                                                                                                                                                1(Suppress    1.0
+                                                                                                                                          =                                                                                                                                                                                                                                       0.7Reward                                                                                          Entropy                                             2                                                                                                                                          =                                                                                                                                                                                                                             0.3                                                                                                        0.8                                                    Only)                                                                                                                                                    0.10                      =                                          1(Suppress                                                                                                                                                                                                                                                                  Only)                                                                                                                                          =                                                                                                                                                                                                                                                        0(Boost                                                                                                                                                                                                                                                                                                                                                                                                                                                 Advantage                                                                                                                                                                                                                                                                                                        vanilla                                                                                                                                                                                 GRPO                                                                                                                                                                                                Sample                                                                                                                                                                                                                                                                                           Only)                                                                                                                                                       =                                                                                                                                                                                                                                                                                      1(Suppress                      =                                      0.7    0.5                                                                                                                                                       =                                                                                                                                                                                                                                                             0.7                                             1                      =                                    0.3                                                                                                                                                    0.05                                                                                                        0.7                                                                                                                                                10%                                                                                                                                                       =                                                                                                                                                                                                                                                0.3                      =                                         0(Boost Only)Training                                                                                          Average                                                                                                                                                       =                                                                                                                                                                                                                                                                              0(Boost Only)                                                                                                                                                Top                                                                                                                                                    0.00                               vanilla GRPO                                                                                                                                                                                                                                                                                                 Effective 0.6    0.0                                   vanilla GRPO           0
+        0           200          400             0           200          400               0           200          400                0          200         400
+                Training Steps                         Training Steps                          Training Steps                          Training Steps
+
+Figure 6: OAR-G ablations on Qwen2.5-7B-Base with different thresholds τ (left to right): reward, policy entropy,
+ESS ratio, and top-10% advantage mass.
+
+
+                                                                          18.7×         Method               GSM8K  MATH500
+ Token 15                                                             Vanilla GRPO                    90.5        75.8                                       OAR (Suppress-only, τ = 1.0)     85.2        70.1
+ per 10                                    OAR (Boost-only, τ = 0.0)        81.5†        61.3†
+                                       OAR (Balanced, τ = 0.7)          89.8        74.2
+      5                                                4.2× Time                                   OAR (Balanced, τ = 0.3)         91.2        78.1
+                 1.0×                1.4×
+      0
+          GRPO        OAR-G       OAR-P(Parallel)    OAR-P(Serial)      Table 3: Ablation results on Qwen2.5-7B-Base. † indi-                      Method
+                                                          cates runs that exhibited instability or collapse during
+                                                               training.    Figure 7: Normalized training time per token.
+
+                                       6  Ablations
+Quantitative Correlation  We sample 500 trajec-                                                    6.1  Effect of the Bi-Level Gating Mechanism
+tories, rank tokens by ˆIt, and compute the recall of
+                                We ablate the bi-level gating in OAR by varyingOracle causal tokens within the top-K% tokens. In
+                                                    the threshold τ on Qwen2.5-7B-Base. This studyFigure 5a, both OAR-P and OAR-G achieve sub-
+                                                                  is conducted based on OAR-G, for brevity we referstantially higher causal-token recall than entropy-
+                                                      to it as OAR. Figure 6 reports training dynamics,based weighting across all percentiles, with OAR-P
+                                             and Table 3 summarizes final accuracy.consistently performing best.
+                                                Credit concentration  We evaluate whether OAR
+                                                  indeed reallocates token-level credit using two aux-
+5.2  Computational Trade-off                        iliary metrics (full definitions in Appendix A.3).
+                                         ESS ratio measures how uniform the token weights
+                                                    are (smaller means more concentrated), whileOAR improves credit assignment at the cost of ad-
+                                         Top-10% advantage mass measures what fractionditional attribution computation. We quantify this
+                                                   of total token advantage lies in the top 10% to-overhead using wall-clock time per token during
+                                                   kens. Compared with vanilla GRPO, OAR yieldstraining. For each update iteration, we record the
+                                               markedly more concentrated credit assignment, andelapsed time ∆t of one optimizer-update sweep
+                                                        larger τ generally produces sparser allocations.over the buffered minibatches, and divide it by the
+number of action tokens.                                               Trade-off  More aggressive sparsification is not
+  Figure 7 shows the normalized cost (GRPO   always beneficial. As shown by the reward and en-
+= 1.0×).  OAR-G incurs only a modest over-   tropy curves in Figure 6, a moderate threshold per-
+head (1.4×), consistent with requiring a single   forms best. Boost-only (τ = 0) learns quickly butbackward-based proxy for importance. In contrast,    is prone to collapse, whereas suppress-only (τ = 1)
+OAR-P is substantially more expensive due to coun-   remains stable yet inefficient. Overall, the balanced
+terfactual evaluation: even with our batched (paral-    setting achieves the best accuracy (Table 3).
+lel) implementation it costs 4.2×, while a naive se-   6.2  Effect of Outcome Definition
+rial implementation would be prohibitive (18.7×).Overall, OAR-G offers the best accuracy–efficiency  OAR is outcome-grounded through an outcome
+balance, while OAR-P serves as a higher-fidelity   probe ϕ(x, y) that summarizes the model’s final-
+but costlier upper bound.                        answer prediction.  Because ϕ  is not unique,
+                                       24687
+
+======================== PDF 第 8 页 ========================
+     Outcome definition  GSM8K  MATH500          tions, whereas AS-JOINT collapses the outcome
+     LT-LOGITS             91.5        78.0            into a scalar likelihood and may miss substantial
+     AS-JOINT              91.0        77.3             distributional changes.
+    AS-MEAN              92.0        78.4
+  Table 4: Accuracy ablation of outcome definitions.    7  Related Work
+
+                                            Reinforcement Learning with Verifiable Re-
+different definitions may induce different token-   wards  RLVR post-trains LLMs using automati-
+importance rankings and thus different credit real-    cally checkable outcome signals, yielding strong
+location behaviors. We therefore ablate several out-   gains in math and code via verifiers such as Math-
+come definitions to assess the robustness of causal-   Verify and sandboxed execution (Cui et al., 2025;
+token identification and its impact on downstream   Yu et  al., 2025a; Luo et  al., 2025; DeepSeek-
+RL performance.                           AI et al., 2025). GRPO further stabilize large-
+                                                     scale training by group-normalizing verifier re-
+Outcome definitions  We consider three outcome   wards (Shao et al., 2024). To move beyond do-
+operators                                            mains with explicit checkers, recent studies learn          ϕ(·):
+    • Last-Token Logits (LT-Logits).                generative reward/verifier models for model-based
+     ϕLT-LOGITS(x, y) = zL, i.e., the next-token       judging (Mahan et al., 2024; Ma et al., 2025; Liu
+     logits at the last position.                           et al., 2025), while verifier-free variants instead use
+    • Answer-Span Mean Logits (AS-Mean).        intrinsic signals such as per-token likelihood on          P
+     ϕAS-MEAN(x, y) =  1         zℓ, averaging       reference answers to enable RL-style post-training
+                           |A|   ℓ∈A
+     logits over positions A that predict the final     without dedicated verifiers (Yu et al., 2025b; Zhou    answer span, where the span is extracted by      et al., 2025).
+     regex matching <answer>...</answer> in
+     the model output.                          Fine-Grained Credit Assignment  To address
+                                                     the coarseness of group-level rewards, recent stud-    • Answer-Span Joint Likelihood (AS-Joint).          P                         1                                ies explored leveraging model-internal signals to re-     ϕAS-JOINT(x, y) =
+                           |A|   ℓ∈A                               log πθ(aℓ+1 |        distribute credits at the token level. Li et al. (2025)
+     x, y≤ℓ), the mean token log-likelihood of the    identify a recurring preplan-and-anchor rhythm     extracted answer span.
+                                             from attention dynamics and upweight advantages
+  For LT-Logits and AS-Mean we compute impor-                                          on the corresponding critical tokens.  Xie et al.
+tance via DKL(softmax(ϕ) ∥softmax(˜ϕ)) under   (2025) propose UCAS, which reshapes advantagestoken masking; for AS-Joint we use the score drop                                                 using response-level confidence and a token-level
+ϕ −˜ϕ.                                              logit-based certainty penalty to encourage explo-
+                                                         ration. Chen et al. (2025) introduce LESS, whichExperiment setup We follow the quantitative
+                                               segments generations by entropy and reweights ad-correlation setup in Section 5.1, measure the re-
+                                                 vantages based on low-entropy segment overlapcall rate under three methods. Notability, For AS-
+                                             between correct and incorrect rollouts.MEAN, both in this experiment and in our training
+runs, we initially apply LT-LOGITS as a warm-up,
+as in early training stage the model may not reliably   8  Conclusion
+produce the required <answer>...</answer> for-
+                                  We propose Outcome-grounded Advantage Reshap-mat. We further report the task accuracy to connect
+                                                   ing (OAR) to improve credit assignment in GRPOattribution quality with actual performance.
+                                                      for long-horizon reasoning. OAR redistributes
+Results  Figure 5b and Table 4 show that AS-   sequence-level advantages to tokens based on out-
+MEAN achieves the highest Oracle top-K% recall   come contribution, with OAR-P using counterfac-
+and the best downstream training performance, fol-    tual attribution and OAR-G a lightweight gradient-
+lowed by LT-LOGITS, while AS-JOINT performs   based proxy. Experiments on mathematical reason-
+worst. We attribute this to a representational mis-   ing benchmarks show consistent gains over strong
+match: LT-LOGITS and AS-MEAN operate on dis-  GRPO baselines. Future work will extend OAR
+tributions and thus can capture subtle shifts in the    to open-ended tasks and deeper RL post-training
+outcome distribution induced by token perturba-    integration.
+                                       24688
+
+======================== PDF 第 9 页 ========================
+Limitaions                                           Correctness-aware low-entropy segment-based ad-
+                                                       vantage shaping for reasoning llms.    Preprint,
+OAR estimates token importance by measuring      arXiv:2512.00908.
+shifts in the model’s own answer distribution,
+                                                 Daixuan Cheng, Shaohan Huang, Xuekai Zhu, Bo Dai,which serves as an efficient surrogate when ver-                                            Wayne Xin Zhao, Zhenliang Zhang, and Furu Wei.
+ifier rewards are discrete and non-differentiable;      2025. Reasoning with exploration: An entropy per-
+nevertheless, this proxy can be imperfect when       spective. Preprint, arXiv:2506.14758.
+distributional changes are weakly coupled with ver-                                                  K. Cobbe, Vineet Kosaraju, Mohammad Bavarian, Mark
+ifier acceptance. Our perturbation-based attribu-                                                   Chen, Heewoo Jun, Lukasz Kaiser, Matthias Plap-
+tion further relies on a masking intervention (e.g.,       pert, Jerry Tworek, Jacob Hilton, Reiichiro Nakano,
+[PAD]), which is a controlled counterfactual but       Christopher Hesse, and John Schulman. 2021. Train-
+                                                         ing verifiers to solve math word problems. ArXiv,may introduce some distribution shift compared
+                                                        abs/2110.14168.
+to in-distribution edits. Empirically, we focus on
+mathematical reasoning with verifiable final an-   Ganqu Cui, Lifan Yuan, Zefan Wang, Hanbin Wang,
+swers, and extending OAR to open-ended or inter-     Yuchen Zhang, Jiacheng Chen, Wendi Li, Bingxiang
+                                                    He, Yuchen Fan, Tianyu Yu, Qixin Xu, Weize Chen,active settings where outcomes are less localized                                                                 Jiarui Yuan, Huayu Chen, Kaiyan Zhang, Xingtai
+remains an important direction. Finally, beyond      Lv, Shuo Wang, Yuan Yao, Xu Han, and 6 others.
+entropy-based shaping, several closely related re-      2025.  Process reinforcement through implicit re-
+cent methods are not yet fully reproducible, we will      wards. Preprint, arXiv:2502.01456.
+broaden comparisons as these baselines become                                                  DeepSeek-AI, Daya Guo, Dejian Yang, Haowei Zhang,
+easier to faithfully re-implement.                       Junxiao Song, Ruoyu Zhang, Runxin Xu, Qihao Zhu,
+                                                       Shirong Ma, Peiyi Wang, Xiao Bi, Xiaokang Zhang,
+Acknowledgements                               Xingkai Yu, Yu Wu, Z. F. Wu, Zhibin Gou, Zhi-
+                                                 hong Shao, Zhuoshu Li, Ziyi Gao, and 181 others.
+The authors would like to thank Fangyuan Mao      2025. Deepseek-r1: Incentivizing reasoning capa-
+for his assistance with the professional illustrations        bility in llms via reinforcement learning. Preprint,
+and diagrams in this paper. We also thank Shun Lu      arXiv:2501.12948.
+for his insightful reviews and valuable suggestions    William Fedus, Barret Zoph, and Noam Shazeer. 2022.
+that significantly improved the quality of this work.      Switch transformers: Scaling to trillion parameter
+                                                  models with simple and efficient sparsity. Preprint,
+                                                        arXiv:2101.03961.
+References                                                     Yarin Gal and Zoubin Ghahramani. 2016. Dropout as
+Josh Achiam, Steven Adler, Sandhini Agarwal, Lama      a bayesian approximation: Representing model un-
+  Ahmad,  Ilge Akkaya,  Florencia Leoni Aleman,       certainty in deep learning.  In Proceedings of The
+  Diogo Almeida, Janko Altenschmidt, Sam Altman,      33rd International Conference on Machine Learn-
+  Shayne An, and 1 others. 2023. GPT-4 Technical       ing, volume 48 of Proceedings of Machine Learning
+   Report. arXiv preprint arXiv:2303.08774.               Research, pages 1050–1059, New York, New York,
+                                            USA. PMLR.
+Tom B. Brown, Benjamin Mann, Nick Ryder, Melanie
+   Subbiah, Jared Kaplan, Prafulla Dhariwal, Arvind   Dan Hendrycks, Collin Burns, Saurav Kadavath, Akul
+   Neelakantan, Pranav Shyam, Girish Sastry, Amanda      Arora, Steven Basart, Eric Tang, D. Song, and
+   Askell,  Sandhini Agarwal,  Ariel  Herbert-Voss,        J.  Steinhardt. 2021.   Measuring mathematical
+  Gretchen Krueger, Tom Henighan, Rewon Child,      problem solving with the math dataset.   ArXiv,
+  Aditya Ramesh, Daniel M. Ziegler, Jeffrey Wu,      abs/2103.03874.
+  Clemens  Winter,  and 12  others. 2020.   Lan-
+  guage models are few-shot learners.   Preprint,    Sarthak Jain and Byron C. Wallace. 2019. Attention is
+   arXiv:2005.14165.                                      not explanation. Preprint, arXiv:1902.10186.
+Mark Chen,  Jerry Tworek, Heewoo Jun, Qiming   Nathan Lambert, Jacob Morrison, Valentina Pyatkin,
+  Yuan, Henrique Pondé, Jared Kaplan, Harrison Ed-      Shengyi Huang, Hamish Ivison, Faeze Brahman,
+   wards, Yura Burda, Nicholas Joseph, Greg Brockman,      Lester James V. Miranda, Alisa Liu, Nouha Dziri,
+  Alex Ray, Raul Puri, Gretchen Krueger, Michael      Shane Lyu, David Havasi, Shrimai Prabhumoye,
+   Petrov, Heidy Khlaaf, Girish Sastry, Pamela Mishkin,      Pengfei Liu, Jesse Dodge, Yejin Choi, Noah A. Smith,
+  Brooke Chan, Scott Gray, and 34 others. 2021. Eval-     Hannaneh Hajishirzi, and Luke Zettlemoyer. 2024.
+   uating large language models trained on code. ArXiv,      Tulu 3: Pushing frontiers in open language model
+   abs/2107.03374.                                            post-training. Preprint, arXiv:2411.15124.
+
+Xinzhu Chen, Xuesheng Li, Zhongxiang Sun, and Wei-    Jia LI, Edward Beeching, Lewis Tunstall, Ben Lip-
+   jie Yu. 2025.  Beyond high-entropy exploration:       kin, Roman Soletskyi, Shengyi Costa Huang, Kashif
+                                       24689
+
+======================== PDF 第 10 页 ========================
+   Rasul, Longhui Yu, Albert Jiang, Ziju Shen, Zihan     Daya Guo. 2024. DeepSeekMath: Pushing the Lim-
+  Qin, Bin Dong, Li Zhou, Yann Fleureau, Guillaume         its of Mathematical Reasoning in Open Language
+  Lample, and Stanislas Polu. 2024.  Numinamath.      Models. Preprint, arXiv:2402.03300.
+  [https://huggingface.co/AI-MO/NuminaMa
+  th-CoT](https://github.com/project-numin   Karen Simonyan, Andrea Vedaldi, and Andrew Zis-
+  a/aimo-progress-prize/blob/main/report/nu      serman. 2014. Deep inside convolutional networks:
+  mina_dataset.pdf).                                     Visualising image classification models and saliency
+                                                    maps. Preprint, arXiv:1312.6034.
+Yang Li, Zhichen Dong, Yuhan Sun, Weixun Wang,
+  Shaopan Xiong, Yijia Luo, Jiashun Liu, Han Lu, Jia-   Wei Sun, Wen Yang, Pu Jian, Qianlong Du, Fuwei
+  mang Wang, Wenbo Su, Bo Zheng, and Junchi Yan.      Cui, Shuo Ren, and Jiajun Zhang. 2025.  Ktae:
+  2025.  Attention illuminates LLM reasoning: The    A model-free algorithm to key-tokens advantage
+   preplan-and-anchor rhythm enables fine-grained pol-      estimation in mathematical reasoning.   Preprint,
+   icy optimization. Preprint, arXiv:2510.13554.            arXiv:2505.16826.
+                                           Mukund Sundararajan, Ankur Taly, and Qiqi Yan. 2017.Ziniu Li, Congliang Chen, Tian Xu, Zeyu Qin, Jiancong
+                                                    Axiomatic attribution for deep networks. Preprint,  Xiao, Zhi-Quan Luo, and Ruoyu Sun. 2024.  Pre-
+                                                        arXiv:1703.01365.   serving diversity in supervised fine-tuning of large
+  language models. arXiv preprint arXiv:2408.16673.                                                    Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten
+                                                 Bosma, Brian Ichter, Fei Xia, Ed Chi, Quoc Le, andAiwei Liu, Haoping Bai, Zhiyun Lu, Yanchao Sun, Xi-
+                                                Denny Zhou. 2023. Chain-of-thought prompting elic-  ang Kong, Simon Wang, Jiulong Shan, Albin Madap-
+                                                                             its reasoning in large language models.  Preprint,   pally Jose, Xiaojiang Liu, Lijie Wen, and 1 others.
+                                                        arXiv:2201.11903.  2024.  Tis-dpo: Token-level importance sampling
+   for direct preference optimization with estimated                                           Can Xie, Ruotong Pan, Xiangyu Wu, Yunfei Zhang,
+   weights. arXiv preprint arXiv:2410.04350.                                                                Jiayi Fu, Tingting Gao, and Guorui Zhou. 2025.
+                                                    Unlocking exploration in rlvr: Uncertainty-awareZichen Liu, Changyu Chen, Wenjun Li, Penghui Qi,                                                      advantage shaping for deeper reasoning. Preprint,  Tianyu Pang, Chao Du, Wee Sun Lee, and Min Lin.                                                        arXiv:2510.10649.  2025. Understanding r1-zero-like training: A critical
+   perspective. Preprint, arXiv:2503.20783.                                       An Yang, Bowen Yu, Chengyuan Li, Dayiheng Liu, Fei
+                                                    Huang, Haoyan Huang, Jiandong Jiang, Jianhong Tu,
+Michael Luo, Sijun Tan, Justin Wong, Xiaoxiang Shi,                                                          Jianwei Zhang, Jingren Zhou, Junyang Lin, Kai Dang,
+  William Y. Tang, Manan Roongta, Colin Cai, Jeffrey                                                  Kexin Yang, Le Yu, Mei Li, Minmin Sun, Qin Zhu,
+  Luo, Li Erran Li, Raluca Ada Popa, and Ion Stoica.                                                    Rui Men, Tao He, and 9 others. 2025a. Qwen2.5-1m
+  2025. DeepScaleR: Surpassing O1-Preview with a                                                              technical report. Preprint, arXiv:2501.15383.
+  1.5B Model by Scaling RL. https://pretty-r
+  adio-b75.notion.site/DeepScaleR-Surpass    Zhihe Yang, Xufang Luo, Zilong Wang, Dongqi Han,
+  ing-O1-Preview-with-a-1-5B-Model-by-Sca      Zhiyuan He, Dongsheng Li, and Yunjian Xu. 2025b.
+  ling-RL-19681902c1468005bed8ca303013a4e2.    Do not let low-probability tokens over-dominate in rl
+  Notion Blog.                                               for llms. Preprint, arXiv:2505.12929.
+
+Xueguang Ma, Qian Liu, Dongfu Jiang, Ge Zhang,   Qiying Yu, Zheng Zhang, Ruofei Zhu, Yufeng Yuan,
+  Zejun Ma, and Wenhu Chen. 2025.   General-     Xiaochen Zuo, Yu Yue, Weinan Dai, Tiantian Fan,
+   reasoner: Advancing llm reasoning across all do-     Gaohong Liu, Lingjun Liu, Xin Liu, Haibin Lin,
+  mains. Preprint, arXiv:2505.14652.                     Zhiqi Lin, Bole Ma, Guangming Sheng, Yuxuan
+                                                     Tong, Chi Zhang, Mofan Zhang, Wang Zhang, and
+Dakota Mahan, Duy Van Phung, Rafael Rafailov,     16 others. 2025a.  Dapo: An open-source llm re-
+  Chase Blagden, Nathan  Lile,  Louis  Castricato,      inforcement learning system at scale.   Preprint,
+   Jan-Philipp Fränken, Chelsea Finn, and Alon Al-      arXiv:2503.14476.
+   balak. 2024. Generative reward models. Preprint,
+  arXiv:2410.12832.                                Tianyu Yu, Bo Ji, Shouli Wang, Shu Yao, Zefan Wang,
+                                             Ganqu Cui, Lifan Yuan, Ning Ding, Yuan Yao,
+Marco Tulio  Ribeiro, Sameer Singh, and Carlos      Zhiyuan Liu, Maosong Sun, and Tat-Seng Chua.
+   Guestrin. 2016.  "why should  i trust you?": Ex-      2025b. Rlpr: Extrapolating rlvr to general domains
+   plaining the predictions of any classifier. Preprint,      without verifiers. Preprint, arXiv:2506.18254.
+  arXiv:1602.04938.
+                                                   Xiangxin Zhou, Zichen Liu, Anya Sims, Haonan Wang,
+Zhiwen Ruan, Yixia Li, He Zhu, Yun Chen, Peng Li,      Tianyu Pang, Chongxuan Li, Liang Wang, Min Lin,
+  Yang Liu, and Guanhua Chen. 2025. Enhancing large      and Chao Du. 2025. Reinforcing general reasoning
+  language model reasoning via selective critical token      without verifiers. Preprint, arXiv:2505.21493.
+   fine-tuning. Preprint, arXiv:2510.10974.
+
+Zhihong Shao, Peiyi Wang, Qihao Zhu, Rui Xu, Junmei
+  Song, Mingchuan Zhang, Y.K. Li, Yuxiang Wu, and
+                                       24690
+
+======================== PDF 第 11 页 ========================
+A  Appendix                                      dient can be decomposed as
+
+A.1  Theoretical Analysis          XT
+                                                         gentropy =   (A + δt)∇θ log πθ(yt | x, y<t)A.1.1  Variance from Reward Alising in                     t=1
+                                                                    T     GRPO                 X
+Assume there exists a latent decomposition of the      = gGRPO +    δt∇θ log πθ(yt | x, y<t).
+sequence advantage into token-level contributions                        t=1
+            PT                                                                       (23)
+at, such that A(i) =   τ=1 aτ, where at can be
+viewed as an unobserved per-token outcome con-                                         The additional term scales with the bonus mass
+tribution used only for analysis. The gradient con-     PT                      M =   t=1 δt, which grows with sequence length
+tribution for a specific token at step t in GRPO can                                     T and the density of high-proxy tokens.  Thus,
+be rewritten as:                                              even when two samples share the same normal-
+                               ized A, their gradients can have systematically dif-
+                                                      ferent magnitudes, effectively inducing a sample-         X                              aτ      log πt ,    ˆgt =        log πt +         |at∇θ{z   }       ∇θ            dependent step size.
+          Token-Specific Signal                        | τ̸=t   {z       }         In PPO-style updates, changing the effective step
+                                    Aliased Credit (Noise)         size shifts the distribution of importance ratios and
+                                            (20)                                                      the realized KL to the reference policy, which may
+In an ideal token-credit setting, the update would                                         harm stability unless one applies sequence-level
+depend primarily on at. However, GRPO effec-        P                            renormalization or re-tunes hyperparameters.
+tively injects a term       aτ into the update for
+                             τ̸=ttoken t, whose variance can be much larger than    A.1.3  Outcome-Grounded Token Importance
+that of at in long-horizon sequences:                         Identification
+                                                    Definition.  Given a prompt x and a generated
+          Var  A(i)                      (21)   sequence y1:T , we define an outcome probe Z as                   ≫Var(at).                the model’s predictive distribution at an outcome-
+                                                  bearing position (e.g., the terminal next-token dis-
+Consequently, for tokens with low causal influ-
+                                                         tribution or the start of an <answer> block):
+ence, the optimizer receives a high-variance signal
+largely determined by other tokens’ actions. This
+                                                      p := pθ(· | x, y1:T ).misalignment hinders the policy from distinguish-
+ing critical reasoning steps from syntactic fillers.     Let y(−t) denote a counterfactual sequence where
+                                                token yt is masked (e.g., replaced by [PAD]), and
+A.1.2 Why Additive Proxy Shaping may           let
+       Induce Sequence-Dependent Update                                                                          qt := pθ(· | x, y(−t)).       Scales
+                                We measure the influence of token yt by the KL
+Additive proxy shaping (e.g., entropy bonuses) is                                                  divergence between the factual and counterfactual
+applied after GRPO’s group-relative normalization,                                            outcome distributions:
+but is typically not re-normalized at the sequence
+level.  Consequently, the effective update scale                                                                 It(y) := DKL(p ∥qt).         (24)can vary across samples as a function of sequence
+length and how often the proxy is activated.         Interpretation.  It(y) is outcome-grounded:  it
+  Define the (non-negative) proxy bonus and    directly quantifies how much removing yt changes
+shaped advantage:                                   the model’s predicted outcome distribution, rather
+                                                 than relying on intrinsic signals such as token en-
+                                                        tropy. A useful sanity connection to RLVR is that,            δt = min α  sg(Ht), |A|    ,                                                      for any event S over outcomes (e.g., the verifier-                                   ·       κ         (22)
+                                                 accepted set of answers),
+                δt ≥0,      ˜At = A + δt,
+                                                       p(S) −qt(S) ≤TV(p,q     qt)where A is the GRPO group-normalized sequence      q                                                                                                (25)
+advantage. The unclipped per-sequence policy gra-      ≤    12DKL(p∥qt) =    12It(y),
+                                       24691
+
+======================== PDF 第 12 页 ========================
+     J  en  ate  three  -quarters  of  the  bag  on  the   first  day    ,  so  that  leaves  one  -quarter  of  the  cookies    .  On  the  second  day    ,  she  ate   half  of  the  remaining  cookies    ,  which   is
+   half  of  one  -quarter    ,  so  she  ate  1   /  8  of  the   original  bag    .  After  the  second  day    ,  she  has  8  cookies   left    .  Let   's   call  the   original  number  of  cookies   in  the  bag   "  x
+    ".  After  the   first  day    ,  she  has  x   /  4  cookies   left    .  After  the  second  day    ,  she  has  x   /  4   -  x   /  8 =  x   /  8  cookies   left    .  Since  she  has  8  cookies   left  on  the   third
+   day    ,  we  have   :  x   /  8 =  8  Now  solve   for  x   :  x =  8  *  8  x =  6  4  The   original  number  of  cookies   in  the  bag  was  6  4    .\  n
+
+     J  en  ate  three  -quarters  of  the  bag  on  the   first  day    ,  so  that  leaves  one  -quarter  of  the  cookies    .  On  the  second  day    ,  she  ate   half  of  the  remaining  cookies    ,  which   is
+   half  of  one  -quarter    ,  so  she  ate  1   /  8  of  the   original  bag    .  After  the  second  day    ,  she  has  8  cookies   left    .  Let   's   call  the   original  number  of  cookies   in  the  bag   "  x
+    ".  After  the   first  day    ,  she  has  x   /  4  cookies   left    .  After  the  second  day    ,  she  has  x   /  4   -  x   /  8 =  x   /  8  cookies   left    .  Since  she  has  8  cookies   left  on  the   third
+   day    ,  we  have   :  x   /  8 =  8  Now  solve   for  x   :  x =  8  *  8  x =  6  4  The   original  number  of  cookies   in  the  bag  was  6  4    .\  n
+
+     J  en  ate  three  -quarters  of  the  bag  on  the   first  day    ,  so  that  leaves  one  -quarter  of  the  cookies    .  On  the  second  day    ,  she  ate   half  of  the  remaining  cookies    ,  which   is
+   half  of  one  -quarter    ,  so  she  ate  1   /  8  of  the   original  bag    .  After  the  second  day    ,  she  has  8  cookies   left    .  Let   's   call  the   original  number  of  cookies   in  the  bag   "  x
+    ".  After  the   first  day    ,  she  has  x   /  4  cookies   left    .  After  the  second  day    ,  she  has  x   /  4   -  x   /  8 =  x   /  8  cookies   left    .  Since  she  has  8  cookies   left  on  the   third
+   day    ,  we  have   :  x   /  8 =  8  Now  solve   for  x   :  x =  8  *  8  x =  6  4  The   original  number  of  cookies   in  the  bag  was  6  4    .\  n
+
+Figure 8: Token-importance visualization on a reasoning trace: OAR-G (top) vs. Oracle causal mask (Middle) vs.
+Entropy-Based(Bottom)
+
+
+where the second inequality is Pinsker’s inequality.   ing parameters associated with nuisance tokens and
+Thus, if It(y) ≈0, masking yt cannot substantially   focusing the optimization on tokens that causallychange the probability mass of any verifier-defined    affect the outcome.
+correct set, suggesting yt is counterfactually non-
+influential for the final outcome.                  A.2  Additional Token-Importance
+                                                        VisualizationsA.1.4  Gradient Noise Suppression
+Standard GRPO broadcasts a trajectory-level ad-   This section provides additional qualitative evi-
+vantage ˆA to all tokens. For a nuisance token that   dence that the token-importance signals used for ad-
+causally contributes nothing to the reward, this    vantage reshaping are aligned with outcome-critical
+broadcasting injects variance into the gradient es-   reasoning steps.Figure 8 shows a representative rea-
+timate, as the token is updated based on a global   soning trace and compares OAR-G with an oracle
+signal it did not influence. We show how OAR    causal mask and an entropy-based baseline.
+mitigates this.
+                                            A.3  Credit Concentration MetricsClaim (Noise Suppression)  Consider a token po-
+sition k that is counterfactually non-influential, i.e.,  We quantify how concentrated token-level credit
+Ik(y) = 0. Under OAR, the contribution of this po-   becomes during training using two auxiliary met-
+sition to the gradient variance is strictly suppressed    rics computed on each sequence with a valid-token
+compared to standard GRPO.                     mask.
+  Proof Sketch. Let sk := ∇θ log πθ(yk | x, y<k)
+be the score function at position k. In standard   ESS ratio  Let wt     denote the token weight                                     ≥0GRPO, the gradient estimator for this token is    assigned by OAR, and let T be the number of valid
+                           yk is irrelevant to the   (non-padding) tokens. Defineˆg(k)GRPO = ˆA·sk. Even if tokentask (nuisance), ˆA varies across trajectories due to
+                                                                                             2rewards earned by other tokens, and sk is non-zero                PT
+(as the model still predicts the token itself). This                              t=1 wt
+                                                ESS(w) =  PT           ,
+                    > 0.                                     t=1 w2tresults in gradient noise: E[∥ˆg(k)GRPO∥2]
+                                                                                                      2  In OAR, the update is reweighted by a scalar                    PT
+                                                                                      t=1 wtω(ˆIk). Since Ik(y) = 0, our weighting scheme                  ESS(w)
+                                                ESS-ratio(w) =     =  PT         .
+                                                     T      T   t=1 w2tassigns ω(ˆIk) ≤ε for some small ε ≪1 (repre-senting the suppression floor). The squared norm                                                (27)
+of the OAR gradient estimator becomes:              ESS-ratio       1] measures the uniformity of                                                  ∈(0,                                                    weights: 1 corresponds to uniform assignment, and
+   E ∥ˆg(k)OAR∥2 = E ∥ω(ˆIk) · ˆA · sk∥2             smaller values indicate more concentrated credit.
+           ≤ε2 · E ∥ˆA · sk∥2         (26)
+                                     Top-10% advantage mass  Let At denote the                                                      .         = ε2 · E ∥ˆg(k)GRPO∥2                                                    token-level advantage used in the policy-gradient
+As ε →0, the gradient noise at position k vanishes.   update. We measure what fraction of the total ab-Thus, OAR acts as a causal filter, effectively freez-   solute advantage mass is carried by the top 10%
+                                       24692
+
+======================== PDF 第 13 页 ========================
+tokens (by |At|):
+        P
+                                 |At| ,         mtop =    t∈TopK(|A|)PT
+                         t=1                             |At|           (28)
+       K = max (1, ⌊0.1T⌋) .
+  where TopK(|A|) returns the indices of the K
+largest |At| among valid tokens. Larger mtop indi-cates that the update is dominated by a small subset
+of tokens.
+
+
+
+
+
+                                       24693

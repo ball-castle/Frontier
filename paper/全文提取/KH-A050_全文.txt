@@ -1,0 +1,805 @@
+KH-A050 | Masked Autoencoders Are Scalable Vision Learners
+来源：https://arxiv.org/abs/2111.06377
+本地PDF：专题文献/何恺明/KH-A050_Masked_Autoencoders_Are_Scalable_Vision_Learners_CVPR2022.pdf
+SHA-256：1b490443925c72a2b7c770f90dd797e248729ae34a57e1abfe9ed36751c4cc5b
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                Masked Autoencoders Are Scalable Vision Learners
+
+             Kaiming He∗,†  Xinlei Chen∗  Saining Xie  Yanghao Li  Piotr Doll´ar  Ross Girshick
+
+                                                   ∗equal technical contribution      †project lead
+
+                                     Facebook AI Research (FAIR)
+
+                        Abstract
+
+            This paper shows that masked autoencoders (MAE) are2021   scalable self-supervised learners for computer vision. Our
+      MAE approach is simple: we mask random patches of the
+          input image and reconstruct the missing pixels. It is based                              encoder              decoderDec   on two core designs.   First, we develop an asymmetric
+
+
+
+                                                                                                                                                                                                                     ....               ....19   encoder-decoderates only on the visiblearchitecture,subset ofwithpatchesan encoder(withoutthatmaskoper-to-              input                                                                target
+          kens), along with a lightweight decoder that reconstructs
+          the original image from the latent representation and mask
+          tokens.  Second, we ﬁnd that masking a high proportion                                                                            Figure 1. Our MAE architecture. During pre-training, a large
+          of the input image,  e.g., 75%,  yields a nontrivial and     random subset of image patches (e.g., 75%) is masked out. The
+         meaningful self-supervisory task. Coupling these two de-      encoder is applied to the small subset of visible patches. Mask[cs.CV]   signs enables us to train large models efﬁciently and ef-      tokens are introduced after the encoder, and the full set of en-
+           fectively: we accelerate training (by 3× or more) and im-     coded patches and mask tokens is processed by a small decoder
+         prove accuracy. Our scalable approach allows for learning       that reconstructs the original image in pixels. After pre-training,
+         high-capacity models that generalize well:  e.g., a vanilla      the decoder is discarded and the encoder is applied to uncorrupted
+        ViT-Huge model achieves the best accuracy (87.8%) among     images (full sets of patches) for recognition tasks.
+        methods that use only ImageNet-1K data.  Transfer per-
+        formance in downstream tasks outperforms supervised pre-
+                                                                             in vision [59, 46] preceded BERT. However, despite signif-          training and shows promising scaling behavior.
+                                                                             icant interest in this idea following the success of BERT,
+                                                                       progress of autoencoding methods in vision lags behind
+                                                           NLP. We ask: what makes masked autoencoding different         1. Introduction
+                                                                between vision and language? We attempt to answer this
+          Deep learning has witnessed an explosion of archi-     question from the following perspectives:
+          tectures of continuously growing capability and capacity           (i) Until recently, architectures were different. In vision,
+          [33, 25, 57]. Aided by the rapid gains in hardware, mod-     convolutional networks [34] were dominant over the lastarXiv:2111.06377v3   els today can easily overﬁt one million images [13] and     decade [33]. Convolutions typically operate on regular grids
+         begin to demand hundreds of millions of—often publicly     and it is not straightforward to integrate ‘indicators’ such as
+         inaccessible—labeled images [16].                       mask tokens [14] or positional embeddings [57] into con-
+            This appetite for data has been successfully addressed in      volutional networks. This architectural gap, however, has
+          natural language processing (NLP) by self-supervised pre-     been addressed with the introduction of Vision Transform-
+           training. The solutions, based on autoregressive language      ers (ViT) [16] and should no longer present an obstacle.
+        modeling in GPT [47, 48, 4] and masked autoencoding in           (ii) Information density is different between language
+      BERT [14], are conceptually simple: they remove a portion     and vision.  Languages are human-generated signals that
+         of the data and learn to predict the removed content. These      are highly semantic and information-dense. When training
+        methods now enable training of generalizable NLP models     a model to predict only a few missing words per sentence,
+         containing over one hundred billion parameters [4].               this task appears to induce sophisticated language under-
+          The idea of masked autoencoders, a form of more gen-      standing. Images, on the contrary, are natural signals with
+          eral denoising autoencoders [58], is natural and applicable     heavy spatial redundancy—e.g., a missing patch can be re-
+          in computer vision as well. Indeed, closely related research     covered from neighboring patches with little high-level un-
+
+
+                                                         1
+
+======================== PDF 第 2 页 ========================
+Figure 2. Example results on ImageNet validation images. For each triplet, we show the masked image (left), our MAE reconstruction†
+(middle), and the ground-truth (right). The masking ratio is 80%, leaving only 39 out of 196 patches. More examples are in the appendix.
+†As no loss is computed on visible patches, the model output on visible patches is qualitatively worse. One can simply overlay the output with the visible
+patches to improve visual quality. We intentionally opt not to do this, so we can more comprehensively demonstrate the method’s behavior.
+
+
+
+
+
+Figure 3. Example results on COCO validation images, using an MAE trained on ImageNet (the same model weights as in Figure 2).
+Observe the reconstructions on the two right-most examples, which, although different from the ground truth, are semantically plausible.
+
+
+derstanding of parts, objects, and scenes. To overcome this     lightweight and reconstructs the input from the latent rep-
+difference and encourage learning useful features, we show      resentation along with mask tokens (Figure 1).  Shifting
+that a simple strategy works well in computer vision: mask-      the mask tokens to the small decoder in our asymmetric
+ing a very high portion of random patches. This strategy     encoder-decoder results in a large reduction in computation.
+largely reduces redundancy and creates a challenging self-     Under this design, a very high masking ratio (e.g., 75%) can
+supervisory task that requires holistic understanding beyond     achieve a win-win scenario: it optimizes accuracy while al-
+low-level image statistics. To get a qualitative sense of our     lowing the encoder to process only a small portion (e.g.,
+reconstruction task, see Figures 2 – 4.                    25%) of patches. This can reduce overall pre-training time
+    (iii) The autoencoder’s decoder, which maps the latent     by 3× or more and likewise reduce memory consumption,
+representation back to the input, plays a different role be-     enabling us to easily scale our MAE to large models.
+tween reconstructing text and images. In vision, the decoder       Our MAE learns very high-capacity models that gen-
+reconstructs pixels, hence its output is of a lower semantic      eralize well.  With MAE pre-training, we can train data-
+level than common recognition tasks.  This is in contrast     hungry models like ViT-Large/-Huge [16] on ImageNet-1K
+to language, where the decoder predicts missing words that     with improved generalization performance. With a vanilla
+contain rich semantic information. While in BERT the de-     ViT-Huge model, we achieve 87.8% accuracy when ﬁne-
+coder can be trivial (an MLP) [14], we found that for im-     tuned on ImageNet-1K. This outperforms all previous re-
+ages, the decoder design plays a key role in determining the      sults that use only ImageNet-1K data. We also evaluate
+semantic level of the learned latent representations.              transfer learning on object detection, instance segmentation,
+   Driven by this analysis, we present a simple, effective,     and semantic segmentation. In these tasks, our pre-training
+and scalable form of a masked autoencoder (MAE) for     achieves better results than its supervised pre-training coun-
+visual representation learning. Our MAE masks random      terparts, and more importantly, we observe signiﬁcant gains
+patches from the input image and reconstructs the missing     by scaling up models.  These observations are aligned
+patches in the pixel space.  It has an asymmetric encoder-     with those witnessed in self-supervised pre-training in NLP
+decoder design. Our encoder operates only on the visible      [14, 47, 48, 4] and we hope that they will enable our ﬁeld to
+subset of patches (without mask tokens), and our decoder is     explore a similar trajectory.
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+                                                            Self-supervised learning approaches have seen signiﬁcant
+                                                                       interest in computer vision, often focusing on different pre-
+                                                                      text tasks for pre-training [15, 61, 42, 70, 45, 17].  Re-
+                                                                     cently, contrastive learning [3, 22] has been popular, e.g.,
+                                                                  [62, 43, 23, 7], which models image similarity and dis-
+                                                                    similarity (or only similarity [21, 8]) between two or more
+                                                             views. Contrastive and related methods strongly depend on
+                                                              data augmentation [7, 21, 8]. Autoencoding pursues a con-
+                                                                ceptually different direction, and it exhibits different behav-
+                                                                     iors as we will present.
+
+
+                                                          3. Approach
+
+                                                    Our masked autoencoder (MAE) is a simple autoencod-
+  original       mask 75%          mask 85%          mask 95%         ing approach that reconstructs the original signal given its
+Figure 4. Reconstructions of ImageNet validation images using      partial observation.  Like all autoencoders, our approach
+an MAE pre-trained with a masking ratio of 75% but applied on     has an encoder that maps the observed signal to a latent
+inputs with higher masking ratios. The predictions differ plausibly      representation, and a decoder that reconstructs the origi-
+from the original images, showing that the method can generalize.      nal signal from the latent representation. Unlike classical
+                                                             autoencoders, we adopt an asymmetric design that allows
+                                                                the encoder to operate only on the partial, observed signal
+2. Related Work                                          (without mask tokens) and a lightweight decoder that re-
+                                                                constructs the full signal from the latent representation and
+Masked language modeling and its autoregressive coun-    mask tokens. Figure 1 illustrates the idea, introduced next.
+terparts, e.g., BERT [14] and GPT [47, 48, 4], are highly     Masking. Following ViT [16], we divide an image into reg-
+successful methods for pre-training in NLP. These methods      ular non-overlapping patches. Then we sample a subset of
+hold out a portion of the input sequence and train models     patches and mask (i.e., remove) the remaining ones. Our
+to predict the missing content. These methods have been     sampling strategy is straightforward: we sample random
+shown to scale excellently [4] and a large abundance of ev-     patches without replacement, following a uniform distribu-
+idence indicates that these pre-trained representations gen-      tion. We simply refer to this as “random sampling”.
+eralize well to various downstream tasks.                                                Random sampling with a high masking ratio (i.e., the ra-
+Autoencoding is a classical method for learning representa-      tio of removed patches) largely eliminates redundancy, thus
+tions. It has an encoder that maps an input to a latent repre-      creating a task that cannot be easily solved by extrapolation
+sentation and a decoder that reconstructs the input. For ex-     from visible neighboring patches (see Figures 2 – 4). The
+ample, PCA and k-means are autoencoders [29]. Denoising     uniform distribution prevents a potential center bias (i.e.,
+autoencoders (DAE) [58] are a class of autoencoders that    more masked patches near the image center).  Finally, the
+corrupt an input signal and learn to reconstruct the origi-     highly sparse input creates an opportunity for designing an
+nal, uncorrupted signal. A series of methods can be thought      efﬁcient encoder, introduced next.
+of as a generalized DAE under different corruptions, e.g.,   MAE encoder. Our encoder is a ViT [16] but applied only
+masking pixels [59, 46, 6] or removing color channels [70].     on visible, unmasked patches. Just as in a standard ViT, our
+Our MAE is a form of denoising autoencoding, but different     encoder embeds patches by a linear projection with added
+from the classical DAE in numerous ways.                       positional embeddings, and then processes the resulting set
+                                                                via a series of Transformer blocks. However, our encoderMasked image encoding methods learn representations
+                                                          only operates on a small subset (e.g., 25%) of the full set.from images corrupted by masking. The pioneering work
+                                                 Masked patches are removed; no mask tokens are used.of [59] presents masking as a noise type in DAE. Context
+                                                          This allows us to train very large encoders with only a frac-Encoder [46] inpaints large missing regions using convolu-
+                                                                   tion of compute and memory. The full set is handled by ational networks. Motivated by the success in NLP, related
+                                                               lightweight decoder, described next.recent methods [6, 16, 2] are based on Transformers [57].
+iGPT [6] operates on sequences of pixels and predicts un-   MAE decoder. The input to the MAE decoder is the full
+known pixels. The ViT paper [16] studies masked patch      set of tokens consisting of (i) encoded visible patches, and
+prediction for self-supervised learning. Most recently, BEiT       (ii) mask tokens. See Figure 1. Each mask token [14] is a
+[2] proposes to predict discrete tokens [44, 50].                 shared, learned vector that indicates the presence of a miss-
+
+
+                                                 3
+
+======================== PDF 第 4 页 ========================
+                                                                                                       85          fine-tuning           84.7       84.9       85.0       84.9 84.9
+ing patch to be predicted. We add positional embeddings to                                                                                           84.5
+all tokens in this full set; without this, mask tokens would              84         83.4       83.4
+                                                                                                                                                                                                           83.0have no information about their location in the image. The              8383.2
+decoder has another series of Transformer blocks.                              10       20       30       40       50       60       70       80       90
+                                                                                                        masking ratio (%)
+                                                                                                                                                                           71.8       73.2 73.5 71.8  The MAE decoder is only used during pre-training to                                linear probing                   69.9
+perform the image reconstruction task (only the encoder              70                              67.0                                                 66.1
+is used to produce image representations for recognition).              60         58.9       61.7
+                                                                                                                       54.6
+Therefore, the decoder architecture can be ﬂexibly designed
+                                                                                                       50
+in a manner that is independent of the encoder design. We                10       20       30       40       50       60       70       80       90
+                                                                                                        masking ratio (%)
+experiment with very small decoders, narrower and shal-
+lower than the encoder. For example, our default decoder      Figure 5. Masking ratio. A high masking ratio (75%) works well
+                                                                          for both ﬁne-tuning (top) and linear probing (bottom). The y-axeshas <10% computation per token vs. the encoder. With this
+                                                                       are ImageNet-1K validation accuracy (%) in all plots in this paper.
+asymmetrical design, the full set of tokens are only pro-
+cessed by the lightweight decoder, which signiﬁcantly re-
+                                                          4. ImageNet Experimentsduces pre-training time.
+                                          We do self-supervised pre-training on the ImageNet-1KReconstruction target. Our MAE reconstructs the input
+                                                     (IN1K) [13] training set. Then we do supervised training toby predicting the pixel values for each masked patch. Each
+                                                               evaluate the representations with (i) end-to-end ﬁne-tuningelement in the decoder’s output is a vector of pixel values
+                                                              or (ii) linear probing. We report top-1 validation accuracyrepresenting a patch. The last layer of the decoder is a lin-
+                                                              of a single 224×224 crop. Details are in Appendix A.1.ear projection whose number of output channels equals the
+number of pixel values in a patch. The decoder’s output is     Baseline: ViT-Large. We use ViT-Large (ViT-L/16) [16]
+reshaped to form a reconstructed image. Our loss function     as the backbone in our ablation study. ViT-L is very big (an
+computes the mean squared error (MSE) between the recon-     order of magnitude bigger than ResNet-50 [25]) and tends
+structed and original images in the pixel space. We compute      to overﬁt. The following is a comparison between ViT-L
+the loss only on masked patches, similar to BERT [14].1         trained from scratch vs. ﬁne-tuned from our baseline MAE:
+  We also study a variant whose reconstruction target is             scratch, original [16]   scratch, our impl.     baseline MAE
+the normalized pixel values of each masked patch. Specif-                   76.5                 82.5               84.9
+ically, we compute the mean and standard deviation of all   We note that it is nontrivial to train supervised ViT-L from
+pixels in a patch and use them to normalize this patch. Us-      scratch and a good recipe with strong regularization  is
+ing normalized pixels as the reconstruction target improves     needed (82.5%, see Appendix A.2). Even so, our MAE pre-
+representation quality in our experiments.                        training contributes a big improvement. Here ﬁne-tuning is
+                                                          only for 50 epochs (vs. 200 from scratch), implying that the
+Simple implementation. Our MAE pre-training can be im-
+                                                           ﬁne-tuning accuracy heavily depends on pre-training.
+plemented efﬁciently, and importantly, does not require any
+specialized sparse operations. First we generate a token for     4.1. Main Properties
+every input patch (by linear projection with an added po-
+                                          We ablate our MAE using the default settings in Table 1sitional embedding). Next we randomly shufﬂe the list of
+                                                                 (see caption). Several intriguing properties are observed.tokens and remove the last portion of the list, based on the
+masking ratio. This process produces a small subset of to-    Masking ratio. Figure 5 shows the inﬂuence of the mask-
+kens for the encoder and is equivalent to sampling patches     ing ratio. The optimal ratios are surprisingly high. The ra-
+without replacement. After encoding, we append a list of      tio of 75% is good for both linear probing and ﬁne-tuning.
+mask tokens to the list of encoded patches, and unshufﬂe     This behavior is in contrast with BERT [14], whose typical
+this full list (inverting the random shufﬂe operation) to align     masking ratio is 15%. Our masking ratios are also much
+all tokens with their targets. The decoder is applied to this     higher than those in related works [6, 16, 2] in computer
+full list (with positional embeddings added). As noted, no      vision (20% to 50%).
+sparse operations are needed. This simple implementation       The model infers missing patches to produce different,
+introduces negligible overhead as the shufﬂing and unshuf-      yet plausible, outputs (Figure 4).   It makes sense of the
+ﬂing operations are fast.                                            gestalt of objects and scenes, which cannot be simply com-
+                                                                pleted by extending lines or textures. We hypothesize that
+                                                                        this reasoning-like behavior is linked to the learning of use-
+   1Computing the loss only on masked patches differs from traditional                                                                      ful representations.
+denoising autoencoders [58] that compute the loss on all pixels.  This
+choice is purely result-driven: computing the loss on all pixels leads to        Figure 5 also shows that linear probing and ﬁne-tuning
+a slight decrease in accuracy (e.g., ∼0.5%).                                results follow different trends. For linear probing, the ac-
+
+
+                                                 4
+
+======================== PDF 第 5 页 ========================
+           blocks      ft         lin                        dim        ft         lin                     case                      ft       lin  FLOPs
+           1      84.8     65.5                        128     84.9     69.1                   encoder w/ [M]   84.2   59.6   3.3×
+           2      84.9     70.0                        256     84.8     71.3                   encoder w/o [M]  84.9   73.5    1×
+           4      84.9     71.9                        512     84.9     73.5
+           8      84.9     73.5                        768     84.4     73.1
+           12     84.4     73.3                        1024    84.3     73.1
+
+ (a) Decoder depth. A deep decoder can im-       (b) Decoder width. The decoder can be nar-        (c) Mask token. An encoder without mask to-
+ prove linear probing accuracy.                    rower than the encoder (1024-d).                  kens is more accurate and faster (Table 2).
+
+    case                         ft          lin                 case                       ft        lin                    case       ratio       ft       lin
+     pixel (w/o norm)     84.9      73.5               none              84.0     65.7                random   75    84.9   73.5
+     pixel (w/ norm)      85.4      73.9                 crop, ﬁxed size     84.7     73.1                  block     50    83.9   72.3
+   PCA                84.6      72.3                 crop, rand size     84.9     73.5                  block     75    82.8   63.9
+   dVAE token         85.3      71.6                crop + color jit     84.3     71.9                    grid      75    84.0   66.0
+
+ (d) Reconstruction target.  Pixels as recon-        (e) Data augmentation. Our MAE works with        (f) Mask sampling. Random sampling works
+ struction targets are effective.                    minimal or no augmentation.                        the best. See Figure 6 for visualizations.
+
+Table 1. MAE ablation experiments with ViT-L/16 on ImageNet-1K. We report ﬁne-tuning (ft) and linear probing (lin) accuracy (%). If
+not speciﬁed, the default is: the decoder has depth 8 and width 512, the reconstruction target is unnormalized pixels, the data augmentation
+is random resized cropping, the masking ratio is 75%, and the pre-training length is 800 epochs. Default settings are marked in gray .
+
+
+curacy increases steadily with the masking ratio until the            encoder           dec. depth     ft acc     hours   speedup
+sweet point: the accuracy gap is up to ∼20% (54.6% vs.            ViT-L, w/ [M]       8        84.2      42.4         -
+                                                                         ViT-L              8        84.9      15.4    2.8×
+73.5%). For ﬁne-tuning, the results are less sensitive to the
+                                                                         ViT-L              1        84.8      11.6    3.7×
+ratios, and a wide range of masking ratios (40–80%) work                                                                            ViT-H, w/ [M]       8             -      119.6†        -
+well. All ﬁne-tuning results in Figure 5 are better than train-          ViT-H              8        85.8      34.5    3.5×
+ing from scratch (82.5%).                                            ViT-H              1        85.9      29.3    4.1×
+
+Decoder design. Our MAE decoder can be ﬂexibly de-      Table 2.  Wall-clock time of our MAE training (800 epochs),
+signed, as studied in Table 1a and 1b.                         benchmarked in 128 TPU-v3 cores with TensorFlow. The speedup
+   Table 1a varies the decoder depth (number of Trans-        is relative to the entry whose encoder has mask tokens (gray). The
+                                                                decoder width is 512, and the mask ratio is 75%. †: This entry isformer blocks). A sufﬁciently deep decoder is important
+                                                                    estimated by training ten epochs.for linear probing.  This can be explained by the gap be-
+tween a pixel reconstruction task and a recognition task: the
+last several layers in an autoencoder are more specialized    Mask token. An important design of our MAE is to skip
+for reconstruction, but are less relevant for recognition. A      the mask token [M] in the encoder and apply it later in the
+reasonably deep decoder can account for the reconstruction     lightweight decoder. Table 1c studies this design.
+specialization, leaving the latent representations at a more          If the encoder uses mask tokens, it performs worse: its
+abstract level. This design can yield up to 8% improvement     accuracy drops by 14% in linear probing.  In this case,
+in linear probing (Table 1a, ‘lin’). However, if ﬁne-tuning      there is a gap between pre-training and deploying: this en-
+is used, the last layers of the encoder can be tuned to adapt     coder has a large portion of mask tokens in its input in pre-
+to the recognition task. The decoder depth is less inﬂuential      training, which does not exist in uncorrupted images. This
+for improving ﬁne-tuning (Table 1a, ‘ft’).                    gap may degrade accuracy in deployment. By removing the
+   Interestingly, our MAE with a single-block decoder can    mask token from the encoder, we constrain the encoder to
+perform strongly with ﬁne-tuning (84.8%). Note that a sin-     always see real patches and thus improve accuracy.
+gle Transformer block is the minimal requirement to propa-        Moreover, by skipping the mask token in the encoder,
+gate information from visible tokens to mask tokens. Such    we greatly reduce training computation.  In Table 1c, we
+a small decoder can further speed up training.                 reduce the overall training FLOPs by 3.3×. This leads to
+   In Table 1b we study the decoder width (number of chan-     a 2.8× wall-clock speedup in our implementation (see Ta-
+nels). We use 512-d by default, which performs well un-      ble 2). The wall-clock speedup is even bigger (3.5–4.1×),
+der ﬁne-tuning and linear probing. A narrower decoder also      for a smaller decoder (1-block), a larger encoder (ViT-H),
+works well with ﬁne-tuning.                                   or both. Note that the speedup can be >4× for a masking
+   Overall, our default MAE decoder is lightweight. It has      ratio of 75%, partially because the self-attention complexity
+8 blocks and a width of 512-d ( gray  in Table 1).  It only       is quadratic. In addition, memory is greatly reduced, which
+has 9% FLOPs per token vs. ViT-L (24 blocks, 1024-d).     can enable training even larger models or speeding up more
+As such, while the decoder processes all tokens, it is still a     by large-batch training. The time and memory efﬁciency
+small fraction of the overall compute.                      makes our MAE favorable for training very large models.
+
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+                                                                                          85          fine-tuning                                            84.9             85.1
+                                                                                                                                                    84.3
+                                                                                          84
+                                                                                                                               83.3
+                                                                                          83
+                                                                                                          82.3
+                                                                                          82
+                                                                                           100               200               400               800               1600
+                                                                                                             epochs (log-scale)
+
+                                                                                                                                                                                            75.1
+                                                                                          75           linear probing                                          73.5
+                                                                                                                                                    69.7     random 75%             block 50%                grid 75%                   70
+                                                                                                                               64.4
+Figure 6. Mask sampling strategies determine the pretext task         65
+difﬁculty, inﬂuencing reconstruction quality and representations         60 57.3
+(Table 1f). Here each output is from an MAE trained with the spec-           100               200               400               800               1600
+iﬁed masking strategy. Left: random sampling (our default). Mid-                                    epochs (log-scale)
+dle: block-wise sampling [2] that removes large random blocks.      Figure 7. Training schedules. A longer training schedule gives a
+Right: grid-wise sampling that keeps one of every four patches.      noticeable improvement. Here each point is a full training sched-
+Images are from the validation set.                                         ule. The model is ViT-L with the default setting in Table 1.
+
+
+
+                                                      and 28% respectively for BYOL [21] and SimCLR [7]. InReconstruction target. We compare different reconstruc-
+                                                                  addition, there is no evidence that contrastive learning cantion targets in Table 1d. Our results thus far are based on
+pixels without (per-patch) normalization. Using pixels with    work without augmentation: the two views of an image are
+                                                                the same and can easily satisfy a trivial solution.normalization improves accuracy. This per-patch normal-
+ization enhances the contrast locally. In another variant, we        In MAE, the role of data augmentation is mainly per-
+perform PCA in the patch space and use the largest PCA     formed by random masking (ablated next). The masks are
+coefﬁcients (96 here) as the target. Doing so degrades ac-      different for each iteration and so they generate new training
+curacy. Both experiments suggest that the high-frequency     samples regardless of data augmentation. The pretext task
+components are useful in our method.                                 is made difﬁcult by masking and requires less augmentation
+  We also compare an MAE variant that predicts tokens,      to regularize training.
+the target used in BEiT [2].  Speciﬁcally for this variant,                                           Mask sampling strategy. In Table 1f we compare different
+we use the DALLE pre-trained dVAE [50] as the tokenizer,
+                                                 mask sampling strategies, illustrated in Figure 6.
+following [2]. Here the MAE decoder predicts the token in-
+                                                    The block-wise masking strategy, proposed in [2], tendsdices using cross-entropy loss. This tokenization improves
+                                                                   to remove large blocks (Figure 6 middle). Our MAE withﬁne-tuning accuracy by 0.4% vs. unnormalized pixels, but
+                                                           block-wise masking works reasonably well at a ratio ofhas no advantage vs. normalized pixels. It also reduces lin-
+                                                  50%, but degrades at a ratio of 75%. This task is harderear probing accuracy. In §5 we further show that tokeniza-
+                                                            than that of random sampling, as a higher training loss istion is not necessary in transfer learning.
+                                                             observed. The reconstruction is also blurrier.
+  Our pixel-based MAE is much simpler than tokeniza-
+tion. The dVAE tokenizer requires one more pre-training     We also study grid-wise sampling, which regularly keeps
+stage, which may depend on extra data (250M images [50]).     one of every four patches (Figure 6 right). This is an eas-
+The dVAE encoder is a large convolutional network (40%      ier task and has lower training loss. The reconstruction is
+FLOPs of ViT-L) and adds nontrivial overhead. Using pix-      sharper. However, the representation quality is lower.
+els does not suffer from these problems.                        Simple random sampling works the best for our MAE. It
+                                                            allows for a higher masking ratio, which provides a greaterData augmentation. Table 1e studies the inﬂuence of data
+                                                       speedup beneﬁt while also enjoying good accuracy.augmentation on our MAE pre-training.
+  Our MAE works well using cropping-only augmenta-     Training schedule.  Our ablations thus far are based on
+tion, either ﬁxed-size or random-size (both having random     800-epoch pre-training. Figure 7 shows the inﬂuence of the
+horizontal ﬂipping). Adding color jittering degrades the re-      training schedule length. The accuracy improves steadily
+sults and so we do not use it in other experiments.              with longer training.  Indeed, we have not observed sat-
+   Surprisingly, our MAE behaves decently even if using      uration of linear probing accuracy even at 1600 epochs.
+no data augmentation (only center-crop, no ﬂipping). This     This behavior is unlike contrastive learning methods, e.g.,
+property is dramatically different from contrastive learning    MoCo v3 [9] saturates at 300 epochs for ViT-L. Note that
+and related methods [62, 23, 7, 21], which heavily rely      the MAE encoder only sees 25% of patches per epoch,
+on data augmentation.   It was observed [21] that using     while in contrastive learning the encoder sees 200% (two-
+cropping-only augmentation reduces the accuracy by 13%     crop) or even more (multi-crop) patches per epoch.
+
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+ method            pre-train data  ViT-B   ViT-L   ViT-H  ViT-H448             85           84.2  84.4              84.6              84.7              84.9
+                                                                                                            83.1                                                                                                                                                              83.8            84.1 scratch, our impl.  -               82.3     82.6     83.1        -                                                                                                                                            83.2
+ DINO [5]        IN1K           82.8        -          -          -                         81.0       81.6  81.9
+                                                                                        80       80.8
+ MoCo v3 [9]     IN1K           83.2     84.1        -          -                           79.9
+ BEiT [2]        IN1K+DALLE   83.2     85.2        -          -                        77.6
+ MAE           IN1K           83.6     85.9     86.9     87.8                75
+Table 3.  Comparisons with previous results on ImageNet-                 73.5                               MAEMoCobaselinev3
+1K. The pre-training data is the ImageNet-1K training set (ex-            70
+                                                                                          0 1  2    4    6               12              18              24
+cept the tokenizer in BEiT was pre-trained on 250M DALLE data
+                                                                                                    # blocks ﬁne-tuned
+[50]).  All self-supervised methods are evaluated by end-to-end
+ﬁne-tuning. The ViT models are B/16, L/16, H/14 [16]. The best      Figure 9. Partial ﬁne-tuning results of ViT-L w.r.t. the number
+for each column is underlined. All results are on an image size of      of ﬁne-tuned Transformer blocks under the default settings from
+224, except for ViT-H with an extra result on 448. Here our MAE      Table 1. Tuning 0 blocks is linear probing; 24 is full ﬁne-tuning.
+reconstructs normalized pixels and is pre-trained for 1600 epochs.     Our MAE representations are less linearly separable, but are con-
+                                                                              sistently better than MoCo v3 if one or more blocks are tuned.
+
+   88
+                                                                  ViT-H/14            The MAE models in Table 3 are pre-trained for 1600   86
+                                ViT-L/16                                epochs for better accuracy (Figure 7). Even so, our total
+   84
+       ViT-B/16                                                       pre-training time is less than the other methods when trained
+   82                                                 on the same hardware. For example, training ViT-L on 128
+   80                                              TPU-v3 cores, our MAE’s training time is 31 hours for 1600
+                                             MAE,                                                      IN1K
+                                                                   supervised,                                                                IN1K, our impl.       epochs and MoCo v3’s is 36 hours for 300 epochs [9].
+   78                                                             supervised, IN1K [16]
+                                                                   supervised, JFT300M [16]       Comparisons with supervised pre-training. In the origi-
+   76
+     0                   200                  400                  600             nal ViT paper [16], ViT-L degrades when trained in IN1K.
+                              params (M)                        Our implementation of supervised training (see A.2) works
+Figure 8. MAE pre-training vs. supervised pre-training, evalu-      better, but accuracy saturates. See Figure 8.
+ated by ﬁne-tuning in ImageNet-1K (224 size). We compare with       Our MAE pre-training, using only IN1K, can general-
+the original ViT results [16] trained in IN1K or JFT300M.                                                                   ize better: the gain over training from scratch is bigger for
+                                                               higher-capacity models.  It follows a trend similar to the
+4.2. Comparisons with Previous Results              JFT-300M supervised pre-training in [16]. This compari-
+                                                        son shows that our MAE can help scale up model sizes.
+Comparisons with self-supervised methods.  In Table 3
+we compare the ﬁne-tuning results of self-supervised ViT     4.3. Partial Fine-tuning
+models. For ViT-B, all methods perform closely. For ViT-L,                                                              Table 1 shows that linear probing and ﬁne-tuning results
+the gaps among methods are bigger, suggesting that a chal-                                                                are largely uncorrelated. Linear probing has been a popular
+lenge for bigger models is to reduce overﬁtting.                                                              protocol in the past few years; however, it misses the oppor-
+  Our MAE can scale up easily and has shown steady im-                                                                   tunity of pursuing strong but non-linear features—which is
+provement from bigger models. We obtain 86.9% accuracy                                                          indeed a strength of deep learning. As a middle ground, we
+using ViT-H (224 size). By ﬁne-tuning with a 448 size, we                                                            study a partial ﬁne-tuning protocol: ﬁne-tune the last sev-
+achieve 87.8% accuracy, using only IN1K data. The pre-                                                                     eral layers while freezing the others. This protocol was also
+vious best accuracy, among all methods using only IN1K                                                         used in early works, e.g., [65, 70, 42].
+data, is 87.1% (512 size) [67], based on advanced networks.                                                              Figure 9 shows the results. Notably, ﬁne-tuning only one
+We improve over the state-of-the-art by a nontrivial margin                                                          Transformer block boosts the accuracy signiﬁcantly from
+in the highly competitive benchmark of IN1K (no external                                                  73.5% to 81.0%. Moreover, if we ﬁne-tune only “half” of
+data). Our result is based on vanilla ViT, and we expect                                                                the last block (i.e., its MLP sub-block), we can get 79.1%,
+advanced networks will perform better.                                               much better than linear probing. This variant is essentially
+  Comparing with BEiT [2], our MAE is more accurate                                                           ﬁne-tuning an MLP head. Fine-tuning a few blocks (e.g., 4
+while being simpler and faster. Our method reconstructs                                                              or 6) can achieve accuracy close to full ﬁne-tuning.
+pixels, in contrast to BEiT that predicts tokens: BEiT re-                                                                 In Figure 9 we also compare with MoCo v3 [9], a con-
+ported a 1.8% degradation [2] when reconstructing pixels                                                                        trastive method with ViT-L results available. MoCo v3 has
+with ViT-B.2 We do not need dVAE pre-training. More-                                                             higher linear probing accuracy; however, all of its partial
+over, our MAE is considerably faster (3.5× per epoch) than                                                           ﬁne-tuning results are worse than MAE. The gap is 2.6%
+BEiT, for the reason as studied in Table 1c.                                                when tuning 4 blocks. While the MAE representations are
+  2We observed the degradation also in BEiT with ViT-L: it produces      less linearly separable, they are stronger non-linear features
+85.2% (tokens) and 83.5% (pixels), reproduced from the ofﬁcial code.       and perform well when a non-linear head is tuned.
+
+
+                                                 7
+
+======================== PDF 第 8 页 ========================
+                                 APbox          APmask
+    method       pre-train data   ViT-B   ViT-L   ViT-B   ViT-L                   method         pre-train data    ViT-B    ViT-L
+    supervised   IN1K w/ labels    47.9    49.3    42.9    43.9                       supervised    IN1K w/ labels     47.4      49.9
+   MoCo v3   IN1K           47.9    49.3    42.7    44.0               MoCo v3     IN1K             47.3      49.1
+   BEiT      IN1K+DALLE    49.8    53.3    44.4    47.1                  BEiT        IN1K+DALLE     47.1      53.3
+   MAE       IN1K           50.3    53.3    44.9    47.2             MAE        IN1K             48.1      53.6
+
+Table 4. COCO object detection and segmentation using a ViT      Table 5. ADE20K semantic segmentation (mIoU) using Uper-
+Mask R-CNN baseline. All entries are based on our implementa-      Net. BEiT results are reproduced using the ofﬁcial code. Other
+tion. Self-supervised entries use IN1K data without labels. Mask       entries are based on our implementation. Self-supervised entries
+AP follows a similar trend as box AP.                               use IN1K data without labels.
+
+                                                                                    dataset      ViT-B    ViT-L    ViT-H   ViT-H448   prev best
+   These observations suggest that linear separability is not
+                                                                              iNat 2017    70.5      75.7      79.3      83.4      75.4 [55]
+the sole metric for evaluating representation quality. It has         iNat 2018    75.4      80.1      83.0      86.8      81.2 [54]
+also been observed (e.g., [8]) that linear probing is not well         iNat 2019    80.5      83.4      85.7      88.3      84.1 [54]
+correlated with transfer learning performance, e.g., for ob-        Places205    63.9      65.8      65.9      66.8      66.0 [19]†
+                                                                          Places365    57.9      59.4      59.8      60.3      58.0 [40]‡ject detection. To our knowledge, linear evaluation is not
+often used in NLP for benchmarking pre-training.               Table 6. Transfer learning accuracy on classiﬁcation datasets,
+                                                                   using MAE pre-trained on IN1K and then ﬁne-tuned. We provide
+5. Transfer Learning Experiments                       system-level comparisons with the previous best results.
+                                                                                          †: pre-trained on 1 billion images. ‡: pre-trained on 3.5 billion images.
+  We evaluate transfer learning in downstream tasks using
+the pre-trained models in Table 3.                                                      IN1K         COCO      ADE20K
+                                                                                               ViT-B  ViT-L  ViT-H  ViT-B  ViT-L  ViT-B  ViT-L
+Object detection and segmentation. We ﬁne-tune Mask         pixel (w/o norm)   83.3   85.1   86.2   49.5   52.8   48.0   51.8
+R-CNN [24] end-to-end on COCO [37]. The ViT backbone         pixel (w/ norm)    83.6   85.9   86.9   50.3   53.3   48.1   53.6
+is adapted for use with FPN [36] (see A.3). We apply this      dVAE token       83.6   85.7   86.9   50.3   53.2   48.1   53.4
+approach for all entries in Table 4. We report box AP for    △                  0.0    -0.2    0.0    0.0    -0.1    0.0    -0.2
+object detection and mask AP for instance segmentation.        Table 7. Pixels vs. tokens as the MAE reconstruction target. △is
+  Compared to supervised pre-training, our MAE performs      the difference between using dVAE tokens and using normalized
+better under all conﬁgurations (Table 4). With the smaller       pixels. The difference is statistically insigniﬁcant.
+ViT-B, our MAE is 2.4 points higher than supervised pre-
+training (50.3 vs. 47.9, APbox). More signiﬁcantly, with the     6. Discussion and Conclusion
+larger ViT-L, our MAE pre-training outperforms supervised
+pre-training by 4.0 points (53.3 vs. 49.3).                       Simple algorithms that scale well are the core of deep
+  The pixel-based MAE is better than or on par with the      learning. In NLP, simple self-supervised learning methods
+token-based BEiT, while MAE is much simpler and faster.       (e.g., [47, 14, 48, 4]) enable beneﬁts from exponentially
+Both MAE and BEiT are better than MoCo v3 and MoCo      scaling models. In computer vision, practical pre-training
+v3 is on par with supervised pre-training.                     paradigms are dominantly supervised (e.g. [33, 51, 25, 16])
+                                                                despite progress in self-supervised learning. In this study,
+Semantic segmentation. We experiment on ADE20K [72]
+                                             we observe on ImageNet and in transfer learning that
+using UperNet [63] (see A.4). Table 5 shows that our pre-
+                                                       an autoencoder—a simple self-supervised method similar
+training signiﬁcantly improves results over supervised pre-
+                                                                   to techniques in NLP—provides scalable beneﬁts.  Self-
+training, e.g., by 3.7 points for ViT-L. Our pixel-based MAE
+                                                             supervised learning in vision may now be embarking on a
+also outperforms the token-based BEiT. These observations
+                                                                 similar trajectory as in NLP.
+are consistent with those in COCO.
+                                            On the other hand, we note that images and languages
+Classiﬁcation tasks.  Table 6 studies transfer learning on                                                                are signals of a different nature and this difference must
+the iNaturalists [56] and Places [71] tasks (see A.5). On                                                       be addressed carefully. Images are merely recorded light
+iNat, our method shows strong scaling behavior: accuracy                                                             without a semantic decomposition into the visual analogue
+improves considerably with bigger models. Our results sur-                                                              of words. Instead of attempting to remove objects, we re-
+pass the previous best results by large margins. On Places,                                               move random patches that most likely do not form a seman-
+our MAE outperforms the previous best results [19, 40],                                                                              tic segment. Likewise, our MAE reconstructs pixels, which
+which were obtained via pre-training on billions of images.                                                                are not semantic entities.  Nevertheless, we observe (e.g.,
+Pixels vs. tokens. Table 7 compares pixels vs. tokens as the     Figure 4) that our MAE infers complex, holistic reconstruc-
+MAE reconstruction target. While using dVAE tokens is      tions, suggesting it has learned numerous visual concepts,
+better than using unnormalized pixels, it is statistically sim-        i.e., semantics. We hypothesize that this behavior occurs
+ilar to using normalized pixels across all cases we tested. It     by way of a rich hidden representation inside the MAE. We
+again shows that tokenization is not necessary for our MAE.     hope this perspective will inspire future work.
+
+
+                                                 8
+
+======================== PDF 第 9 页 ========================
+Broader impacts. The proposed method predicts content            Uszkoreit, and Neil Houlsby. An image is worth 16x16 words:
+based on learned statistics of the training dataset and as such           Transformers for image recognition at scale. In ICLR, 2021.
+will reﬂect biases in those data, including ones with nega-       [17] Spyros Gidaris, Praveer Singh, and Nikos Komodakis. Unsuper-
+tive societal impacts. The model may generate inexistent            vised representation learning by predicting image rotations.  In
+                                                                      ICLR, 2018.
+content. These issues warrant further research and consid-
+                                                                            [18] Xavier Glorot and Yoshua Bengio. Understanding the difﬁculty oferation when building upon this work to generate images.
+                                                                                       training deep feedforward neural networks. In AISTATS, 2010.
+References                                                            [19] Priya Goyal, Mathilde Caron, Benjamin Lefaudeux, Min Xu,                                                                      Pengchao Wang, Vivek Pai, Mannat Singh, Vitaliy Liptchinsky, Is-
+                                                                       han Misra, Armand Joulin, and Piotr Bojanowski. Self-supervised [1] Jimmy Lei Ba, Jamie Ryan Kiros, and Geoffrey E Hinton. Layer
+                                                                                     pretraining of visual features in the wild. arXiv:2103.01988, 2021.     normalization. arXiv:1607.06450, 2016.
+                                                                            [20] Priya Goyal, Piotr Doll´ar, Ross Girshick, Pieter Noordhuis, Lukasz [2] Hangbo Bao, Li Dong, and Furu Wei. BEiT: BERT pre-training
+     of image transformers. arXiv:2106.08254, 2021. Accessed in June           Wesolowski, Aapo Kyrola, Andrew Tulloch, Yangqing Jia, and
+     2021.                                                           Kaiming He. Accurate, large minibatch SGD: Training ImageNet
+                                                                                       in 1 hour. arXiv:1706.02677, 2017.
+ [3] Suzanna Becker and Geoffrey E Hinton.  Self-organizing neural
+     network that discovers surfaces in random-dot stereograms. Na-       [21] Jean-Bastien Grill, Florian Strub, Florent Altch´e, Corentin Tallec,
+      ture, 1992.                                                                     Pierre Richemond, Elena Buchatskaya, Carl Doersch, Bernardo
+                                                                               Avila Pires, Zhaohan Guo, Mohammad Gheshlaghi Azar, Bilal
+ [4] Tom Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah,                                                                                           Piot, Koray Kavukcuoglu, Remi Munos, and Michal Valko. Boot-
+     Jared D Kaplan, Prafulla Dhariwal, Arvind Neelakantan, Pranav                                                                                       strap your own latent - a new approach to self-supervised learning.
+     Shyam, Girish Sastry, Amanda Askell, Sandhini Agarwal, Ariel                                                                                  In NeurIPS, 2020.
+     Herbert-Voss, Gretchen Krueger, Tom Henighan, Rewon Child,
+                                                                            [22] Raia Hadsell, Sumit Chopra, and Yann LeCun.  Dimensionality     Aditya Ramesh, Daniel Ziegler, Jeffrey Wu, Clemens Winter, Chris
+                                                                                 reduction by learning an invariant mapping. In CVPR, 2006.     Hesse, Mark Chen, Eric Sigler, Mateusz Litwin, Scott Gray, Ben-
+     jamin Chess, Jack Clark, Christopher Berner, Sam McCandlish,       [23] Kaiming He, Haoqi Fan, Yuxin Wu, Saining Xie, and Ross Gir-
+     Alec Radford, Ilya Sutskever, and Dario Amodei. Language mod-             shick. Momentum contrast for unsupervised visual representation
+      els are few-shot learners. In NeurIPS, 2020.                                    learning. In CVPR, 2020.
+
+ [5] Mathilde Caron, Hugo Touvron, Ishan Misra, Herv´e J´egou, Julien       [24] Kaiming He, Georgia Gkioxari, Piotr Doll´ar, and Ross Girshick.
+     Mairal, Piotr Bojanowski, and Armand Joulin. Emerging properties         Mask R-CNN. In ICCV, 2017.
+      in self-supervised vision transformers. In ICCV, 2021.                                                                            [25] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep
+ [6] Mark Chen, Alec Radford, Rewon Child, Jeffrey Wu, Heewoo Jun,             residual learning for image recognition. In CVPR, 2016.
+     David Luan, and Ilya Sutskever. Generative pretraining from pix-                                                                            [26] Dan Hendrycks, Steven Basart, Norman Mu, Saurav Kadavath,
+       els. In ICML, 2020.                                                                         Frank Wang, Evan Dorundo, Rahul Desai, Tyler Zhu, Samyak
+ [7] Ting Chen, Simon Kornblith, Mohammad Norouzi, and Geoffrey              Parajuli, Mike Guo, et al. The many faces of robustness: A critical
+     Hinton. A simple framework for contrastive learning of visual rep-            analysis of out-of-distribution generalization. In ICCV, 2021.
+      resentations. In ICML, 2020.                                                                            [27] Dan Hendrycks and Thomas Dietterich. Benchmarking neural net-
+ [8] Xinlei Chen and Kaiming He. Exploring simple Siamese represen-          work robustness to common corruptions and perturbations.  In
+      tation learning. In CVPR, 2021.                                       ICLR, 2019.
+
+ [9] Xinlei Chen, Saining Xie, and Kaiming He. An empirical study of       [28] Dan Hendrycks, Kevin Zhao, Steven Basart, Jacob Steinhardt, and
+      training self-supervised Vision Transformers. In ICCV, 2021.            Dawn Song. Natural adversarial examples. In CVPR, 2021.
+
+[10] Kevin Clark, Minh-Thang Luong, Quoc V Le, and Christopher D       [29] Geoffrey E Hinton and Richard S Zemel. Autoencoders, minimum
+     Manning. ELECTRA: Pre-training text encoders as discriminators            description length, and helmholtz free energy. In NeurIPS, 1994.
+      rather than generators. In ICLR, 2020.                                                                            [30] Gao Huang, Yu Sun, Zhuang Liu, Daniel Sedra, and Kilian Q Wein-
+[11] Corinna Cortes and Vladimir Vapnik.  Support-vector networks.             berger. Deep networks with stochastic depth. In ECCV, 2016.
+     Machine learning, 1995.                                                                            [31] Sergey Ioffe and Christian Szegedy. Batch normalization: Accel-
+[12] Ekin D Cubuk, Barret Zoph, Jonathon Shlens, and Quoc V Le. Ran-             erating deep network training by reducing internal covariate shift.
+     daugment: Practical automated data augmentation with a reduced            In ICML, 2015.
+     search space. In CVPR Workshops, 2020.                                                                            [32] Insoo Kim, Seungju Han, Ji-won Baek, Seong-Jin Park, Jae-Joon
+[13]  Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li           Han, and Jinwoo Shin. Quality-agnostic image recognition via in-
+      Fei-Fei. ImageNet: A large-scale hierarchical image database. In             vertible decoder. In CVPR, 2021.
+    CVPR, 2009.                                                                            [33] Alex Krizhevsky, Ilya Sutskever, and Geoff Hinton. Imagenet clas-
+[14] Jacob  Devlin,  Ming-Wei Chang,  Kenton  Lee,  and  Kristina            siﬁcation with deep convolutional neural networks.  In NeurIPS,
+     Toutanova. BERT: Pre-training of deep bidirectional transformers           2012.
+      for language understanding. In NAACL, 2019.                                                                            [34] Yann LeCun, Bernhard Boser, John S Denker, Donnie Hender-
+[15] Carl Doersch, Abhinav Gupta, and Alexei A Efros. Unsupervised            son, Richard E Howard, Wayne Hubbard, and Lawrence D Jackel.
+      visual representation learning by context prediction.  In ICCV,           Backpropagation applied to handwritten zip code recognition. Neu-
+     2015.                                                                             ral computation, 1989.
+
+[16] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk       [35] Yanghao Li, Saining Xie, Xinlei Chen, Piotr Doll´ar, Kaiming He,
+     Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa De-          and Ross Girshick. Benchmarking detection transfer learning with
+     hghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, Jakob            vision transformers. In preparation, 2021.
+
+
+                                                 9
+
+======================== PDF 第 10 页 ========================
+[36] Tsung-Yi Lin, Piotr Doll´ar, Ross Girshick, Kaiming He, Bharath       [56] Grant Van Horn, Oisin Mac Aodha, Yang Song, Yin Cui, Chen
+     Hariharan, and Serge Belongie. Feature pyramid networks for ob-           Sun, Alex Shepard, Hartwig Adam, Pietro Perona, and Serge Be-
+      ject detection. In CVPR, 2017.                                                 longie. The iNaturalist species classiﬁcation and detection dataset.
+                                                                                  In CVPR, 2018.[37] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays, Pietro
+     Perona, Deva Ramanan, Piotr Doll´ar, and C Lawrence Zitnick. Mi-       [57] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit,
+      crosoft COCO: Common objects in context. In ECCV, 2014.                 Llion Jones, Aidan N Gomez, Lukasz Kaiser, and Illia Polosukhin.
+                                                                                 Attention is all you need. In NeurIPS, 2017.
+[38]  Ilya Loshchilov and Frank Hutter. SGDR: Stochastic gradient de-
+      scent with warm restarts. In ICLR, 2017.                               [58] Pascal Vincent, Hugo Larochelle, Yoshua Bengio, and Pierre-
+                                                                          Antoine Manzagol. Extracting and composing robust features with
+[39]  Ilya Loshchilov and Frank Hutter. Decoupled weight decay regu-
+                                                                               denoising autoencoders. In ICML, 2008.
+      larization. In ICLR, 2019.
+                                                                            [59] Pascal Vincent, Hugo Larochelle, Isabelle Lajoie, Yoshua Bengio,
+[40] Dhruv Mahajan, Ross Girshick, Vignesh Ramanathan, Kaiming                                                                                Pierre-Antoine Manzagol, and L´eon Bottou. Stacked denoising au-
+     He, Manohar Paluri, Yixuan Li, Ashwin Bharambe, and Laurens                                                                                 toencoders: Learning useful representations in a deep network with
+     van der Maaten.  Exploring the limits of weakly supervised pre-                                                                            a local denoising criterion. JMLR, 2010.
+      training. In ECCV, 2018.
+                                                                            [60] Haohan Wang, Songwei Ge, Zachary Lipton, and Eric P Xing.
+[41] Xiaofeng Mao, Gege Qi, Yuefeng Chen, Xiaodan Li, Ranjie Duan,                                                                           Learning robust global representations by penalizing local predic-
+     Shaokai Ye, Yuan He, and Hui Xue. Towards robust vision trans-                                                                                             tive power. In NeurIPS, 2019.
+     former. arXiv:2105.07926, 2021.
+                                                                            [61] Xiaolong Wang and Abhinav Gupta. Unsupervised learning of vi-
+[42] Mehdi Noroozi and Paolo Favaro. Unsupervised learning of visual            sual representations using videos. In ICCV, 2015.
+      representations by solving jigsaw puzzles. In ECCV, 2016.
+                                                                            [62] Zhirong Wu, Yuanjun Xiong, Stella Yu, and Dahua Lin. Unsuper-
+[43] Aaron van den Oord, Yazhe Li, and Oriol Vinyals.  Representa-            vised feature learning via non-parametric instance discrimination.
+      tion learning with contrastive predictive coding. arXiv:1807.03748,            In CVPR, 2018.
+     2018.
+                                                                            [63] Tete Xiao, Yingcheng Liu, Bolei Zhou, Yuning Jiang, and Jian
+[44] Aaron van den Oord, Oriol Vinyals, and Koray Kavukcuoglu. Neu-           Sun. Uniﬁed perceptual parsing for scene understanding. In ECCV,
+      ral discrete representation learning. In NeurIPS, 2017.                      2018.
+[45] Deepak Pathak, Ross Girshick, Piotr Doll´ar, Trevor Darrell, and       [64] Tete Xiao, Mannat Singh, Eric Mintun, Trevor Darrell, Piotr Doll´ar,
+     Bharath Hariharan. Learning features by watching objects move.          and Ross Girshick. Early convolutions help transformers see better.
+     In CVPR, 2017.                                                             In NeurIPS, 2021.
+
+[46] Deepak Pathak, Philipp Krahenbuhl, Jeff Donahue, Trevor Darrell,       [65] Jason Yosinski, Jeff Clune, Yoshua Bengio, and Hod Lipson. How
+     and Alexei A Efros. Context encoders: Feature learning by inpaint-             transferable are features in deep neural networks?   In NeurIPS,
+      ing. In CVPR, 2016.                                                    2014.
+[47] Alec Radford,  Karthik Narasimhan, Tim Salimans, and  Ilya       [66] Yang You, Igor Gitman, and Boris Ginsburg. Large batch training
+      Sutskever. Improving language understanding by generative pre-            of convolutional networks. arXiv:1708.03888, 2017.
+      training. 2018.                                                        [67] Li Yuan, Qibin Hou, Zihang Jiang, Jiashi Feng, and Shuicheng Yan.
+[48] Alec Radford,  Jeffrey Wu, Rewon Child, David Luan, Dario        VOLO: Vision outlooker for visual recognition. arXiv:2106.13112,
+     Amodei, and Ilya Sutskever. Language models are unsupervised           2021.
+      multitask learners. 2019.                                               [68] Sangdoo Yun, Dongyoon Han, Seong Joon Oh, Sanghyuk Chun,
+[49] Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee, Sharan           Junsuk Choe, and Youngjoon Yoo. Cutmix: Regularization strategy
+     Narang, Michael Matena, Yanqi Zhou, Wei Li, and Peter J. Liu.             to train strong classiﬁers with localizable features. In ICCV, 2019.
+     Exploring the limits of transfer learning with a uniﬁed text-to-text       [69] Hongyi Zhang, Moustapha Cisse, Yann N Dauphin, and David
+      transformer. JMLR, 2020.                                               Lopez-Paz. mixup: Beyond empirical risk minimization. In ICLR,
+                                                                           2018.[50] Aditya Ramesh, Mikhail Pavlov, Gabriel Goh, Scott Gray, Chelsea
+     Voss, Alec Radford, Mark Chen, and Ilya Sutskever.  Zero-shot       [70] Richard Zhang, Phillip Isola, and Alexei A Efros. Colorful image
+      text-to-image generation. In ICML, 2021.                                       colorization. In ECCV, 2016.
+
+[51] Karen Simonyan and Andrew Zisserman. Very deep convolutional       [71] Bolei Zhou, Agata Lapedriza, Jianxiong Xiao, Antonio Torralba,
+     networks for large-scale image recognition. In ICLR, 2015.                and Aude Oliva. Learning deep features for scene recognition using
+                                                                                Places database. In NeurIPS, 2014.
+[52] Christian Szegedy, Vincent Vanhoucke, Sergey Ioffe, Jonathon
+     Shlens, and Zbigniew Wojna. Rethinking the inception architec-       [72] Bolei Zhou, Hang Zhao, Xavier Puig, Tete Xiao, Sanja Fidler,
+      ture for computer vision. In CVPR, 2016.                               Adela Barriuso, and Antonio Torralba.  Semantic understanding
+                                                                                  of scenes through the ADE20K dataset. IJCV, 2019.
+[53] Hugo Touvron, Matthieu Cord, Matthijs Douze, Francisco Massa,
+     Alexandre Sablayrolles, and Herv´e J´egou. Training data-efﬁcient
+     image transformers & distillation through attention.  In ICML,
+     2021.
+
+[54] Hugo Touvron, Alexandre Sablayrolles, Matthijs Douze, Matthieu
+     Cord, and Herv´e J´egou. Graﬁt: Learning ﬁne-grained image repre-
+      sentations with coarse labels. In ICCV, 2021.
+
+[55] Hugo Touvron, Andrea Vedaldi, Matthijs Douze, and Herv´e J´egou.
+     Fixing the train-test resolution discrepancy.  arXiv:1906.06423,
+     2019.
+
+
+                                                 10
+
+======================== PDF 第 11 页 ========================
+A. Implementation Details                                            conﬁg                              value
+                                                                                                 optimizer                 AdamW [39]
+                                                                                             base learning rate                    1.5e-4
+A.1. ImageNet Experiments                                                  weight decay                       0.05
+                                                                                                 optimizer momentum             β1, β2=0.9, 0.95 [6]
+                                                                                               batch size                       4096
+ViT architecture. We follow the standard ViT architecture                  learning rate schedule                cosine decay [38]
+[16].  It has a stack of Transformer blocks [57], and each              warmup epochs [20]               40
+block consists of a multi-head self-attention block and an                augmentation                    RandomResizedCrop
+MLP block, both having LayerNorm (LN) [1]. The encoder                      Table 8. Pre-training setting.
+ends with LN. As the MAE encoder and decoder have dif-
+                                                                                   conﬁg                              value
+ferent width, we adopt a linear projection layer after the                 optimizer                 AdamW
+encoder to match it. Our MAE adds positional embeddings                 base learning rate                   1e-3
+[57] (the sine-cosine version) to both the encoder and de-                weight decay                       0.05
+                                                                                                 optimizer momentum             β1, β2=0.9, 0.999
+coder inputs. Our MAE does not use relative position or                  layer-wise lr decay [10, 2]           0.75
+layer scaling (which are used in the code of [2]).                               batch size                       1024
+                                                                                                     learning rate schedule                cosine decay
+  We extract features from the encoder output for ﬁne-              warmup epochs                  5
+tuning and linear probing. As ViT has a class token [16],                   training epochs                   100 (B), 50 (L/H)                                                                                           augmentation                  RandAug (9, 0.5) [12]
+to adapt to this design, in our MAE pre-training we append                   label smoothing [52]                 0.1
+an auxiliary dummy token to the encoder input. This token               mixup [69]                          0.8                                                                                         cutmix [68]                          1.0
+will be treated as the class token for training the classiﬁer in                drop path [30]                       0.1 (B/L) 0.2 (H)
+linear probing and ﬁne-tuning. Our MAE works similarly
+                                                                             Table 9. End-to-end ﬁne-tuning setting.
+well without this token (with average pooling).
+Pre-training.  The default setting is in Table 8. We do               conﬁg                              value
+                                                                                                 optimizer                  LARS [66]
+not use color jittering, drop path, or gradient clip. We use                 base learning rate                    0.1
+xavier uniform [18] to initialize all Transformer blocks, fol-                weight decay                    0
+                                                                                                 optimizer momentum                0.9
+lowing ViT’s ofﬁcial code [16]. We use the linear lr scaling                 batch size                       16384
+rule [20]: lr = base lr×batchsize / 256.                                              learning rate schedule                cosine decay
+                                                                            warmup epochs                  10
+End-to-end ﬁne-tuning. Our ﬁne-tuning follows common                   training epochs                   90
+                                                                                           augmentation                    RandomResizedCrop
+practice of supervised ViT training. The default setting is in
+Table 9. We use layer-wise lr decay [10] following [2].          Table 10. Linear probing setting. We use LARS with a large
+                                                                   batch for faster training; SGD works similarly with a 4096 batch.
+Linear probing. Our linear classiﬁer training follows [9].
+See Table 10. We observe that linear probing requires a very
+different recipe than end-to-end ﬁne-tuning. In particular,     Partial ﬁne-tuning. Our MAE partial ﬁne-tuning (§4.3)
+regularization is in general harmful for linear probing. Fol-     follows the setting in Table 9, except that we adjust the num-
+lowing [9], we disable many common regularization strate-     ber of ﬁne-tuning epochs. We observe that tuning fewer
+gies: we do not use mixup [69], cutmix [68], drop path [30],     blocks requires a longer schedule. We set the numbers of
+or color jittering, and we set weight decay as zero.             ﬁne-tuning epochs as {50, 100, 200} and use the optimal
+    It is a common practice to normalize the classiﬁer input     one for each number of blocks tuned.
+when training a classical linear classiﬁer (e.g., SVM [11]).
+Similarly, it is beneﬁcial to normalize the pre-trained fea-     A.2. Supervised Training ViT-L/H from Scratch
+tures when training the linear probing classiﬁer.  Follow-
+                                          We ﬁnd that it is nontrivial to train supervised ViT-L/H
+ing [15], we adopt an extra BatchNorm layer [31] without
+                                                        from scratch on ImageNet-1K. The training is unstable.
+afﬁne transformation (affine=False). This layer is ap-
+                                                     While there have been strong baselines with publicly avail-
+plied on the pre-trained features produced by the encoder,
+                                                              able implementations [53] for smaller models, the recipes
+and is before the linear classiﬁer. We note that the layer
+                                                                   for the larger ViT-L/H are unexplored.  Directly applying
+does not break the linear property, and it can be absorbed
+                                                                the previous recipes to these larger models does not work.
+into the linear classiﬁer after training: it is essentially a re-
+                                    A NaN loss is frequently observed during training.
+parameterized linear classiﬁer.3 Introducing this layer helps
+                                          We provide our recipe in Table 11. We use a wd of 0.3,
+calibrate the feature magnitudes across different variants in
+                                                          a large batch size of 4096, and a long warmup, following
+our ablations, so that they can use the same setting without
+                                                                the original ViT [16]. We use β2=0.95 following [6]. Wefurther lr search.
+                                                          use the regularizations listed in Table 11 and disable others,
+   3Alternatively, we can pre-compute the mean and std of the features     following [64]. All these choices are for improving training
+and use the normalized features to train linear classiﬁers.                       stability. Our recipe can ﬁnish training with no NaN loss.
+
+
+                                                 11
+
+======================== PDF 第 12 页 ========================
+        conﬁg                              value                                      method     model       params      acc
+          optimizer                 AdamW                                 iGPT [6]    iGPT-L     1362 M     69.0
+         base learning rate                   1e-4
+                                                                      iGPT [6]    iGPT-XL    6801 M     72.0         weight decay                        0.3
+          optimizer momentum             β1, β2=0.9, 0.95                         BEiT [2]    ViT-L        304 M     52.1†
+          batch size                       4096                          MAE     ViT-B         86 M     68.0
+          learning rate schedule                cosine decay                       MAE      ViT-L        304 M     75.8
+        warmup epochs                  20
+                                                    MAE     ViT-H       632 M     76.6
+           training epochs                   300 (B), 200 (L/H)
+         augmentation                 RandAug (9, 0.5) [12]              Table 12. Linear probing results of masked encoding methods.
+           label smoothing [52]                 0.1                        Our ﬁne-tuning results are in Table 3. †: our implementation.
+        mixup [69]                          0.8
+         cutmix [68]                          1.0
+         drop path [30]                       0.1 (B), 0.2 (L/H)                        dataset             ViT-B  ViT-L  ViT-H  ViT-H448  prev best
+          exp. moving average (EMA)         0.9999                              IN-Corruption ↓[27]   51.7    41.8    33.8    36.8    42.5 [32]
+       Table 11. Supervised training ViT from scratch.                IN-Adversarial [28]    35.9    57.1    68.2    76.7    35.8 [41]
+                                                                          IN-Rendition [26]      48.3    59.9    64.4    66.5    48.7 [41]
+                                                                        IN-Sketch [60]        34.5    45.3    49.6    50.9    36.0 [41]
+                                                                       our supervised training baselines:
+The accuracy is 82.6% for ViT-L (81.5% w/o EMA), and
+                                                                          IN-Corruption ↓       45.8    42.3    41.3
+83.1% for ViT-H (80.9% w/o EMA). Both ViT-L and ViT-H        IN-Adversarial        27.2    29.6    33.1
+show an overﬁtting trend if not using EMA.                         IN-Rendition          49.4    50.9    50.3
+  As a by-product, our recipe for ViT-B has 82.3% accu-       IN-Sketch             35.6    37.5    38.0
+racy (82.1% w/o EMA), vs. 81.8% in [53].                       Table 13. Robustness evaluation on ImageNet variants (top-1
+                                                                      accuracy, except for IN-C [27] which evaluates mean corruption
+A.3. Object Detection and Segmentation in COCO       error). We test the same MAE models (Table 3) on different Im-
+                                                             ageNet validation sets, without any specialized ﬁne-tuning. We
+  We adapt the vanilla ViT for the use of an FPN backbone      provide system-level comparisons with the previous best results.
+[36] in Mask R-CNN [24]. ViT has a stack of Transformer
+blocks that all produce feature maps at a single scale (e.g.,    B. Comparison on Linear Probing Results
+stride 16). We equally divide this stack into 4 subsets and
+apply convolutions to upsample or downsample the inter-        In §4.3 we have shown that linear probing accuracy and
+mediate feature maps for producing different scales (stride     ﬁne-tuning accuracy are largely uncorrelated and they have
+4, 8, 16, or 32, the same as a standard ResNet [25]). FPN is      different focuses about linear separability. We notice that
+built on these multi-scale maps.                                  existing masked image encoding methods are generally less
+                                                             competitive in linear probing (e.g., than contrastive learn-   For  fair comparisons among  different methods, we
+                                                                      ing). For completeness, in Table 12 we compare on linearsearch for hyper-parameters for each entry in Table 4 (in-
+                                                          probing accuracy with masking-based methods.cluding all competitors). The hyper-parameters we search
+                                                    Our MAE with ViT-L has 75.8% linear probing accu-for are the learning rate, weight decay, drop path rate, and
+                                                                     racy.  This is substantially better than previous masking-ﬁne-tuning epochs. We will release code along with the
+                                                         based methods. On the other hand, it still lags behind con-speciﬁc conﬁgurations. For full model and training details,
+                                                                        trastive methods under this protocol: e.g., MoCo v3 [9] hasplus additional experiments, see [35].
+                                                  77.6% linear probing accuracy for the ViT-L (Figure 9).
+A.4. Semantic Segmentation in ADE20K
+                                             C. Robustness Evaluation on ImageNet
+  We use UperNet [63] following the semantic segmenta-
+tion code of [2]. We ﬁne-tune end-to-end for 100 epochs        In Table 13 we evaluate the robustness of our models on
+with a batch size of 16. We search for the optimal lr for      different variants of ImageNet validation sets. We use the
+each entry in Table 5 (including all competitors).             same models ﬁne-tuned on original ImageNet (Table 3) and
+  The semantic segmentation code of [2] uses relative po-     only run inference on the different validation sets, without
+sition bias [49]. Our MAE pre-training does not use it. For     any specialized ﬁne-tuning. Table 13 shows that our method
+fair comparison, we turn on relative position bias only dur-     has strong scaling behavior: increasing the model sizes has
+ing transfer learning, initialized as zero. We note that our     signiﬁcant gains. Increasing the image size helps in all sets
+BEiT reproduction uses relative position bias in both pre-     but IN-C. Our results outperform the previous best results
+training and ﬁne-tuning, following their code.                    (of specialized systems) by large margins.
+                                                                 In contrast, supervised training performs much worse
+A.5. Additional Classiﬁcation Tasks                      (Table 13 bottom; models described in A.2). For example,
+                                                          with ViT-H, our MAE pre-training is 35% better on IN-A
+  We follow the setting in Table 9 for iNaturalist and
+                                                     (68.2% vs 33.1%) than the supervised counterpart.
+Places ﬁne-tuning (Table 6). We adjust the lr and ﬁne-
+tuning epochs for each individual dataset.
+
+
+                                                 12
+
+======================== PDF 第 13 页 ========================
+Figure 10. Uncurated random samples on ImageNet validation images. For each triplet, we show the masked image (left), our MAE
+reconstruction (middle), and the ground-truth (right). The masking ratio is 75%.
+
+                                                 13
+
+======================== PDF 第 14 页 ========================
+Figure 11. Uncurated random samples on COCO validation images, using an MAE trained on ImageNet. For each triplet, we show the
+masked image (left), our MAE reconstruction (middle), and the ground-truth (right). The masking ratio is 75%.
+
+                                                 14

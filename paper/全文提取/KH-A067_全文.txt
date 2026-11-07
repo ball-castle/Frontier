@@ -1,0 +1,1107 @@
+KH-A067 | Bidirectional Normalizing Flow: From Data to Noise and Back
+来源：https://arxiv.org/abs/2512.10953
+本地PDF：专题文献/何恺明/KH-A067_Bidirectional_Normalizing_Flow_From_Data_to_Noise_and_Back_CVPR2026.pdf
+SHA-256：c1de5fd627ede22ecfb4abdb7f24118656a3194fbce9fe8994162926835a8c9d
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                 Bidirectional Normalizing Flow: From Data to Noise and Back
+
+
+         Yiyang Lu1,2,∗,†,‡ Qiao Sun1,∗,† Xianbang Wang1,∗Zhicheng Jiang1 Hanhong Zhao1 Kaiming He1
+
+                                           ∗Equal technical contribution      †Project lead
+                                 1MIT    2Tsinghua University
+
+                          Abstract
+
+          Normalizing Flows (NFs) have been established as a prin-
+           cipled framework for generative modeling. Standard NFs2025
+            consist of a forward process and a reverse process: the for-
+         ward process maps data to noise, while the reverse process
+           generates samples by inverting it. Typical NF forward trans-Dec
+           formations are constrained by explicit invertibility, ensuring
+            that the reverse process can serve as their exact analytic11
+            inverse. Recent developments in TARFlow and its variants
+                                                                                                          (a) Standard Normalizing Flow:   (b) Bidirectional Normalizing Flow:
+          have revitalized NF methods by combining Transformers and                   explicit inverse.                   learned inverse.
+            autoregressive flows, but have also exposed causal decoding
+                                                                             Figure 1. Conceptual comparison between standard Normalizing
+           as a major bottleneck. In this work, we introduce Bidirec-
+                                                                       Flows and our proposed Bidirectional Normalizing Flow (BiFlow).
+            tional Normalizing Flow (BiFlow), a framework that re-                                                                                 Instead of constraining the forward model F to be explicitly in-
+          moves the need for an exact analytic inverse. BiFlow learns[cs.LG]                                                                                   vertible and using its exact analytic inverse for generation, BiFlow
+         a reverse model that approximates the underlying noise-to-     introduces a learnable reverse model G that approximates this in-
+           data inverse mapping, enabling more flexible loss functions      verse through our hidden alignment objective. This design frees
+         and architectures. Experiments on ImageNet demonstrate     BiFlow from architectural constraints and enables flexible loss de-
+            that BiFlow, compared to its causal decoding counterpart,      sign, allowing for efficient generation with improved quality in a
+          improves generation quality while accelerating sampling      single forward pass.
+          by up to two orders of magnitude. BiFlow yields state-of-
+            the-art results among NF-based methods and competitive       The standard NF paradigm [45, 10] requires the reverse
+          performance among single-evaluation (“1-NFE”) methods.     process to be the exact analytic inverse of the forward pro-
+           Following recent encouraging progress on NFs, we hope our      cess (Fig. 1a). This requirement restricts the range of forward
+         work will draw further attention to this classical paradigm.    model architectures that can be employed, as the model must
+                                                                  be explicitly invertible and its Jacobian determinant must be
+           1. Introduction                                         computable, tractable, and differentiable. Existing work on
+                                                        NFs [45, 10, 57, 30, 41, 29] have largely focused on design-
+             Normalizing Flows (NFs) are a long-standing family                                                                       ing compound forward functions that satisfy these require-
+           of generative models [45, 10, 30]. They contain two pro-arXiv:2512.10953v1                                                                 ments. Despite these diverse attempts, NF-based methods re-
+            cesses: a forward process that learns to transform data into                                                               main limited in their ability to use powerful, general-purpose
+            noise, and a reverse process that generates samples by in-                                                                                architectures (e.g., U-Nets [47] or Vision Transformers [12]),
+            verting this transformation. A notable property of NFs is                                                                               in contrast to many modern generative model families.
+            that the underlying flow trajectories from data to noise are
+                                                                              Recently, the gap between NFs and other generative mod-
+           learned rather than imposed. This differs from their modern
+                                                                                  els has been largely closed by TARFlow [65] and its exten-
+           continuous-time counterparts [7], such as Flow Matching
+                                                                            sions [21]. TARFlow has effectively integrated Transformers
+         (FM) [36, 37, 1], whose ground-truth trajectories are pre-
+                                                                          [58] with autoregressive flows [30, 41] into the NF paradigm.
+          determined via time-scheduling. However, this advantage
+                                                                    This design allows NF methods to benefit from the power-
+           of NFs comes at the cost of increased learning difficulty,
+                                                                                    ful Transformers, substantially mitigating a major limitation
+            typically leading to more demanding constraints on forward
+                                                                        of traditional NFs. However, to maintain computable and
+            architectures and objective formulations.
+                                                                                tractable Jacobian determinants, TARFlow decomposes the
+              ‡Work done as an intern at MIT.                                forward process into a long chain (e.g., thousands of steps)
+
+
+                                                           1
+
+======================== PDF 第 2 页 ========================
+     8
+                                          We report competitive results on the ImageNet 256×256
+          improved TARFlow                                              6.83                generation. Comparing with an improved TARFlow (which
+          BiFlow                                                        is also the forward model for BiFlow), BiFlow achieves an
+     6
+                                                 FID of 2.39 using a DiT-B size [42] model, while being two CFG)                                                         orders of magnitude faster (see Fig. 2; detailed in Tab. 3).
+                                              4.4 points      4.54                                                         This not only sets a new state-of-the-art result among NF- (w/     4                                              better
+                                                       2.1 points         based methods, but also represents a strong 1-NFE result in
+                    224× Faster                       better
+      2.39                                               comparison with other generative model families.
+                                                            Following the progress established by TARFlow and ex-  FID-50K 2
+                                                                    tensions, our work on BiFlow further unleashes the potential
+                        697× Faster                                                             of NFs as a strong competitor among modern generative
+                                                     model families. Our findings indicate that the NF principle of
+     0
+                 0.001              0.01                0.1           0.5        learning the forward trajectories, rather than pre-scheduling
+         Reverse Process Time (s, log-scale)                                                           them, can be advantageous and need not introduce inference-
+Figure 2. BiFlow surpasses our improved TARFlow baseline by     time limitations. Considering that modern Flow Matching
+a wide margin in generation quality, despite using a base-size     methods are continuous-time NFs with pre-scheduled tra-
+model versus an extra-large model, and it achieves markedly faster      jectories, we hope our study will shed light on the potential
+sampling as well. The x-axis denotes the wall-clock time (log scale)
+                                                          synergy among these related methods.
+for generating one image on 8 v4 TPU cores. VAE decoding is
+omitted from this figure; comprehensive inference cost comparison
+appears in Tab. 3.                                            2. Related Work
+
+                                                     Normalizing Flows. Normalizing Flows (NFs) have longof autoregressive operations. The resulting explicit inverse
+                                                           served as a principled framework for probabilistic genera-therefore requires a large number of causal steps at inference
+                                                                        tive modeling. Over the past decade, extensive research hastime, which is difficult to parallelize. This design not only
+                                                            focused on enhancing the expressivity and scalability of NFsslows down sampling, but also retains the undesirable archi-
+                                                        under the constraint of invertible transformations. Planartectural constraints during inference, e.g., the reverse model
+                                                            flows [45] and NICE [10] pioneered the use of simple re-cannot perform feedforward, non-causal attention.
+                                                                   versible mappings to construct deep generative models. Real   In this work, we introduce Bidirectional Normalizing
+                                        NVP [11] and Glow [29] extended this framework with non-Flow (BiFlow), a framework in which both the forward and
+                                                           volume-preserving transformations and convolutional archi-reverse processes are learned. In our framework, the designs
+                                                                      tectures. IAF [30] and MAF [41] introduced autoregressiveof the forward and reverse processes are decoupled: the
+                                                            flows to improve expressivity while maintaining tractableforward process can be any NF model Fθ that is computable,
+                                                                  likelihoods. TARFlow [65] and STARFlow [21] further re-tractable, and easy to learn (e.g., an improved TARFlow),
+                                                                   vitalized the NF family by incorporating Transformer intowhile the reverse process learns a separate model Gϕ to
+                                                              autoregressive flows. They demonstrated significant gainsapproximate its inverse (Fig. 1b). In contrast to the explicit
+                                                                  in generation quality and scalability, reaffirming NFs as ainverse, our reverse model is highly flexible:  it can be a
+                                                             competitive paradigm in modern generative modeling.feedforward, non-causal Transformer that is both expressive
+                                                              Despite these advances, standard NFs still inherit limita-and efficient to run, naturally enabling high-quality, single
+                                                                  tions from their invertibility requirement. In particular, au-function evaluation (1-NFE) generation.
+                                                                  toregressive flow formulations impose strict causal ordering   Learning the reverse model Gϕ is not merely a form of dis-
+                                                      and sequential dependencies, which constrain architecturaltillation, even though we use a pre-trained forward model Fθ:
+                                                            design and lead to slow inference.in fact, our learned reverse model Gϕ can outperform the ex-
+plicit inverse of Fθ. Compared to distilling the noise-to-data     Continuous Normalizing Flows. Continuous Normalizing
+trajectories, we find that aligning the intermediate hidden     Flows (CNFs) [20, 14, 19] generalize discrete flows by mod-
+states yields results even better than the explicit inverse. In      eling transformations as continuous-time dynamics governed
+addition, our learnable reverse model can naturally eliminate     by ordinary differential equations (ODEs) [7]. CNFs enable
+the extra step of score-based denoising in TARFlow, sim-    more flexible architectures and tractable likelihood compu-
+plifying and accelerating inference while improving quality.     tation via numerical ODE simulations. FM [36, 37, 13]
+Such a “what-you-see-is-what-you-get” property further en-     reformulates the explicit maximum-likelihood training ob-
+ables the use of perceptual loss [68], which is impossible or      jective into an equivalent implicit objective. Diffusion mod-
+difficult to leverage with an explicit inverse. Putting these      els [25, 51, 9] can be interpreted as a special case of Flow
+factors together, our learned reverse model can substantially     Matching with stochastic dynamics, achieving impressive
+outperform its explicit-inverse counterpart.                         fidelity and scalability. Despite their empirical success, the
+
+
+                                                 2
+
+======================== PDF 第 3 页 ========================
+                                                                 inverse is only required at inference time, where we need to
+                                             map samples from prior back to the data space.
+
+                                               TARFlow. TARFlow [65] integrates Transformer architec-
+                                                            TARFlow Block                                                         tures into autoregressive flows (AF), substantially improv-
+                                                            ing their expressiveness and scalability. The core idea in
+                                                            TARFlow Block                                   AF is to further decompose each sub-transformation fi, pa-
+                                                           rameterized by a block, into T steps, where T denotes the
+                                                        sequence length of the input tokens. Each step transforms
+                                                               the i-th token only conditioned on its predecessors, which
+Figure 3. Illustration on the autoregressive inference process of     can naturally be realized through Transformer layers with
+TARFlow. In each block, each token is transformed one by one,     causal masks. To capture bidirectional context, AF flips
+depending on previous tokens. This is repeated for a sequence     the sequence order in alternating blocks. By combining ex-
+with length 256 for a 32×32 input with patch size 2, and is further      pressive Transformer architectures with autoregressive flows,
+repeated for all blocks (e.g., 8 blocks). Altogether, TARFlow infer-    TARFlow successfully revives NF to remain competitive
+ence requires 8×256 sequential function evaluations.                                                          with today’s state-of-the-art generative models.
+                                                        However, AF parameterization introduces asymmetry
+implicit formulation of FM and diffusion models sacrifices     between training and sampling.  Similar to next-token-
+the learnable bidirectional mapping that characterizes NFs.      prediction language models, although likelihood evaluation
+                                                     and training can be parallelized efficiently, sampling must
+3. Background: Normalizing Flows                 proceed sequentially due to the autoregressive nature, as
+                                                                      illustrated in Fig. 3. In practice, this requires performing,
+   Normalizing Flows (NFs) are a class of generative models
+                                                                               e.g., thousands of (8×256) inverse transformations one after
+that establish a bijective transformation between a Gaussian
+                                                              another, resulting in substantial inference latency.
+prior distribution p0 and a complex data distribution pdata.
+An NF consists of a forward process and a reverse process.
+                                                          4. Bidirectional Normalizing FlowGiven a data sample x ∈RD ∼pdata, the forward process
+F maps it into the Gaussian prior space z = F(x). The     We propose a Bidirectional Normalizing Flow (BiFlow)
+model assigns the data likelihood p(x) through the change-    framework, which has: (i) a forward model Fθ that trans-
+of-variables formula. Training is performed by optimizing F     forms data samples into pure noise, and (ii) a learnable,
+to maximize the log-likelihood log p(x) over data samples.      separate reverse model Gϕ that approximates its inverse,
+   Classical NF requires the forward process F to be explic-    mapping noise back to the data space. Training is performed
+itly invertible for exact likelihood computation and efficient      in two stages:  first, similar to classical NF, we train the
+sampling. Once trained, its exact inverse, F−1, can be used     forward model using maximum likelihood estimation; then,
+for generation by transforming Gaussian noise back to the     keeping the forward model fixed, we train the reverse model
+data space, i.e., x = F−1(z) where z ∼p0.                      to approximate its inverse mapping.
+   In practice, to enhance expressiveness, the forward pro-        Notably, our reverse model Gϕ is not constrained by ex-
+cess is commonly constructed as a composition of multiple      plicit invertibility. As a result, this allows us to design the
+simpler bijective transformations F := fB−1 ◦· · · ◦f1 ◦f0      reverse model with arbitrary architectures (e.g., bidirectional
+(◦denotes function composition). Under this formulation,     attention-based Transformers) and training objectives. Next,
+the log-likelihood objective becomes                   we discuss the formulation, objectives, and learning dynam-
+                                                                      ics of the reverse process.
+                                       ∂fi(xi)
+      log p(x) = log p0(z) + X log det              ,    (1)
+                                      ∂xi                4.1. Learning to Approximate the Inverse                                             i
+                                                       Given a pre-trained forward model Fθ, our goal is towith x0 = x and xi+1 = fi(xi).  Here, det(·) denotes
+                                                          optimize a reverse model Gϕ that approximates its inverse.
+the determinant operator. Designing transformations that
+                                         We consider three strategies: (i) naive distillation; (ii) hidden
+yield computable and differentiable determinant has been a
+                                                                            distillation; (iii) hidden alignment, as approaches to learning
+key consideration in prior NF formulations. This require-
+                                                               the reverse model. Fig. 4 illustrates the differences among
+ment motivates specialized designs such as affine coupling
+                                                               these methods, as we describe next.
+[10, 11] and autoregressive flows [30, 41], which preserve
+tractable Jacobians.                                     Naive Distillation. A straightforward strategy is to impose
+   Importantly, while the log-determinant term in Eq. (1)     a direct distillation loss:
+requires the forward process F to be invertible, it does not
+necessitate an explicitly invertible formulation. The explicit                        Lnaive(x) = D x, x′  ,
+
+
+                                                 3
+
+======================== PDF 第 4 页 ========================
+               (a) Naive Distillation.                               (b) Hidden Distillation.                                (c) Hidden Alignment.
+
+Figure 4. Comparison of three approaches for learning the reverse process. Each ◦marks a position where the model returns to the same
+dimension as input x. Blue arrows with D refer to distance loss terms. Our hidden alignment strategy (Fig. 4c) combines the strengths of
+Fig. 4a and Fig. 4b, leveraging the entire trajectory for supervision without repeatedly returning to input space.
+
+where x is a data sample, x′ = Gϕ(Fθ(x)) is the recon-     termed hidden alignment. Crucially, it leverages the full for-
+structed data, and D denotes a distance metric (e.g., L2     ward trajectory for supervision while relaxing the restrictive
+distance). The reverse model is trained to minimize the     requirement in hidden distillation that intermediate hidden
+reconstruction error on data samples (see Fig. 4a).                states must lie in the input space.
+   This simple approach provides supervision only at the fi-      As shown in Fig. 4c, we extract intermediate hidden states
+nal output, which may be insufficient for effectively training     {hi} from the reverse model Gϕ. Unlike hidden distillation,
+the reverse model. Directly mapping pure noise to data in    which enforces each hi to directly match its input-space
+one step is highly under-constrained, making it difficult for     counterpart xi, we introduce a set of learnable projection
+the reverse network to learn a reliable inverse from a single     heads {φi} to align the projected representations φi(hi) with
+reconstruction loss.                                            the corresponding forward states xi. The training objective
+                                                            then becomes:Hidden Distillation. A typical NF is composed of a se-
+quence of simple sub-transformations, i.e., Fθ = fB−1 ◦                                                                                  Lalign(x) = X D xi, φi(hi)  ,            (2)
+· · · ◦f1 ◦f0, where each fi is a transformation block and B
+                                                                                                                                   i
+denotes the total number of blocks. We can strengthen the
+                                                     where h0 = x′ and φ0 is the identity mapping.training signal by leveraging the full sequence of intermedi-
+                                                            This simple modification allows the reverse model toate states generated along the forward trajectory.
+                                                                  benefit from full trajectory supervision while maintaining
+  As illustrated in Fig. 4b, starting from x ∼pdata, the
+                                                                    architectural and representational flexibility. By decoupling
+forward model produces a trajectory of intermediate hidden
+                                                                the representation space from the input token space, hiddenstates {xi} with z = Fθ(x) as the final output prior. Analo-
+                                                            alignment avoids the potential semantic distortion caused by
+gously, we also design the reverse model to be composed of
+                                                             repeated projections.B blocks, generating a reverse trajectory {hi} from z. We
+distill the reverse model by enforcing the two trajectories to     4.2. Eliminating Score-based Denoising
+be close. Formally, the loss is defined as:
+                                                                  Existing state-of-the-art NFs such as TARFlow [65] devi-
+                Lhidden(x) = X D xi, hi  ,                     ate from standard flow-based modeling in that they learn
+                                                         a noise-perturbed distribution and then denoise the out-
+                                           i
+                                                                   put. Specifically, during training, TARFlow takes a noise-
+where h0 corresponds to the reconstructed output x′. Option-
+                                                              perturbed input ˜x = x + σϵ, where ϵ ∼N(0, I), and during
+ally, each term can be assigned a distinct weighting factor.
+                                                                inference, TARFlow first generates ˜x = F−1θ  (z), then per-This formulation encourages the reverse model to invert each
+                                                        forms an additional score-based denoising step:
+sub-transformation individually, which could help guide the
+reverse model to invert the mapping Fθ step by step. The in-               x ←˜x + σ2 ∇˜x log p(˜x),               (3)
+termediate hidden states {xi} serve as auxiliary supervision
+for learning the correspondence between x and z.               as illustrated in Fig. 5a, where the score term is computed
+   Although this hidden distillation strategy provides more     via a forward-backward pass. This post-processing almost
+supervision than naive distillation, it introduces structural     doubles the inference cost, becoming a clear computational
+constraints on model design. Since each intermediate state     bottleneck for efficient generation.
+xi has the same dimensionality as the input, the reverse                                                  Learned Denoising. We eliminate the explicit score-based
+model is forced to repeatedly project features down to the                                                            denoising step by integrating denoising directly into the re-
+input space and then back up into the hidden space. This                                                               verse model. As illustrated in Fig. 5b, we extend the forward
+rigid requirement restricts architectural flexibility, ultimately                                                                   trajectory from ˜x to z by appending the clean data x at its
+limiting the model’s effectiveness.                                                                                 start, and extend the reverse model with one additional block
+Hidden Alignment. We propose a more flexible strategy,    h0 →x′ that learns denoising jointly with the inverse. The
+
+
+                                                 4
+
+======================== PDF 第 5 页 ========================
+                                                               ceptual loss (our implementation for VGG features follows
+                                                 LPIPS [68]). As in prior work [16, 52, 17], all loss terms
+                                                       can be adaptively re-weighted during training. Details are
+                                                           provided in Appendix B.3.
+
+                                                               4.4. Norm Control
+                      (a) TARFlow: explicit denoising.
+                                                    The intermediate states produced by the forward model
+                                                                 are unconstrained under the NF formulation, often exhibiting
+                                                                large norm fluctuations across blocks (see Fig. 8a). These
+                                                                 variations can lead to imbalanced supervision when using
+                                                             magnitude-sensitive losses such as MSE for reverse-model
+                                                                    training. To mitigate this issue, we introduce two comple-
+                                                       mentary norm-control strategies applied to the forward and
+                      (b) BiFlow: learned denoising.                      reverse models to ensure stable and consistent supervision
+Figure 5. Incorporating the denoising step into our hidden align-     strength (details in Appendix B.3).
+ment framework. The reverse model is extended with an additional      On the forward model, we clip the output parameters of
+block dedicated to denoising. Our learned denoising eliminates the     each transformation fi within a fixed range [−c, c], limiting
+need for calculating the score function through a whole forward-     excessive scaling and stabilizing intermediate state norms
+backward pass, incurring only a single additional block forward.      without compromising expressiveness. On the reverse model,
+                                             we normalize each intermediate state before performing hid-
+resulting reverse network, with one extra block for denoising,    den alignment, which equalizes the contribution across tra-
+maps z to a clean sample x′ in a single pass. As such, our      jectory depth and promotes scale-invariant learning.
+reverse model directly learns the correspondence between z
+                                                               4.5. BiFlow with Guidanceand the clean data x directly, rather than the noisy data ˜x.
+  The training process follows the same objective as Eq. (2),         Classifier-free guidance (CFG) [24] was originally pro-
+with a reconstruction loss on (x, x′) and hidden alignment     posed for diffusion models to control the trade-off between
+losses on intermediate states. By integrating denoising into     sample diversity and fidelity. Due to its effectiveness, it has
+the reverse process itself, BiFlow achieves a unified learned     been widely adopted in diffusion-based generative models.
+formulation for generation, where inverse and denoising are     Following this success, recent Normalizing Flows [65, 21]
+seamlessly coupled within a single direct generative model,    and autoregressive models [56, 35] also incorporate CFG to
+eliminating the need for any extra refinement step.               further improve generation quality.
+                                         CFG can be seamlessly integrated into BiFlow’s infer-
+4.3. Distance Metric                                     ence process by extrapolating conditional and unconditional
+                                                                predictions of Gϕ at each hidden state hi, i.e.,  BiFlow provides a flexible supervised-learning frame-
+work for tackling the generation problem. This flexibility            hi+1 = (1 + wi) Giϕ(hi | c) −wi Giϕ(hi),      (4)
+stems from two key properties of BiFlow: (i) 1-NFE genera-
+tion — the learned reverse model produces a sample x′ in a    where c is the class condition and wi is the guidance scale
+single forward pass, so generated samples are directly acces-     (our w definition follows the original CFG formulation [24],
+sible during training; and (ii) explicit pairing — the forward        i.e., w = 0 is w/o CFG). The subscript i indicates that wi can
+process establishes a direct correspondence between data x      differ among blocks, supporting CFG interval [31]. More
+and noise z, serving as training pairs for the reverse model.      results are provided in Appendix C.2.
+Together, these properties realize a what-you-see-is-what-        Directly applying CFG doubles the computational cost
+you-get training regime: generated samples are available for     during inference, since each guided block requires two for-
+immediate loss evaluation and backpropagation, enabling    ward passes. To alleviate this, following [5, 55], we incor-
+rich semantic supervision signals.                              porate CFG into the training stage, enabling inference with
+  Our framework is highly flexible in the choice of loss     only one function evaluation (1-NFE) while preserving the
+functions: almost any distance metric can be used, and mul-     benefits of guidance. Additionally, to retain the flexibility
+tiple metrics can be combined. Our default choice for the     of adjusting guidance scales at inference time, we allow the
+distance metric D in Eq. (2) is simply mean squared error     reverse model to leverage CFG scale as condition [39, 18].
+(MSE). To enhance realism, we further apply perceptual loss    By training the model with a range of guidance scales, Bi-
+at the final VAE-decoded image, while intermediate hidden     Flow can generate outputs corresponding to various guidance
+states remain aligned by MSE. In this work, we adopt both      strengths within a single forward pass. Further details are
+VGG [50] and ConvNeXt V2 [61] feature spaces for per-     provided in Appendix B.2.
+
+
+                                                 5
+
+======================== PDF 第 6 页 ========================
+                                                                                        FID (↓)            attention
+5. Experiments                                                           exact inverse                  44.46             causal
+                                                                                 naive distillation               43.41 −1.05       bidirect
+Experiment Settings. Our experiments are conducted on          hidden distillation              55.00 +10.54      bidirect
+class-conditional ImageNet [8] generation at 256×256 reso-          hidden alignment              36.93 −7.53       bidirect
+lution. We evaluate Fr´echet Inception Distance (FID) [23]                                                                 Table 1. Reverse learning method. Naive distillation can exceed
+and Inception Score (IS) [48] on 50000 generated images.      the exact inverse with a simple MSE objective. Our hidden align-
+Following [46, 13, 21], we implement our models on the     ment yields the best result among the three strategies. (Settings:
+latent space of a pre-trained VAE tokenizer. For ImageNet      BiFlow-B/2, 160 epochs, adaptive weighted MSE loss, w/o CFG)
+256×256, the tokenizer maps images to a 32×32×4 latent
+                                                      between representation and input spaces cause information
+representation, serving as the input and output domain of our
+                                                                  loss and limit architectural expressiveness. This results in
+models.
+                                                         degraded performance compared to the naive distillation.
+Improved TARFlow as Baseline. Our BiFlow framework       Our proposed hidden alignment method removes the re-
+builds upon TARFlow [65] as our forward model. We in-     peated projections inherent in hidden distillation while re-
+troduce several modifications to the original TARFlow to      taining full trajectory-level supervision, thereby preserving
+enhance stability and performance. Specifically, we replace     both architectural flexibility and representational richness. It
+additive conditioning with in-context conditioning [42] and     achieves the best performance among the three strategies and
+apply the norm control strategy in Sec. 4.4, while omitting     surpasses the exact inverse by a clear margin in generation
+STARFlow-specific components such as deep-shallow de-      quality. These results collectively demonstrate that hidden
+sign, decoder finetuning, and customized CFG. We denote     alignment is an effective and robust strategy for learning an
+this enhanced version as improved TARFlow (iTARFlow).     approximate inverse in BiFlow.
+As shown in the table below, it achieves substantial gains
+over the original TARFlow, both with or without CFG, es-     5.2. Other Ablations
+tablishing a strong baseline for BiFlow.                 We ablate several key design choices in BiFlow and ana-
+                                 FID (↓)
+  Method                                                  # Params       lyze their impact on performance in Tab. 2.
+                             w/o CFG    w/ CFG
+  latent TARFlow-B/2 *            59.43       10.89    118M       BiFlow with Guidance. BiFlow is conditioned on the CFG
+ + in-context conditioning         53.87        8.25     120M         scale and learns across a range of CFG scales during training.
+ + 160 epochs →960 epochs      45.48        7.05     120M        This enables 1-NFE inference while preserving the benefits
+ + norm control (iTARFlow)       44.46        6.83     120M        and flexibility of guidance. As shown in Tab. 2a, compared to
+Configurations. Our reverse model adopts a ViT backbone     standard CFG approach, our training-time CFG mechanism
+with modern Transformer components [53, 66] and multi-     reduces inference cost by half while achieving better FID.
+token in-context conditioning [18]. We name our model as    Learned Denoising. Tab. 2b demonstrates the effective-
+BiFlow-B/2, where B/2 indicates a base-sized model with     ness of our learned denoising strategy. By jointly training
+patch size 2, resulting in a sequence length of 256. In our     denoising with the inverse, our learned one-block denoiser
+ablation studies, we choose an iTARFlow as our forward     improves generation quality over the score-based denoising
+model and train the reverse model with the forward model     used in TARFlow. Moreover, our approach introduces only a
+fixed. Unless otherwise specified, our ablations employ the      single additional block, whereas TARFlow’s score-based de-
+adaptive-weighted MSE, while final comparisons in Tab. 4     noising requires an extra forward-backward pass (incurring
+incorporate perceptual distance mentioned in Sec. 4.3 for    15.8× flops). This substantially reduces inference overhead.
+optimal performance. Details are provided in Appendix A.                                          Norm Control. We introduce two norm control strategies in
+                                                            Sec. 4.4 and evaluate their effectiveness in Tab. 2c. Apply-5.1. Ablation: Learning to Approximate the Inverse
+                                                            ing either strategy alleviates imbalance in MSE loss across
+  We evaluate three strategies for learning the reverse      blocks, thereby enhancing performance. We provide visual-
+model, as described in Sec. 4.1, and report generation qual-     izations of the norm statistics in Appendix C.4.
+ity (FID in Tab. 1) as well as reconstruction error (see Ap-
+                                                         Distance Metric. Our framework supports various distance
+pendix C.1).
+                                                            metric designs. As shown in Tab. 2d, incorporating percep-
+  The naive distillation approach, trained with a simple
+                                                                    tual distance [68, 61] at the image end can largely improve
+MSE objective, already outperforms the exact inverse base-
+                                                               generation quality. Notably, when both VGG and ConvNeXt
+line, indicating that a learned reverse model is a practical
+                                                                features are used for the perceptual loss, the optimal guid-
+and competitive alternative to the analytic inverse.
+                                                         ance scale in Eq. (4) for this model is close to 0.0, resulting
+  Hidden distillation supervises the reverse model using
+                                                                  in performance similar to no-CFG setting. This suggests
+the entire forward trajectory. However, repeated projections
+                                                              these features already provide strong class-discriminative
+   *The latent TARFlow-B/2 is our TARFlow reproduction in VAE latent.     information. More results are provided in Appendix C.3.
+
+
+                                                 6
+
+======================== PDF 第 7 页 ========================
+                             FID, w/o CFG    FID, w/ CFG                          BiFlow                  improved TARFlow
+                                                                                                B/2          B/2        M/2          L/2        XL/2
+      inference-time CFG       36.93 (NFE=1)    6.90 (NFE=2)                FID         2.39          6.83          5.22          4.82          4.54
+      →training-time CFG     31.88 (NFE=1)    6.79 (NFE=1)               # Params    133M      120M      296M      448M      690M
+(a) BiFlow with guidance. Conditioning on the CFG scale during training          Gflops       38          152         363         552         836
+improves FID both w/ and w/o CFG while preserving flexible 1-NFE infer-         Wall-clock time (ms)
+ence. The baseline w/o CFG is final results in Tab. 1.                        TPU      0.29+1.3      65+1.3       85+1.3      165+1.3      202+1.3
+                                                             GPU      2.15+2.7      129+2.7      208+2.7      349+2.7      400+2.7
+                             FID, w/o CFG    FID, w/ CFG
+                                                              CPU      80+240     9040+240   16200+240   20400+240   26300+240
+      learned denoise               31.88             6.79                     Wall-clock speedup, BiFlow-B/2 vs. iTARFlow: (VAE excluded, see also Fig. 2)
+   →no denoise               100.51           26.20                 TPU             -        224×      293×      569×      697×
+     →score-based denoise        42.62            10.98                GPU             -        60×       97×       162×      186×
+                                                              CPU             -        113×      203×      255×      329×
+(b) Learned denoising. Our learned denoising scheme is effective. Com-
+                                                                                       Wall-clock speedup, BiFlow-B/2 vs. iTARFlow: (VAE included)
+pared to score-based denoising in TARFlow, it eliminates an extra forward-
+                                                                TPU             -        42×       54×       105×      128×
+backward calculation, and unifies the denoising step into our framework.
+                                                             GPU             -        27×       43×       73×       83×
+                             FID, w/o CFG    FID, w/ CFG             CPU             -        29×       51×       65×       83×
+     norm control: clip            31.88             6.79
+                                                                 Table 3. Comparison between BiFlow and iTARFlow baseline.
+     norm control: none           45.54            12.33
+                                           We report both generation quality (FID-50K) and inference cost
+     norm control: traj.            34.88             8.03
+                                                                   per image.  All wall-clock time measurements are reported as
+(c) Norm control. Either clipping the forward model’s output or normaliz-
+                                                                 “generator + VAE decoding”. Compared to iTARFlow, BiFlow
+ing the forward trajectory improves generation quality by ensuring balanced
+                                                                   achieves one to two orders of magnitude faster sampling on TPU,supervision strength across blocks.
+                                                   GPU, and CPU, while attaining superior generation quality. (The
+                             FID, w/o CFG    FID, w/ CFG
+                                             VAE decoder contains 49M parameters and requires 308 Gflops.)
+    MSE                        31.88             6.79
+     + LPIPS                     14.15             4.91               Experiments show that our BiFlow-B/2 surpasses the
+     + LPIPS + ConvNeXt          2.46             2.46
+                                                             exact inverse of the improved TARFlow-XL/2 baseline in
+(d) Distance metric. Our framework enables a flexible design of distance     generation quality. Remarkably, BiFlow requires only a
+metrics. Incorporating perceptual distance improves generation quality.
+                                                                single function evaluation (1-NFE), compared to 256×2
+Table 2. Ablation study on ImageNet 256×256 generation. FID-     sequential decoding steps for the autoregressive inference
+50K with 1-NFE is reported by default. (Settings: BiFlow-B/2, 160     of the exact analytic inverse — resulting in up to a 42×
+epochs. By default: adaptive weighted MSE loss without perceptual                                                        speedup for models of similar size on TPU.
+loss, training-time CFG.)
+                                        Why can a learned inverse outperform the exact inverse?
+                                                 Our reverse model Gϕ is trained to reconstruct real images
+Scaling Behavior. We investigate the scaling behavior of                                                                         directly, rather than to replicate synthetic samples produced
+BiFlow under different distance metrics, using iTARFlow                                                   by the exact inverse as in conventional distillation. This
+of corresponding size as forward models. We summarize                                                           encourages its predictions to align more closely with the true
+preliminary results in the table below.                                                             data distribution. In addition, Gϕ is optimized end-to-end
+         FID, w/ CFG           B       XL                with the forward map fixed, learning to directly transform
+      MSE                       6.79         4.61                noise into clean data. This joint optimization can help the
+       + LPIPS                    4.91         3.36              model to learn a stable and globally consistent mapping.
+       + LPIPS + ConvNeXt        2.46         2.57
+                                          Why is a learned inverse significantly faster than the exact
+   Overall, BiFlow exhibits clear gains from increased     inverse? From an algorithmic perspective, two key improve-
+model capacity when trained without the ConvNeXt-based     ments reduce the computational cost of BiFlow. First, Bi-
+perceptual loss. However, after incorporating ConvNeXt    Flow eliminates the score-based denoising step required
+features, further scaling yields diminishing returns, with FID    by the exact inverse of TARFlow, removing a major com-
+improvements gradually saturating. We hypothesize this      putational bottleneck. Second, we integrate CFG into the
+behavior may be related to overfitting, as evidenced by an      training stage, effectively halving the inference cost com-
+increase in FID during training. A comprehensive investiga-     pared to applying CFG during sampling. Together, these two
+tion of BiFlow’s scaling behavior is left for future work.       improvements reduce the flops by roughly 4×.
+                                                  From an architectural perspective, the autoregressive de-
+5.3. BiFlow vs. improved TARFlow
+                                                                sign of TARFlow imposes inherent limitations on parallelism
+  We compare our learned reverse model (BiFlow) with     during inference. Our bidirectional attention Transformer
+the exact analytic inverse baseline (improved TARFlow) of     design allows for fully parallelized computation across the
+the forward process. In Tab. 3, we benchmark in terms of     sequence dimension, which leads to significant speedups
+generation quality (FID score) and inference efficiency (flops    on modern accelerators. Notably, due to the efficiency of
+and wall-clock time for generating a single image). Details     BiFlow, the VAE decoder has become a dominant computa-
+of our benchmarking setup are provided in Appendix A.         tional overhead, which is outside the scope of this work.
+
+
+                                                 7
+
+======================== PDF 第 8 页 ========================
+                                                             Method              # Params NFE  FID(↓)  IS(↑)      Method                # Params  NFE   FID(↓)  IS(↑)
+
+                                                   GANs                                                          autoregressive/masking
+  Method                  # Params NFE  FID(↓)  IS(↑)      BigGAN-deep [3]     112M    1     6.95   202.6      MaskGIT [4]          227M     ⋆      6.18   182.1
+  Autoregressive Normalizing Flow                           GigaGAN [26]       569M    1     3.45   225.5      RCG,VAR-d30conditional[56]    [34]    512M2.0B      ⋆⋆      2.121.92   267.7323.1
+   TARFlow-XL/8@pix [65]    1.3B     ⋆     5.56       -        StyleGAN-XL [49]    166M    1     2.30   265.1     MAR-H [35]          943M     ⋆      1.55   303.7
+   STARFlow-XL/1 [21]       1.4B     ⋆     2.40       -      1-NFE diffusion/flow matching from scratch              RAR-XXL [63]           1.5B      ⋆      1.48   326.0
+  Autoregressive Normalizing Flow (our impl.)                      iCT-XL/2 [52]       675M    1    34.24      -        xAR-H [44]              1.1B      ⋆      1.24   301.6
+   iTARFlow-B/2          120M    ⋆     6.83   226.2       Shortcut-XL/2 [15]    675M    1    10.60      -        Multi-NFE diffusion/flow matching
+   iTARFlow-M/2          296M    ⋆     5.22   255.5      MeanFlow-XL/2 [17]   676M    1     3.43   247.5     ADM-G [9]           554M   250×2   4.59       -
+                                                              TiM-XL/2 [60]       664M    1     3.26   210.3      LDM-4-G [46]         400M   250×2   3.60   247.7
+   iTARFlow-L/2          448M    ⋆     4.82   254.8
+                                                                α-Flow-XL/2+ [67]    676M    1     2.58       -         DiT-XL/2 [42]         675M   250×2   2.27   278.2
+   iTARFlow-XL/2         690M    ⋆     4.54   259.3      iMF-XL/2 [18]       610M    1     1.72   282.0       SiT-XL/2 [38]         675M   250×2   2.06   252.2
+  1-NFE Normalizing Flow                                 1-NFE diffusion/flow matching (distillation)                    JiT-G/16SiT-XL/2[33]+ REPA [64]    675M2B    100×2250×2   1.821.42   292.6305.7
+   BiFlow-B/2 (Ours)       133M    1     2.39   303.0      π-Flow-XL/2 [6]      675M    1     2.85       -          LightningDiT-XL/1 [62]   675M   250×2   1.35   295.3
+                                                        DMF-XL/2+ [32]     675M    1     2.16       -        DDT-XL/2 [59]        675M   250×2   1.26   310.6
+                                                        FACM-XL/2 [43]     675M    1     1.76   290.0      DiTDH-XL + RAE [69]    839M   50×2    1.13   262.6
+
+Table 4. System-level comparison on ImageNet 256×256 class-conditional generation. All results are reported with CFG if applicable.
+Left: Comparison with Normalizing Flow models. Middle: Other 1-NFE generative models, including GANs and diffusion/flow matching-
+based models. Right: Other families of generative models. Our BiFlow model is trained for 350 epochs with perceptual distance. In all
+tables, ×2 indicates the use of CFG incurs double NFEs. ⋆: All AR-based methods, including AR Normalizing Flow (left) and other AR
+models (right), involve a large number of forward evaluations, yet each evaluation is on one or a very few tokens. For example, for standard
+left-to-right order AR, the average NFE of the entire AR process is roughly 1 (or 2× w/ CFG), that is, K evaluations with a K1 fraction of
+tokens each. In addition, TARFlow/iTARFlow has an extra NFE of 2 due to the score-based denoising post-processing. Results of [52] is collected
+
+from [70]; results of [65] is collected from [21]; TARFlow-XL/8@pix denotes TARFlow on pixel-space with patch size 8.
+
+
+5.4. Comparison with Prior Works
+
+   In Tab. 4, we provide system-level comparisons with
+previous methods on class-conditional ImageNet 256×256
+generation. We categorize prior works into three groups:
+Normalizing Flows (Tab. 4, left), 1-NFE generative models
+(Tab. 4, middle), and other families of generative models
+(Tab. 4, right). All our models are trained to convergence.
+
+Comparison with Normalizing Flows. Tab. 4 (left) com-
+pares BiFlow with previous state-of-the-art Normalizing
+Flows models. Our BiFlow-B/2, with only 133 million pa-
+rameters, achieves an FID of 2.39 in a single function eval-
+uation (1-NFE), establishing a new state-of-the-art among
+Normalizing Flows. In contrast, STARFlow uses thousands
+                                                                   Figure 6. 1-NFE Generation Results. We show selected samplesof sequential decoding steps due to their autoregressive sam-
+                                                                  generated by our BiFlow-B/2 model with guidance scale 2.0 on
+pling process. It yields a similar FID score with about 10×
+                                                            ImageNet 256×256. BiFlow achieves high-fidelity generation with
+parameters and more than 400× inference wall-clock time
+                                                                 only a single function evaluation (1-NFE) from noise.
+(see Tab. 6 for details).
+  More broadly, BiFlow represents a significant advance-    wisdom that the reverse process must be the exact analytic
+ment in Normalizing Flows, demonstrating that direct and     inverse of the forward process, and demonstrate that the
+efficient generation can coexist with high fidelity.               long-held constraint is unnecessary. By introducing a learn-
+                                                                able reverse model, BiFlow pushes Normalizing Flows fromComparison with Other Generative Models. We compare
+                                                                  analytically invertible mappings to trainable bidirectionalBiFlow with other generative model families, especially
+                                                             systems, from autoregressive sampling to fully parallelized,1-NFE methods. As shown in Tab. 4, BiFlow offers an
+                                                                       efficient 1-NFE generation, and from an implicit genera-excellent balance between generation quality and sampling
+                                                                       tive model towards a direct generative model. Experimentsefficiency. These results demonstrate that BiFlow achieves
+                                                         demonstrate that BiFlow achieves competitive generationperformance on par with leading 1-NFE generative models.
+                                                                quality among Normalizing Flows, while delivering up to
+                                                   two orders of magnitude faster inference than its explicit6. Conclusion
+                                                               inverse counterpart. We hope this work can serve as a step
+   This work revisits one of the oldest, yet most principled,     toward rethinking and expanding the scope of Normaliz-
+foundations of generative modeling — Normalizing Flows —     ing Flows, inspiring future research on direct, flexible, and
+and redefines its boundaries. We challenge the conventional      efficient NF-based generation.
+
+
+                                                 8
+
+======================== PDF 第 9 页 ========================
+                     BiFlow            improved TARFlow                 Method                  # Params    Time (ms)      Speed   VAE?
+  config
+                       B/2        B/2     M/2      L/2     XL/2          TARFlow-XL/8@pix [65]      1.3B        1192       1×     ✗
+  # Params (M)          133       120     296     448     690           STARFlow-XL/1 [21]         1.4B       677+1.3      1.76×   ✓
+  block                 9         8       10      12      15            iTARFlow-B/2            120M       65+1.3      18.0×   ✓
+  layer                  8         8       9       9       9            iTARFlow-M/2           296M       85+1.3      13.8×   ✓
+  hidden dim            384       384     512     576     640           iTARFlow-L/2            446M       165+1.3      7.17×   ✓
+  attn heads              6         6       8       9       10           iTARFlow-XL/2           675M       202+1.3      5.86×   ✓
+  patch size              2                      2                           BiFlow-B/2 (Ours)         133M       0.29+1.3    750×   ✓
+  class tokens            8           —
+                                                                                        (a) TPU inference time comparison, benchmarked on 8 TPU v4 cores with  guidance tokens       4† / 1          —
+                                                                         a pre-compiled JAX sampling function.
+  epochs             160† / 350    960     640     640     480
+  batch size             256                    256                        Method                  # Params    Time (ms)      Speed   VAE?
+  learning rate            4e-4        4e-4     4e-4     2e-4     1e-4          TARFlow-XL/8@pix [65]      1.3B        3452       1×     ✗
+   lr schedule            constant                   constant                     STARFlow-XL/1 [21]         1.4B       2193+2.7     1.57×   ✓
+   lr warmup          10 epochs               10 epochs                      iTARFlow-B/2            120M       129+2.7     26.2×   ✓
+  optimizer          Adam             Adam [28]                     iTARFlow-M/2           296M       208+2.7     16.4×   ✓
+ Adam (β1, β2)       (0.9, 0.95)                   (0.9, 0.95)                      iTARFlow-L/2            446M       349+2.7     9.82×   ✓
+  weight decay            0.0                        0.0                        iTARFlow-XL/2           675M       400+2.7     8.57×   ✓
+  dropout                  0.0                        0.0                          BiFlow-B/2 (Ours)         133M       2.15+2.7    712×   ✓
+ ema decay            0.9999                   0.9999
+                                                                                     (b) GPU inference time comparison, benchmarked on 1 NVIDIA H200 core  label drop               0.1                        0.1
+                                                                         with PyTorch and torch.compile optimization if beneficial.
+  adaptive weight p       1           —
+ wVGG                1.0† / 0.8         —                        Method                  # Params    Time (ms)      Speed   VAE?
+  wConvNeXt            0.4† / 0.6         —                       TARFlow-XL/8@pix [65]      1.3B       512000      1×     ✗
+  clip range c      —          1.0       1.0       3.0       3.0           STARFlow-XL/1 [21]         1.4B     276700+240    1.85×   ✓
+  noise level σ     —                        0.3                         iTARFlow-B/2            120M     9040+240     55.2×   ✓
+                                                                         iTARFlow-M/2           296M     16200+240    31.1×   ✓
+Table 5. Configurations and training hyperparameters on Ima-        iTARFlow-L/2            446M     20400+240    24.8×   ✓
+geNet 256×256. † indicates the setting in the ablation study.             iTARFlow-XL/2           675M     26300+240    19.3×   ✓
+                                                                               BiFlow-B/2 (Ours)         133M      80+240   1600×   ✓
+
+                                                                                        (c) CPU inference time comparison, benchmarked on 1 AMD EPYC 7B12
+A. Implementation Details                                 node with 120 physical CPU cores and 400GB RAM. We reuse the PyTorch
+                                                                         implementations with torch.compile optimization if beneficial.
+  We implement all experiments using the JAX frame-
+                                                                Table 6. Comparison of NF models’ inference wall-clock time
+work [2] on Google TPU hardware. All reported results are
+                                                      on TPU, GPU, and CPU. The wall-clock time is evaluated per
+obtained on TPU v4, v5p, and v6e cores. The configurations                                                            image on average in milliseconds. All models include the overhead
+and training hyperparameters for improved TARFlow and      of CFG at inference time, as well as the VAE decoding time when
+BiFlow are provided in Tab. 5. For the MSE-only ablation in      applicable. All autoregressive models utilize KV-cache to acceler-
+Sec. 5, we employ adaptive weighting with exponent p = 2;      ate inference. See Appendix A for further details.
+for all other experiments we use p = 1 (see Appendix C.3
+for detailed ablations).
+
+FID Evaluation. For generative evaluation, we compute        For TPU wall-clock time, all models are evaluated using
+the Fr´echet Inception Distance (FID) [23] between 50,000     a pre-compiled JAX sampling function on 8 TPU v4 cores.
+generated images and training images, without applying any     Reported times exclude compilation overhead. We use a
+data augmentation. We use the Inception-V3 model [54] pro-     local device batch size of 10 for model inference, and 200
+vided by StyleGAN3 [27], converted into a JAX-compatible      for VAE decoding.
+implementation. We sample 50 images per class for all 1000        For GPU wall-clock time, all models are re-implemented
+ImageNet classes, following the protocol in [69].                in PyTorch and evaluated on a single NVIDIA H200 GPU
+Inference Cost Evaluation. In Fig. 2 and Tab. 3, we report     with a batch size of 128. The VAE decoding time is obtained
+                                                          with torch.compile optimization.inference cost across three hardware configurations: GPU,
+TPU, and CPU. For all metrics, we report the average per-       For CPU wall-clock time, we reuse the PyTorch imple-
+image runtime in seconds, averaged over multiple runs to     mentation on a single AMD EPYC 7B12 node (120 physical
+ensure stability. All measurements include the overhead of   CPU cores and 400 GB RAM). We use a smaller batch size
+CFG and VAE decoding time when applicable. We also     of 64 for most models; however, TARFlow and STARFlow
+provide a comparison with prior Normalizing Flow mod-     are restricted to a batch size of 4 due to efficiency concerns.
+els [65, 21] in Tab. 6.  All autoregressive models utilize   We observe that batch size has a negligible impact on per-
+KV-cache to accelerate inference, and Gflops in Tab. 3 is     image CPU inference time. All other experimental settings
+estimated using JAX’s cost analysis function.            remain consistent with the GPU evaluation.
+
+
+                                                 9
+
+======================== PDF 第 10 页 ========================
+                                                                      40
+Algorithm 1 BiFlow: Training.
+                                                                                                               inference-time CFG (2-NFE)
+                                                                      30                        training-time CFG  (1-NFE)# x: training batch, (N, H, W, C)
+# F: forward model (B blocks), frozen
+# G: reverse model (B + 1 blocks)                           20# phi: projection heads                                                                                                           FID-50K
+                                                                      10
+# noise injection
+e = randn like(x)                                                 0
+x_tilde = x + noise_level * e                                           0.0            0.5            1.0            1.5
+                                                           CFG scale
+# get forward trajectory xs and prior z             Figure 7. Comparison between training-time and inference-time
+xs, z = F(x_tilde)                                        CFG of BiFlow. Training-time CFG achieves similar or better
+                                                                performance compared to inference-time CFG while requiring only
+# get reverse trajectory hs and
+                                                                            half inference compute and retaining full post-hoc tuning flexibility.    reconstructed x’
+hs, x_prime = G(z)                                               (Settings: BiFlow-B/2, 160 epochs, MSE-only baseline.)
+
+# project hidden into input space                                                      where wi is the guidance scale at block i. The unconditional
+for    i in         range(B):
+                                                            output of Gi,cfgϕ   matches that of the original Giϕ. Therefore,   hs[i]         =           phi[i](hs[i])
+                                                                the unguided block output can be expressed as
+# compute loss
+loss_align = mse(xs, hs)                                                            Gi,cfgϕ   (hi | c) + wiGi,cfgϕ  (hi)
+loss_recon = metric(x, x_prime)                             hi+1 =                                          .        (5)                                                                            1 + wi
+loss = loss_align + loss_recon
+                                                      During training, we compute our hidden-alignment loss di-
+                                                                   rectly on hi+1 from Eq. (5). At inference time, this for-
+Algorithm 2 BiFlow: 1-NFE Sampling.                      mulation allows us to use Gi,cfgϕ    directly, producing guided
+                                                        samples with only a 1-NFE forward pass. We add stop gra-
+e = randn(x_shape)
+                                                                 dient to the unconditional output to stabilize training._, x = G(e)
+                                                  Guidance conditioning.  To retain the ability to adjust
+                                                               the CFG scale at inference time, we explicitly condition
+                                                               the reverse model on the guidance scale [39, 18],  i.e.,
+B. Method Details                                                                           Gi,cfgϕ   (hi  | c, wi). During training, we sample wi from a
+B.1. Pseudocode                                       uniform distribution U(0, wmax) and apply Eq. (5) to com-
+                                                            pute the unguided output hi+1 for hidden alignment loss.
+  We provide the pseudocode for training our BiFlow model                                         We compare this training-time CFG scheme with the
+with hidden alignment in Alg. 1, as well as the 1-NFE sam-                                                  more conventional inference-time CFG in Fig. 7. Training-
+pling procedure in Alg. 2.                                                           time CFG achieves similar (even better) performance while
+   In the algorithm, the forward model F produces the entire                                                              preserving the 1-NFE efficiency and the flexibility to sweep
+forward trajectory xs, i.e., ˜x, x1, x2, . . . , xB−1, along with                                        CFG scales at inference time.
+the prior z = xB. Similarly, the reverse model G outputs the
+sequence of intermediate hiddens states hs as reverse tra-     B.3. Distance Metric
+jectory: hB−1, hB−2, . . . , h0, along with the reconstructed
+                                                       Adaptive weighting. We adopt the adaptive loss reweighting
+clean input x prime.
+                                                                   strategy from [16, 52, 17]. Given a prediction x and target y,
+  The final loss function consists of alignment loss between
+                                                                the adaptive-weighted distance is defined as:
+forward and reverse hidden states in Eq. (2), and reconstruc-
+tion loss between the clean input x and reconstructed output       Dp = sg(wp) · D(x, y),  wp = (D(x, y) + c)−p,
+x prime.
+                                                    where c is a small constant and p ≥0 is adaptive weight.
+B.2. BiFlow with Guidance                                  sg(·) denotes the stop-gradient operator. We apply adaptive
+                                                          weighting to all loss terms in our training objective.
+Training-time CFG. As discussed in Sec. 4.5, to enable
+                                  VGG feature. For the perceptual loss based on VGG fea-
+guided sampling within a single forward pass (1-NFE), we
+directly train a guided reverse model Gcfgϕ  defined as              tures, we follow the LPIPS formulation [68].  Since our                                                    model operates in the latent space of a pre-trained VAE, we
+                                                      decode the predicted latent x′ back into image space and
+      Gi,cfgϕ   (hi | c) = (1 + wi)Giϕ(hi | c) −wiGiϕ(hi).         compute the LPIPS loss against the ground-truth image.
+
+
+                                                 10
+
+======================== PDF 第 11 页 ========================
+                       MSE       LPIPS                      wd\w      0.5       0.6        0.7
+          naive distillation           0.115        0.331                                     0.5       10.51      9.45       8.77
+         hidden distillation          0.156        0.392                                     0.6       10.21      9.21       8.59
+         hidden alignment           0.111        0.321                                     0.7        9.93       8.99       8.41
+                                                                                               3.5        7.05       6.87       6.89
+Table 7. Reverse learning methods: reconstruction fidelity. We                        4.0        6.94       6.81       6.87
+report MSE and LPIPS between the original sample x and the                        4.5        6.88       6.79       6.87
+reconstructed sample x′ produced by the learned reverse model.                       5.0        6.86       6.80       6.89
+Among the three strategies for approximating the inverse transfor-
+mation, the hidden alignment method achieves the most accurate      Table 8. Separate guidance scale for the denoising block. BiFlow
+reconstruction. The corresponding FIDs are shown in Tab. 1 (Set-      eliminates the score-based denoising step in TARFlow by learning
+tings: BiFlow-B/2, 160 epochs, no CFG, adaptive-weighted MSE      a dedicated denoising block, jointly trained with other blocks. This
+loss only. All three rows share the same forward model.)               denoising block serves a different purpose from the rest NF reverse
+                                                                      process. Using a separate, larger guidance scale for the denoising
+                                                                  block improves sample quality. (Settings: BiFlow-B/2, 160 epochs,
+ConvNeXt feature. In addition to VGG features, we in-                                                                    adaptively-weighted MSE only, training-time CFG. FID w/o CFG:
+corporate ConvNeXt V2 [61] (ImageNet-22K pre-trained,                                                                       31.88.)
+base-size) as a complementary perceptual feature extractor.
+Similar to the LPIPS, both the reconstructed image x′ and
+                                          We observe that the proposed hidden-alignment strategy
+the ground-truth image x are passed through the ConvNeXt
+                                                              achieves the lowest regression loss across both metrics. This
+network after VAE decoding. The perceptual distance is                                                                 indicates that hidden alignment provides a more accurate
+computed using the extracted features, excluding the final                                                   mapping between x and x′, leading to a better-behaved re-
+classification head.
+                                                              verse learning process.
+Usage of loss terms. In the ablation studies in Sec. 5, we
+use only the adaptively weighted MSE loss unless otherwise     C.2. BiFlow with Guidance
+noted. In Tab. 4, we combine all three loss terms:                                                As discussed in Sec. 4.2, the additional denoising block
+  L(x) = X LMSE(xi, φi(hi))                                   in our reverse model functions as a dedicated denoiser, while
+                 i                                                   the preceding B blocks focus on inverting the forward sub-
+                                                                 transformations. This structure naturally motivates applying    + wVGGLVGG(x, x′) + wConvNeXtLConvNeXt(x, x′),
+                                       CFG differently across these two components. We empiri-
+where wVGG and wConvNeXt are tunable hyperparameters. We      cally validate this design choice in Tab. 8.
+observe that the final performance is particularly sensitive to       For training-time CFG, we use a shared guidance scale
+wConvNeXt. Concrete weights are specified in Appendix A.       across all blocks, sampling w from a simple uniform prior
+                                                          U[0, 0.5]. In ablation studies that use MSE loss only (Sec. 5),Normalized Trajectory. As described in Sec. 4.4, the re-
+                                            we decouple the guidance scales for the inverse blocks andverse model is trained to align with a normalized forward
+                                                                 the denoising block, since the optimal pair (w, wd) typicallytrajectory. Specifically, we pre-compute the squared norm
+∥xi∥2 of each trajectory point and average it over the entire      satisfies wd ≫w. In this case, we sample w ∼U[0, 1] and
+dataset. During reverse model training, the intermediate    wd ∼U[0, 8].
+trajectory points are divided by p E[∥xi∥2], ensuring scale                                                       C.3. Distance Metric
+consistency across different blocks.
+  We do not use normalized trajectories in any experiments        In Sec. 4.3, we discuss different choices of distance met-
+except the one in Tab. 2c, as we observe no significant differ-      rics for training BiFlow. We ablate the choice of perceptual
+ence when combined with iTARFlow. Nonetheless, normal-     distance terms in Tab. 9. First, we compare different fea-
+ized trajectories are worth noting for scenarios where one      ture extractors, including a ResNet-101 [22] pre-trained for
+wishes to use a pre-trained NF model without clipping.          classification and a DINOv2-B model [40], as reported in
+                                                            Tab. 9a. For ResNet-101, we extract features by remov-
+C. Additional Experiments                            ing the final MLP head, following the same procedure as
+                                                   ConvNeXt. Among all tested feature extractors, ConvNeXt
+C.1. Learning to Approximate the Inverse                                                              achieves the best empirical performance. We further evaluate
+   In Tab. 1, we compare the empirical performance of the      the combination of VGG and ConvNeXt features in Tab. 9b.
+three reverse learning approaches introduced in Sec. 4. Here,    The results indicate that using both features together yields
+we further provide quantitative results on their reconstruction      better FID scores than using either one individually.
+fidelity in Tab. 7. Specifically, we evaluate the reconstruction        Furthermore, we study the effect of adaptive weighting
+distance D(x, x′) using MSE and LPIPS (VGG-based) as      in the MSE loss in Tab. 10. MSE with adaptive weighting
+metrics.                                                         consistently outperforms the naive MSE loss.
+
+
+                                                 11
+
+======================== PDF 第 12 页 ========================
+       feature model            FID, w/o CFG    FID, w/ CFG
+                                                                                  60           ||x1||2            ||x5||2
+     none                        31.88             6.79
+                                                                                  50           ||x2||2            ||x6||2
+    VGG + ResNet                9.69             4.34
+                                                                                                                                       ||x3||2            ||x7||2                                                                                                                            Norm 40    VGG + DINO                 9.33             4.36
+                                                              L2              ||x4||2
+     ConvNeXt + DINO            3.19             3.19                       30
+    VGG + ConvNeXt             2.46             2.46                       20                         (a) Feature model ablation.                                                                                    Squared 10
+     wVGG      wConvNeXt     FID, w/o CFG    FID, w/ CFG                  0
+        0.0           0.0            31.88             6.79                           0           1           2           3           4           5
+        1.0           0.0            16.97             5.31                                          Training Steps (×106)
+        0.0           0.4             2.62             2.62                                                                                                            (a) Improved TARFlow w/o clipping.
+        1.0           0.4             2.46             2.46
+                 (b) VGG and ConvNeXt weight ablation.                                                                                                          ||x1||2            ||x5||2
+                                                                                                  0.8                                                               ||x2||2            ||x6||2
+Table 9. Ablation on perceptual loss for BiFlow-B/2. FID-50K            Norm                                                                   ||x3||2            ||x7||2
+with/without CFG are reported. (Settings: BiFlow-B/2, 160 epochs,      L2 0.6                                                               ||x4||2
+training-time CFG, weight for two perceptual losses are 1.0 and 0.4
+by default.)                                                                                   0.4                                                                                                                                                                                                                       Squared
+
+         adaptive weight p      FID, w/o CFG    FID, w/ CFG                      0.2
+                0.0                38.23             7.49                             0          1          2          3          4          5
+                0.5                34.74             7.08                                            Training Steps (×106)
+                1.0                34.43             6.70
+                                                                                                       (b) Improved TARFlow w/ clipping.
+                2.0                31.88             6.79
+                                                                 Figure 8.  Comparison of intermediate states’ norm during
+Table 10. Ablation on adaptive weighting. Adaptive weighted    TARFlow training between training with and without clipping.
+MSE loss works better than naive MSE (p = 0.0). (Settings: BiFlow-      Left: without clipping, the norms at different blocks diverge signif-
+B/2, 160 epochs, adaptive weighted MSE only, training-time CFG.)       icantly, and continue to increase as training proceeds. Right: with
+                                                                         clipping, the norms are well controlled within a reasonable range,
+                                                                            stabilizing training and improving final FID scores.
+C.4. Improved TARFlow Norm Control
+  To mitigate the imbalance in loss magnitudes across dif-                            Linear                    Const
+                                                                                    µ, α          z          µ, α          z
+ferent blocks of BiFlow, we introduce a simple yet effective
+modification to the original TARFlow [65] in Sec. 4.4: clip-       Online       6.83(2.8)      6.82(2.8)      7.26(1.3)      7.24(1.3)
+ping the parameters µ and α within a fixed range.  This         Offline      22.14(1.2)    22.03(1.2)    18.23(1.0)    18.11(1.0)
+adjustment stabilizes training and improves final FID perfor-
+                                                                Table 11. Improved TARFlow CFG ablation. Online guidance
+mance.                                                                         substantially outperforms the offline variants, whereas the choice
+   In Fig. 8, we visualize the norms of intermediate trajec-     of guidance schedule (linear vs. constant) and the level at which
+tory states during training of the improved TARFlow. With-     guidance is applied (µ, α vs. z) has only minor impact. Numbers
+out clipping, the norms across blocks diverge sharply and      in gray parentheses denote the corresponding optimal CFG scale.
+continue to grow as training progresses. With clipping, the      (Settings: improved TARFlow-B/2, FID w/o CFG: 44.46.)
+norms remain stable and well-controlled within a reasonable
+range. Such normalization substantially benefits the training     with a linearly increasing guidance schedule wt = T −1wt
+of the reverse model in the downstream.                      along the token dimension. Here, subscript t denotes the
+                                                           token dimension, superscript i denotes the block dimension,C.5. Improved TARFlow CFG
+                                                     and (· | c) and (·) represent the conditional and uncondi-
+   For completeness, we also examine classifier-free guid-      tional counterparts, respectively.
+ance (CFG) designs for TARFlow, although this component       Following prior CFG studies in diffusion models, we
+is orthogonal to our main contributions.  In the original     decompose the design space into three orthogonal choices:
+TARFlow [65], the reverse update rule at block i is                Schedule. We can replace the original linearly increasing
+                                                   wt with a constant guidance scale: wt = w.            zit,cfg = zi+1t  ⊙exp(αit,cfg) + µit,cfg,                                                        Space for applying guidance.  Parameter-space CFG
+where guidance is applied to the predicted parameters by       (µ, α) vs. pixel-space CFG applied directly to z:
+                                                                             zit,cfg = (1 + wt)zit(· | c) −wtzit(·).         αit,cfg = (1 + wt) αit(· | c) −wt αit(·),
+          µit,cfg = (1 + wt) µit(· | c) −wt µit(·),          We denote these two settings by “µ, α” and “z”, respectively.
+
+
+                                                 12
+
+======================== PDF 第 13 页 ========================
+                                                                              egyptian cat             kit fox          hen            flamingo
+
+
+                                             −→                −→
+
+
+
+                                                                                    tennis ball       golden retriever      daisy          custard apple
+
+
+                                             −→                −→
+
+
+
+                                                                 Figure 10. Class Editing. BiFlow constructs an explicit bidirec-
+                                                                           tional mapping between images and noise. With this property,
+                                                          BiFlow is able to conduct training-free class editing by modifying
+Figure 9.  Inpainting. BiFlow enables efficient image inpaint-
+                                                                 only the label condition in the forward and reverse process.
+ing by leveraging its bidirectional mapping between images and
+noise. By resampling the masked part of the noise, BiFlow can
+perform training-free inpainting on various image masks. Each       Based on this property, BiFlow enables inpainting with
+triplet contains ground-truth image (left), masked image (middle),     an arbitrary binary mask M ∈{0, 1}H×W . Given a masked
+and reconstructed image (right).                             image xmask = M ⊙x, we first map it to the noise domain
+                                                           using the forward model:  zmask = Fθ(xmask). We then
+                                                         resample the masked portion of the prior as
+   Online vs. Offline. We distinguish between online and
+                                                                           z′ = M ⊙zmask + (1 −M) ⊙ϵ,   ϵ ∼N(0, I).offline CFG strategies. The online approach (TARFlow’s
+practice) applies guidance at each generation step; the offline      Finally, the modified noise z′ is mapped back to the im-
+approach generates the entire conditional and unconditional     age domain by the reverse model Gϕ. This procedure fills
+sequences independently and performs extrapolation only     the masked region with content coherent with the context.
+once on the final outputs. The difference lies only in how     Representative examples are shown in Fig. 9.
+guidance interacts with intermediate states.
+                                                         Class Editing. The reverse model Gϕ allows us to generate
+  While both approaches have similar runtimes, Tab. 11
+                                                      images from noise z under different class conditions. For
+shows that online CFG significantly outperforms the offline
+                                                          a fixed z, changing the class label c primarily modifies the
+variant. Regarding other hyperparameters, a linear schedule
+                                                            class-dependent appearance while largely preserving the
+offers a slight advantage over a constant one, while applying
+                                                              global spatial structure.
+guidance in parameter space versus pixel space yields similar
+                                                                 Concretely, given an image x with label c, we obtain its
+performance. Overall, TARFlow’s original CFG formulation
+                                                                  prior variable z = Fθ(x  | c), and reconstruct it using a
+is close to optimal.
+                                                                   different label c′, writing x′ = Gϕ(z  | c′). As illustrated
+   Based on these results, we use the original TARFlow CFG                                                                   in Fig. 10, BiFlow effectively alters class-specific attributes
+formulation (Online, Linear, Parameter-space) as our base-                                                         while maintaining the overall structure, enabling intuitive
+line. It is important to note that this CFG setting only affects                                                                   class editing without retraining.
+the inference quality of the forward model; the training of
+                                                                 Efficiency. Both inpainting and class editing require only aour BiFlow reverse model always relies on the unguided
+                                                                single forward pass from data to noise and a single reverseforward trajectory.
+                                                           pass from noise to data, making BiFlow a lightweight and
+                                                                        efficient tool for training-free image manipulation.
+D. Training-free Image Editing
+                                               E. Visualizations  BiFlow naturally supports several training-free image
+editing applications by explicitly modeling a bidirectional     We provide uncurated 1-NFE generation results of
+mapping between the data and noise domains. We showcase     BiFlow-B/2 in Fig. 11 to Fig. 13.
+two representative applications: inpainting and class editing.
+For brevity, we omit the VAE encoder/decoder in the follow-                                                   Acknowledgements. We greatly thank Google TPU Re-
+ing descriptions, as they always serve as pre-/post-processing                                                              search Cloud (TRC) for granting us access to TPUs. Q. Sun,
+steps in our experiments.                                                    X. Wang, Z. Jiang, and H. Zhao are supported by the MIT
+Inpainting. The forward model Fθ encodes an image x     Undergraduate Research Opportunities Program (UROP).
+into noise z = Fθ(x). We empirically observe that localized   We thank Zhengyang Geng, Tianhong Li, and our other
+perturbations in z predominantly affect corresponding spatial     group members for their helpful discussions and feedback
+regions in the reconstructed image.                        on the draft.
+
+
+                                                 13
+
+======================== PDF 第 14 页 ========================
+References                                                      [17] Zhengyang Geng, Mingyang Deng, Xingjian Bai, J. Zico
+                                                                                Kolter, and Kaiming He. Mean flows for one-step generative
+ [1] Michael S. Albergo and Eric Vanden-Eijnden. Building nor-                                                                     modeling. In NeurIPS, 2025.
+     malizing flows with stochastic interpolants. In ICLR, 2023.                                                                     [18] Zhengyang Geng, Yiyang Lu, Zongze Wu, Eli Shechtman,
+ [2] James Bradbury, Roy Frostig, Peter Hawkins, Matthew James               J. Zico Kolter, and Kaiming He. Improved mean flows: On the
+     Johnson, Chris Leary, Dougal Maclaurin, George Necula,           challenges of fastforward generative models. arXiv preprint
+    Adam Paszke, Jake VanderPlas, Skye Wanderman-Milne,          arXiv:2512.02012, 2025.
+     and Qiao Zhang.  JAX: composable transformations of      [19] Arnab Ghosh, Harkirat Singh Behl, Emilien Dupont, Philip
+    Python+NumPy programs, 2018.                                H. S. Torr, and Vinay Namboodiri. Steer: Simple temporal
+ [3] Andrew Brock, Jeff Donahue, and Karen Simonyan. Large            regularization for neural ode. In NeurIPS, 2020.
+      scale gan training for high fidelity natural image synthesis. In      [20] Will Grathwohl, Ricky T. Q. Chen, Jesse Bettencourt, Ilya
+     ICLR, 2018.                                                          Sutskever, and David Duvenaud. Ffjord: Free-form continu-
+ [4] Huiwen Chang, Han Zhang, Lu Jiang, Ce Liu, and William T.          ous dynamics for scalable reversible generative models. In
+     Freeman. Maskgit: Masked generative image transformer. In          ICLR, 2018.
+    CVPR, 2022.                                                   [21] Jiatao Gu, Tianrong Chen, David Berthelot, Huangjie Zheng,
+                                                            Yuyang Wang, Ruixiang Zhang, Laurent Dinh, Miguel An- [5] Huayu Chen, Kai Jiang, Kaiwen Zheng, Jianfei Chen, Hang
+                                                                           gel Bautista, Josh Susskind, and Shuangfei Zhai. Starflow:     Su, and Jun Zhu. Visual generation without guidance. In
+                                                                       Scaling latent normalizing flows for high-resolution image    ICML, 2025.
+                                                                               synthesis. In NeurIPS, 2025.
+ [6] Hansheng Chen, Kai Zhang, Hao Tan, Leonidas Guibas,
+                                                                     [22] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+    Gordon Wetzstein, and Sai Bi. pi-flow: Policy-based few-
+                                                            Deep residual learning for image recognition. In CVPR, 2016.
+     step generation via imitation distillation.  arXiv preprint
+                                                                     [23] Martin Heusel, Hubert Ramsauer, Thomas Unterthiner, Bern-
+     arXiv:2510.14974, 2025.
+                                                                     hard Nessler, and Sepp Hochreiter. Gans trained by a two
+ [7] Ricky T. Q. Chen, Yulia Rubanova, Jesse Bettencourt, and                                                                          time-scale update rule converge to a local nash equilibrium.
+     David Duvenaud. Neural ordinary differential equations. In                                                                           In NeurIPS, 2017.
+     NeurIPS, 2018.
+                                                                     [24] Jonathan Ho and Tim Salimans.  Classifier-free diffusion
+ [8]  Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li           guidance. In NeurIPS Workshop, 2021.
+      Fei-Fei. Imagenet: A large-scale hierarchical image database.      [25] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffu-
+     In CVPR, 2009.                                                      sion probabilistic models. In NeurIPS, 2020.
+ [9] Prafulla Dhariwal and Alex Nichol. Diffusion models beat      [26] Minguk Kang, Jun-Yan Zhu, Richard Zhang, Jaesik Park, Eli
+     gans on image synthesis. In NeurIPS, 2021.                         Shechtman, Sylvain Paris, and Taesung Park. Scaling up gans
+[10] Laurent Dinh, David Krueger, and Yoshua Bengio.  Nice:            for text-to-image synthesis. In CVPR, 2023.
+     Non-linear independent components estimation.  In ICLR      [27] Tero Karras, Miika Aittala, Samuli Laine, Erik H¨ark¨onen,
+     Workshop, 2015.                                                Janne Hellsten, Jaakko Lehtinen, and Timo Aila. Alias-free
+[11] Laurent Dinh, Jascha Sohl-Dickstein, and Samy Bengio. Den-           generative adversarial networks. In NeurIPS, 2021.
+      sity estimation using real nvp. In ICLR, 2017.                    [28] Diederik P. Kingma and Jimmy Ba. Adam: A method for
+                                                                               stochastic optimization. In ICLR, 2015.
+[12] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov,
+                                                                     [29] Diederik P. Kingma and Prafulla Dhariwal. Glow: Generative     Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner,
+                                                                       flow with invertible 1x1 convolutions. In NeurIPS, 2018.     Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-
+                                                                     [30] Diederik P. Kingma, Tim Salimans, Rafal Jozefowicz, Xi     vain Gelly, Jakob Uszkoreit, and Neil Houlsby. An image is
+                                                                   Chen, Ilya Sutskever, and Max Welling. Improved variational     worth 16x16 words: Transformers for image recognition at
+                                                                            inference with inverse autoregressive flow. In NeurIPS, 2016.      scale. In ICLR, 2021.
+                                                                     [31] Tuomas Kynk¨a¨anniemi, Miika Aittala, Tero Karras, Samuli
+[13] Patrick Esser, Sumith Kulal, Andreas Blattmann, Rahim En-
+                                                                         Laine, Timo Aila, and Jaakko Lehtinen. Applying guidance
+      tezari, Jonas M¨uller, Harry Saini, Yam Levi, Dominik Lorenz,
+                                                                                 in a limited interval improves sample and distribution quality
+    Axel Sauer, Frederic Boesel, Dustin Podell, Tim Dockhorn,
+                                                                                in diffusion models. In NeurIPS, 2024.
+     Zion English, Kyle Lacey, Alex Goodwin, Yannik Marek,
+                                                                     [32] Kyungmin Lee, Sihyun Yu, and Jinwoo Shin. Decoupled
+     and Robin Rombach. Scaling rectified flow transformers for
+                                                                 meanflow: Turning flow models into flow maps for acceler-
+     high-resolution image synthesis. In ICML, 2024.
+                                                                           ated sampling. arXiv preprint arXiv:2510.24474, 2025.
+[14] Chris Finlay, J¨orn-Henrik Jacobsen, Levon Nurbekyan, and                                                                     [33] Tianhong Li and Kaiming He. Back to basics: Let denoising
+    Adam M Oberman. How to train your neural ode: the world                                                                             generative models denoise. arXiv preprint arXiv:2511.13720,
+     of jacobian and kinetic regularization. In ICML, 2020.                                                                     2025.
+[15] Kevin Frans, Danijar Hafner, Sergey Levine, and Pieter      [34] Tianhong Li, Dina Katabi, and Kaiming He. Return of uncon-
+     Abbeel. One step diffusion via shortcut models. In ICLR,            ditional generation: A self-supervised representation genera-
+     2024.                                                                    tion method. In NeurIPS, 2024.
+[16] Zhengyang Geng, Ashwini Pokle, Weijian Luo, Justin Lin,      [35] Tianhong Li, Yonglong Tian, He Li, Mingyang Deng, and
+     and J. Zico Kolter. Consistency models made easy. In ICLR,         Kaiming He. Autoregressive image generation without vector
+     2024.                                                                   quantization. In NeurIPS, 2024.
+
+
+                                                 14
+
+======================== PDF 第 15 页 ========================
+[36] Yaron Lipman, Ricky T. Q. Chen, Heli Ben-Hamu, Maxi-      [54] Christian Szegedy, Vincent Vanhoucke, Sergey Ioffe, Jon
+     milian Nickel, and Matt Le. Flow matching for generative            Shlens, and Zbigniew Wojna. Rethinking the inception archi-
+     modeling. In ICLR, 2023.                                                tecture for computer vision. In CVPR, 2016.
+[37] Xingchao Liu, Chengyue Gong, and Qiang Liu. Flow straight      [55] Zhicong Tang, Jianmin Bao, Dong Chen, and Baining Guo.
+     and fast: Learning to generate and transfer data with rectified           Diffusion models without classifier-free guidance.  arXiv
+      flow. In ICLR, 2023.                                                   preprint arXiv:2502.12154, 2025.
+[38] Nanye Ma, Mark Goldstein, Michael S. Albergo, Nicholas M.      [56] Keyu Tian, Yi Jiang, Zehuan Yuan, Bingyue Peng, and Li-
+      Boffi, Eric Vanden-Eijnden, and Saining Xie. Sit: Exploring          wei Wang. Visual autoregressive modeling: scalable image
+     flow and diffusion-based generative models with scalable           generation via next-scale prediction. In NeurIPS, 2024.
+      interpolant transformers. In ECCV, 2024.                        [57] Jakub M. Tomczak and Max Welling.  Improving varia-
+[39] Chenlin Meng, Robin Rombach, Ruiqi Gao, Diederik P.            tional auto-encoders using householder flow. arXiv preprint
+    Kingma, Stefano Ermon, Jonathan Ho, and Tim Salimans.          arXiv:1611.09630, 2016.
+    On distillation of guided diffusion models. In CVPR, 2023.       [58] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszko-
+[40] Maxime Oquab, Timoth´ee Darcet, Th´eo Moutakanni, Huy Vo,              reit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, and Illia
+    Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel           Polosukhin. Attention is all you need. In NeurIPS, 2017.
+     Haziza, Francisco Massa, Alaaeldin El-Nouby, Mahmoud      [59] Shuai Wang, Zhi Tian, Weilin Huang, and Limin Wang.
+     Assran, Nicolas Ballas, Wojciech Galuba, Russell Howes,          Ddt:  Decoupled diffusion transformer.   arXiv preprint
+     Po-Yao Huang, Shang-Wen Li, Ishan Misra, Michael Rabbat,          arXiv:2504.05741, 2025.
+     Vasu Sharma, Gabriel Synnaeve, Hu Xu, Herv´e Jegou, Julien      [60] Zidong Wang, Yiyuan Zhang, Xiaoyu Yue, Xiangyu Yue,
+     Mairal, Patrick Labatut, Armand Joulin, and Piotr Bojanowski.         Yangguang Li, Wanli Ouyang, and Lei Bai. Transition models:
+     Dinov2: Learning robust visual features without supervision.          Rethinking the generative learning objective. arXiv preprint
+    TMLR, 2024.                                                     arXiv:2509.04394, 2025.
+[41] George Papamakarios, Theo Pavlakou, and Iain Murray.      [61] Sanghyun Woo, Shoubhik Debnath, Ronghang Hu, Xinlei
+    Masked autoregressive flow for density estimation.   In          Chen, Zhuang Liu, In So Kweon, and Saining Xie. Con-
+     NeurIPS, 2017.                                                  vnext v2: Co-designing and scaling convnets with masked
+[42] William Peebles and Saining Xie. Scalable diffusion models           autoencoders. In CVPR, 2023.
+     with transformers. In ICCV, 2023.                               [62] Jingfeng Yao, Bin Yang, and Xinggang Wang. Reconstruc-
+[43] Yansong Peng, Kai Zhu, Yu Liu, Pingyu Wu, Hebei Li, Xi-            tion vs. generation: Taming optimization dilemma in latent
+     aoyan Sun, and Feng Wu. Flow-anchored consistency models.           diffusion models. In CVPR, 2025.
+     arXiv preprint arXiv:2507.03738, 2025.                         [63] Qihang Yu, Ju He, Xueqing Deng, Xiaohui Shen, and Liang-
+[44] Sucheng Ren, Qihang Yu, Ju He, Xiaohui Shen, Alan L Yuille,         Chieh Chen. Randomized autoregressive visual generation.
+     and Liang-Chieh Chen. Beyond next-token: Next-x prediction           In ICCV, 2025.
+      for autoregressive visual generation. In ICCV, 2025.              [64] Sihyun Yu, Sangkyung Kwak, Huiwon Jang, Jongheon Jeong,
+[45] Danilo Jimenez Rezende and Shakir Mohamed. Variational           Jonathan Huang, Jinwoo Shin, and Saining Xie. Representa-
+     inference with normalizing flows. In ICML, 2015.                       tion alignment for generation: Training diffusion transformers
+[46] Robin Rombach, Andreas Blattmann, Dominik Lorenz,              is easier than you think. In ICLR, 2025.
+     Patrick Esser, and Bj¨orn Ommer.  High-resolution image      [65] Shuangfei Zhai, Ruixiang Zhang, Preetum Nakkiran, David
+     synthesis with latent diffusion models. In CVPR, 2022.                 Berthelot,  Jiatao Gu, Huangjie Zheng, Tianrong Chen,
+[47] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-net:          Miguel Angel Bautista, Navdeep Jaitly, and Joshua Susskind.
+     Convolutional networks for biomedical image segmentation.          Normalizing flows are capable generative models. In ICML,
+     In MICCAI, 2015.                                                2024.
+[48] Tim Salimans, Ian Goodfellow, Wojciech Zaremba, Vicki      [66] Biao Zhang and Rico Sennrich.  Root mean square layer
+     Cheung, Alec Radford, and Xi Chen. Improved techniques           normalization. In NeurIPS, 2019.
+      for training gans. In NeurIPS, 2016.                             [67] Huijie Zhang, Aliaksandr Siarohin, Willi Menapace, Michael
+[49] Axel Sauer, Katja Schwarz, and Andreas Geiger. Stylegan-xl:           Vasilkovsky, Sergey Tulyakov, Qing Qu, and Ivan Sko-
+     Scaling stylegan to large diverse datasets. In SIGGRAPH,          rokhodov. Alphaflow: Understanding and improving mean-
+     2022.                                                             flow models. arXiv preprint arXiv:2510.20771, 2025.
+[50] Karen Simonyan and Andrew Zisserman. Very deep convolu-      [68] Richard Zhang, Phillip Isola, Alexei A. Efros, Eli Shechtman,
+      tional networks for large-scale image recognition. In ICLR,         and Oliver Wang. The unreasonable effectiveness of deep
+     2015.                                                                   features as a perceptual metric. In CVPR, 2018.
+[51] Jiaming Song, Chenlin Meng, and Stefano Ermon. Denoising      [69] Boyang Zheng, Nanye Ma, Shengbang Tong, and Saining
+      diffusion implicit models. In ICLR, 2020.                             Xie. Diffusion transformers with representation autoencoders.
+[52] Yang Song and Prafulla Dhariwal. Improved techniques for           arXiv preprint arXiv:2510.11690, 2025.
+      training consistency models. In ICLR, 2023.                     [70] Linqi Zhou, Stefano Ermon, and Jiaming Song. Inductive
+[53] Jianlin Su, Yu Lu, Shengfeng Pan, Ahmed Murtadha, Bo         moment matching. In ICML, 2025.
+    Wen, and Yunfeng Liu. Roformer: Enhanced transformer
+     with rotary position embedding. Neurocomputing, 2024.
+
+
+                                                 15
+
+======================== PDF 第 16 页 ========================
+    class 12: house finch, linnet, Carpodacus mexicanus                                                              class 81: ptarmigan
+
+
+
+
+
+                 class 207: golden retriever                                                            class 279: Arctic fox, white fox, Alopex lagopus
+
+
+
+
+
+                        class 309: bee                                                   class 323: monarch, monarch butterfly, milkweed butterfly, Danaus plexippus
+
+
+
+
+
+                 class 327: starfish, sea star                                                                            class 417: balloon
+
+
+Figure 11. Uncurated 1-NFE class-conditional generation samples of BiFlow-B/2 on ImageNet 256×256. CFG scale: 2.0
+
+
+
+
+
+                                           16
+
+======================== PDF 第 17 页 ========================
+                       class 425: barn                                                                 class 437: beacon, lighthouse, beacon light, pharos
+
+
+
+
+
+                    class 449: boathouse                                                                      class 497: church, church building
+
+
+
+
+
+                       class 538: dome                                                                                 class 554: fireboat
+
+
+
+
+
+                     class 562: fountain                                                                                 class 616: knot
+
+
+Figure 12. Uncurated 1-NFE class-conditional generation samples of BiFlow-B/2 on ImageNet 256×256. CFG scale: 2.0
+
+
+
+
+
+                                           17
+
+======================== PDF 第 18 页 ========================
+                 class 646: maze, labyrinth                                                                class 649: megalith, megalithic structure
+
+
+
+
+
+                      class 888: viaduct                                                                                  class 952: fig
+
+
+
+
+
+                        class 970: alp                                                                                 class 973: coral reef
+
+
+
+
+
+                class 975: lakeside, lakeshore                                                                           class 985: daisy
+
+
+Figure 13. Uncurated 1-NFE class-conditional generation samples of BiFlow-B/2 on ImageNet 256×256. CFG scale: 2.0
+
+
+
+
+
+                                           18

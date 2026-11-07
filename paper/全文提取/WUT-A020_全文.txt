@@ -1,0 +1,699 @@
+WUT-A020 | Distributed Image Compression with Multimodal Side Information at Extremely Low Bitrates
+来源：https://openaccess.thecvf.com/content/CVPR2026/html/Xu_Distributed_Image_Compression_with_Multimodal_Side_Information_at_Extremely_Low_CVPR_2026_paper.html
+本地PDF：专题文献/武汉理工AI_CCF-A/WUT-A020_Distributed_Image_Compression_CVPR2026.pdf
+SHA-256：8e87a0504957e3039abc9fedfc9339a4bf7ec068358caf5fe3faa703d9384ec4
+页码为PDF文件页序，不一定等于论文印刷页码。此文件为机器文字提取；多栏阅读顺序、数学符号和图表必须回看PDF。空文本页不等于空白页。
+
+======================== PDF 第 1 页 ========================
+                  This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                             Except for this watermark, it is identical to the accepted version;
+                            the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+
+Distributed Image Compression with Multimodal Side Information at Extremely
+                       Low Bitrates
+
+
+      Guojun Xu, Mingyang Zhang, Jianwen Xiang, Cheng Tan, Yanchao Yang, Junwei Zhou∗
+      School of Computer Science and Artificial Intelligence, Wuhan University of Technology
+                          guojunxu@whut.edu.cn, junweizhou@msn.com
+
+
+
+                 Abstract                                                          (a) VAE-based framework          Bitstream
+                                                                                                                                        CNN-Encoder    Q          CNN-Decoder                        +  Element-wise addition
+Distributed Image Compression (DIC) is crucial for multi-                                                          Crossq  Attentionk   v     Direct Fusion+                           C  Concatenation
+                                                                                                                                                                                             Visual Side                           Q  Quantizationview transmission, especially when operating at extremely                                CNN-Encoder                Information
+low bitrates (< 0.1 bpp). Its core challenge is effectively uti-
+lizing side information to achieve high-quality reconstruc-            (b) Our Diffusion-based framework            Bitstream
+tion under strict bitrate budgets. However, existing DIC ap-                                 EncoderVAE-       Hyper-Encoder   Q           LDM-basedDecoder         DecoderVAE-
+proaches struggle to exploit global context and object-level                                                                     Fine-grained Semantics
+details from side information, leading to local blurring and
+                                                                                                                                                   Encoder                                                                                                                                 VAE-       Hyper-Encoder               InformationVisual Side                  Global Semantics
+the loss of fine details in the reconstruction.  To address                                                                                               Alignment
+these limitations, we propose a Multimodal DIC framework
+                                                                                                                                                                        Image-to-Text               Text-Encoder                    TextualinformationSide(MDIC), which, for the first time, leverages side informa-
+tion in a multimodal manner into the DIC paradigm, effec-
+tively preserving fine-grained local details and enhancing      Figure 1.  (a) The existing VAE-based distributed coding frame-
+global perceptual quality in reconstructed images. Specifi-     work only with visual side information [20, 21, 32, 40]. (b) Our
+                                                                      diffusion-based pipeline with multimodal side information.cally, we introduce a text-to-image diffusion-based decoder
+conditioned on textual side information extracted from cor-
+related images to capture shared global semantics. More-
+over, we design a feature-mask generator, supervised by a     as multi-camera surveillance and 3D scene reconstruction,
+multimodal fine-grained alignment task, to strengthen the    DIC is particularly important without requiring interaction
+exploitation of visual side information. The generated mask    among encoder devices, theoretically can achieve compres-
+serves two purposes:  first, it guides the extraction of fine-     sion efficiency comparable to joint coding [29, 35]. Given
+grained details from losslessly transmitted side information      their bandwidth-constrained application scenarios and re-
+to preserve the semantic consistency of reconstructed de-      liance on side information, the DIC algorithms are primarily
+tails; second,  it regulates the extraction of clustered fea-      suited to extremely low bitrates (< 0.1 bits per pixel (bpp)).
+ture representations from the quantized VQ-VAE embed-       The main challenge in DIC lies in effectively utilizing
+dings, compensating for category information lost under the      the side information at the decoder, which is highly corre-
+extreme compression of the primary image. Extensive ex-      lated with the compressed image features [20, 21, 37, 40].
+periments on the widely used KITTI Stereo and Cityscapes       It is crucial to fully exploit informative correlated features
+datasets demonstrate that MDIC achieves state-of-the-art     while suppressing irrelevant or redundant ones that may in-
+perceptual quality at extremely low bitrates.                      terfere with reconstruction. Nevertheless, separating these
+                                                    two types of information is non-trivial due to the complexity
+                                                      and diversity of multi-view object-level details. Moreover,
+1. Introduction                                             the varying importance of fine-grained information across
+                                                                    different regions and objects makes it difficult to balance
+Distributed Image Compression (DIC) transmits one view                                                                the model’s attention effectively.
+losslessly and leverages it as side information to assist in
+                                                 As illustrated in Fig. 1 (a), most existing DIC methods
+the reconstruction of other compressed views at the de-
+                                                                are built upon a VAE framework, where side information
+coder [20, 21, 32]. In multi-view distributed scenarios such
+                                                                              is fused through global cross-attention modules [21, 32,
+    * Junwei Zhou is the corresponding author.                          38, 40], enabling interaction between compressed features
+
+
+
+                                                     33662
+
+======================== PDF 第 2 页 ========================
+   Ground Truth
+     (bppk, bppc)
+
+
+      BiSIC
+    (0.091, 0.047)
+
+
+    LDMIC                                                                                                                                                                           Perco
+    (0.090, 0.053)                                                                                                                                                                                                   (0.051, 0.051)
+
+
+    CAMSIC                                                                                                                                                                        DiffEIC
+    (0.099, 0.070)                                                                                                                                                                                                   (0.059, 0.048)
+
+
+    MDIC                                                                                                                             RDEIC
+    (0.050, 0.042)                                                                                                                                                                                                  (0.054, 0.050)
+
+
+Figure 2. Comparison of reconstruction performance by joint coding method BiSIC [17] and CAMSIC [41], the DIC method LDMIC [40],
+the LIC method Perco [3], DiffEIC [14] and RDEIC [15], and the proposed MDIC. bppk and bppc are the compressed bits per pixel (bpp)
+of these methods in two images.
+
+
+and the auxiliary view. However, under extremely low bi-      Distributed Image Compression (MDIC) framework built
+trates, the transmitted features are highly degraded and con-     upon a pre-trained Latent Diffusion Model (LDM), as il-
+tain far less information than the side input. As a result,      lustrated in Fig. 1 (b), where side information is leveraged
+the attention mechanism can focus only on signals corre-      in a multimodal form. During training, a feature-mask gen-
+lated with the limited transmitted content, making it diffi-      erator, supervised by a multimodal alignment task, is intro-
+cult to recover lost object-level details during compression.     duced to produce a region-aware mask that adaptively regu-
+Moreover, these methods prioritize pixel-wise fidelity be-      lates the use of side information. The multimodal alignment
+tween reconstructed and original images [1, 20, 21, 38, 40],     provides object-level semantic supervision, guiding the vi-
+while neglecting the perceptual quality of the reconstruc-      sual mask to capture fine-grained cues with varying seman-
+tion. When detailed information is missing, they tend to       tic importance.
+compensate by averaging correlated cues rather than ef-     We further incorporate VQ-VAE quantization [30] to
+ficiently utilizing side information aligned with the com-      cluster the core category representations. The generated vi-
+pressed content’s detailed semantics. At extremely low bi-      sual mask is applied to the quantized side information to re-
+trates, this results in excessively smooth reconstructions,     cover category information that is lost during extreme com-
+exhibiting local blurring, as shown in Fig. 2. Representa-      pression. On the other hand, it is applied to the unquantized
+tive multi-view coding frameworks such as LDMIC [40]      side information to preserve fine-grained details around key
+and BiSIC [17] rely heavily on attention mechanisms but      object regions while constraining the reconstructed image
+insufficiently exploit fine-grained side information, result-      to remain semantically consistent with the original content.
+ing in blurred textures and degraded perceptual quality.       As illustrated in Fig. 2, the proposed MDIC achieves supe-
+   Recently,   perception-oriented  compression  frame-      rior perceptual quality while maintaining comparable pixel-
+works [3, 10, 11, 14, 19, 25, 36] have achieved remarkable     wise fidelity.
+progress in Learned Image Compression (LIC), generating       The contributions of our work are as follows:
+high-quality  reconstructions  from  limited  information                                                                          • We propose a novel Multimodal DIC (MDIC) framework
+under semantic guidance.   Leveraging large-scale pre-                                                                             that, for the first time, leverages multimodal side informa-
+training, these models deliver strong perceptual fidelity on                                                                     tion to guide distributed image reconstruction, enabling
+benchmark datasets [16, 23, 42]. However, these methods                                                                     richer semantic priors and fine-grained detail preservation
+fail to achieve satisfactory performance when applied to                                                                          at extremely low bitrates.
+distributed scenarios due to the limited scale of trainable                                                                          • We introduce an object-level text prediction task to super-
+multi-view datasets and the absence of dedicated side-                                                                   vise the proposed feature-mask generator. By enforcing
+information modeling. As illustrated in Fig. 2, Perco [3],                                                            semantic consistency at the object level, the task guides
+DiffEIC [14], and RDEIC [15] are diffusion-based LIC                                                                  the mask to function as an information gate, selectively
+framework.  Although it yields visually appealing recon-                                                                    retaining category cues and fine-grained structural details.
+structions,  it often produces details inconsistent with the                                                                          • The proposed MDIC achieves impressive  perceptual
+original image and suffers from local distortions.                                                                    quality at extremely low bitrates, outperforming both
+  To address these challenges, we propose a Multimodal        existing DIC methods and perception-oriented LIC ap-
+
+
+
+                                                     33663
+
+======================== PDF 第 3 页 ========================
+  proaches across multiple perceptual evaluation metrics.       thereby underutilizing distribution-consistent cues in the
+                                                                side information. In contrast, our approach leverages mul-
+2. Related Work                                        timodal side information, in which textual representations
+                                                              capture global distributional information between multi-
+2.1. Distributed Image Compression
+                                                      view images.   Benefiting from the multimodal integra-
+Distributed Image Compression (DIC) is grounded in the      tion and detail-rich generation capability of the pre-trained
+Slepian-Wolf theory [29], which shows that distributed cod-    LDM, our method avoids local pixel averaging and yields
+ing can match the efficiency of joint coding, and is later ex-     sharper reconstructions from highly compressed data.
+tended to lossy compression by Wyner and Ziv [35].
+  As illustrated in Fig. 3 (a), learned DIC frameworks pre-     2.2. Diffusion-based Compressors
+dominantly operate under an asymmetric paradigm, where     Diffusion-based image compression methods are mainly
+one view is transmitted losslessly to the destination (e.g.,     designed for extremely low bitrates, aiming to maintain
+central storage or processing unit) and serves as side in-      distributional consistency between the original and recon-
+formation for reconstructing other lossy compressed views.      structed images to achieve high perceptual quality [3, 14,
+The side information incurs no additional bitrate and re-      15]. Perco [3] first introduces a pre-trained text-to-image
+quires no interaction among encoder-side devices [20, 32].      diffusion model to the decoder of the LIC task. DiffEIC [14]
+Representative methods include NDIC [20], which extracts      further proposes a two-stage framework that leverages the
+shared information from primary and correlated views for     strong generative capacity of diffusion models for realis-
+decoder-side fusion, and ATN [21], which leverages a cross-       tic reconstruction at ultra-low bitrates. RDEIC [15] em-
+attention module to integrate side information during de-     ploys compressed feature initialization and residual diffu-
+coding. LDMIC [40] further extends this idea with a joint      sion, using noisy latent features to accelerate denoising and
+context module to better exploit multi-view correlations.       improve reconstruction efficiency.
+                                                                Diffusion-based compressors recover rich global seman-
+     𝑥1                                                                                                𝑥ො1           tics even at extremely low bitrates, naturally benefiting DIC
+                       Joint        01001…              Joint
+   ……          Encoder        Bitstream           Decoder      ……       by enabling the separation of global and fine-grained cues
+     𝑥𝑛                                                                                      𝑥ො𝑛         within side information. Motivated by this, we propose a
+                          01101…                       DIC framework built upon a pre-trained text-to-image dif-
+                         (a) Joint image compression                       fusion model, which introduces an object-level multimodal
+                                                          alignment task to generate semantic masks and a mask-
+      𝑥1          Encoder                           Decoder               𝑥ො1
+                          01101…                              gated mechanism to efficiently exploit side information.
+    ……         ……          Bitstream     …       ……
+    𝑥𝑛−1         Encoder                           Decoder          𝑥ො𝑛−1       3. Method                          01010…
+                                    Losslessly Transmit     Central                  3.1. Overview of the Proposed Framework     𝑥𝑛           Encoder                                                              𝑥ො𝑛                                                         Storage
+                                                  The overall architecture of the proposed MDIC is illustrated
+                    (b) Distributed image compression
+                                                                   in Fig. 4. At the encoder side, a frozen pre-trained VAE en-
+                                                         codes the images into a latent space. The encoded features     Figure 3. Different compressors for multi-view images.
+                                                                are then refined and compressed using a convolutional and
+                                                                    linear-attention hybrid module, producing deep semantic   Fig. 3 (b) illustrates a joint coding paradigm, a symmetri-
+                                                                representations for subsequent VQ-VAE quantization andcal framework in which multi-view images are encoded and
+                                                                transmission. The overall process is:decoded jointly, commonly applied to Stereo Image Com-
+pression (SIC) [24, 41]. SASIC [33] uses a stereo atten-                                        (                                                                   zLx = Evae(Ix),tion module to connect left and right views during decod-                                                                (1)
+ing. ECSIC [34] explicitly models the mutual information                              ˆzx = V Q(Hax(zLx)) ,
+shared across stereo images to improve coding efficiency.          (                                                                            zy = Hay(Evae(Iy)) ,
+BiSIC [17] employs 3D convolutions and bidirectional at-                                                                (2)
+                                                                                                                 ˆzy = V Q(zy),tention to extract both local and global contextual features.
+   Despite significant progress in improving distortion met-                        ztext = Eclip(B2(Iy)) ,                (3)
+rics such as PSNR [12] and MS-SSIM [31], these methods
+suffer from regional and even global blurring at extremely     where Evae denotes the pre-trained VAE encoder, V Q rep-
+low bitrates. This is because they focus on pixel-wise re-      resents the VQ-VAE quantization module [30], Hax and
+construction fidelity while neglecting alignment between    Hay are the HyperAlign module that is similar to Perco [3],
+the distributions of the reconstructed and original images,    B2 refers to the BLIP-2 captioning model [13], and Eclip
+
+
+
+                                                    33664
+
+======================== PDF 第 4 页 ========================
+                                                         AE         AD
+
+
+
+
+                  LDM               VQ
+                          Encoder                   AC
+
+
+
+                                                               Mask
+                                                                             Generator
+
+
+
+                                    VQ
+                                          AC                                    C-Conv              M
+
+                                                                                       LDM
+
+
+
+
+
+                                                                                                                                   Conv
+
+                                                                                                                    ReLU
+
+                                                                                                                                                             1  1      1
+                                                                                                                                                    9            2  1
+                                                                                                                                                                           3  4                                                                                                                                                                    5  1
+                                                                                                                                                       1  5                                                                                                                                                                       7                                                              +
+
+                                                                                                                                                  Sigmoid                                                                     ReLU                           Linear Attention                                                            Conv                                                                                        s    1  1                    7                                                                                                                                                                                               Softsign
+
+                                                                                  Transformer
+                                                                               Encoder
+
+                                                                                                                                       Reduce
+                                                                                     +  Element-wise Addition
+                     C                    ReLU                         GumbelSigmoid                                                       PE                          Frozen                                                                                       Conv
+                                                                                                       C-Conv   Concatation + Convolution layer
+
+
+Figure 4. Overview of the proposed MDIC framework. The input view Ix is lossy-compressed, while the correlated view Iy is transmitted
+losslessly as side information available only at the decoder. Both Ix and Iy are encoded into latent spaces by the LDM encoder [27],
+producing zLx and zLy, which are further refined by the HyperAlign module into zx and zy. VQ-VAE quantization [30] is applied for
+compression and feature clustering, yielding ˆzx and ˆzy. A Transformer-based autoregressive entropy model [32] estimates the bitrate
+bppx. The BLIP-2 captioning model [13] generates textual descriptions from Iy, which are then encoded into ztext to provide global
+semantic guidance. The Arithmetic Encoding (AE) further converts the ˆzx, ˆzy, zy, and ztext into a binary bitstream, with the Arithmetic
+Decoding (AD) performing the inverse operation. Under the supervision of ztext, a visual mask mv is generated and integrated into the
+Mask-Gated Side Information Supplementary Module (MG-SISM): gate G1 fuses ˆzy to restore categorical information lost in ˆzx, while
+gate G2 extracts fine-grained object details from zy. After a denoising process guided by multimodal side information (zd, ˆzxc, and ztext),
+the final reconstruction Iˆx is obtained by decoding the denoised latent variable ˆz0 with the LDM decoder.
+
+
+denotes the CLIP text encoder [26].  To estimate the     Generation Module in Text Supervision (VMGM-TS), as
+coding cost, a Transformer-based autoregressive entropy      illustrated in Fig. 5. The module aligns the generated vi-
+model [32] is employed to model the probability distribu-      sual mask with object-level textual semantics, enabling end-
+tion of ˆzx, from which the average bitrate bppx is derived.       to-end learning with visual side information.  It identifies
+  On the decoder side, the Visual Mask Generation Mod-      spatial regions of target objects and captures their semantic
+ule in Text Supervision (VMGM-TS) generates a visual      representations, facilitating faithful reconstruction of text-
+feature mask to effectively modulate the available visual      referred content.
+side information by the Mask-Gated Side Information Sup-       To capture fine-grained object semantics, we construct
+plementary Module (MG-SISM). Then the textual side in-     a vocabulary of the N most frequent object nouns in the
+formation ztext provides global semantic guidance for the      dataset.  During training, object-related words in the im-
+denoising process, while the visual side information fo-     age captions are replaced with special mask tokens to form
+cuses on reconstructing fine-grained local details. The com-     object-masked text. The contextual representations of these
+bined guidance enables semantically consistent reconstruc-    masked words are jointly modeled with their corresponding
+tion, and the final image is obtained through a VAE decoder.      visual masks via an autoregressive-based fusion architec-
+                                                                        ture, enabling alignment between textual context and the
+3.2. Visual Mask Generation Module in Text Super-                                                                 visual regions of the same object and facilitating deeper
+     vision (VMGM-TS)                                                                   object-level semantic learning beyond explicit word-object
+To preserve fine-grained details while suppressing redun-     correspondences. During the inference phase, the mask can
+dant multi-view discrepancies, we introduce a Visual Mask     be directly obtained from the trained mask generator.
+
+
+
+                                                     33665
+
+======================== PDF 第 5 页 ========================
+        “a street                                                    the tokenized visual features obtained by fusing the visual
+       with a few
+                                                 mask mv with side information zy. PMSA is a mask pre-        cars and                           Mask Generator                       Object Mask        houses”                                                       dictor based on the multi-head self-attention. {P1, ..., Pn}
+                                                                              is the prediction of the masked text.                      Text Encoder
+       “a [mask]
+       with a few             and     …                                    3.3. Mask-Gated Side Information Supplementary      [mask]
+       [mask]”                                        Module (MG-SISM)
+           …       … …            To further compensate for the loss of categorical informa-
+           …      … …                tion and rich object-level details caused by quantization dur-
+                                                             ing compression, we introduce a Mask-Gated Side Informa-
+                    Multi-Head Self-Attention + MLP                 tion Supplementary Module (MG-SISM). The brief mathe-
+                                                              matical formulation for MG-SISM can be given as follows:
+
+                                                                                                       ˆzxc = G1(ˆzx, ˆzy ⊙mv),             (13)
+              …                                       zd = zy + G2(zy) ⊙Fm(mv).          (14)
+
+                                                 As illustrated in Fig. 4, VQ-VAE quantization com-
+Figure 5.  Visual Mask Generation Module in Text Supervision
+                                                               presses the information while simultaneously clustering im-
+(VMGM-TS). This module is regarded as an auxiliary task that
+                                                        age features into a structured latent space, thereby facili-supervises the Mask Generator, enabling alignment between the
+object-level visual features and the masked text vocabulary.            tating global reconstruction during denoising. The visual
+                                                 mask mv is first applied to the quantized side information
+                                                                                          ˆzy to focus on category-related regions. These masked fea-
+  The overall mask-generating process is as follows:            tures interact with the quantized latent representation of the
+                                                    main image through visual Transformer blocks [6], produc-
+         Fdiff = |ˆzx −ˆzy|,   Fprod = ˆzx ⊙ˆzy,       (4)                                                             ing semantically enriched category features ˆzxc.
+       logits = Conv(concat(ˆzx, ˆzy, Fdiff, Fprod)),    (5)     A gating mechanism further regulates the losslessly
+      g = −log(−log(U + ϵ) + ϵ), U ∼U(0, 1),    (6)      transmitted visual side information zy, ensuring that fine-
+                                                             grained object-level details receive maximal attention while                         logits + g
+        m = σ                      ,                 (7)     suppressing redundant or variant information. This gated
+                            τ
+                                                             output zd enhances both semantic consistency and percep-
+      mv = I(m > θ) + sg(m −I(m > θ)),       (8)      tual fidelity in the reconstructed images.
+
+where Fdiff and Fprod represent the element-wise differ-     3.4. Decoder with Latent Diffusion Model
+ence and product capturing disparity and similarity cues.
+                                        We employ a multimodal-conditioned denoising diffusionThe Conv(·) denotes a three-layer convolutional module
+                                                    model to learn the underlying data distribution, where visualwith ReLU activation that outputs the values of the mask,
+                                                                side information provides fine-grained details and overallas shown in Fig. 4. The g is the Gumbel noise sampled [9]
+                                                                 categorical features, while textual side information guidesfrom a uniform distribution U(0, 1), and τ is the temper-
+                                                                the denoising toward semantically consistent reconstructionature controlling the smoothness of the Gumbel–Sigmoid
+                                                                    (Fig. 4). The diffusion and denoising process is as follows:function. The θ is the hard sampling threshold, and I(·) is
+the indicator function for binary masking, sg(·) represents
+                                                                                    zt = p ˆαtzLx + p 1 −ˆαtε,           (15)the stop-gradient operation.
+  The auxiliary supervision process for the mask generator              q(zt|zt−1) = N(zt; p 1 −βtzt−1, βtI),     (16)
+is as follows:                                                                 pθ(zt−1|zt) = N(zt−1; µθ(zt, Zcond, t), βtI).    (17)
+
+                Mtext = M(Otext),                 (9)                                                              Here, (15) and (16) represent the process of forward
+           {T1, ..., Tn} = Tencoder(Mtext),         (10)     noise addition. ε ∼N(0, 1) is standard Gaussian noise,
+          {V1, ..., Vk} = Ptoken(mv ⊙zy),        (11)      t ∈{1, . . . , T} denotes the diffusion timestep, βt ∈(0, 1)
+                                                                represents the variance schedule, and ˆαt = Qti=1(1 −βi).    {P1, ..., Pn} = PMSA(T1, ..., Tn, V1, ..., Vk),    (12)
+                                                  The conditional multimodal side information is defined as
+where M represents the Object Mask. Otext is the orange     Zcond = {zd, ˆzxc, ztext}, where zd, ˆzxc, and ztext corre-
+text and Mtext is the masked text. Ptoken tokenizes the vi-     spond to fine-grained detail semantics, clustered category
+sual features. Tencoder encodes the context of masked vo-      features, and global textual information, respectively. Dur-
+cabulary to {T1, ..., Tn}, n ∈1, 2, ..., N. {V1, ..., Vk} are     ing the denoising process, a neural network µθ(·) predicts
+
+
+
+                                                     33666
+
+======================== PDF 第 6 页 ========================
+         NDIC (22′DCC)      ATN (23′WACV)       ECSIC (24′WACV)     CAMSIC (25′AAAI)      RDEIC-5 (25′TCSVT)      MDIC (Ours)
+         LDMIC (23′ICLR)      SASIC (22′CVPR)       BiSIC (24′ECCV)         Perco-20 (23′ICLR)        DiffEIC-50 (24′TCSVT)
+
+            LPIPS ↓                   FID ↓                   DISTS ↓                 KID ↓                 NIQE ↓
+       0.55                                                     250                                                            0.35
+                                                                                                                                                                                                                   0.4                                                      18
+       0.50
+  Stereo 0.450.40                                                     200150                                                            0.300.25                                                                 0.3                                                      1614
+       0.35                                                                                                                                                                                                        0.2
+       0.30                                                     100                                                            0.20                                                                                                               12 KITTI                                                                                                                                                                                                                   0.1                                                      10
+       0.25                                                      50                                                            0.15
+
+       0.20                                                                                                                                                                                                        0.0                                                       8
+
+            0.00      0.02      0.04      0.06      0.08      0.10        0.00      0.02      0.04      0.06      0.08      0.10        0.00      0.02      0.04      0.06      0.08      0.10        0.00      0.02      0.04      0.06      0.08      0.10        0.00      0.02      0.04      0.06      0.08      0.10
+
+                                                                                                                                        0.35       0.50
+                                                               200
+                                                                                                                                                                                                        0.25                                                      22
+       0.45                                                                                                                                        0.30                                                               175
+                                                                                                                                                                                                                                         20
+       0.40                                                     150                                                                                                                             0.20
+                                                                                                                                        0.25                                                                                                               18
+                                                               125       0.35
+                                                                                                                                                                                                        0.15                                                      16
+                                                               100                                                            0.20       0.30
+                                                                                                                                                                                                        0.10                                                      14   Cityscapes 0.25                                                      75                                                            0.15
+       0.20                                                      50                                                                                                                             0.05                                                      12
+                                                                25                                                            0.10                                                                                                               10
+       0.15                                                                                                                                                                                             0.00
+           0.00      0.02 Bits/pixel0.04      0.06(Bpp)0.08      0.10          0.00      0.02 Bits/pixel0.04      0.06(Bpp)0.08      0.10          0.00      0.02 Bits/pixel0.04      0.06(Bpp)0.08      0.10          0.00      0.02 Bits/pixel0.04      0.06(Bpp)0.08      0.10          0.00      0.02 Bits/pixel0.04      0.06(Bpp)0.08      0.10
+
+       Figure 6. Perception evaluation of MDIC and other DIC, SIC, and LIC methods on KITTI Stereo and Cityscapes datasets.
+
+
+the posterior mean based on the noisy input zt, the condi-      the ground-truth mask Ti over all n samples.  LVQ fol-
+tioning information Zcond, and the diffusion timestep t.        lows the standard VQ-VAE formulation, which consists of
+   After the iterative denoising process, the latent represen-     a codebook commitment term and a codebook embedding
+tation ˆz0 is obtained. We then employ a pre-trained VAE de-     term. The Rate–Distortion loss LRD is the core loss of im-
+coder Dvae to reconstruct the image from the latent space:      age compression, balancing the trade-off between bitrate
+                                                      and reconstruction quality by hyperparameter λ.  p(ˆzx) is
+                             Iˆx = Dvae(ˆz0),                 (18)      the probability distribution of ˆzx, and λmask is set to 0.1.
+
+where Iˆx denotes the reconstructed image.                                                          4. Experiments
+3.5. Loss Function                                                               4.1. Experimental Settings
+We adopt the noise prediction objective as distortion loss:
+                                                        Training Setup and Datasets. We train and evaluate our
+                                                    model on the KITTI Stereo [7] and Cityscapes [4] datasets.           Ldiff = Ez0, ϵ, t ∥ϵ −ϵθ(zt, t, Zcond)∥22  ,     (19)
+                                                         Following NDIC [20], 1576 image pairs from KITTI are
+where z0 denotes the latent representation initialized from     used for training, and 790 pairs are used for validation and
+zLx, ϵ ∼N(0, I) denotes the Gaussian noise, and zt is ob-      testing. For Cityscapes, we use 2975 image pairs for train-
+tained via the forward diffusion process in (15). The func-      ing, 500 for validation, and 1525 for testing.  All KITTI
+tion ϵθ(·) is implemented using a U-Net [28] architecture     images are center-cropped to 370×740 and then downsam-
+(Fig. 4), which consists of a downsampling encoder (D), a     pled to 128×256, while the Cityscapes images are directly
+middle block (M), and an upsampling decoder (U).              resized to the same resolution.
+  Our main function L consists of mask auxiliary loss       Our model is trained on four NVIDIA L40 GPUs with
+Lmask, vector quantization loss LVQ, and rate-distortion     a batch size of 8 using the AdamW optimizer. The learn-
+tradeoff loss LRD. They are defined as follows:                 ing rate follows a constant with a warmup schedule, where
+                                                                                             it linearly increases to 8×10−5 during the first 10000 itera-
+                       n
+                    1                                        tions and remains constant thereafter. Training is conducted
+              Lmask = X CE(Pi, Ti),           (20)                 n                                        for an average of 200 epochs per data point. During infer-
+                         i=1                                 ence, the number of diffusion steps is set to 10, and the
+  LVQ = Ezx ∥sg(zx) −ˆzx∥22 + ∥sg(ˆzx) −zx∥22  ,  (21)     hard sampling threshold θ is 0.2. We construct the vocabu-
+ LRD = EIx[λ · Eˆzx∼p(ˆzx|Ix)[−log2(p(ˆzx))] + Ldiff], (22)      lary consisting of the 14 most frequent object nouns in both
+       L = LVQ + λmask · Lmask + LRD,        (23)      datasets. Based on the Rate-Distortion tradeoff setting of
+                                                         Perco [3], we further set the hyperparameter λ to {0.1, 10}.
+where Lmask supervises the mask generator by measuring     Evaluation Metrics.  We evaluate performance using
+the cross-entropy loss between the predicted mask Pi and    LPIPS [39], FID [8], DISTS [5], KID [2], NIQE [22],
+
+
+
+                                                     33667
+
+======================== PDF 第 7 页 ========================
+           NDIC (22′DCC)      ATN (23′WACV)       ECSIC (24′WACV)     CAMSIC (25′AAAI)      RDEIC-5 (25′TCSVT)      MDIC (Ours)
+          LDMIC (23′ICLR)      SASIC (22′CVPR)       BiSIC (24′ECCV)         Perco-20 (23′ICLR)        DiffEIC-50 (24′TCSVT)
+
+   PSNR ↑ in KITTI Stereo  MS-SSIM ↑ in KITTI Stereo  mIoU ↑ in KITTI Stereo    PSNR ↑ in Cityscapes    MS-SSIM ↑ in Cityscapes    mIoU ↑ in Cityscapes
+                                                                                                                                                       32
+   24                                                                                                                                                                                                                                                                                           0.70                                                                                                                  0.70                                                                                                                                                                                                        14                                                                                                                                                       30
+   22                                               10
+                                                                                                                                                                                                                                                                                           0.65                                                                                                                                                       28                                                                                                                                                                                                        12                                                                                                                  0.65
+   20
+                                                                                                                                                       26                                                     8                                                                                                                                                                                                                                                                                           0.60                                                                                                                                                                                                        10                                                                                                                  0.60
+   18
+                                                                                                                                                       24                                                                                                                                                                                                                                                                                           0.55                                                                                                                                                                                                         8                                                                                                                  0.55                                                     6   16                                                                                                                                                       22
+                                                                                                                                                                                                                                                                                           0.50
+                                                                                                                                                                                                         6                                                                                                                  0.50   14                                                                                                                                                       20
+                                                     4                                                                                                                                                                                                                                                                                           0.45
+                                                                                                                                                                                                         4                                                                                                                                                       18   12                                                                                                                  0.45
+   10                                                2                                                                                                16                                                2                                                    0.40
+       0.00     0.02     0.04     0.06     0.08     0.10       0.00     0.02     0.04     0.06     0.08     0.10       0.00     0.02     0.04     0.06     0.08     0.10        0.00    0.02    0.04    0.06    0.08    0.10          0.00    0.02    0.04    0.06    0.08    0.10          0.00    0.02    0.04    0.06    0.08    0.10
+         Bits/pixel (Bpp)              Bits/pixel (Bpp)              Bits/pixel (Bpp)              Bits/pixel (Bpp)              Bits/pixel (Bpp)              Bits/pixel (Bpp)
+
+        Figure 7. Distortion evaluation of MDIC and other DIC, SIC, and LIC methods on KITTI Stereo and Cityscapes datasets.
+
+
+ Ground Truth                                            ATN
+
+
+
+
+
+  (Bpp↓, PSNR↑, LPIPS↓)    (Bpp↓, PSNR↑, LPIPS↓)    (Bpp↓, PSNR↑, LPIPS↓)     (0.0316, 23.99, 0.4287)      (0.0401, 22.36, 0.3673)      (0.0248, 28.16, 0.2776)
+
+  BiSIC                                                                     Perco
+
+
+
+
+
+   (0.0288, 23.61, 0.4373)      (0.0408, 21.83, 0.4101)      (0.0460, 27.19, 0.3214)      (0.0313, 17.85, 0.4385)      (0.0313, 15.16, 0.4171)      (0.0313, 18.17, 0.3777)
+
+ RDEIC                                                            Ours
+
+
+
+
+
+   (0.0188, 12.71, 0.5445)      (0.0212, 12.61, 0.5660)      (0.0425, 20.21, 0.3888)      (0.0107, 22.56, 0.2524)      (0.0201, 20.41, 0.2420)      (0.0207, 24.61, 0.1663)
+
+Figure 8. Visualization results on KITTI Stereo and Cityscapes datasets. Each row compares two methods (three images per method).
+Numbers below the images indicate (Bpp, PSNR, LPIPS). Ground Truth includes symbol conventions: ↑=higher better, ↓=lower better.
+
+
+as well as PSNR [12] and MS-SSIM [31]. To assess the     methods, all of which take multi-view images as input for
+object-level semantic consistency, we further employ the     compression and reconstruction. Since our work is the first
+mean Intersection over Union (mIoU) metric [18]. PSNR      to introduce a perceptually optimized diffusion-based archi-
+and MS-SSIM serve as the primary distortion metrics in      tecture into DIC, we further include benchmark perception-
+DIC, whereas LPIPS, FID, KID, NIQE, and DISTS are      oriented LIC methods for comparison.
+commonly used to assess the perceptual realism.  Since      As shown in Fig. 6, MDIC achieves the best performance
+low-level distortion metrics become less meaningful at ex-     across all perceptual quality metrics in the KITTI Stereo
+tremely low bitrates [3], and our DIC framework is primar-     and Cityscapes datasets, significantly surpassing previous
+ily designed for such low-rate scenarios, perceptual quality    DIC approaches. Even when compared with joint coding
+metrics are adopted as the main evaluation criteria.            schemes in SIC, MDIC demonstrates notable improvements
+Baselines.  We reimplement NDIC [20], LDMIC [40],      in perceptual quality.  Moreover, perception-oriented LIC
+and ATN [21], where LDMIC [40] is commonly used as     methods, despite the absence of side information, still per-
+a representative DIC baseline. For comparison with joint     form competitively on most perceptual metrics. This is be-
+coding approaches, we include SASIC [33], ECSIC [34],     cause perceptual optimization aims to align the distribu-
+CAMSIC [41], and BiSIC [17]. To further compare with      tion of the reconstructed image with that of the original
+diffusion-based image compression frameworks, we evalu-     one, rather than ensuring pixel-wise fidelity. To compre-
+ate Perco [3], DiffEIC [14], and RDEIC [15], among which     hensively assess the effectiveness of our method, we fur-
+Perco serves as a baseline in LIC methods based on pre-      ther compare it with existing approaches using distortion
+trained latent diffusion models.                                  metrics. As illustrated in Fig. 7, our method achieves the
+                                                               highest MS-SSIM and mIoU on the KITTI Stereo dataset.
+4.2. Main Results
+                                                       Although MDIC achieves a lower PSNR than distortion-
+Comparisons With State-of-the-art (SOTA) Methods.      oriented methods,  it attains a comparable mIoU to the
+We compare the proposed MDIC with SOTA DIC and SIC      best of them, demonstrating its effectiveness in preserving
+
+
+
+                                                     33668
+
+======================== PDF 第 8 页 ========================
+object-level details. Our distortion metrics significantly out-      Table 2. The ablation of the mask-gate G1 and G2. Symbol con-
+perform other diffusion-based LIC methods, demonstrating      vention: ↑=higher better.
+its superior ability to maintain semantic consistency. More-
+over, at extremely low bitrates, conventional distortion met-      Method                      BD-Quality ↑
+rics become less meaningful [3].                                            LPIPS DISTS PSNR MS-SSIM
+Visualize comparisons. As illustrated in Fig. 8, we provide
+                                             MDIC w/o (G1 + G2) -0.0437 -0.0050 -0.5979  -0.4491
+qualitative visual comparisons among various methods. At                                             MDIC w/o G2        -0.0106 -0.0045 -0.2864  -0.2595
+extremely low bitrates, existing DIC methods, such as ATN,     MDIC (Ours)           0      0      0       0
+tend to suffer from severe local or even global blurring,
+which significantly degrades perceptual quality. Although
+joint coding approaches like BiSIC can partially alleviate
+                                                                    features. To further provide an intuitive understanding of
+this issue, they often introduce noticeable local distortions
+                                                                the impact of our gating mechanism, Fig. 9 presents visual
+and artifact patterns.  Diffusion-based LIC methods, such
+                                                         comparisons between two ablated variants and the MDIC. It
+as Perco and RDEIC, on the other hand, effectively reduce
+                                                                              is clear that incorporating the gating mechanism facilitates
+blurring but frequently produce locally inconsistent seman-
+                                                   more accurate reconstruction of object boundaries and en-
+tics due to the lack of fine-grained alignment. In contrast,
+                                                         hances consistency between category-level and fine-grained
+the proposed MDIC effectively avoids these problems. Ben-
+                                                          semantic details.
+efiting from fine-grained perception and multimodal align-
+ment strategies, our method achieves superior perceptual
+                                                                  Ground Truth     w/o G1+G2        w/o G2       MDIC
+quality with consistent semantics across both global and lo-          Bpp / DISTS             0.0572/0.1613            0.0560/0.1649            0.0552/0.1576
+cal regions.
+
+4.3. Ablation Studies
+
+Side information ˆzxc and zd. As shown in Table 1, we
+conduct ablation experiments on two types of image side
+information. When the fine-grained semantic information
+zd is removed, the diffusion model tends to generate object
+details (e.g., color or contour) that are inconsistent with the
+original image. This leads to a noticeable drop in pixel-level
+                                                                                         Bpp / DISTS             0.0522/0.1406            0.0539/0.1470            0.0516/0.1252
+fidelity, while having relatively little effect on perceptual
+consistency. When the category feature information ˆzxc is
+missing, the diffusion model can only generate content from
+a limited set of categories. Under extremely low bitrates, the      Figure 9. The visual comparison results after ablating the G1 and
+absence of sufficient categories severely affects both global    G2 in MG-SISM.
+and local reconstruction quality of the generated images.
+
+                                                                Additional experimental results on complexity, hyperpa-Table 1. Ablation study of ˆzxc and zd. BD-Quality denotes the av-
+                                                               rameters, and the role of multimodal side information areerage changes of various quality metrics compared with the MDIC
+baseline at identical bitrates. Higher is better (↑).                   provided in the Supplementary Material.
+
+                              BD-Quality ↑                5. Conclusion Method
+                  LPIPS  DISTS  PSNR MS-SSIM
+                                                              In this paper, we propose an innovative Multimodal Dis-
+ MDIC w/o (zd + ˆzxc)  -0.3550  -0.1826  -8.6358   -6.5115         tributed Image Compression (MDIC) framework that lever-
+ MDIC w/o zd         -0.1179  -0.0489  -2.8161   -3.1127        ages multimodal side information and decodes compressed
+ MDIC (Ours)           0       0      0        0                                                                      latent representations with a pre-trained text-to-image dif-
+                                                              fusion model. A text-supervised visual mask restores cate-
+The G1 and G2 in MG-SISM. As shown in Table 2, we     gory semantics lost in VQ-VAE compression and extracts
+perform ablation experiments on the G1 and G2 compo-      fine-grained details from visual side information, ensur-
+nents within the MG-SISM to validate the effectiveness of     ing semantically faithful reconstruction. Extensive exper-
+our mask-gating mechanism. The results demonstrate that     iments demonstrate clear perceptual advantages over exist-
+applying mask gating enables the model to better exploit     ing multi-view coding and diffusion-based methods. In the
+visual side information during reconstruction, while effec-      future, we will investigate stronger multi-view correlations
+tively suppressing redundant and inconsistent multi-view     and unified pre-trained decoders.
+
+
+
+                                                     33669
+
+======================== PDF 第 9 页 ========================
+Acknowledgement                                            [12]  Jari Korhonen and Junyong You. Peak signal-to-noise ratio
+                                                                                    revisited: Is simple beautiful? In 2012 Fourth International
+This work is partially supported by the Hubei Province                                                               Workshop on Quality of Multimedia Experience, pages 37–
+Major  Science  and  Technology  Innovation  Program                                                                           38, 2012. 3, 7
+(2024BAA011),  the Key  Research  and  Development
+                                                                     [13] Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi.
+Program of Hubei Province (2025BEB012, 2023BAB016).
+                                                                             Blip-2:  Bootstrapping language-image pre-training with
+                                                                         frozen image encoders and large language models.  In In-
+                                                                             ternational Conference on Machine Learning, pages 19730–
+References                                                      19742. PMLR, 2023. 3, 4
+ [1] Sharon Ayzik and Shai Avidan. Deep image compression      [14] Zhiyuan Li, Yanhui Zhou, Hao Wei, Chenyang Ge, and Jing-
+     using decoder side information. In European Conference on         wen Jiang. Towards extreme image compression with latent
+    Computer Vision, pages 699–714. Springer, 2020. 2                    feature guidance and diffusion prior. IEEE Transactions on
+                                                                              Circuits and Systems for Video Technology, 2024. 2, 3, 7 [2] Mikołaj Bi´nkowski, Danica J Sutherland, Michael Arbel, and
+     Arthur Gretton.  Demystifying mmd gans.  arXiv preprint      [15] Zhiyuan Li, Yanhui Zhou, Hao Wei, Chenyang Ge, and Aj-
+     arXiv:1801.01401, 2018. 6                                    mal Mian. Rdeic: Accelerating diffusion-based extreme im-
+                                                                   age compression with relay residual diffusion. IEEE Trans- [3] Marlene Careil, Matthew J Muckley, Jakob Verbeek, and
+                                                                           actions on Circuits and Systems for Video Technology, pages     St´ephane Lathuili`ere. Towards image compression with per-
+                                                                       1–1, 2025. 2, 3, 7      fect realism at ultra-low bitrates. In The Twelfth International
+     Conference on Learning Representations, 2023. 2, 3, 6, 7, 8      [16] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays,
+                                                                              Pietro Perona, Deva Ramanan, Piotr Doll´ar, and C Lawrence [4] Marius Cordts, Mohamed Omran, Sebastian Ramos, Timo
+                                                                               Zitnick.  Microsoft coco: Common objects in context.  In     Rehfeld,  Markus  Enzweiler,  Rodrigo  Benenson, Uwe
+                                                                European Conference on Computer Vision, pages 740–755.     Franke, Stefan Roth, and Bernt Schiele.  The cityscapes
+                                                                             Springer, 2014. 2      dataset for semantic urban scene understanding. In Proceed-
+     ings of the IEEE Conference on Computer Vision and Pattern      [17] Zhening Liu, Xinjie Zhang, Jiawei Shao, Zehong Lin, and
+     Recognition, pages 3213–3223, 2016. 6                            Jun Zhang.  Bidirectional stereo image compression with
+                                                                         cross-dimensional entropy model. In European Conference [5] Keyan Ding, Kede Ma, Shiqi Wang, and Eero P Simoncelli.
+                                                              on Computer Vision, pages 480–496. Springer, 2024. 2, 3, 7    Image quality assessment: Unifying structure and texture
+      similarity. IEEE Transactions on Pattern Analysis and Ma-      [18] Jonathan Long, Evan Shelhamer, and Trevor Darrell. Fully
+     chine Intelligence, 44(5):2567–2581, 2020. 6                          convolutional networks for semantic segmentation. In Pro-
+                                                                       ceedings of the IEEE Conference on Computer Vision and [6] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov,
+                                                                           Pattern Recognition, pages 3431–3440, 2015. 7     Dirk Weissenborn,  Xiaohua  Zhai, Thomas  Unterthiner,
+     Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-      [19] Yiyang Ma, Wenhan Yang, and Jiaying Liu.  Correcting
+     vain Gelly, Jakob Uszkoreit, and Neil Houlsby. An image is           diffusion-based perceptual image compression with privi-
+     worth 16x16 words: Transformers for image recognition at           leged end-to-end decoder. 2024. 2
+      scale. In 9th International Conference on Learning Repre-      [20] Nitish Mital, Ezgi ¨Ozyılkan, Ali Garjani, and Deniz G¨und¨uz.
+      sentations, 2021. 5                                               Neural distributed image compression using common in-
+ [7] Andreas Geiger, Philip Lenz, and Raquel Urtasun. Are we           formation.  In 2022 Data Compression Conference (DCC),
+     ready for autonomous driving?  the kitti vision benchmark          pages 182–191. IEEE, 2022. 1, 2, 3, 6, 7
+      suite.  In 2012 IEEE Conference on Computer Vision and      [21] Nitish Mital, Ezgi ¨Ozyilkan, Ali Garjani, and Deniz G¨und¨uz.
+     Pattern Recognition, pages 3354–3361, 2012. 6                     Neural distributed image compression with cross-attention
+ [8] Martin Heusel,  Hubert Ramsauer, Thomas  Unterthiner,            feature alignment.  In Proceedings of the IEEE/CVF Win-
+     Bernhard Nessler, and Sepp Hochreiter. Gans trained by a             ter Conference on Applications of Computer Vision, pages
+    two time-scale update rule converge to a local nash equilib-          2498–2507, 2023. 1, 2, 3, 7
+     rium. Advances in Neural Information Processing Systems,      [22] Anish Mittal, Rajiv Soundararajan, and Alan C Bovik. Mak-
+     30, 2017. 6                                                         ing a “completely blind” image quality analyzer. IEEE Sig-
+ [9] Eric Jang,  Shixiang Gu, and Ben Poole.   Categorical           nal Processing Letters, 20(3):209–212, 2012. 6
+     reparameterization with gumbel-softmax.   arXiv preprint      [23] Guy Ohayon, Hila Manor, Tomer Michaeli, and Michael
+     arXiv:1611.01144, 2016. 5                                           Elad. Compressed image generation with denoising diffusion
+[10] Xuhao Jiang, Weimin Tan, Tian Tan, Bo Yan, and Liquan          codebook models. In Forty-second International Conference
+     Shen. Multi-modality deep network for extreme learned im-         on Machine Learning, 2025. 2
+     age compression. In Proceedings of the AAAI Conference on      [24] Ya Qiao, Yongqi Zhai, and Ronggang Wang. Bssic: Stereo
+      Artificial Intelligence, pages 1033–1041, 2023. 2                   image compression based on block shift.  In 2024 Interna-
+[11] Anle Ke, Xu Zhang, Tong Chen, Ming Lu, Chao Zhou, Ji-            tional Joint Conference on Neural Networks (IJCNN), pages
+    awen Gu, and Zhan Ma.  Ultra lowrate image compression           1–7. IEEE, 2024. 3
+     with semantic residual coding and compression-aware dif-      [25] Shi-Yu Qin, Bin Chen, Yu-Jun Huang, Bao-Yi An, Tao Dai,
+      fusion.  In International Conference on Machine Learning.          and Shu-Tao Xia. Perceptual image compression with textual
+    PMLR, 2025. 2                                                        side information. Pattern Recognition, 169:111848, 2026. 2
+
+
+
+                                                     33670
+
+======================== PDF 第 10 页 ========================
+[26] Alec Radford, Jong Wook Kim,  Chris Hallacy, Aditya          deep features as a perceptual metric. In Proceedings of the
+    Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,         IEEE Conference on Computer Vision and Pattern Recogni-
+    Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learn-             tion, pages 586–595, 2018. 6
+     ing transferable visual models from natural language super-      [40] Xinjie Zhang,  Jiawei Shao, and Jun Zhang.   Ldmic:
+      vision.  In International Conference on Machine Learning,           Learning-based distributed multi-view image coding. In In-
+     pages 8748–8763. PMLR, 2021. 4                                     ternational Conference on Learning Representations, 2023.
+[27] Robin Rombach, Andreas Blattmann, Dominik Lorenz,             1, 2, 3, 7
+      Patrick Esser, and Bj¨orn Ommer.  High-resolution image      [41] Xinjie Zhang, Shenyuan Gao, Zhening Liu, Jiawei Shao,
+     synthesis with latent diffusion models.  In Proceedings of          Xingtong Ge, Dailan He, Tongda Xu, Yan Wang, and Jun
+     the IEEE/CVF Conference on Computer Vision and Pattern          Zhang.  Camsic: Content-aware masked image modeling
+     Recognition, pages 10684–10695, 2022. 4                            transformer for stereo image compression. In Proceedings of
+[28] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-            the AAAI Conference on Artificial Intelligence, pages 10239–
+      net: Convolutional networks for biomedical image segmen-          10247, 2025. 2, 3, 7
+      tation. In International Conference on Medical Image Com-      [42] Lingyu Zhu, Xiangrui Zeng, Bolin Chen, Peilin Chen, Yung-
+     puting and Computer-Assisted Intervention, pages 234–241.         Hui Li, and Shiqi Wang. Leveraging diffusion knowledge for
+     Springer, 2015. 6                                                     generative image compression with fractal frequency-aware
+[29] David Slepian and Jack Wolf. Noiseless coding of correlated          band learning. arXiv preprint arXiv:2503.11321, 2025. 2
+     information sources. IEEE Transactions on Information The-
+      ory, 19(4):471–480, 1973. 1, 3
+[30] Aaron Van Den Oord, Oriol Vinyals, et al. Neural discrete
+     representation learning.  Advances in Neural Information
+     Processing Systems, 30, 2017. 2, 3, 4
+[31] Zhou Wang, Eero P Simoncelli, and Alan C Bovik. Mul-
+      tiscale structural similarity for image quality assessment. In
+    The Thrity-seventh Asilomar Conference on Signals, Systems
+   & Computers, 2003, pages 1398–1402. IEEE, 2003. 3, 7
+[32] Jay Whang, Alliot Nagle, Anish Acharya, Hyeji Kim, and
+     Alexandros G. Dimakis. Neural distributed source coding.
+    IEEE Journal on Selected Areas in Information Theory, 5:
+     493–508, 2024. 1, 3, 4
+[33] Matthias W¨odlinger, Jan Kotera, Jan Xu, and Robert Sab-
+      latnig.  Sasic: Stereo image compression with latent shifts
+     and stereo attention. In Proceedings of the IEEE/CVF Con-
+     ference on Computer Vision and Pattern Recognition, pages
+     661–670, 2022. 3, 7
+[34] Matthias W¨odlinger, Jan Kotera, Manuel Keglevic, Jan Xu,
+     and Robert Sablatnig.  Ecsic: Epipolar cross attention for
+      stereo image compression. In Proceedings of the IEEE/CVF
+     Winter Conference on Applications of Computer Vision,
+     pages 3436–3445, 2024. 3, 7
+[35] Aaron Wyner and Jacob Ziv. The rate-distortion function for
+     source coding with side information at the decoder. IEEE
+     Transactions on Information Theory, 22(1):1–10, 2003. 1, 3
+[36] Ruihan Yang and Stephan Mandt. Lossy image compression
+     with conditional diffusion models. Advances in Neural In-
+     formation Processing Systems, 36:64971–64995, 2023. 2
+[37] Selim F Yilmaz, Ezgi Ozyilkan, Deniz G¨und¨uz, and Elza
+     Erkip.  Distributed deep joint source-channel coding with
+     decoder-only side information. In 2024 IEEE International
+     Conference on Machine Learning for Communication and
+     Networking (ICMLCN), pages 139–144. IEEE, 2024. 1
+[38] Yankai Yin, Zhe Sun, Peiying Ruan, Ruidong Li, and Feng
+     Duan. Learned distributed image compression with decoder
+      side information. Digital Communications and Networks, 11
+     (2):349–358, 2025. 1, 2
+[39] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shecht-
+     man, and Oliver Wang. The unreasonable effectiveness of
+
+
+
+                                                    33671
